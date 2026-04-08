@@ -25,32 +25,610 @@
 # STATUS VALUES: active | deprecated | superseded-by: TR-[system]-NNN
 
 version: 1
-last_updated: ""
+last_updated: "2026-04-08"
 
-requirements: []
+requirements:
 
-# --- EXAMPLE ENTRIES (remove when first real entries are added) ---
-#
-# - id: TR-combat-001
-#   system: combat
-#   gdd: design/gdd/combat-system.md
-#   requirement: "Player takes damage from enemies based on attack power minus defence"
-#   created: 2026-03-10
-#   revised: ""
-#   status: active
-#
-# - id: TR-combat-002
-#   system: combat
-#   gdd: design/gdd/combat-system.md
-#   requirement: "Combo window timing is 0.4 seconds between hits"
-#   created: 2026-03-10
-#   revised: "2026-04-01"
-#   status: active
-#
-# - id: TR-combat-003
-#   system: combat
-#   gdd: design/gdd/combat-system.md
-#   requirement: "Old damage formula using raw stats"
-#   created: 2026-03-10
-#   revised: ""
-#   status: superseded-by: TR-combat-001
+# ===== E2: Difficulty System =====
+
+- id: TR-difficulty-001
+  system: difficulty
+  gdd: design/gdd/difficulty-system.md
+  requirement: "DifficultyConfig ScriptableObject holds all 6 multipliers (statMin, statMax, enemyCount, healDrop, pacing, reward) editable in Inspector without code changes"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-difficulty-002
+  system: difficulty
+  gdd: design/gdd/difficulty-system.md
+  requirement: "Systems query IDifficultyProvider interface rather than checking difficulty enum directly"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-difficulty-003
+  system: difficulty
+  gdd: design/gdd/difficulty-system.md
+  requirement: "Hard mode for a room is locked until player clears that room on Normal; unlock state derived from LevelStats save data"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-difficulty-004
+  system: difficulty
+  gdd: design/gdd/difficulty-system.md
+  requirement: "Enemy count scaling: Ceil(baseCount * enemyCountMultiplier); extra enemies round-robin across spawn points"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-difficulty-005
+  system: difficulty
+  gdd: design/gdd/difficulty-system.md
+  requirement: "Healing drop rate multiplied by healDropMultiplier; non-healing drops unaffected"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-difficulty-006
+  system: difficulty
+  gdd: design/gdd/difficulty-system.md
+  requirement: "Spawn pacing: actualDelay = baseDelay * pacingMultiplier; affects inter-wave delay only"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-difficulty-007
+  system: difficulty
+  gdd: design/gdd/difficulty-system.md
+  requirement: "Reward scaling: Ceil(baseReward * rewardMultiplier); applies to enemy kills, boss drops, room-clear bonuses; shop prices unaffected"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-difficulty-008
+  system: difficulty
+  gdd: design/gdd/difficulty-system.md
+  requirement: "Boss enemies (tagged isBoss in EnemyData) are exempt from enemy count scaling"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-difficulty-009
+  system: difficulty
+  gdd: design/gdd/difficulty-system.md
+  requirement: "Difficulty cannot be changed mid-room; set per-room before entering"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-difficulty-010
+  system: difficulty
+  gdd: design/gdd/difficulty-system.md
+  requirement: "Performance: Room 1 Hard with max concurrent enemies must not drop below 30 FPS on minimum-spec target hardware"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-difficulty-011
+  system: difficulty
+  gdd: design/gdd/difficulty-system.md
+  requirement: "Endless Mode uses separate EndlessDifficultyConfig with wave-based scaling; SpawnManager checks active mode and reads corresponding config"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+# ===== N1: Archer Character =====
+
+- id: TR-archer-001
+  system: archer
+  gdd: design/gdd/archer-character.md
+  requirement: "Add Archer to PlayerClassType enum; create ArcherPlayerController : PlayerController with InitAttributes() and GetClassType()"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-archer-002
+  system: archer
+  gdd: design/gdd/archer-character.md
+  requirement: "ArrowShotSkill : UpgradableSkill with 0.5s cooldown, 0.6x Attack damage, speed 18 projectile, auto-aim at nearest enemy"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-archer-003
+  system: archer
+  gdd: design/gdd/archer-character.md
+  requirement: "DodgeRollSkill : UpgradableSkill with 2.0 unit distance, 0.2s i-frames, movement-direction roll, wall-blocking"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-archer-004
+  system: archer
+  gdd: design/gdd/archer-character.md
+  requirement: "I-frames block ALL damage sources and status effect application during the 0.2s window"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-archer-005
+  system: archer
+  gdd: design/gdd/archer-character.md
+  requirement: "Archer base stats in GamePlayDatabase ScriptableObject: HP 75, Attack 80, AttackRange 10, MoveSpeed 3.6, Defense 3, CritChance 0.08"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-archer-006
+  system: archer
+  gdd: design/gdd/archer-character.md
+  requirement: "Shared skill pool filtered by CanApplyUpgrade() compatibleUpgradeTypes; Mage-only skills excluded from Archer draft pool and vice versa"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-archer-007
+  system: archer
+  gdd: design/gdd/archer-character.md
+  requirement: "7 new archer-exclusive skills: PiercingArrow, Multishot, PoisonArrow, Afterimage, CounterRoll, Quickdraw, EagleEye"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-archer-008
+  system: archer
+  gdd: design/gdd/archer-character.md
+  requirement: "Refactor DashSkill to cast to PlayerController or ICharacterClass instead of MagePlayerController"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-archer-009
+  system: archer
+  gdd: design/gdd/archer-character.md
+  requirement: "DraftRunController filters draft options by class compatibility using CanApplyUpgrade() against player collected skills"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-archer-010
+  system: archer
+  gdd: design/gdd/archer-character.md
+  requirement: "Afterimage decoy: 1 HP, 2s duration, draws enemy aggro, destroyed by any hit"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-archer-011
+  system: archer
+  gdd: design/gdd/archer-character.md
+  requirement: "CharacterDatabase extended with Archer entry; localization for all 11 locales"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-archer-012
+  system: archer
+  gdd: design/gdd/archer-character.md
+  requirement: "No MagePlayerController casts in shared code; all must use PlayerController or ICharacterClass"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+# ===== E3: Boss Phase System =====
+
+- id: TR-boss-001
+  system: boss
+  gdd: design/gdd/boss-phase-system.md
+  requirement: "BossController : EnemyController subclass with List<BossPhase> configurable in Inspector"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-boss-002
+  system: boss
+  gdd: design/gdd/boss-phase-system.md
+  requirement: "Phase check hooks into Health.OnDamaged event (not Update); checks phases sorted by threshold ascending"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-boss-003
+  system: boss
+  gdd: design/gdd/boss-phase-system.md
+  requirement: "Multi-threshold skip: single massive hit triggers all skipped phases in sequence, each with 0.5s stagger"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-boss-004
+  system: boss
+  gdd: design/gdd/boss-phase-system.md
+  requirement: "Stagger state: 0.5s invulnerable, clears all debuffs via StateMachine.ResetState(), swaps BehaviourTree, applies stat modifiers, plays VFX"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-boss-005
+  system: boss
+  gdd: design/gdd/boss-phase-system.md
+  requirement: "Phases are one-way; healing a boss does not reverse triggered phases"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-boss-006
+  system: boss
+  gdd: design/gdd/boss-phase-system.md
+  requirement: "EnemyData.isBoss flag replaces all tag/name-based boss detection in SpawnManager, OneShotKillEffect, DraftRunController"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-boss-007
+  system: boss
+  gdd: design/gdd/boss-phase-system.md
+  requirement: "4 new ability templates as MonoBehaviours: GroundSlam, Charge, ShieldPhase, RainOfFire"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-boss-008
+  system: boss
+  gdd: design/gdd/boss-phase-system.md
+  requirement: "5 unique bosses: Stone Guardian (melee), Dark Sorcerer (ranged), Necromancer (summoner), War Chief (tank), Lich King (all-rounder)"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-boss-009
+  system: boss
+  gdd: design/gdd/boss-phase-system.md
+  requirement: "Rooms 1-5: 2-phase bosses; Rooms 6-10: 3-phase bosses"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-boss-010
+  system: boss
+  gdd: design/gdd/boss-phase-system.md
+  requirement: "Summoned minions persist after boss death; room does not clear until all enemies dead"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-boss-011
+  system: boss
+  gdd: design/gdd/boss-phase-system.md
+  requirement: "Shield Phase blocks damage but NOT status effects; shield destroyed by hit counter"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-boss-012
+  system: boss
+  gdd: design/gdd/boss-phase-system.md
+  requirement: "Fix DraftRunController.OnRunComplete() to detect actual boss kill via IBossPhaseController.OnBossDefeated event instead of hardcoding true"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-boss-013
+  system: boss
+  gdd: design/gdd/boss-phase-system.md
+  requirement: "Boss death during stagger must process immediately; death takes priority over phase transition"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-boss-014
+  system: boss
+  gdd: design/gdd/boss-phase-system.md
+  requirement: "IBossPhaseController interface: CurrentPhaseIndex, TotalPhases, IsInStagger, OnPhaseTransition event, OnBossDefeated event"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+# ===== E4: Combo/Synergy Expansion =====
+
+- id: TR-combo-001
+  system: combo
+  gdd: design/gdd/combo-synergy-expansion.md
+  requirement: "ComboEffect abstract ScriptableObject base class with Activate(PlayerController), Deactivate(), OnTrigger(TriggerContext)"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-combo-002
+  system: combo
+  gdd: design/gdd/combo-synergy-expansion.md
+  requirement: "18 concrete ComboEffect implementations: 5 Mage-exclusive, 6 Archer-exclusive, 7 Universal"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-combo-003
+  system: combo
+  gdd: design/gdd/combo-synergy-expansion.md
+  requirement: "4 trigger conditions (OnDraft, OnSkillUse, OnKill, Passive) implemented via event subscription, not per-frame polling"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-combo-004
+  system: combo
+  gdd: design/gdd/combo-synergy-expansion.md
+  requirement: "ComboRegistry.CheckCombos() runs after each draft pick; activates ComboEffect on discovery"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-combo-005
+  system: combo
+  gdd: design/gdd/combo-synergy-expansion.md
+  requirement: "Combo discovery UI: gold text flash (Cinzel font, center screen, 2s fade) with distinct SFX"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-combo-006
+  system: combo
+  gdd: design/gdd/combo-synergy-expansion.md
+  requirement: "discoveredFlag persisted per-combo in save data; tracks lifetime discovery across campaign and Endless"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-combo-007
+  system: combo
+  gdd: design/gdd/combo-synergy-expansion.md
+  requirement: "Combos reset on run end; ComboEffect.Deactivate() called, effects do not persist between runs"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-combo-008
+  system: combo
+  gdd: design/gdd/combo-synergy-expansion.md
+  requirement: "Executioner combo: instant kill on slowed enemies below 25% HP, MUST be boss-immune via EnemyData.isBoss check"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-combo-009
+  system: combo
+  gdd: design/gdd/combo-synergy-expansion.md
+  requirement: "Elemental Storm: 30% bonus damage on Burn+Freeze targets, resets after 5 hits per target (resolved bug B4)"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-combo-010
+  system: combo
+  gdd: design/gdd/combo-synergy-expansion.md
+  requirement: "Performance budget: < 0.5ms/frame total for all active combo effects"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-combo-011
+  system: combo
+  gdd: design/gdd/combo-synergy-expansion.md
+  requirement: "TriggerContext struct is stack-allocated (zero heap allocation per trigger event)"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-combo-012
+  system: combo
+  gdd: design/gdd/combo-synergy-expansion.md
+  requirement: "ComboDefinition extended with comboCategory, triggerCondition, triggerEffect SO reference, discoveredFlag"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+# ===== E1: Room Content =====
+
+- id: TR-room-001
+  system: room
+  gdd: design/gdd/room-content.md
+  requirement: "10 RoomConfig ScriptableObjects: each stores wave lists, trap placements, boss assignment, archetype tag"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-room-002
+  system: room
+  gdd: design/gdd/room-content.md
+  requirement: "4 room archetypes (Swarm, Ambush, Gauntlet, Arena) + Hybrid; implemented as RoomArchetype enum"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-room-003
+  system: room
+  gdd: design/gdd/room-content.md
+  requirement: "Hard mode derived automatically from Normal baseline via IDifficultyProvider multipliers; no per-difficulty room authoring"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-room-004
+  system: room
+  gdd: design/gdd/room-content.md
+  requirement: "Minimum arena size: 20x20 units (Swarm/Ambush), 30x20 (Gauntlet), 25x25 (Arena)"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-room-005
+  system: room
+  gdd: design/gdd/room-content.md
+  requirement: "Spawn point minimum: 4 per room (cardinal directions); Swarm rooms need 6-8"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-room-006
+  system: room
+  gdd: design/gdd/room-content.md
+  requirement: "Trap coverage max 15% of navigable floor area; at least one safe path must exist"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-room-007
+  system: room
+  gdd: design/gdd/room-content.md
+  requirement: "Every room has at least one 8-unit clear lane for Archer kiting"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-room-008
+  system: room
+  gdd: design/gdd/room-content.md
+  requirement: "Room replay is deterministic: same enemy types, spawn points, traps on every replay"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-room-009
+  system: room
+  gdd: design/gdd/room-content.md
+  requirement: "Room clear time targets: Room 1 ~105s, Room 10 ~240s on Normal; Hard adds 30-50%"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-room-010
+  system: room
+  gdd: design/gdd/room-content.md
+  requirement: "Wave composition per-wave: each WaveDefinition stores List<SpawnItemInfo> with enemy type, count, delay"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-room-011
+  system: room
+  gdd: design/gdd/room-content.md
+  requirement: "Boss spawns after final wave is cleared; no dead time between wave clear and boss spawn"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+# ===== N2: Endless Mode =====
+
+- id: TR-endless-001
+  system: endless
+  gdd: design/gdd/endless-mode.md
+  requirement: "EndlessDifficultyConfig ScriptableObject with wave-based scaling formulas: stat, healDrop, pacing, reward"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-endless-002
+  system: endless
+  gdd: design/gdd/endless-mode.md
+  requirement: "Enemy count formula: enemyCount(wave) = 4 + Floor(wave * 0.5)"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-endless-003
+  system: endless
+  gdd: design/gdd/endless-mode.md
+  requirement: "Elite ratio formula: eliteRatio(wave) = Min(0.50, wave * 0.02)"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-endless-004
+  system: endless
+  gdd: design/gdd/endless-mode.md
+  requirement: "Enemy type introduction: enemyTypeCount(wave) = Min(5, 1 + Floor(wave/5))"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-endless-005
+  system: endless
+  gdd: design/gdd/endless-mode.md
+  requirement: "Skill draft every 5 waves via DraftRunController.ShowDraft(); class filtering applies"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-endless-006
+  system: endless
+  gdd: design/gdd/endless-mode.md
+  requirement: "Boss wave every 10 waves: cycle A-E (2-phase only in Endless), cycle restarts at wave 60+"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-endless-007
+  system: endless
+  gdd: design/gdd/endless-mode.md
+  requirement: "3s breathing window between waves"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-endless-008
+  system: endless
+  gdd: design/gdd/endless-mode.md
+  requirement: "Single 30x30 unit arena, Arena archetype, no traps, 6 spawn points"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-endless-009
+  system: endless
+  gdd: design/gdd/endless-mode.md
+  requirement: "Score = waves cleared; per-class leaderboard (Mage/Archer tracked separately) persisted via LevelStats with synthetic IDs"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-endless-010
+  system: endless
+  gdd: design/gdd/endless-mode.md
+  requirement: "No mid-run save; quitting = run lost; runs are 10-15 minutes"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-endless-011
+  system: endless
+  gdd: design/gdd/endless-mode.md
+  requirement: "SpawnManager reads EndlessDifficultyConfig in Endless mode, NOT campaign DifficultyConfig; mode set at Endless entry"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-endless-012
+  system: endless
+  gdd: design/gdd/endless-mode.md
+  requirement: "Performance: wave 30+ with 19+ enemies must maintain <16.6ms PC frame time, <33ms mobile"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-endless-013
+  system: endless
+  gdd: design/gdd/endless-mode.md
+  requirement: "EndlessSessionController coordinates wave loop: wave counter, draft timing, boss cycling, score tracking"
+  created: 2026-04-08
+  revised: ""
+  status: active
+
+- id: TR-endless-014
+  system: endless
+  gdd: design/gdd/endless-mode.md
+  requirement: "Death screen shows: waves cleared, total kills, combos discovered, class used"
+  created: 2026-04-08
+  revised: ""
+  status: active
