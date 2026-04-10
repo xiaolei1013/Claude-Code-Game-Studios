@@ -3,7 +3,7 @@
 > **Epic**: difficulty-system
 > **Type**: Config
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: S
 
@@ -61,3 +61,10 @@ Create the two `DifficultyConfig` ScriptableObject assets for the campaign diffi
 ## Engine Notes
 
 ScriptableObject asset creation is standard Unity workflow. Use `Assets > Create > Trizzle > DifficultyConfig` menu (provided by the `CreateAssetMenu` attribute in Story 001). Verify serialised float values persist correctly after Unity domain reload.
+
+## Completion Notes
+**Completed**: 2026-04-08
+**Criteria**: 5/5 passing
+**Deviations**: None
+**Test Evidence**: Config/Data — smoke check at production/qa/evidence/e2-002-normal-hard-config-presets.md
+**Code Review**: Skipped (Lean mode, Config/Data story)

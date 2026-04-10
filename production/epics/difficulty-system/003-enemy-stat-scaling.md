@@ -3,7 +3,7 @@
 > **Epic**: difficulty-system
 > **Type**: Integration
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -59,3 +59,10 @@ Wire `EnemyController.InitAttributes()` to read stat multiplier ranges from `IDi
 ## Engine Notes
 
 `EnemyController` is an existing class in `Assets/Trizzle/Scripts/`. Read the current implementation to identify the exact location of `ApplyRandomVariation()` and how `statMultiplierMin`/`statMultiplierMax` are currently sourced. The `GameManager.Instance` singleton pattern is already used by all 46 managers in the project.
+
+## Completion Notes
+**Completed**: 2026-04-08
+**Criteria**: 7/7 passing
+**Deviations**: Story says 8 attributes but implementation scales 7 (AbilityInterval was never scaled pre-migration). Story references GameManager but actual singleton is GlobalEntry — functionally equivalent.
+**Test Evidence**: Integration — Assets/Trizzle/Tests/Difficulty/EnemyStatScalingTest.cs (4 tests)
+**Code Review**: Skipped (Lean mode)

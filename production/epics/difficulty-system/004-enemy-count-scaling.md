@@ -3,7 +3,7 @@
 > **Epic**: difficulty-system
 > **Type**: Logic
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -66,3 +66,10 @@ Wire `SpawnManager` to apply `EnemyCountMultiplier` from `IDifficultyProvider` w
 ## Engine Notes
 
 `SpawnManager` is an existing singleton manager in `Assets/Trizzle/Scripts/Manager/`. Read the current implementation to identify where `SpawnItemInfo.SpawnCount` is consumed and where the spawn loop iterates over spawn points. `EnemyData` is a ScriptableObject -- confirm `IsBoss` field exists (it may need to be added per R-022 / ADR-0004; if not yet present, this story should add it or coordinate with the Boss Phase System epic).
+
+## Completion Notes
+**Completed**: 2026-04-08
+**Criteria**: 8/8 passing
+**Deviations**: LevelDifficulty param still in SpawnEnemies/GenerateEnmeyWave signatures (unused for count logic, separate refactor). EnemyData.IsBoss defaults false for all existing entries (must flag bosses in Inspector).
+**Test Evidence**: Logic — Assets/Trizzle/Tests/Difficulty/EnemyCountScalingTest.cs (9 tests)
+**Code Review**: Skipped (Lean mode)
