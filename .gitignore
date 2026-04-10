@@ -12,7 +12,12 @@ Desktop.ini
 # === Claude Code Local ===
 .claude/settings.local.json
 CLAUDE.local.md
+.claude/agent-memory/
 production/session-logs/
+production/session-state/
+
+# === External Engine Projects (symlinked, not tracked) ===
+production/Trizzle
 
 # === Internal Planning (not for public) ===
 
