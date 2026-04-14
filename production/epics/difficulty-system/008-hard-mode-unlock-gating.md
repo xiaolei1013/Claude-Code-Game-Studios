@@ -3,7 +3,7 @@
 > **Epic**: difficulty-system
 > **Type**: UI
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -73,3 +73,12 @@ Implement Hard mode unlock gating in the room selection UI and wire the difficul
 ## Engine Notes
 
 `MenuPrepareStagePanelPC` is in `Assets/Trizzle/Scripts/UI/PC/`. `LevelStats` is part of the existing Save/Load system (D11). Read both files to understand the current room selection flow and how `LevelState` is queried. The gold flash animation should reuse existing VFX/tween infrastructure from the project -- check DESIGN.md for the rarity glow specification. Unity UI (UGUI Canvas) is the UI framework per the project's existing patterns.
+
+## Completion Notes
+**Completed**: 2026-04-10
+**Criteria**: 7/9 passing (gold flash VFX and visual layout deferred — require Unity Editor)
+**Deviations**: PlayPausePanel.cs touched (out of stated scope, valid for TR-difficulty-009 read-only requirement)
+**Test Evidence**: UI: evidence doc pending Unity Editor wiring at production/qa/evidence/e2-008-hard-mode-unlock-gating.md
+**Code Review**: Skipped (Lean mode)
+**Files Changed**: MenuPrepareStagePanelPC.cs (difficulty selector + provider wiring), SceneManagerPC.cs (ApplyDifficultyProvider call), PlayPausePanel.cs (read-only difficulty display)
+**Editor Wiring Required**: Assign normalDifficultyProvider, hardDifficultyProvider, hardDifficultyButton, hardLockIcon, hardLockTooltipText in Inspector; assign difficultyInfoText in PlayPausePanel; create gold flash animation

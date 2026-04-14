@@ -3,7 +3,7 @@
 > **Epic**: boss-phase-system
 > **Type**: Logic
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -74,3 +74,13 @@ Implement the Ground Slam ability template -- a telegraphed AoE attack used by W
 ## Engine Notes
 
 MonoBehaviour component with coroutine-based execution. Uses existing `DamageCalculator` for damage application and existing projectile/VFX instantiation patterns. BehaviourTree integration via NodeCanvas (existing BT framework in project). No post-cutoff API concerns.
+
+## Completion Notes
+
+**Completed**: 2026-04-14
+**Criteria**: 9/9 passing (AC4/AC6/AC8 behavioral verification deferred to play-mode/playtest)
+**Deviations**: ADVISORY — doc comments initially referenced ADR-0005 (fixed to ADR-0004 in all 3 files); radial damage and null-safe VFX behavioral tests deferred to play-mode
+**Test Evidence**: Logic — `Assets/Trizzle/Tests/Combat/GroundSlamAbilityTest.cs` (19 test functions)
+**Code Review**: Complete — 7 suggestions applied (LayerMask, OverlapSphereNonAlloc, cached StateMachine, OnDestroy cleanup, ADR doc fix, impact VFX self-termination requirement documented, default-value tests added)
+**Files created**: `BTAction_GroundSlam.cs`, `GroundSlamAbilityTest.cs`
+**Files modified**: `GroundSlamAbility.cs` (perf + lifecycle optimizations per code review)

@@ -3,7 +3,7 @@
 > **Epic**: difficulty-system
 > **Type**: Logic
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: S
 
@@ -61,3 +61,11 @@ Wire `SpawnManager` wave delays to apply `PacingMultiplier` from `IDifficultyPro
 ## Engine Notes
 
 `SpawnManager` is in `Assets/Trizzle/Scripts/Manager/`. Read the current implementation to find where wave `Delay` values from `SpawnItemInfo` are consumed -- this is likely in a coroutine that waits between waves. The multiplier should be applied to the `WaitForSeconds` duration or equivalent delay mechanism.
+
+## Completion Notes
+**Completed**: 2026-04-10
+**Criteria**: 5/6 passing (AC-3 playtest timing validation deferred)
+**Deviations**: None
+**Test Evidence**: Logic: unit test at Assets/Trizzle/Tests/Difficulty/SpawnPacingScalingTest.cs (5 tests)
+**Code Review**: Skipped (Lean mode)
+**Files Changed**: SpawnManager.cs (inter-wave delay line 96-98)

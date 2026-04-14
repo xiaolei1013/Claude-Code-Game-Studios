@@ -3,7 +3,7 @@
 > **Epic**: incomplete-skills
 > **Type**: Logic
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -91,3 +91,11 @@ Create a systematic test that verifies all 121 skill implementations can be acti
 ## Engine Notes
 
 Tests use Unity Test Framework (NUnit) with Moq, per project testing standards in `CLAUDE.md`. The `TrizzleUnitTests.asmdef` assembly in `Assets/Trizzle/Tests/` is the test assembly. Use `[Test]` attribute for NUnit test methods. `ScriptableObject.CreateInstance<T>()` creates runtime instances without asset files -- suitable for EditMode tests. For bulk skill loading, use `AssetDatabase.FindAssets("t:BaseSkill")` in EditMode tests. Moq can create `Mock<ICharacter>()` and `Mock<PlayerController>()` for activation tests -- verify Moq can mock the specific types used (MonoBehaviours may need interface-based mocking).
+
+## Completion Notes
+**Completed**: 2026-04-10
+**Criteria**: 11/11 passing
+**Deviations**: None
+**Test Evidence**: Logic: SkillActivationSmokeTest.cs (13 tests) + 107 existing test files (464 total tests)
+**Code Review**: Skipped (Lean mode)
+**Files Changed**: SkillActivationSmokeTest.cs (new — bulk activation, F-010 compliance, per-skill unit tests)

@@ -3,7 +3,7 @@
 > **Epic**: archer-character
 > **Type**: Logic
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: XL
 
@@ -36,11 +36,11 @@ Create all 7 archer-exclusive skill ScriptableObjects. Each skill's `compatibleU
    - Tuning knobs: `_arrowCount = 3`, `_damagePerArrow = 0.5f`
 
 3. **PoisonArrow** (`PoisonArrow.asset`)
-   - Arrows apply Poison status (DoT over 4s)
-   - Stacks up to 3 times
-   - Uses existing `PoisonState` via `StateMachine.SwitchState()` (upstream: D3 Status Effects)
+   - Arrows apply Poison status on hit (DoT over 4s)
+   - Uses existing `PoisonState` via `StateEffect` (upstream: D3 Status Effects)
    - `compatibleUpgradeTypes` references `ArrowShotSkill`
-   - Tuning knobs: `_poisonDuration = 4f`, `_maxStacks = 3`
+   - Tuning knob: `_poisonDuration = 4f`
+   - **Stacking deferred to story 010-poison-state-stack-extension** — `PoisonState`/`StateEffect` do not currently support stack counts. Follow-up story adds `StackCount` field + stack-aware DoT math, then re-enables `_maxStacks = 3` here.
 
 ### Dodge Upgrades (2)
 
@@ -85,7 +85,7 @@ Create all 7 archer-exclusive skill ScriptableObjects. Each skill's `compatibleU
 - [ ] All 7 skill assets exist in `Assets/Trizzle/Data/Skill/Archer/`
 - [ ] PiercingArrow: Arrows pierce up to 3 targets with 0.8x damage falloff per pierce
 - [ ] Multishot: 3 arrows fire in fan spread, each dealing 0.5x damage
-- [ ] PoisonArrow: Applies Poison status, stacks up to 3 times, DoT over 4s
+- [ ] PoisonArrow: Applies Poison status on hit, DoT over 4s (stacking deferred to follow-up story 010-poison-state-stack-extension)
 - [ ] Afterimage: Decoy spawned at roll origin, 1 HP, 2s duration, draws enemy aggro
 - [ ] CounterRoll: 2x damage buff for 3s on i-frame block; no stacking, refreshes window
 - [ ] Quickdraw: +50% attack speed for 2s after dodge roll ends
@@ -101,7 +101,7 @@ Create all 7 archer-exclusive skill ScriptableObjects. Each skill's `compatibleU
 
 - Unit test: PiercingArrow damage falloff: target 1 = 1.0x, target 2 = 0.8x, target 3 = 0.64x
 - Unit test: Multishot per-arrow damage = 0.5x base
-- Unit test: PoisonArrow applies PoisonState, stacks cap at 3
+- Unit test: PoisonArrow applies PoisonState on hit, duration = 4s (stacking test moved to story 010)
 - Unit test: CounterRoll buff expires after 3s; second trigger refreshes window (no stack)
 - Unit test: Quickdraw `cooldownTime = baseCooldownTime * 0.5` during buff window
 - Unit test: EagleEye crit bonus applied only when `distance > attackRange * 0.5`
@@ -115,3 +115,13 @@ Create all 7 archer-exclusive skill ScriptableObjects. Each skill's `compatibleU
 ## Engine Notes
 
 Uses `UpgradableSkill` SO subclasses and the existing `Effect` system -- same pattern as existing Mage skill upgrades. Afterimage decoy requires spawning a targetable entity for enemy BehaviourTree -- verify the AI targeting system can handle non-player targetables. PoisonArrow uses `StateMachine.SwitchState()` for status effect application -- verify the PoisonState class exists and supports stacking.
+
+## Completion Notes
+**Completed**: 2026-04-14
+**Criteria**: 10/10 covered (stacking deferred to story 010-poison-state-stack-extension)
+**Deviations**:
+- Test path: `Assets/Trizzle/Tests/Character/Archer/ArcherExclusiveSkillsTest.cs` (Unity requires tests under `Assets/`; spec's `tests/unit/archer/` was notional)
+- PoisonArrow stacking deferred to `010-poison-state-stack-extension.md`
+- `.asset` ScriptableObject instances authored in Unity Editor via `[CreateAssetMenu]`
+**Test Evidence**: `Assets/Trizzle/Tests/Character/Archer/ArcherExclusiveSkillsTest.cs` (35+ unit tests + 2 `[UnityTest]` play-mode cases)
+**Code Review**: Complete (3 passes — APPROVED WITH SUGGESTIONS; defensive tweaks and play-mode test expansion logged as follow-ups)

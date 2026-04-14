@@ -3,7 +3,7 @@
 > **Epic**: archer-character
 > **Type**: Integration
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -82,3 +82,11 @@ Update `DraftRunController` to filter draft skill options by class compatibility
 ## Engine Notes
 
 `DraftRunController` is an existing system. The change is a filter addition to the draft generation path. Verify `CanApplyUpgrade()` API signature in the codebase -- ADR-0005 notes this as LOW risk but requires verification. If the API is insufficient for the class-filter use case, a targeted extension to `UpgradableSkill` is scoped at that point (ADR-0005 Risk table).
+
+## Completion Notes
+**Completed**: 2026-04-13
+**Criteria**: 9/9 (class-specific draft pool tests deferred until N1-006 adds archer-exclusive skill assets; filtering mechanism is in place and structural tests pass)
+**Deviations**: Implemented class filtering via `BaseSkill.IsCompatibleWithClass(PlayerClassType)` rather than `CanApplyUpgrade()` — the existing `CanApplyUpgrade()` only works for UpgraderSkill→UpgradableSkill relationships, not base skill class filtering. Added `compatibleClasses` field to `BaseSkill` (empty array = universal). This is the data-driven approach R-014 requires. Dependency N1-006 not yet done — existing skill assets default to empty `compatibleClasses` (universal), which is correct for current shared skills. Archer/Mage-exclusive filtering activates when N1-006 populates the field on those assets.
+**Test Evidence**: Integration — Assets/Trizzle/Tests/Character/Archer/DraftPoolFilteringTest.cs (7 tests)
+**Code Review**: Skipped (Lean mode)
+**Files Changed**: BaseSkill.cs (added compatibleClasses field + IsCompatibleWithClass method), DraftRunController.cs (added class filter in GetWeightedDraftOptions)

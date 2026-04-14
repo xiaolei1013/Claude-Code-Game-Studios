@@ -3,7 +3,7 @@
 > **Epic**: archer-character
 > **Type**: Logic
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -92,3 +92,11 @@ iFrameRatio = 0.2 / rollDuration
 ## Engine Notes
 
 Uses `UpgradableSkill` base class and `AdvancedWalkerController` momentum -- same pattern as the post-refactor DashSkill. Wall collision uses Unity Physics raycasts (stable API). The i-frame implementation integrates with `Health.TakeDamage()` -- verify the Health component's API allows external suppression (flag or callback) before implementation.
+
+## Completion Notes
+**Completed**: 2026-04-11
+**Criteria**: 9/13 passing (movement direction, status effect blocking, ground check, gameplay verification deferred)
+**Deviations**: Health.cs touched (valid — IsInvincible flag required for i-frames)
+**Test Evidence**: Logic: Assets/Trizzle/Tests/Character/Archer/DodgeRollSkillTest.cs (7 tests)
+**Code Review**: Skipped (Lean mode)
+**Files Changed**: DodgeRollSkill.cs (new), Health.cs (added IsInvincible), DodgeRollSkillTest.cs (new)

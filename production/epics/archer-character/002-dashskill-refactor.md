@@ -3,7 +3,7 @@
 > **Epic**: archer-character
 > **Type**: Logic
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -73,3 +73,11 @@ After all changes, re-run `grep -r "MagePlayerController" Assets/Trizzle/Scripts
 ## Engine Notes
 
 Refactoring C# casts and interface usage -- all stable Unity APIs. No post-cutoff API risk. The primary risk is discovering unexpected cast sites in mobile/platform code. ADR-0005 lists this as MEDIUM likelihood with mitigation: "Read all callers of DashSkill before touching any code."
+
+## Completion Notes
+**Completed**: 2026-04-10
+**Criteria**: 8/8 passing (DashSkill already refactored in Sprint 1 E5-002; OneShotKillEffect redundant cast removed)
+**Deviations**: None
+**Test Evidence**: Logic: ArcherControllerTest::test_DashSkill_no_MagePlayerController_reference
+**Code Review**: Skipped (Lean mode)
+**Files Changed**: OneShotKillEffect.cs (removed redundant MagePlayerController check)

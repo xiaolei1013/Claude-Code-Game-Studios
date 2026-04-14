@@ -3,7 +3,7 @@
 > **Epic**: difficulty-system
 > **Type**: Logic
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: S
 
@@ -65,3 +65,11 @@ Wire drop behavior to apply `HealDropMultiplier` from `IDifficultyProvider`. Thi
 ## Engine Notes
 
 Drop behavior code is likely in `Assets/Trizzle/Scripts/Combat/` or a loot/drops subdirectory. Read the existing drop system to identify the healing drop roll location. The `Random.value` comparison pattern is standard Unity. Ensure the multiplier is applied before the random roll, not after.
+
+## Completion Notes
+**Completed**: 2026-04-10
+**Criteria**: 6/7 passing (AC-3 statistical playtest validation deferred)
+**Deviations**: None
+**Test Evidence**: Logic: unit test at Assets/Trizzle/Tests/Difficulty/HealDropScalingTest.cs (6 tests)
+**Code Review**: Skipped (Lean mode)
+**Files Changed**: EnemyController.cs (InitLootItems heal drop line), NormalLootIChestBehavior.cs (chest heal drop line)

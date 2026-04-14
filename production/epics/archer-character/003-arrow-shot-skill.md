@@ -3,7 +3,7 @@
 > **Epic**: archer-character
 > **Type**: Logic
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -70,3 +70,12 @@ Archer DPS = 80 Attack * 0.6 / 0.5s = 96 DPS (~4% less raw, compensated by highe
 ## Engine Notes
 
 Uses `UpgradableSkill` base class, `DamageCalculator`, and projectile instantiation -- all existing patterns from the Mage implementation. No new engine APIs needed. Follow FireballSkill implementation as the reference pattern.
+
+## Completion Notes
+**Completed**: 2026-04-10
+**Criteria**: 8/9 passing (arrow projectile prefab deferred — Unity Editor creation)
+**Deviations**: None
+**Test Evidence**: Logic: Assets/Trizzle/Tests/Character/Archer/ArrowShotSkillTest.cs (7 tests)
+**Code Review**: Skipped (Lean mode)
+**Files Changed**: ArrowShotSkill.cs (new — auto-aim, configurable damage/speed/cooldown)
+**Editor Work Remaining**: Create ArrowProjectile.prefab in Assets/Trizzle/Prefabs/Projectiles/

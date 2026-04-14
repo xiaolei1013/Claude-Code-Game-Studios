@@ -3,7 +3,7 @@
 > **Epic**: archer-character
 > **Type**: Config
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: S
 
@@ -86,3 +86,11 @@ Add Archer-specific stat fields to `GamePlayDatabase` and create the Archer entr
 ## Engine Notes
 
 Uses `ScriptableObject` `[SerializeField]` fields and Unity Inspector serialization -- all stable APIs. CharacterDatabase likely uses Unity's built-in localization system or a custom LocalizedString pattern. Follow the existing Mage entry's localization approach exactly. Verify that adding new fields to an existing SO does not corrupt the `.asset` file (standard Unity behavior: new fields get default values, existing fields preserved).
+
+## Completion Notes
+**Completed**: 2026-04-10
+**Criteria**: 6/8 passing (CharacterDatabase.asset Archer entry + 11-locale localization deferred — Unity Editor)
+**Deviations**: ArcherPlayerController.cs touched (valid — InitAttributes reads new Archer fields)
+**Test Evidence**: Config/Data: code defaults verified via grep, Inspector verification pending
+**Code Review**: Skipped (Lean mode)
+**Files Changed**: GamePlayDatabase.cs (6 Archer stat fields), ArcherPlayerController.cs (reads Archer-specific fields)

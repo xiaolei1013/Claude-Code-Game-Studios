@@ -2,11 +2,15 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
 2026-04-07
+
+## Accepted Date
+
+2026-04-14
 
 ## Engine Compatibility
 

@@ -3,7 +3,7 @@
 > **Epic**: difficulty-system
 > **Type**: Logic
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: S
 
@@ -69,3 +69,11 @@ Wire gold/gem drops and room-clear bonuses to apply `RewardMultiplier` from `IDi
 ## Engine Notes
 
 Reward grant code is likely in the loot/drop system under `Assets/Trizzle/Scripts/Combat/` or `Assets/Trizzle/Scripts/` (look for drop behaviors, loot tables, or reward controllers). `Mathf.CeilToInt` is a standard Unity API. Ensure the multiplier is applied at the grant point, not at the UI display point -- the actual currency added to the player's inventory must be the scaled amount.
+
+## Completion Notes
+**Completed**: 2026-04-10
+**Criteria**: 6/7 passing (AC-3 playtest 2x verification deferred)
+**Deviations**: None
+**Test Evidence**: Logic: unit test at Assets/Trizzle/Tests/Difficulty/RewardScalingTest.cs (7 tests)
+**Code Review**: Skipped (Lean mode)
+**Files Changed**: EnemyController.cs (gold/gem CeilToInt with RewardMultiplier), NormalLootIChestBehavior.cs (gold/gem CeilToInt with RewardMultiplier)

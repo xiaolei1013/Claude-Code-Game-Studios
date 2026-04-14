@@ -3,7 +3,7 @@
 > **Epic**: boss-phase-system
 > **Type**: Logic
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: S
 
@@ -72,3 +72,11 @@ Add the `isBoss` boolean flag to `EnemyData` ScriptableObject and replace all ex
 ## Engine Notes
 
 Adding a public field to an existing ScriptableObject is safe in Unity -- existing assets get the default value (`false`) on next load. No asset migration needed. The tooltip attribute is purely editor-side.
+
+## Completion Notes
+**Completed**: 2026-04-13
+**Criteria**: 7/7 passing (EnemyData.IsBoss field pre-existed from E2-004; OneShotKillEffect migrated; SpawnManager already clean from E2-004; DraftRunController receives bossKilled as parameter — no internal detection to replace; grep verified zero tag/name patterns remain)
+**Deviations**: DraftRunController.OnRunComplete(bool bossKilled) does not do boss detection itself — it receives the flag from SceneManagerPC. The hardcoded `true` in SceneManagerPC is a separate concern addressed by E3-010 (boss kill tracking fix). AC #4 is satisfied because there is no tag/name boss detection in DraftRunController.
+**Test Evidence**: Logic — Assets/Trizzle/Tests/Combat/IsBossFlagTest.cs (6 tests)
+**Code Review**: Skipped (Lean mode)
+**Files Changed**: EnemyController.cs (added IsBoss property + SetBossFlag method), SpawnManager.cs (calls SetBossFlag at spawn), OneShotKillEffect.cs (replaced CompareTag/name check with EnemyController.IsBoss)

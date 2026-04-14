@@ -3,7 +3,7 @@
 > **Epic**: difficulty-system
 > **Type**: Logic
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -76,3 +76,11 @@ Create the comprehensive test suite for the Difficulty System. This covers unit 
 ## Engine Notes
 
 Tests use Unity Test Framework (NUnit) with Moq, per project testing standards in `CLAUDE.md`. The `TrizzleUnitTests.asmdef` assembly in `Assets/Trizzle/Tests/` is the test assembly. Use `[Test]` attribute for NUnit test methods. `ScriptableObject.CreateInstance<T>()` creates runtime instances without asset files -- suitable for EditMode tests. For integration tests that need `GameManager`, use test scaffolding that instantiates a minimal `GameManager` with the provider.
+
+## Completion Notes
+**Completed**: 2026-04-10
+**Criteria**: 8/8 passing
+**Deviations**: None
+**Test Evidence**: Logic: 6 test files at Assets/Trizzle/Tests/Difficulty/ (44 total tests)
+**Code Review**: Skipped (Lean mode)
+**Files Changed**: DifficultySystemIntegrationTest.cs (created, 12 tests covering ADR-0001 validation criteria)

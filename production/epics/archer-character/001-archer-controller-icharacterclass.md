@@ -3,7 +3,7 @@
 > **Epic**: archer-character
 > **Type**: Logic
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -66,3 +66,11 @@ Create the Archer character controller and the class-agnostic interface that ena
 ## Engine Notes
 
 Uses `MonoBehaviour` inheritance, C# interfaces, and enum extension -- all stable Unity APIs with no post-cutoff changes. `PlayerController` base class must not be `sealed` (verify before implementation). ADR-0005 Engine Compatibility section confirms LOW risk for these specific APIs.
+
+## Completion Notes
+**Completed**: 2026-04-10
+**Criteria**: 9/9 passing
+**Deviations**: ArcherPlayerController.InitAttributes uses Mage baseline stats temporarily — N1-005 will add Archer-specific GamePlayDatabase fields
+**Test Evidence**: Logic: Assets/Trizzle/Tests/Character/Archer/ArcherControllerTest.cs (10 tests)
+**Code Review**: Skipped (Lean mode)
+**Files Changed**: ICharacterClass.cs (new), ArcherPlayerController.cs (new), MagePlayerController.cs (added ICharacterClass), PlayerController.cs (Archer enum)

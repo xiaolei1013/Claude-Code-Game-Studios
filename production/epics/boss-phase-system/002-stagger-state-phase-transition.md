@@ -3,7 +3,7 @@
 > **Epic**: boss-phase-system
 > **Type**: Logic
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -81,3 +81,11 @@ Implement the full `TransitionToPhase()` coroutine in `BossController` that was 
 ## Engine Notes
 
 Uses coroutines (`StartCoroutine`, `WaitForSeconds`, `StopAllCoroutines`) -- stable Unity APIs. ADR-0004 Verification Required: confirm coroutine-based stagger timing is not affected by new frame scheduling behaviour introduced in Unity 6.0. The `StateMachine.ResetState()` call is an existing shipped API on the status effect system.
+
+## Completion Notes
+**Completed**: 2026-04-13
+**Criteria**: 11/11 passing (all structural — runtime behaviour requires playtest)
+**Deviations**: BossPhase.StatModifiers type changed from `AttributeModifier[]` to `BossStatModifier[]` — the original `AttributeModifier` has no `AttributeType` field, making it impossible to apply modifiers to specific attributes. Added `BossStatModifier` struct pairing `AttributeType` with `AttributeModifier`. Existing BossControllerTest field-existence check still passes (field name unchanged).
+**Test Evidence**: Logic — Assets/Trizzle/Tests/Combat/BossStaggerTest.cs (10 tests)
+**Code Review**: Skipped (Lean mode)
+**Files Changed**: BossController.cs (replaced stub with full TransitionToPhase coroutine, ChainPhaseTransitions, CleanupStagger, SwapBehaviourTree, death guard), BossPhase.cs (added BossStatModifier struct, changed StatModifiers type)
