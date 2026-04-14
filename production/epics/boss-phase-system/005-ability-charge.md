@@ -3,7 +3,7 @@
 > **Epic**: boss-phase-system
 > **Type**: Logic
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -80,3 +80,17 @@ Implement the Charge ability template -- a telegraphed dash toward the player us
 ## Engine Notes
 
 MonoBehaviour with physics-based movement (Rigidbody or CharacterController dash). Wall collision detection via raycast or collider. Uses existing `DamageCalculator` and VFX instantiation patterns. BehaviourTree integration via NodeCanvas. No post-cutoff API concerns.
+
+## Completion Notes
+
+**Completed**: 2026-04-14
+**Criteria**: 10/10 passing (AC4/AC5/AC6/AC7/AC10 behavioral verification deferred to play-mode/playtest, matching E3-004 convention)
+**Deviations**: ADVISORY — behavioral tests for direction-lock (AC4), wall-stop (AC5), player-damage (AC6), dodge-avoidance (AC7), and zero-warnings-compile (AC10) deferred to playtest per user decision during `/review`. Matches E3-004 Ground Slam pattern.
+**Test Evidence**: Logic — `Assets/Trizzle/Tests/Combat/ChargeAbilityTest.cs` (28 test functions)
+**Code Review**: Complete — 14 findings surfaced via `/review`; 8 fixes applied (4 CRITICAL: NavMeshAgent safety cluster, player-check post-translate, wall SphereCast + origin safety, Blackboard target injection replacing `FindWithTag`; 4 INFORMATIONAL: telegraph VFX field + abort cleanup, LayerMask `0` defaults + self-exclusion, impact VFX at hit point + rotation, hygiene bundle). Behavioral test coverage deferred per user direction.
+**Files created**: `ChargeAbility.cs`, `BTAction_Charge.cs`, `ChargeAbilityTest.cs`
+**Files modified**: None (all new files)
+**Implementation notes**:
+- NavMeshAgent is cached in Awake, disabled during dash, restored via `NavMesh.SamplePosition` + `Warp` to recover from off-mesh endpoints without throwing
+- `AbortChargeSequence()` helper is the single cleanup path (called from OnDestroy + Reset), preventing permanent agent-disable bricks on mid-dash abort
+- Target injection via `BTAction_Charge.Tick(bb)` → `_ability.SetTarget(bb.Get<Transform>(BBKeys.PlayerTransform))` replaces the initial `GameObject.FindWithTag("Player")` approach, restoring control-manifest F-007 compliance

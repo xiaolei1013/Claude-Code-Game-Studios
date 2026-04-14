@@ -7,7 +7,7 @@ start: "2026-04-14"
 end: "2026-04-28"
 generated: "2026-04-13"
 updated: "2026-04-14"
-# Last story closed: E3-004 Ability Template -- Ground Slam
+# Last story closed: E3-010 Boss Kill Tracking Fix
 
 stories:
 
@@ -39,21 +39,21 @@ stories:
     name: "Ability Template -- Charge"
     file: "production/epics/boss-phase-system/005-ability-charge.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei"
     estimate_days: 2.0
     blocker: ""
-    completed: ""
+    completed: "2026-04-14"
 
   - id: "E3-010"
     name: "Boss Kill Tracking Fix"
     file: "production/epics/boss-phase-system/010-boss-kill-tracking-fix.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei"
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-04-14"
 
   - id: "E3-006"
     name: "Ability Template -- Shield Phase"

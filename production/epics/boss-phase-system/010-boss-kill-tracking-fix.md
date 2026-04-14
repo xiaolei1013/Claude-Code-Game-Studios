@@ -3,7 +3,7 @@
 > **Epic**: boss-phase-system
 > **Type**: Logic
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: S
 
@@ -73,3 +73,24 @@ Fix `DraftRunController.OnRunComplete()` to detect actual boss kills using the `
 ## Engine Notes
 
 Modifies existing `DraftRunController.cs` -- read the current implementation to find the exact location of the hardcoded `true` in `OnRunComplete()`. Uses C# event subscription pattern (existing pattern throughout the project). No post-cutoff API concerns.
+
+## Completion Notes
+
+**Completed**: 2026-04-14
+**Criteria**: 8/8 passing (AC8 zero-warnings-compile deferred to Unity Editor per project convention)
+**Deviations**:
+- ADVISORY -- AC6 mechanism: story suggested using `EnemyData.IsBoss` to detect boss spawns; implementation uses new static event `BossController.OnAnyBossSpawned` instead. Both satisfy the F-007 "no tag/name strings" rule; chosen approach is more event-driven per R-027.
+- ADVISORY -- Scope expansion: story listed only DraftRunController.cs; actual production changes spanned DraftRunController.cs (core state + subscription), BossController.cs (new static OnAnyBossSpawned event + RuntimeInitializeOnLoadMethod reset), SceneManagerPC.cs line 167 (call-site updated because OnRunComplete signature lost its bool parameter). All required by the chosen event-driven approach.
+- ADVISORY -- DraftRunController now names BossController concrete class in subscription code (static events cannot live on C# interfaces). Documented as explicit ADR-0004 exception via inline comment.
+- ADVISORY -- Integration tests (SceneManagerPC -> OnRunComplete -> LogRunCompleted chain) deferred to play-mode per project convention for MonoBehaviour-dependent flows.
+
+**Test Evidence**: Logic -- `Assets/Trizzle/Tests/Combat/BossKillTrackingTest.cs` (11 test functions: 4 structural + 7 behavioral covering story TC-1 through TC-4 plus stale-subscription, OnDisable cleanup, double-subscription idempotency)
+**Code Review**: Complete -- `/code-review` ran unity-specialist + qa-tester in parallel. Initial verdict CHANGES REQUIRED: 2 CRITICAL implementation bugs (OnEnable ordering race / StartDraftRun-clears-before-rescan; static event lacks domain-reload reset) + 1 BLOCKING test gap (TC-1/TC-2 didn't exercise OnRunComplete). User approved all 5 fixes (3 required + 2 suggested). Final verdict APPROVED WITH SUGGESTIONS.
+
+**Files created**: `BossKillTrackingTest.cs`
+**Files modified**: `DraftRunController.cs` (internal state + subscription machinery + parameterless OnRunComplete + scene-scan fix), `BossController.cs` (static OnAnyBossSpawned event + RuntimeInitializeOnLoadMethod reset), `SceneManagerPC.cs` (line 167 call-site)
+
+**Implementation notes**:
+- Boss spawn detection is fully event-driven via a static event; `FindObjectsByType<BossController>` scan in OnEnable + StartDraftRun catches scene-placed bosses and OnEnable ordering races without relying on Unity's non-deterministic sibling component enable order.
+- `_subscribedBosses.Contains` guard prevents double-subscription under pool re-enable cycles.
+- Static event `RuntimeInitializeOnLoadMethod` reset handles Unity 6's "Enter Play Mode without Domain Reload" editor optimization.

@@ -117,11 +117,22 @@ Create all 7 archer-exclusive skill ScriptableObjects. Each skill's `compatibleU
 Uses `UpgradableSkill` SO subclasses and the existing `Effect` system -- same pattern as existing Mage skill upgrades. Afterimage decoy requires spawning a targetable entity for enemy BehaviourTree -- verify the AI targeting system can handle non-player targetables. PoisonArrow uses `StateMachine.SwitchState()` for status effect application -- verify the PoisonState class exists and supports stacking.
 
 ## Completion Notes
+
 **Completed**: 2026-04-14
 **Criteria**: 10/10 covered (stacking deferred to story 010-poison-state-stack-extension)
 **Deviations**:
 - Test path: `Assets/Trizzle/Tests/Character/Archer/ArcherExclusiveSkillsTest.cs` (Unity requires tests under `Assets/`; spec's `tests/unit/archer/` was notional)
 - PoisonArrow stacking deferred to `010-poison-state-stack-extension.md`
-- `.asset` ScriptableObject instances authored in Unity Editor via `[CreateAssetMenu]`
+- `.asset` ScriptableObject instances authored via editor menu helper (below) rather than per-class `[CreateAssetMenu]` — one-shot bulk author avoided 7× manual editor clicks
 **Test Evidence**: `Assets/Trizzle/Tests/Character/Archer/ArcherExclusiveSkillsTest.cs` (35+ unit tests + 2 `[UnityTest]` play-mode cases)
 **Code Review**: Complete (3 passes — APPROVED WITH SUGGESTIONS; defensive tweaks and play-mode test expansion logged as follow-ups)
+**Playtest Evidence**: `production/session-logs/playtest-sprint-03-archer-skills.md` — 9/9 behavioral checklist items PASS, `/team-qa sprint` sign-off APPROVED (session-local; evidence retained in solo-dev session logs)
+
+### Reopen/close history
+
+Briefly reopened 2026-04-14 during `/team-qa` Phase 4 when QA discovered that
+`Assets/Trizzle/Data/Skill/Archer/` did not exist on disk — original completion
+was premature (classes shipped, instances not authored). Resolved same day:
+- `Assets/Trizzle/Editor/CreateArcherSkillAssets.cs` helper added (Unity menu: `Trizzle → QA Tools → Create Archer Skill Assets`) — idempotent, one-shot bulk creator
+- 7 `.asset` instances authored, committed, and merged to `main` via Trizzle PR #117
+- `/team-qa sprint` resumed and signed off (see `production/qa/qa-signoff-sprint-03-2026-04-14.md`)
