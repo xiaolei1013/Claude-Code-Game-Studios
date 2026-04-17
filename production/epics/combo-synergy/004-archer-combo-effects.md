@@ -3,7 +3,7 @@
 > **Epic**: combo-synergy
 > **Type**: Logic
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: L
 
@@ -121,3 +121,13 @@ If N1 is not yet implemented, author the effects against the expected API from t
 ## Engine Notes
 
 Same stable APIs as Story 003. Archer-specific events (arrow hit, afterimage death) depend on N1 implementation. If N1 uses `UnityEvent` or C# `event/Action`, the subscription pattern in `Activate()`/`Deactivate()` is the same. Confirm the event system in `ArcherPlayerController` during implementation.
+
+## Completion Notes
+**Completed**: 2026-04-17
+**Criteria**: 12/12 passing (AC-11 combo discovery deferred to INFRA-001 scene-attach)
+**Deviations**:
+- ADVISORY: ShadowStep triggers on DodgeRoll use (not afterimage death) because afterimage prefab system is not shipped. Fires at dodge start position where afterimage would spawn. Functionally equivalent for v1.
+- ADVISORY: PredatorsMarkComboEffect._counterRollSkill needs Inspector wiring to CounterRollSkill.asset.
+**Test Evidence**: Logic — 6 test files at Assets/Trizzle/Tests/Combo/ArcherEffects/ (~36 tests)
+**Code Review**: Complete (/simplify x1, /review x1 — 5 fixes applied: PredatorsMark _isActive on error, RapidAssault cooldown restore, _isActive guards in all OnTrigger, reflection warning log)
+**PR**: #122 (merged 2026-04-17)

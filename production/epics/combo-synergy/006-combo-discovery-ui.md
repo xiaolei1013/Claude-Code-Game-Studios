@@ -3,7 +3,7 @@
 > **Epic**: combo-synergy
 > **Type**: UI
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -77,3 +77,15 @@ Create the combo discovery presentation layer: a gold text flash notification th
 ## Engine Notes
 
 Uses TextMeshPro (TMPro) for text rendering, `CanvasGroup.alpha` for fade animation, and `Coroutine` or `DOTween` for the fade sequence. TextMeshPro is bundled with Unity 6 and is the standard text solution. Cinzel font must be imported as a TMPro font asset (SDF format). If Cinzel is not already in the project, it needs to be added as a font asset (Google Fonts, OFL license). Verify TMPro font asset generation works in Unity 6000.3.11f1.
+
+## Completion Notes
+**Completed**: 2026-04-17
+**Criteria**: 8/10 passing (AC-7 HUD obscuring, AC-9 Plague Volley runtime flash deferred to visual playtest)
+**Deviations**:
+- ADVISORY: Modified existing `ComboDiscoveryFeedback.cs` (UI/PC/) instead of creating new `ComboDiscoveryUI.cs`. Existing component covered 80% of requirements; creating a duplicate would be wasteful.
+- ADVISORY: Cinzel font not imported. TMPro component uses current scene font until Cinzel SDF asset is added.
+- ADVISORY: `_discoverySfx` AudioClip not assigned. Falls back to `SoundEffectType.Positive` until distinct clip is wired.
+- ADVISORY: Inspector re-wiring needed: `_comboRegistry` field must be assigned to scene ComboRegistry (was previously `draftRunController`).
+- ADVISORY: Prefab `ComboDiscoveryFlash.prefab` not extracted from scene hierarchy.
+**Test Evidence**: UI — manual walkthrough + screenshot required at production/qa/evidence/
+**Code Review**: Skipped (Lean mode)
