@@ -3,7 +3,7 @@
 > **Epic**: room-content
 > **Type**: Logic
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -81,3 +81,12 @@ Implement `CampaignWaveProvider` as the bridge between `RoomConfig` ScriptableOb
 ## Engine Notes
 
 Uses `MonoBehaviour`, `Mathf.CeilToInt()`, `ScriptableObject` references, and C# interface implementation -- all stable Unity APIs. `WaveData` is a plain C# struct (no Unity serialisation needed) for stack allocation. Verify that `GameManager.Instance.ActiveDifficultyProvider` is accessible from a MonoBehaviour at runtime in Unity 6000.3.11f1. No post-cutoff API dependencies.
+
+## Completion Notes
+
+**Completed**: 2026-04-18
+**Criteria**: 12/12 passing
+**Deviations**:
+- Created IWaveProvider.cs, WaveData.cs, TrapLayout.cs (types defined in ADR-0002 but not previously implemented). Required for CampaignWaveProvider to compile.
+**Test Evidence**: Logic: 8 unit tests at `Assets/Trizzle/Tests/Rooms/CampaignWaveProviderTest.cs`
+**Code Review**: Pending (run `/simplify` or `/review` before merge)

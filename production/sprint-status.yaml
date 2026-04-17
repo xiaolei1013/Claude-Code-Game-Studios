@@ -16,41 +16,41 @@ stories:
     name: "Ability Template -- Rain of Fire"
     file: "production/epics/boss-phase-system/007-ability-rain-of-fire.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei"
     estimate_days: 2.0
     blocker: ""
-    completed: ""
+    completed: "2026-04-18"
 
   - id: "E3-008"
     name: "Boss Prefab Configuration"
     file: "production/epics/boss-phase-system/008-boss-prefab-configuration.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei"
     estimate_days: 2.0
     blocker: "E3-007"
-    completed: ""
+    completed: "2026-04-18"
 
   - id: "E1-001"
     name: "RoomConfig ScriptableObject"
     file: "production/epics/room-content/001-roomconfig-scriptableobject.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei"
     estimate_days: 2.0
     blocker: ""
-    completed: ""
+    completed: "2026-04-18"
 
   - id: "E1-002"
     name: "Campaign Wave Provider"
     file: "production/epics/room-content/002-campaign-wave-provider.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei"
     estimate_days: 2.0
     blocker: "E1-001"
-    completed: ""
+    completed: "2026-04-18"
 
   # ── Should Have ──────────────────────────────────────────────────────
 

@@ -3,7 +3,7 @@
 > **Epic**: boss-phase-system
 > **Type**: Logic
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -89,3 +89,11 @@ Implement the Rain of Fire ability template -- random AoE denial circles that te
 ## Engine Notes
 
 MonoBehaviour component with coroutine-based execution. Uses existing `DamageCalculator` and status effect application (`Burn`). AoE detection via Physics overlap (sphere/circle cast). Performance: ADR-0004 Performance Implications notes Rain of Fire + transition VFX combined must be < 2ms render. Keep particle count reasonable for mobile target.
+
+## Completion Notes
+
+**Completed**: 2026-04-18
+**Criteria**: 12/12 passing
+**Deviations**: None
+**Test Evidence**: Logic: 7 unit tests at `Assets/Trizzle/Tests/Boss/RainOfFireAbilityTest.cs`
+**Code Review**: Pending (run `/simplify` or `/review` before merge)

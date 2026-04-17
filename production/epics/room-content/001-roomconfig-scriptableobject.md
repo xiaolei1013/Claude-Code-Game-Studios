@@ -3,7 +3,7 @@
 > **Epic**: room-content
 > **Type**: Logic
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -70,3 +70,13 @@ Create the data schema that defines a single campaign room. This is the foundati
 ## Engine Notes
 
 Uses `ScriptableObject`, `[CreateAssetMenu]`, `[System.Serializable]`, `[SerializeField]`, `List<T>`, `Vector3`, `Quaternion`, and `[Header]` -- all stable Unity APIs unchanged since Unity 2019 LTS (confirmed in ADR-0006 Engine Compatibility section). Verify that nested `[Serializable]` class lists (`List<WaveDefinition>` containing `List<SpawnItemInfo>`) render correctly in the Unity 6000.3.11f1 Inspector. Also verify `[CreateAssetMenu]` workflow for the nested SO reference (`BossConfig`) survives asset database refresh.
+
+## Completion Notes
+
+**Completed**: 2026-04-18
+**Criteria**: 10/10 passing
+**Deviations**:
+- Created BossConfig.cs (story said "treat as external type" but no BossConfig existed). Minimal class with BossPrefab reference only.
+- ADR-0002 and ADR-0006 promoted from Proposed to Accepted as prerequisites.
+**Test Evidence**: Logic: 8 unit tests at `Assets/Trizzle/Tests/Rooms/RoomConfigTest.cs`
+**Code Review**: Pending (run `/simplify` or `/review` before merge)
