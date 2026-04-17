@@ -3,7 +3,7 @@
 > **Epic**: combo-synergy
 > **Type**: Logic
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -105,3 +105,11 @@ Create the comprehensive test suite for the Combo/Synergy system. This covers un
 ## Engine Notes
 
 Tests use Unity Test Framework (NUnit) with Moq, per project testing standards in `CLAUDE.md`. `ScriptableObject.CreateInstance<T>()` creates runtime instances without asset files -- suitable for EditMode tests. For integration tests that need `ComboRegistry` and `PlayerController`, use test scaffolding that instantiates minimal required components. Mock `StateMachine.HasState()` for status-conditional tests (Executioner Slow check, Elemental Storm Burn/Freeze check). Mock `EnemyData.IsBoss` for boss immunity tests.
+
+## Completion Notes
+
+**Completed**: 2026-04-18
+**Criteria**: 30/30 test cases covered across existing + new ComboSystemIntegrationTest.cs
+**Deviations**: None. Tests distributed across 22 existing files + 1 new integration file.
+**Test Evidence**: Logic: `Assets/Trizzle/Tests/Combo/ComboSystemIntegrationTest.cs` (10 new tests) + 150+ existing tests across Mage/Archer/Universal effect files
+**Code Review**: Pending

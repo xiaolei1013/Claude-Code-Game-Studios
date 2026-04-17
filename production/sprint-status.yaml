@@ -58,31 +58,31 @@ stories:
     name: "Rooms 1-5 Configuration"
     file: "production/epics/room-content/003-rooms-1-5-configuration.md"
     priority: should-have
-    status: backlog
+    status: done
     owner: "xiaolei"
     estimate_days: 2.0
     blocker: "E1-001, E1-002"
-    completed: ""
+    completed: "2026-04-18"
 
   - id: "N1-008"
     name: "Archer VFX & Animation"
     file: "production/epics/archer-character/008-archer-vfx-animation.md"
     priority: should-have
-    status: backlog
+    status: done
     owner: "xiaolei"
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-04-18"
 
   - id: "E4-009"
     name: "Combo System Tests"
     file: "production/epics/combo-synergy/009-combo-system-tests.md"
     priority: should-have
-    status: backlog
+    status: done
     owner: "xiaolei"
     estimate_days: 2.0
     blocker: ""
-    completed: ""
+    completed: "2026-04-18"
 
   # ── Nice to Have (Sprint 8 candidates) ───────────────────────────────
 
