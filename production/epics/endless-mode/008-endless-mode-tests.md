@@ -3,7 +3,7 @@
 > **Epic**: endless-mode
 > **Type**: Logic
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 

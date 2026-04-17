@@ -88,21 +88,21 @@ stories:
     name: "Endless Mode Tests"
     file: "production/epics/endless-mode/008-endless-mode-tests.md"
     priority: should-have
-    status: backlog
+    status: done
     owner: "xiaolei"
     estimate_days: 2.0
-    blocker: "N2-001, N2-002, N2-003, N2-004, N2-005, N2-006, N2-007"
-    completed: ""
+    blocker: ""
+    completed: "2026-04-19"
 
   - id: "E1-004"
     name: "Rooms 6-10 Configuration"
     file: "production/epics/room-content/004-rooms-6-10-configuration.md"
     priority: should-have
-    status: backlog
+    status: done
     owner: "xiaolei"
     estimate_days: 2.0
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "N1-010"
     name: "Poison State Stack Extension"
@@ -111,7 +111,7 @@ stories:
     status: backlog
     owner: "xiaolei"
     estimate_days: 1.0
-    blocker: ""
+    blocker: "Status: Draft — needs story readiness before implementation"
     completed: ""
 
   # ── Nice to Have (Sprint 9 candidates) ───────────────────────────────
@@ -120,38 +120,38 @@ stories:
     name: "Boss Phase VFX"
     file: "production/epics/boss-phase-system/009-boss-phase-vfx.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: "xiaolei"
     estimate_days: 2.0
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "E3-011"
     name: "Boss System Tests"
     file: "production/epics/boss-phase-system/011-boss-system-tests.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: "xiaolei"
     estimate_days: 2.0
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "E1-005"
     name: "Room Layout & Spawn Points"
     file: "production/epics/room-content/005-room-layout-spawn-points.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: "xiaolei"
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "E1-006"
     name: "Room Content Tests"
     file: "production/epics/room-content/006-room-content-tests.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: "xiaolei"
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
