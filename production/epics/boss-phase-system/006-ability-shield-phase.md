@@ -3,7 +3,7 @@
 > **Epic**: boss-phase-system
 > **Type**: Logic
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -81,3 +81,12 @@ Implement the Shield Phase ability template -- temporary invulnerability with a 
 ## Engine Notes
 
 MonoBehaviour component. Damage blocking uses the existing invulnerability system but must diverge from it for status effects -- standard invulnerability blocks everything, but shield must selectively block only HP damage. May need a new `isShielded` flag separate from `isInvulnerable`, or a modification to the damage/status application pipeline to distinguish shield from stagger invulnerability. This is the most architecturally novel ability template -- verify the approach in a spike if needed.
+
+## Completion Notes
+
+**Completed**: 2026-04-17
+**Criteria**: 11/11 passing
+**Deviations**:
+- Health.cs modified: added `IsShielded` property + guard in `TakeDamage`. Anticipated by Engine Notes. `IsShielded` zeroes HP damage but still fires `OnHit` (so shield counts hits). Status effects unaffected because they use `StateMachine.SwitchState`, not `TakeDamage`.
+**Test Evidence**: Logic: 9 unit tests at `Assets/Trizzle/Tests/Boss/ShieldPhaseAbilityTest.cs`
+**Code Review**: Pending (run `/simplify` or `/review` before merge)

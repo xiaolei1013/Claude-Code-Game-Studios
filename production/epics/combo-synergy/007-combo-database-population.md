@@ -3,7 +3,7 @@
 > **Epic**: combo-synergy
 > **Type**: Config
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -93,3 +93,13 @@ Universal (7):
 ## Engine Notes
 
 This is a Unity Editor data-authoring task. No code changes -- all work is in the Inspector assigning `[SerializeField]` references on the `ComboDatabase.asset`. The `.asset` file is serialized as YAML by Unity and version-controlled via Git. If multiple developers touch the same `.asset`, merge conflicts in the YAML are possible but manageable for a solo developer. Verify all references survive a domain reload (exit/re-enter play mode) in Unity 6000.3.11f1.
+
+## Completion Notes
+
+**Completed**: 2026-04-17
+**Criteria**: 10/11 passing (1 deferred: null ref handling requires play-mode smoke)
+**Deviations**:
+- Shadow Step skillA is null (DodgeRollSkill has no standalone .asset; base-kit skill). CheckCombos null-guards at line 65. Wire when asset is confirmed.
+- Attribute skills use Common variants (FrenzyFuryCommonSkill, StoneguardCommonSkill, etc.). Rare variants won't trigger combos via name-matching. Design gap in CheckCombos, not a data issue.
+**Test Evidence**: Config/Data: smoke check at production/qa/smoke-2026-04-17.md. New smoke recommended after sprint close-out.
+**Code Review**: N/A (Config/Data story, no new code)

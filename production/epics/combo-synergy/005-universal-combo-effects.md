@@ -3,7 +3,7 @@
 > **Epic**: combo-synergy
 > **Type**: Logic
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: L
 
@@ -142,3 +142,16 @@ Implement the 7 Universal `ComboEffect` ScriptableObject subclasses. Universal c
 ## Engine Notes
 
 Same stable APIs as Stories 003/004. `Dictionary<Health, int>` in ElementalStorm is heap-allocated once in `Activate()` and reused -- no per-trigger allocation. `Health.Kill()` method must be confirmed against the shipped codebase (the exact method that bypasses normal damage calculation for instant kill). `EnemyData.IsBoss` field availability depends on E3 (Boss Phase System) or may already exist -- confirm during implementation.
+
+## Completion Notes
+
+**Completed**: 2026-04-17
+**Criteria**: 12/14 passing (2 deferred: .asset file authoring → E4-007, simultaneous combo test → E4-007)
+**Deviations**:
+- GaleForce uses PinpointAttackMultiplier as attack speed proxy (no dedicated AttackSpeed attribute exists). Follow-up: add AttackSpeed to AttributeType enum.
+- Executioner uses `health.TakeDamage(health.CurrentHealth)` for instant kill (no Health.Kill() method exists). Functionally equivalent.
+- OnKill effects (BerserkersFury, GoldRush, VampiricStrikes) only subscribe to enemies alive at Activate time. Known MVP gap shared with Mage/Archer effects.
+- Ironclad re-evaluates HP threshold on next OnHit event after healing (no Health.OnHealed event exists).
+**Test Evidence**: Logic: 7 test files at `Assets/Trizzle/Tests/Combo/UniversalEffects/` (~45 tests, 8 behavioral)
+**Code Review**: Complete — /simplify (3-agent) + /review (adversarial + testing specialist). 7 issues found and fixed.
+**PR**: https://github.com/xiaolei1013/Trizzle/pull/124 (merged)
