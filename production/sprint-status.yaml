@@ -16,71 +16,71 @@ stories:
     name: "Endless Difficulty Provider"
     file: "production/epics/endless-mode/001-endless-difficulty-provider.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei"
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "N2-002"
     name: "Endless Wave Provider"
     file: "production/epics/endless-mode/002-endless-wave-provider.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei"
     estimate_days: 1.5
     blocker: "N2-001"
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "N2-003"
     name: "Endless Session Controller"
     file: "production/epics/endless-mode/003-endless-session-controller.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei"
     estimate_days: 2.0
     blocker: "N2-001, N2-002"
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "N2-004"
     name: "Boss Wave Cycling"
     file: "production/epics/endless-mode/004-boss-wave-cycling.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei"
     estimate_days: 1.0
     blocker: "N2-003"
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "N2-005"
     name: "Endless Arena Setup"
     file: "production/epics/endless-mode/005-endless-arena-setup.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei"
     estimate_days: 0.5
     blocker: "N2-003"
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "N2-007"
     name: "Endless Draft Integration"
     file: "production/epics/endless-mode/007-endless-draft-integration.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei"
     estimate_days: 1.0
     blocker: "N2-003"
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "N2-006"
     name: "Score and Leaderboard"
     file: "production/epics/endless-mode/006-score-and-leaderboard.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei"
     estimate_days: 1.0
     blocker: "N2-003"
-    completed: ""
+    completed: "2026-04-19"
 
   # ── Should Have ──────────────────────────────────────────────────────
 
