@@ -3,7 +3,7 @@
 > **Epic**: combo-synergy
 > **Type**: Logic
 > **Priority**: P1
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: S
 
@@ -78,3 +78,24 @@ Extend the save/load system to persist combo discovery state. When a player disc
 ## Engine Notes
 
 Uses Unity's existing save system (likely `JsonUtility`, `PlayerPrefs`, or a custom serialization system). Extending a `[Serializable]` save data class with a new `List<string>` field is safe -- `JsonUtility` handles missing fields gracefully on deserialization (defaults to empty list). If the project uses a binary serializer, verify that adding a field does not break existing save compatibility. Check the existing save/load code in `Assets/Trizzle/Scripts/Manager/` before modifying.
+
+## Completion Notes
+**Completed**: 2026-04-16
+**Criteria**: 8/8 passing (all ACs covered by automated tests)
+**Deviations**:
+- ADVISORY: Cloud sync not wired — local PlayerPrefs only. Story scoped local-first for v1.0; cloud sync via `CloudServiceManager.UserDataToCloud` is a known followup.
+- ADVISORY: `ComboDiscoveryTracker` not yet scene-attached. Tests verify the mechanism via reflection; live in-game verification deferred to PR #118 scene-wire work (same pending scope as `ComboRegistry` scene-attach).
+**Test Evidence**: 2 files, 21 tests in `Assets/Trizzle/Tests/Combo/`:
+- `ComboDiscoveryStoreTest.cs` (13 unit tests — pure C#, zero Unity dep)
+- `ComboDiscoveryTrackerTest.cs` (8 integration tests — PlayerPrefs roundtrip + end-to-end event path + corrupt-JSON recovery)
+**Code Review**: Completed via `/simplify` + `/code-review` (Lean mode). 3 post-review fixes applied: OnDestroy unsubscribe hygiene, end-to-end AC-2 event-path test, corrupt-JSON recovery test. LP-CODE-REVIEW + QL-TEST-COVERAGE gates skipped per Lean mode.
+**Files delivered** (4 production + 2 tests):
+- `Assets/Trizzle/Scripts/Manager/ComboDiscoveryData.cs` — serializable DTO
+- `Assets/Trizzle/Scripts/Manager/ComboDiscoveryStore.cs` — pure C# store with `OnFirstDiscovery` dedup event + zero-alloc `DiscoveredIds` view
+- `Assets/Trizzle/Scripts/Manager/ComboDiscoveryPersistence.cs` — static PlayerPrefs + Newtonsoft JsonConvert I/O (matches `UserManager` pattern)
+- `Assets/Trizzle/Scripts/Manager/ComboDiscoveryTracker.cs` — MonoBehaviour glue: subscribes `ComboRegistry.OnComboDiscovered` → Store → Persistence
+- `Assets/Trizzle/Tests/Combo/ComboDiscoveryStoreTest.cs`
+- `Assets/Trizzle/Tests/Combo/ComboDiscoveryTrackerTest.cs`
+**Known out-of-scope followups**:
+- `ComboDiscoveryTracker` scene-attach + `_comboRegistry` Inspector wire — pending PR #118 (same scope as ComboRegistry scene-wire; not blocking E4-008 closure)
+- Cloud sync integration via `UserDataToCloud` batch — v1.0 scope allows local PlayerPrefs; cloud sync is a separate enhancement

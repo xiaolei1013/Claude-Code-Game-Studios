@@ -2,15 +2,15 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
-2026-04-07
+2026-04-07 (Proposed) / 2026-04-15 (Accepted) / 2026-04-16 (Amended — see end of file)
 
 ## Last Verified
 
-2026-04-07
+2026-04-16
 
 ## Decision Makers
 
@@ -572,3 +572,117 @@ backward-compatible (Unity ignores unknown serialized fields on ScriptableObject
   trigger conditions, detection flow, tuning knobs, and acceptance criteria
 - `design/gdd/archer-character.md` — N1 GDD, source for 6 Archer-exclusive combos and
   the Archer skill references required by those effects
+
+---
+
+## Amendment 2026-04-16 — Implementation Reality Corrections
+
+Applied during E4-003 (Mage Combo Effects) implementation after a mandatory code audit
+of the shipped codebase revealed four mismatches between this ADR's original Decision
+section and the actual API surface. No Decision is reversed — only clarified/corrected.
+
+### 1. `PlayerController.OnSkillUsed` — event is new, added in E4-003
+
+This ADR assumed an existing skill-activation event. None was shipped. The demo invokes
+skills via direct `skill.Activate(character)` calls inside
+`PlayerController.OnSkillActivation(int skillIndex)` with no event broadcast.
+
+**Resolution:** E4-003 introduces `public event Action<BaseSkill, Vector3> OnSkillUsed`
+on `PlayerController`. The event fires inside the existing 0.2s animation-delay coroutine
+immediately after `skillInstance.Activate(this)` succeeds — the `Vector3` payload is the
+player's cast-commit position (captured before the coroutine) so combo effects can spawn
+ground patches at the correct location.
+
+R-026 is hereby updated: `OnSkillUse` combos subscribe to
+`PlayerController.OnSkillUsed(BaseSkill, Vector3)` in `Activate()`.
+
+### 2. Kill event — `Health.OnDead`, parameterless
+
+This ADR referenced `Health.OnDied`. The actual event is `Health.OnDead` of type `Action`
+(no parameters). There is **no global kill bus**; each enemy's `Health` component exposes
+its own event, fired at `Health.cs:159` when `currentHealth <= 0`.
+
+**Consequence for OnKill combos:** the handler cannot receive the killing skill, damage
+amount, or target reference from the event. The combo must subscribe per-enemy (enemy-spawn
+hook) OR track the last-damage context separately. For E4-003 scope, the simpler pattern
+wins: combos subscribe to `Health.OnDead` on each enemy at spawn time (via an existing
+enemy-spawned hook if available, else at `Activate()` scanning current enemies + subscribing
+to new ones via `SpawnManager` — confirm during impl). `TriggerContext.TargetHealth` is
+populated from the sending `Health`, `DamageAmount` is 0, `TriggerPosition` is the
+`Health.transform.position`.
+
+### 3. Status-check API — `StateMachine.HasDebuffState(StateCategory)`
+
+This ADR used `StateMachine.HasState()` in prose. The actual API is
+`StateMachine.HasDebuffState(StateCategory category)` at `StateMachine.cs:69`. Valid
+enum values: `Frozen`, `Stun`, `Burn`, `Poison`, `MoveSpeedDown` (not `Slowed`).
+
+**Resolution:** Thunderstrike reads `ctx.TargetHealth.GetStateMachine().HasDebuffState(StateCategory.Stun)`.
+Blizzard (on enemy death) reads `enemyHealth.GetStateMachine().HasDebuffState(StateCategory.Frozen)`.
+Executioner uses `StateCategory.MoveSpeedDown` (the in-code name for "Slowed").
+
+### 4. Physics is 3D, not 2D
+
+This ADR's diagram showed `Physics2D.OverlapCircle`. The project uses 3D physics across
+the board — confirmed via three cite sites: `ChargeAbility.cs`, `GroundSlamAbility.cs`,
+`BloodBondSkill.cs`, plus `Utils.cs`.
+
+**Resolution:** Blizzard and Supernova use `Physics.OverlapSphere` (or the non-allocating
+`Physics.OverlapSphereNonAlloc` with a cached buffer — preferred for OnKill combos that
+may fire on multi-kill frames).
+
+### 5. `SpawnManager.SpawnGroundPatch` — does not exist; use prefab pattern
+
+This ADR referenced `SpawnManager.SpawnGroundPatch(pos, params)` for Inferno. No such
+method exists. The shipped pattern for persistent area effects is: `[SerializeField]`
+prefab reference on the skill/effect, `Instantiate(prefab, position, Quaternion.identity)`,
+`<Area>.Initialize(this)` for runtime data, `Destroy(obj, duration)` for auto-cleanup.
+Reference implementation: `IcePondSkill.CreateIcePond` at
+`IcePondSkill.cs:84-96`.
+
+**Resolution:** Inferno holds `[SerializeField] GameObject _burnPatchPrefab`. On trigger,
+instantiates the prefab at `ctx.TriggerPosition`, calls `BurnPatchArea.Initialize(duration, tickInterval)`,
+schedules `Destroy` for `_burnDuration` seconds. A new `BurnPatchArea` MonoBehaviour is
+authored in E4-003 (mirroring `IcePondArea`). The `.prefab` is authored in the Unity Editor
+post-merge (same deferral pattern as N1-006 archer-skill prefabs).
+
+### 6. Venom redesign — duration-multiplier instead of tick-interval
+
+This ADR's Venom spec ("poison tick 1.0s → 0.67s") assumed a shipped poison DoT damage
+tick. The code audit found the DoT damage loop is NOT implemented: `PoisonState` ticks
+only for duration expiry, `DamageCalculator.CalculateDotDamage` exists but has zero
+callers, and neither `PoisonAttackSkill` nor `PoisonState` exposes a tick-interval field.
+Only `BurnState` and `NumbState` ship tick intervals (hardcoded private constants).
+
+**Resolution (V1):** Venom's effect changes from "tick 50% faster" to "duration 50%
+longer". `VenomComboEffect` holds `[SerializeField] PoisonAttackSkill _poisonSkill` +
+`[SerializeField] float _durationMultiplier = 1.5f`. On `Activate()`, stores the current
+`totalDurationInMs` via reflection (private field), writes back `original * multiplier`.
+On `Deactivate()`, writes the stored original back.
+
+**F-003 compliance (runtime SO mutation):** Venom is technically mutating a ScriptableObject
+at runtime, same forbidden pattern that retracted `ComboDatabase.discoveredFlag` in E4-001.
+Tolerated here because (a) `Deactivate()` guarantees restore, (b) `ComboEffect.OnDisable`
+always calls `Deactivate` so Editor play-mode exit restores even on crash-outside-StartDraftRun,
+(c) the mutation is bounded in scope to a single field on a single known asset. This is a
+pragmatic exception, not a general relaxation of F-003. GDD (`combo-synergy-expansion.md`)
+is amended to reflect the new effect text.
+
+**Future work:** If/when the poison DoT damage loop is built as a proper system, Venom
+should migrate to modify that system's tick interval instead of mutating the SO field.
+Tracked as: `Follow-up — rebuild Venom on poison DoT tick system (depends on poison-DoT
+damage story)`.
+
+### Governing Rule Updates
+
+These amendments update (not replace) the following control-manifest rules:
+
+- **R-026** (updated): `OnSkillUse` subscribes to `PlayerController.OnSkillUsed(BaseSkill, Vector3)`. `OnKill` subscribes to `Health.OnDead` (parameterless) per-enemy. `Passive` applies `AttributeModifier.Add()` OR (narrow exception) modifies a specific SO field with guaranteed symmetric restore.
+
+### Amendment Validation Criteria
+
+- [x] Code audit via `/dev-story` subagent found 4 mismatches; all documented and resolved
+- [x] `PlayerController.OnSkillUsed` event added in same branch as E4-003 (not a separate story — too small to warrant split)
+- [ ] E4-003 implementation passes audit against this amendment (validated at `/story-done`)
+- [ ] No new F-003 violations introduced beyond the documented Venom exception
+- [ ] GDD `combo-synergy-expansion.md` reflects Venom duration-not-tick change

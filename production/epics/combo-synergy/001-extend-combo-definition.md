@@ -3,7 +3,7 @@
 > **Epic**: combo-synergy
 > **Type**: Logic
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -70,3 +70,38 @@ Extend the existing `ComboDefinition` class in `ComboDatabase.cs` with four new 
 ## Engine Notes
 
 Uses `[SerializeField]`, `[Serializable]`, and C# enums -- all stable Unity APIs with no post-cutoff changes. Adding serialized fields to an existing `[Serializable]` class is safe in Unity; existing asset data is preserved and new fields initialize to default values (enum 0, null reference, false).
+
+## Completion Notes
+
+**Completed**: 2026-04-15
+**Branch**: `feature/e4-001-extend-combo-definition` (in Trizzle Unity project repo at `/Users/xiaolei/work/Trizzle/`)
+**Verdict**: COMPLETE WITH NOTES
+
+### 2026-04-15 Amendment — `discoveredFlag` + `SetDiscovered()` removed
+
+During E4-002 adversarial review (gstack `/review` on 2026-04-15), Codex + Claude adversarial both flagged that AC-6's `discoveredFlag` + `SetDiscovered()` directly contradict ADR-0003 forbidden pattern F-003 (no runtime writes to SO assets). In the Unity Editor, `SetDiscovered()` would persist the flag across Play sessions, pre-marking every combo as discovered on the second Play press -- silently breaking the combo discovery loop.
+
+**Resolution**: removed both `discoveredFlag` field and `SetDiscovered()` method from `ComboDefinition`. Per-save discovery persistence is owned by save data (E4-008), keyed by combo name. AC-6's requirement for these members was mis-specified; the registry entry `discovered_combos` (save-data-system owner) remains valid.
+
+**AC-6 status**: superseded -- `ComboDefinition` has a `discoveredFlag` field → should have been "Discovery persistence is tracked by save data, not on the SO".
+
+**Criteria**: 7/9 auto-verified, 2/9 deferred to manual Unity Editor verification (AC-8 asset load, AC-9 zero warnings). Deferred checks tracked in `production/qa/evidence/e4-001-extend-combo-definition.md`.
+
+**Files changed**:
+- `Assets/Trizzle/Scripts/Data/ComboDatabase.cs` (modified) -- extended `ComboDefinition` with 4 fields + `SetDiscovered()`
+- `Assets/Trizzle/Scripts/Data/ComboCategory.cs` (new) -- enum `{ Mage, Archer, Universal }`
+- `Assets/Trizzle/Scripts/Data/TriggerCondition.cs` (new) -- enum `{ OnDraft, OnSkillUse, OnKill, Passive }`
+- `Assets/Trizzle/Scripts/Combo/ComboEffect.cs` (new, scope extension) -- empty abstract SO stub; full lifecycle deferred to Story E4-002 per ADR-0003
+- `Assets/Trizzle/Tests/Combo/ComboDefinitionSchemaTest.cs` (new) -- 7 NUnit tests covering enum shape, ComboDefinition defaults, and SetDiscovered semantics (incl. idempotence)
+
+**Deviations**:
+- Scope extension: `ComboEffect.cs` stub created outside story's stated file list. Architecturally required by ADR-0003 for `triggerEffect` field type reference to compile. E4-002 owns the full lifecycle contract (Activate/Deactivate/OnTrigger). Not logged as tech debt -- documented in the stub's `<remarks>` block.
+
+**Test Evidence**: `Assets/Trizzle/Tests/Combo/ComboDefinitionSchemaTest.cs` (7 tests); manual checklist at `production/qa/evidence/e4-001-extend-combo-definition.md` (AC-8 / AC-9 PENDING user walkthrough before branch merge)
+
+**Code Review**: Manual `/code-review` run — APPROVED WITH SUGGESTIONS; both suggestions (idempotence test + manual verification doc) applied before sign-off. `/simplify` pass also applied: `[Serializable]` removed from enums, rotting "E4-007" history trimmed from docs + tests, failure messages added to `Enum.IsDefined` asserts. Director-gate phases (QL-TEST-COVERAGE, LP-CODE-REVIEW) skipped per `lean` review mode.
+
+**Follow-up required before branch merge**:
+1. Open Unity Editor → Test Runner → verify all 7 tests pass
+2. Walk through the 9-item checklist in `production/qa/evidence/e4-001-extend-combo-definition.md`, tick each box, fill in date + verifier
+3. Confirm `ComboDatabase.asset` opens with zero console errors (AC-8), zero compile warnings (AC-9)

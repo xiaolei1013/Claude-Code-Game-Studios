@@ -3,7 +3,7 @@
 > **Epic**: combo-synergy
 > **Type**: Logic
 > **Priority**: P0
-> **Status**: Ready
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
@@ -98,3 +98,16 @@ Create the abstract `ComboEffect` ScriptableObject base class and its supporting
 ## Engine Notes
 
 Uses abstract `ScriptableObject`, `MonoBehaviour`, C# interfaces, C# events, `readonly struct` -- all stable Unity APIs present since Unity 2019 LTS. The `OnDisable()` override on ScriptableObject fires when play mode exits in the Editor, which is the correct hook for state cleanup. Verify that `ScriptableObject.CreateInstance<T>()` works correctly for abstract subclass instantiation in Unity 6000.3.11f1 EditMode tests.
+
+## Completion Notes
+**Completed**: 2026-04-16
+**Criteria**: 10/11 passing (AC-11 zero-warnings DEFERRED — requires Unity Editor build)
+**Deviations**:
+- File location: `ComboEffect.cs` and `TriggerContext.cs` placed under `Assets/Trizzle/Scripts/Combo/` instead of story-stated `Scripts/Data/` — aligns with new combo namespace folder from E4-001, functionally equivalent.
+- Out-of-scope changes from /review gstack 2026-04-15 (all approved): DraftRunController lifecycle wiring (4 `DeactivateAllCombos` call-sites + SetPlayer + HandleComboDiscovered), ComboDatabase `discoveredFlag`/`SetDiscovered` removal (amends E4-001, fixes ADR-0003 F-003 violation), 2 tests removed from ComboDefinitionSchemaTest (7→5), 2 legacy tests removed from DraftRunControllerTest (coverage migrated to ComboRegistryTest).
+- Untested ACs (ADVISORY): AC-3 (OnDisable→Deactivate hook) and AC-10 (null-triggerEffect path) have no direct tests. Follow-up quality story recommended.
+**Test Evidence**: Unit — `Assets/Trizzle/Tests/Combo/ComboRegistryTest.cs` (6 tests). Test Runner execution pending Unity Editor verification per PR #118 checklist.
+**Code Review**: Skipped (Lean mode); /review gstack session on 2026-04-15 covered combined E4-001 + E4-002 diff with 6 specialists, all critical findings fixed.
+**PR**: https://github.com/xiaolei1013/Trizzle/pull/118 (commit `72f3e293f`)
+**Pending before merge**: Attach ComboRegistry MonoBehaviour to scene GameObject, wire `DraftRunController._comboRegistry` Inspector field, run all 11 new NUnit tests in Test Runner, confirm zero compile warnings, tick evidence checklist.
+

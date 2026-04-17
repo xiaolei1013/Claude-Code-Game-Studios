@@ -30,7 +30,7 @@
 #   Superseded entries:     Grep pattern="status: superseded"
 
 version: 1
-last_updated: ""
+last_updated: "2026-04-15"
 
 # ─── STATE OWNERSHIP ─────────────────────────────────────────────────────────
 # Who is the authoritative owner of each piece of shared game state.
@@ -43,7 +43,28 @@ last_updated: ""
 # interface: how other systems access this state (read-only property, method call,
 #   signal, shared resource, etc.) — this is the contract other ADRs depend on.
 
-state_ownership: []
+state_ownership:
+  - state: active_combos_this_run
+    status: active
+    owner_system: combo-system
+    adr: docs/architecture/adr-0003-combo-effect-architecture.md
+    interface: "IComboRegistry.ActiveCombos (read-only IReadOnlyList<ComboDefinition>, valid only during an active run; cleared on DeactivateAllCombos)"
+    write_access: combo-registry-only
+    referenced_by:
+      - docs/architecture/adr-0003-combo-effect-architecture.md
+    added: 2026-04-15
+    revised: ""
+
+  - state: discovered_combos
+    status: active
+    owner_system: save-data-system
+    adr: docs/architecture/adr-0003-combo-effect-architecture.md
+    interface: "Save-data collection of discovered combo identifiers (string-keyed per combo name). Populated by subscribing to IComboRegistry.OnComboDiscovered; never written back to ComboDefinition SO (see forbidden_patterns.runtime_scriptableobject_mutation)."
+    write_access: save-data-system-only
+    referenced_by:
+      - docs/architecture/adr-0003-combo-effect-architecture.md
+    added: 2026-04-15
+    revised: ""
 
 # Example:
 #
@@ -71,7 +92,50 @@ state_ownership: []
 #
 # pattern options: signal | direct_call | event_bus | shared_resource | rpc | none
 
-interfaces: []
+interfaces:
+  - contract: combo_registry_api
+    status: active
+    pattern: interface
+    producer: combo-system
+    consumers:
+      - draft-run-controller     # calls CheckCombos after each draft pick
+      - combo-discovery-ui       # subscribes to OnComboDiscovered
+      - save-data-system         # subscribes to OnComboDiscovered to persist discoveries
+    adr: docs/architecture/adr-0003-combo-effect-architecture.md
+    interface_signature: |
+      interface IComboRegistry {
+        void CheckCombos(IReadOnlyList<BaseSkill> collectedSkills);
+        IReadOnlyList<ComboDefinition> ActiveCombos { get; }
+        event System.Action<ComboDefinition> OnComboDiscovered;  // fires exactly once per new combo per run
+      }
+    referenced_by:
+      - docs/architecture/adr-0003-combo-effect-architecture.md
+    added: 2026-04-15
+    revised: ""
+
+  - contract: combo_effect_lifecycle
+    status: active
+    pattern: abstract_scriptableobject
+    producer: combo-registry
+    consumers:
+      - all-18-concrete-combo-effect-subclasses   # Mage (5), Archer (6), Universal (7)
+    adr: docs/architecture/adr-0003-combo-effect-architecture.md
+    interface_signature: |
+      abstract class ComboEffect : ScriptableObject {
+        abstract void Activate(PlayerController player);   // register events + apply modifiers; calls Deactivate first as guard
+        abstract void Deactivate();                         // unsubscribe + reverse modifiers; idempotent
+        virtual  void OnTrigger(TriggerContext ctx) { }    // runtime behavior (no-op default for Passive)
+      }
+      readonly struct TriggerContext {
+        readonly BaseSkill TriggeringSkill;
+        readonly Health    TargetHealth;
+        readonly float     DamageAmount;
+        readonly Vector3   TriggerPosition;
+      }
+    referenced_by:
+      - docs/architecture/adr-0003-combo-effect-architecture.md
+    added: 2026-04-15
+    revised: ""
 
 # Example:
 #
@@ -100,7 +164,17 @@ interfaces: []
 # Register a budget when an ADR explicitly claims a frame time allocation.
 # The registry lets /architecture-review verify the total doesn't exceed the target.
 
-performance_budgets: []
+performance_budgets:
+  - system: combo-system
+    status: active
+    budget_ms: 0.5
+    platform: All
+    adr: docs/architecture/adr-0003-combo-effect-architecture.md
+    notes: "Covers all 18 simultaneously-active combo effects. Estimated actual cost <0.05 ms/frame — event-driven with zero cost for idle frames. Re-profile after E4-003 Mage effects land; fail the build if any single trigger dispatch exceeds 0.1 ms."
+    referenced_by:
+      - docs/architecture/adr-0003-combo-effect-architecture.md
+    added: 2026-04-15
+    revised: ""
 
 # Example:
 #
@@ -131,7 +205,28 @@ performance_budgets: []
 # Register an API decision when the choice is non-obvious and other ADRs might
 # make a different choice for the same purpose without knowing this was decided.
 
-api_decisions: []
+api_decisions:
+  - purpose: combo_trigger_mechanism
+    status: active
+    api: "event_subscription (PlayerController.OnSkillUsed, Health.OnDied, PlayerController.OnEnemyKilled; subscribed in Activate(), unsubscribed in Deactivate())"
+    not: "per_frame_polling in Update() or coroutine tick loops"
+    adr: docs/architecture/adr-0003-combo-effect-architecture.md
+    reason: "18 simultaneously active effects × 60fps polling would violate the <0.5 ms/frame budget. Event subscription gives zero cost for idle frames. Named methods (not anonymous lambdas) enable clean unsubscription."
+    referenced_by:
+      - docs/architecture/adr-0003-combo-effect-architecture.md
+    added: 2026-04-15
+    revised: ""
+
+  - purpose: trigger_context_passing
+    status: active
+    api: "readonly struct TriggerContext (stack-allocated, pass by copy)"
+    not: "object-boxed parameters or System.Object[] argument arrays"
+    adr: docs/architecture/adr-0003-combo-effect-architecture.md
+    reason: "Combo triggers fire per hit/kill — boxed parameters would churn GC in hot paths. readonly struct is stack-allocated and guarantees zero heap per trigger."
+    referenced_by:
+      - docs/architecture/adr-0003-combo-effect-architecture.md
+    added: 2026-04-15
+    revised: ""
 
 # Example:
 #
@@ -157,7 +252,27 @@ api_decisions: []
 # Register a pattern when an ADR explicitly bans it AND other ADRs might
 # unknowingly use it (i.e., it's a tempting but wrong approach for this project).
 
-forbidden_patterns: []
+forbidden_patterns:
+  - pattern: combo_per_frame_polling
+    status: active
+    description: "ComboEffect subclasses must not poll for trigger conditions in Update() or coroutines. Subscribe to the appropriate C# event in Activate() and unsubscribe in Deactivate()."
+    why: "18 effects × 60 fps polling exceeds the combo-system <0.5 ms/frame budget. Polling also creates hidden coupling between PlayerController state exposure and combo trigger logic. ADR-0003 Open Question A3 explicitly rejected polling."
+    adr: docs/architecture/adr-0003-combo-effect-architecture.md
+    added: 2026-04-15
+
+  - pattern: monobehaviour_combo_effect
+    status: active
+    description: "ComboEffect subclasses must inherit from abstract ScriptableObject, never MonoBehaviour. No AddComponent/Destroy on combo discovery/run-end."
+    why: "AddComponent/Destroy allocates heap memory, triggering GC at combo discovery and run end. MonoBehaviours can't be authored as flat assets in ComboDatabase without prefab indirection, creating unnecessary authoring friction for a solo developer workflow. ADR-0003 Alternative 1 rejection reason."
+    adr: docs/architecture/adr-0003-combo-effect-architecture.md
+    added: 2026-04-15
+
+  - pattern: runtime_scriptableobject_mutation
+    status: active
+    description: "Systems must not write back to ScriptableObject assets at runtime. Transient runtime state (e.g., ComboDefinition.discoveredFlag when persisted across sessions) belongs in save data, not on the SO asset."
+    why: "In Editor, SO mutations persist between play sessions, masking reset bugs and faking persistence. In standalone builds, SO assets are effectively read-only — writes would fail silently or corrupt the asset database. Per-player/per-save state belongs in save data keyed by a stable identifier (e.g., combo name)."
+    adr: docs/architecture/adr-0003-combo-effect-architecture.md
+    added: 2026-04-15
 
 # Example:
 #

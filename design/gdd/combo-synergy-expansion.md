@@ -77,7 +77,7 @@ ComboDefinition
 | 1 | Inferno | FireballSkill | BurnAttackSkill | OnSkillUse | Fireball explosions leave a burning ground patch (3s, ticks Burn damage) |
 | 2 | Blizzard | FrostShardSkill | FreezeAttackSkill | OnKill | Killed frozen enemies explode in a frost nova (3-unit radius, applies Slow) |
 | 3 | Thunderstrike | LightningBoltSkill | StunAttackSkill | OnSkillUse | Stunned enemies take 2x damage from Lightning attacks |
-| 4 | Venom | PoisonCloudSkill | PoisonAttackSkill | Passive | Poison stacks 50% faster (tick interval reduced from 1.0s to 0.67s) |
+| 4 | Venom | PoisonCloudSkill | PoisonAttackSkill | Passive | Poison duration extended by 50% while combo active (amended 2026-04-16 — original design "tick interval 1.0s→0.67s" replaced; see ADR-0003 Amendment §6 for rationale: poison DoT tick damage loop is not shipped) |
 | 5 | Supernova | SolarFlareSkill | ExplosionAttackSkill | OnKill | Kills have a 25% chance to trigger a secondary explosion (50% original damage, 4-unit radius) |
 
 **Archer-Exclusive Combos (6):**
