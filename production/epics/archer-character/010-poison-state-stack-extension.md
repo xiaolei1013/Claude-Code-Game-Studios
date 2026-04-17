@@ -3,7 +3,7 @@
 > **Epic**: archer-character
 > **Type**: Logic
 > **Priority**: P2
-> **Status**: Draft
+> **Status**: Complete
 > **Manifest Version**: 2026-04-08-v1
 > **Estimated Effort**: M
 
