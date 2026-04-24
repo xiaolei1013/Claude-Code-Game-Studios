@@ -1,7 +1,7 @@
 # Story 001: TickSystem autoload skeleton
 
 > **Epic**: tick-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24
@@ -97,3 +97,14 @@
 
 - **Depends on**: None
 - **Unlocks**: Story 002
+
+
+## Completion Notes
+
+**Completed**: 2026-04-24
+**Criteria**: 4/4 passing
+**Story Type**: Logic
+**Test Evidence**: tests/unit/tick_system/tick_system_autoload_skeleton_test.gd (11/11 pass)
+**Deviations**: class_name TickSystem removed (conflicted with autoload singleton of same name). Test-file type annotations use preload pattern.
+**Code Review**: Skipped — review mode solo (per production/review-mode.txt)
+**Next**: Sprint-close sequence (/smoke-check sprint → /team-qa sprint → /gate-check)

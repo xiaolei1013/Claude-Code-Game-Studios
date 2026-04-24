@@ -1,7 +1,7 @@
 # Story 001: DataRegistry autoload skeleton and state machine
 
 > **Epic**: data-registry
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24
@@ -107,3 +107,14 @@
 
 - **Depends on**: None
 - **Unlocks**: Story 002, Story 003
+
+
+## Completion Notes
+
+**Completed**: 2026-04-24
+**Criteria**: 5/5 passing
+**Story Type**: Logic
+**Test Evidence**: tests/unit/data_registry/autoload_skeleton_and_state_machine_test.gd (6/6 pass)
+**Deviations**: class_name DataRegistry removed (same autoload-singleton conflict as TickSystem). Tests updated to override `min_content_count = {}` after S1-N1 added default thresholds.
+**Code Review**: Skipped — review mode solo (per production/review-mode.txt)
+**Next**: Sprint-close sequence (/smoke-check sprint → /team-qa sprint → /gate-check)

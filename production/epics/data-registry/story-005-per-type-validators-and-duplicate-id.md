@@ -1,7 +1,7 @@
 # Story 005: Per-type validators, duplicate id detection, and min_content_count
 
 > **Epic**: data-registry
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24
@@ -111,3 +111,14 @@
 
 - **Depends on**: Story 003, Story 004
 - **Unlocks**: Story 006
+
+
+## Completion Notes
+
+**Completed**: 2026-04-24
+**Criteria**: 6/6 passing
+**Story Type**: Logic
+**Test Evidence**: tests/unit/data_registry/per_type_validators_and_duplicate_id_test.gd (3/3 pass — plus 5 id-validation micro-tests)
+**Deviations**: Per-type field validator hook (_validate_resource_fields) ships as no-op seam; concrete HeroClass/EnemyData/Biome/Dungeon/Floor validators land with Core DB epics (ADR-0011) outside Sprint 1.
+**Code Review**: Skipped — review mode solo (per production/review-mode.txt)
+**Next**: Sprint-close sequence (/smoke-check sprint → /team-qa sprint → /gate-check)

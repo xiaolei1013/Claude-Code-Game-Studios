@@ -17,9 +17,8 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-; Autoloads land here in Sprint 1 via /dev-story (per ADR-0003 rank table):
-; TickSystem="*res://src/core/tick_system/tick_system.gd"    (rank 0 — S1-M1)
-; DataRegistry="*res://src/core/data_registry/data_registry.gd"  (rank 1 — S1-M3)
+TickSystem="*res://src/core/tick_system/tick_system.gd"
+DataRegistry="*res://src/core/data_registry/data_registry.gd"
 
 [display]
 

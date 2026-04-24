@@ -1,7 +1,7 @@
 # Story 004: `resolve()` API and typed category accessors
 
 > **Epic**: data-registry
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24
@@ -112,3 +112,14 @@
 
 - **Depends on**: Story 003
 - **Unlocks**: Story 005, Story 006, Story 007
+
+
+## Completion Notes
+
+**Completed**: 2026-04-24
+**Criteria**: 7/7 passing
+**Story Type**: Logic
+**Test Evidence**: tests/unit/data_registry/resolve_api_and_typed_accessors_test.gd (10/10 pass)
+**Deviations**: Typed per-category accessors (get_all_classes/get_class_by_id/etc.) deferred to future per-DB consumer stories per ADR-0006 and story Out-of-Scope. Only category-agnostic resolve()/get_all_by_type() shipped.
+**Code Review**: Skipped — review mode solo (per production/review-mode.txt)
+**Next**: Sprint-close sequence (/smoke-check sprint → /team-qa sprint → /gate-check)

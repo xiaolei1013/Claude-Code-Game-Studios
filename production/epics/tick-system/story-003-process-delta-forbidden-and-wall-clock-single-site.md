@@ -1,7 +1,7 @@
 # Story 003: `_process(delta)` forbidden-as-economy-input and wall-clock single call site
 
 > **Epic**: tick-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24
@@ -95,3 +95,14 @@
 
 - **Depends on**: Story 002 must be DONE
 - **Unlocks**: Story 005
+
+
+## Completion Notes
+
+**Completed**: 2026-04-24
+**Criteria**: 4/4 passing
+**Story Type**: Logic
+**Test Evidence**: tests/unit/tick_system/process_delta_forbidden_wall_clock_single_call_site_test.gd (8/8 pass)
+**Deviations**: None. `_read_wall_clock_unix_time()` is the single call site; CI grep invariant verified in-test.
+**Code Review**: Skipped — review mode solo (per production/review-mode.txt)
+**Next**: Sprint-close sequence (/smoke-check sprint → /team-qa sprint → /gate-check)

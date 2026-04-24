@@ -1,7 +1,7 @@
 # Story 004: Platform BG/FG notifications and tick-emission pause with residual preservation
 
 > **Epic**: tick-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Integration
 > **Manifest Version**: 2026-04-24
@@ -111,3 +111,14 @@
 
 - **Depends on**: Story 002 must be DONE
 - **Unlocks**: Story 008
+
+
+## Completion Notes
+
+**Completed**: 2026-04-24
+**Criteria**: 6/6 passing
+**Story Type**: Integration
+**Test Evidence**: tests/integration/tick_system/platform_notifications_bg_fg_pause_residual_preservation_test.gd (5/5 pass)
+**Deviations**: MEDIUM-risk engine verification still pending: mobile `NOTIFICATION_APPLICATION_PAUSED` hardware handshake on Steam Deck + mobile simulator. Unit-level behavior fully verified.
+**Code Review**: Skipped — review mode solo (per production/review-mode.txt)
+**Next**: Sprint-close sequence (/smoke-check sprint → /team-qa sprint → /gate-check)

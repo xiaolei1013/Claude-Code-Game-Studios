@@ -15,88 +15,88 @@ stories:
     name: "TickSystem autoload skeleton"
     file: "production/epics/tick-system/story-001-tick-system-autoload-skeleton.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_hours: 2
     blocker: ""
-    completed: ""
+    completed: "2026-04-24"
 
   - id: "S1-M2"
     name: "Integer accumulator and tick_fired synchronous emission"
     file: "production/epics/tick-system/story-002-integer-accumulator-and-tick-fired-emission.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_hours: 3
     blocker: ""
-    completed: ""
+    completed: "2026-04-24"
 
   - id: "S1-M3"
     name: "DataRegistry autoload skeleton and state machine"
     file: "production/epics/data-registry/story-001-autoload-skeleton-and-state-machine.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_hours: 2
     blocker: ""
-    completed: ""
+    completed: "2026-04-24"
 
   - id: "S1-M4"
     name: "GameData abstract base and archetype/role constant sets"
     file: "production/epics/data-registry/story-002-gamedata-base-and-constant-sets.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_hours: 3
     blocker: ""
-    completed: ""
+    completed: "2026-04-24"
 
   - id: "S1-M5"
     name: "Boot scan load order and per-category enumeration"
     file: "production/epics/data-registry/story-003-boot-scan-load-order.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_hours: 3
     blocker: ""
-    completed: ""
+    completed: "2026-04-24"
 
   - id: "S1-S1"
     name: "_process(delta) forbidden as economy input and wall-clock single call site"
     file: "production/epics/tick-system/story-003-process-delta-forbidden-and-wall-clock-single-site.md"
     priority: should-have
-    status: backlog
+    status: done
     owner: ""
     estimate_hours: 2
     blocker: ""
-    completed: ""
+    completed: "2026-04-24"
 
   - id: "S1-S2"
     name: "resolve() API and typed category accessors"
     file: "production/epics/data-registry/story-004-resolve-api-and-typed-accessors.md"
     priority: should-have
-    status: backlog
+    status: done
     owner: ""
     estimate_hours: 3
     blocker: ""
-    completed: ""
+    completed: "2026-04-24"
 
   - id: "S1-N1"
     name: "Per-type validators, duplicate id detection, min_content_count"
     file: "production/epics/data-registry/story-005-per-type-validators-and-duplicate-id.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: ""
     estimate_hours: 3
     blocker: ""
-    completed: ""
+    completed: "2026-04-24"
 
   - id: "S1-N2"
     name: "Platform BG/FG notifications and tick-emission pause with residual preservation"
     file: "production/epics/tick-system/story-004-platform-bg-fg-notifications-and-emission-pause.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: ""
     estimate_hours: 4
     blocker: ""
-    completed: ""
+    completed: "2026-04-24"

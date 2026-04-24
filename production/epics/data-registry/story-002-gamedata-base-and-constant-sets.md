@@ -1,7 +1,7 @@
 # Story 002: GameData abstract base and archetype/role constant sets
 
 > **Epic**: data-registry
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24
@@ -99,3 +99,14 @@
 
 - **Depends on**: Story 001 (autoload skeleton)
 - **Unlocks**: Story 003, Story 005
+
+
+## Completion Notes
+
+**Completed**: 2026-04-24
+**Criteria**: 2/2 passing
+**Story Type**: Logic
+**Test Evidence**: tests/unit/data_registry/gamedata_base_and_constant_sets_test.gd (6/6 pass)
+**Deviations**: `const MVP_SET/ALL_SET = PackedStringArray([...])` changed to `const ... = Array[String]` — constructor calls aren't constant expressions in Godot 4.6. MEDIUM-risk engine verification still pending: `@abstract` keyword editor 'New Resource' UI probe on Godot 4.6.1.
+**Code Review**: Skipped — review mode solo (per production/review-mode.txt)
+**Next**: Sprint-close sequence (/smoke-check sprint → /team-qa sprint → /gate-check)

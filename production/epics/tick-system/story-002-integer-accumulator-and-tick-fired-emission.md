@@ -1,7 +1,7 @@
 # Story 002: Integer accumulator and `tick_fired` synchronous emission
 
 > **Epic**: tick-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24
@@ -101,3 +101,14 @@
 
 - **Depends on**: Story 001 must be DONE
 - **Unlocks**: Story 003
+
+
+## Completion Notes
+
+**Completed**: 2026-04-24
+**Criteria**: 7/7 passing
+**Story Type**: Logic
+**Test Evidence**: tests/unit/tick_system/integer_accumulator_tick_fired_emission_test.gd (10/10 pass)
+**Deviations**: AC-TICK-01 catch-up edge test uses `_process(1.001)` instead of `_process(1.0)` to sidestep IEEE-754 rounding (20 × 0.05 ≠ 1.0 exactly).
+**Code Review**: Skipped — review mode solo (per production/review-mode.txt)
+**Next**: Sprint-close sequence (/smoke-check sprint → /team-qa sprint → /gate-check)

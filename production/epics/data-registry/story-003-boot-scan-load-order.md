@@ -1,7 +1,7 @@
 # Story 003: Boot scan load order and per-category enumeration
 
 > **Epic**: data-registry
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24
@@ -125,3 +125,14 @@
 
 - **Depends on**: Story 001, Story 002
 - **Unlocks**: Story 004, Story 005
+
+
+## Completion Notes
+
+**Completed**: 2026-04-24
+**Criteria**: 8/8 passing
+**Story Type**: Logic
+**Test Evidence**: tests/unit/data_registry/boot_scan_load_order_test.gd (7/7 pass)
+**Deviations**: `const ORDERED_CATEGORIES: PackedStringArray = PackedStringArray([...])` changed to `const ... = Array[String] = [...]`. Tests updated to call `_make_registry()` helper (adds `min_content_count = {}`) after S1-N1 thresholds landed.
+**Code Review**: Skipped — review mode solo (per production/review-mode.txt)
+**Next**: Sprint-close sequence (/smoke-check sprint → /team-qa sprint → /gate-check)

@@ -23,6 +23,9 @@ expansions/
 # Created on first use by /consistency-check and /architecture-review
 docs/consistency-failures.md
 
+# GdUnit4 HTML/XML test reports (regenerated on every test run)
+reports/
+
 # === Build Output ===
 build/
 builds/
