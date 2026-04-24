@@ -90,4 +90,12 @@ None — this is Sprint 1.
 
 ## QA Plan Status
 
-⚠️ **No QA plan yet**. Run `/qa-plan sprint` before starting S1-M1 implementation — the stories already carry Given/When/Then QA test cases, but a per-sprint QA plan adds cross-story testing strategy, smoke scope, severity classification, and QA sign-off criteria. The Production → Polish gate requires the QA plan, so landing it early is cheap insurance.
+✅ **QA plan landed 2026-04-24** → `production/qa/qa-plan-sprint-1-2026-04-24.md`
+
+Classification: 8 Logic + 1 Integration. No Visual/Feel, UI, or Config/Data stories. Per-story Given/When/Then QA cases live in each story file; the QA plan adds cross-story strategy, `project.godot` lockstep audit, smoke scope delta, severity classification (S1/S2 block sprint close), and DoD.
+
+Key QA gates for this sprint:
+- Every Logic story → unit test file under `tests/unit/[system]/` must exist and pass before `/story-done`
+- S1-M4 supplement: editor-probe evidence doc for `@abstract` behavior (manual)
+- S1-N2 supplement: hardware handshake evidence doc for Steam Deck + mobile simulator BG/FG (manual)
+- Every autoload story (S1-M1, S1-M3): `project.godot` + architecture.md + control-manifest lockstep audit
