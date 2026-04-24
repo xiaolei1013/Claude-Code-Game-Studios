@@ -5,7 +5,7 @@
 > **Architecture Module**: `SceneManager` (autoload rank ≥6, OQ-8 unassigned)
 > **Control Manifest Version**: 2026-04-24
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories scene-manager`
+> **Stories**: 10 defined (all Ready)
 
 ## Overview
 
@@ -83,6 +83,23 @@ This epic is complete when:
 - Every `Screen` subclass declares all 4 lifecycle hooks (CI check per ADR-0007)
 - `MainRoot.theme` preload wiring present; `UIFramework.assert_tap_target_min` called in every interactive Control's `_ready()` (ADR-0008)
 
+## Stories
+
+| # | Story | Type | Status | Governing ADR |
+|---|---|---|---|---|
+| 001 | `MainRoot.tscn` persistent-root scene + four CanvasLayer children | Integration | Ready | ADR-0007 (+ ADR-0008) |
+| 002 | SceneManager autoload skeleton + four-state machine + DataRegistry gating | Logic | Ready | ADR-0007 (+ ADR-0003) |
+| 003 | `request_screen` sole external API + `ScreenContainer` node-swap + first-launch routing | Integration | Ready | ADR-0007 (+ ADR-0014 coordination) |
+| 004 | `Screen extends Control` base class + four lifecycle hooks + CI grep enforcement | Logic | Ready | ADR-0007 |
+| 005 | Tween-based 5 standard transitions + `_active_transition_tween` leak guard + H-01 timing | Logic | Ready | ADR-0007 |
+| 006 | CEREMONY transition exclusively via `AnimationPlayer` | Integration | Ready | ADR-0007 |
+| 007 | Modal overlay API (`push_overlay` / `pop_overlay`) + counter-based `_modal_pause_count` | Logic | Ready | ADR-0007 (+ ADR-0005) |
+| 008 | `scene_boundary_persist` narrow trigger + `save_failed` abort path + cozy modal | Integration | Ready | ADR-0007 (+ ADR-0004) |
+| 009 | `reduce_motion` accessibility flag + offline-replay cozy-modal coordination | Integration | Ready | ADR-0007 (+ ADR-0014, ADR-0008) |
+| 010 | Edge cases (input-block, back-to-back queue, BG mid-transition) + performance verification (H-10, H-11, H-12) | Integration (Performance) | Ready | ADR-0007 (+ ADR-0008, ADR-0005) |
+
+**Dependency chain**: 001 → 002 → {003 ∥ 004} → 005 → {006, 007} → 008 → 009 → 010. Stories 003 and 004 are parallelizable once 002 is done (003 calls the hooks; 004 declares them — contract-by-coordination). Stories 006 and 007 are parallelizable once 005 is done. Story 010 is the final verification across all prior invariants (H-04, H-05, H-09, H-10, H-11, H-12 evidence).
+
 ## Next Step
 
-Run `/create-stories scene-manager` to break this epic into implementable stories.
+Begin implementation with Story 001 (`MainRoot.tscn` persistent-root scene). Each story is scoped for a focused 2–4 hour session; verify AC evidence with `/story-done` before advancing.

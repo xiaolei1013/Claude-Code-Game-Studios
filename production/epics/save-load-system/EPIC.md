@@ -5,7 +5,7 @@
 > **Architecture Module**: `SaveLoadSystem` (autoload rank 2)
 > **Control Manifest Version**: 2026-04-24
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories save-load-system`
+> **Stories**: 15 defined (all Ready)
 
 ## Overview
 
@@ -68,6 +68,28 @@ This epic is complete when:
 - No identifier in SaveLoadSystem or HMAC fragment autoloads contains "key"/"secret"/"hmac" (CI grep enforced)
 - Visual/Feel stories (save-failed cozy modal copy) have evidence docs with sign-off in `tests/evidence/`
 
+## Stories
+
+| # | Story | Type | Status | Governing ADR |
+|---|-------|------|--------|---------------|
+| 001 | SaveLoadSystem autoload skeleton + CONSUMER_PATHS + state machine | Logic | Ready | ADR-0003, ADR-0004, ADR-0007 |
+| 002 | Save envelope binary layout + little-endian encode/decode | Logic | Ready | ADR-0004 |
+| 003 | XOR mask — SHA256-derived seed + chunk-indexed mask stream | Logic | Ready | ADR-0004 |
+| 004 | HMAC-SHA256 GDScript wrapper + 7 RFC 4231 test vectors (BLOCKING gate) | Logic | Ready | ADR-0004 |
+| 005 | HMAC key derivation — multi-part assembly + N=2 build-version rotation | Logic | Ready | ADR-0004 |
+| 006 | Validation order (MAGIC → VERSION → HMAC) + DoS-safe pre-HMAC buffer | Logic | Ready | ADR-0004 |
+| 007 | Consumer persist/hydrate contract + ordered consumer loop | Integration | Ready | ADR-0003, ADR-0004, ADR-0014 |
+| 008 | Atomic write order + iOS/Android `.commit` marker fallback + `.bak` | Integration | Ready | ADR-0004 |
+| 009 | `_meta` namespace — slot_index, save_sequence_number, tamper counters | Logic | Ready | ADR-0004 |
+| 010 | Schema VERSION migration path (placeholder for MVP) | Integration | Ready | ADR-0004, ADR-0003 |
+| 011 | Heartbeat partial-envelope — `request_heartbeat_persist` (≤512 bytes) | Integration | Ready | ADR-0005, ADR-0004 |
+| 012 | Scene-boundary persist + `save_failed` abort modal coupling | Integration | Ready | ADR-0007, ADR-0004 |
+| 013 | Tamper detection — HMAC fail + `.bak` fallback + counter increment | Integration | Ready | ADR-0004, ADR-0007 |
+| 014 | CI identifier-substring grep + production-build surfacing contract | Config/Data | Ready | ADR-0004 (AC-SL-TAMPER-05) |
+| 015 | Performance verification — persist/load budgets + file size | Integration (Performance) | Ready | ADR-0004, ADR-0005 |
+
+**Dependency chain**: 001 → 002 → 003 → 004 (BLOCKING gate AC-SL-HMAC-01) → 005 → 006 → 007 → 008 → 009 → 010; 011 + 012 depend on 007-009; 013 gated on 004 + 006-009; 014 scans files from 001-013; 015 measures the full pipeline (depends on all).
+
 ## Next Step
 
-Run `/create-stories save-load-system` to break this epic into implementable stories.
+Begin implementation with Story 001. Story 004 is the BLOCKING gate for all AC-SL-TAMPER-* ACs — all 7 RFC 4231 vectors must pass bit-exactly before Story 013 tamper detection runs.

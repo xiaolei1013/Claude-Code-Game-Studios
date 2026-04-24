@@ -5,7 +5,7 @@
 > **Architecture Module**: `DataRegistry` (autoload rank 1)
 > **Control Manifest Version**: 2026-04-24
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories data-registry`
+> **Stories**: 8 defined (all Ready)
 
 ## Overview
 
@@ -70,6 +70,21 @@ This epic is complete when:
 - No `ResourceLoader.load("res://assets/data/...")` outside DataRegistry (CI grep per ADR-0006)
 - No consumer mutates a Resource returned by accessors (CI assertion per ADR-0006)
 - No filename-as-id assignments; `id` is authored `snake_case` (CI grep per ADR-0011)
+
+## Stories
+
+| # | Story | Type | Status | Governing ADR |
+|---|---|---|---|---|
+| 001 | DataRegistry autoload skeleton and state machine | Logic | Ready | ADR-0006 + ADR-0003 |
+| 002 | GameData abstract base and archetype/role constant sets | Logic | Ready | ADR-0006 + ADR-0011 |
+| 003 | Boot scan load order and per-category enumeration | Logic | Ready | ADR-0006 |
+| 004 | `resolve()` API and typed category accessors | Logic | Ready | ADR-0006 |
+| 005 | Per-type validators, duplicate id detection, and `min_content_count` | Logic | Ready | ADR-0006 + ADR-0011 |
+| 006 | Cross-reference DAG validation and cross-type invariants | Logic | Ready | ADR-0006 + ADR-0011 |
+| 007 | Hot-reload, immutability enforcement, and SaveLoadSystem hydration gate | Integration | Ready | ADR-0006 + ADR-0003 |
+| 008 | Boot scan performance budget (MVP <200 ms on min-spec mobile) | Integration | Ready | ADR-0006 |
+
+**Dependency chain**: 001 → 002 → 003 → 004 → 005 → 006 → 007 → 008 (strictly sequential; each story unlocks only the next numbered story).
 
 ## Next Step
 
