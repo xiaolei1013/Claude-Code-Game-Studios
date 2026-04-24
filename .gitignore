@@ -26,6 +26,10 @@ docs/consistency-failures.md
 # GdUnit4 HTML/XML test reports (regenerated on every test run)
 reports/
 
+# GdUnit4 test-run fixture subdirs (regenerated per test; only the canonical
+# helper files under tests/fixtures/data_registry/ belong in git)
+tests/fixtures/data_registry/*/
+
 # === Build Output ===
 build/
 builds/
