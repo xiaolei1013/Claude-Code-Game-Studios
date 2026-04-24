@@ -23,6 +23,7 @@
 extends GdUnitTestSuite
 
 const DataRegistryScript = preload("res://src/core/data_registry/data_registry.gd")
+const DataRegistryFixtures = preload("res://tests/fixtures/data_registry/fixture_helpers.gd")
 
 
 # ---------------------------------------------------------------------------
@@ -54,61 +55,6 @@ class _FieldValidatorRegistry extends DataRegistryScript:
 const FIXTURE_ROOT: String = "res://tests/fixtures/data_registry/validators/"
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-## Creates the fixture directory tree and saves the provided content map.
-##
-## [param fixture_map]: Dictionary of shape
-##   { "category": [ { "id": "...", "display_name": "..." }, ... ] }
-## All categories present as keys will have their directories created even if
-## the value array is empty.
-func _write_fixtures(fixture_map: Dictionary) -> void:
-	for category: String in fixture_map:
-		var dir_path: String = FIXTURE_ROOT + category
-		DirAccess.make_dir_recursive_absolute(
-			ProjectSettings.globalize_path(dir_path)
-		)
-		for entry: Dictionary in fixture_map[category]:
-			var res: TestContentType = TestContentType.new()
-			res.id = entry.get("id", "")
-			res.display_name = entry.get("display_name", "")
-			ResourceSaver.save(
-				res,
-				"%s/%s.tres" % [dir_path, res.id if res.id != "" else "unnamed"]
-			)
-
-
-## Recursively removes a directory and all its contents.
-##
-## Deletes all files first, then removes the (now-empty) directory.
-## Handles one level of subdirectory depth — sufficient for the flat
-## fixture structure used in this test suite.
-func _remove_dir_recursive(path: String) -> void:
-	var abs_path: String = ProjectSettings.globalize_path(path)
-	var da: DirAccess = DirAccess.open(path)
-	if da == null:
-		return
-	da.list_dir_begin()
-	var entry: String = da.get_next()
-	while entry != "":
-		if entry == "." or entry == "..":
-			entry = da.get_next()
-			continue
-		var full: String = path + "/" + entry
-		if da.current_is_dir():
-			_remove_dir_recursive(full)
-		else:
-			DirAccess.remove_absolute(ProjectSettings.globalize_path(full))
-		entry = da.get_next()
-	da.list_dir_end()
-	DirAccess.remove_absolute(abs_path)
-
-
-## Tears down the entire FIXTURE_ROOT tree after each test.
-func _cleanup_fixtures() -> void:
-	_remove_dir_recursive(FIXTURE_ROOT.trim_suffix("/"))
 
 
 ## Creates a fresh DataRegistry pointing at FIXTURE_ROOT with
@@ -129,7 +75,7 @@ func _make_registry() -> DataRegistry:
 # ---------------------------------------------------------------------------
 
 func after_test() -> void:
-	_cleanup_fixtures()
+	DataRegistryFixtures.cleanup(FIXTURE_ROOT)
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +142,7 @@ func test_duplicate_id_within_category_transitions_to_error() -> void:
 # ---------------------------------------------------------------------------
 func test_malformed_tres_file_is_skipped_state_remains_ready() -> void:
 	# Arrange — one valid .tres + one garbage file that ResourceLoader returns null for
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [{"id": "hero_warrior", "display_name": "Warrior"}],
 	})
 
@@ -241,7 +187,7 @@ func test_malformed_tres_file_is_skipped_state_remains_ready() -> void:
 # ---------------------------------------------------------------------------
 func test_below_min_content_count_transitions_to_error() -> void:
 	# Arrange — 2 valid classes; default min_content_count requires 3
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [
 			{"id": "hero_warrior", "display_name": "Warrior"},
 			{"id": "hero_mage", "display_name": "Mage"},
@@ -442,7 +388,7 @@ func test_id_with_hyphens_transitions_to_error() -> void:
 # ---------------------------------------------------------------------------
 func test_per_type_field_validator_hook_routes_errors_to_transition_to_error() -> void:
 	# Arrange — one valid class; _FieldValidatorRegistry always rejects "classes"
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [{"id": "hero_warrior", "display_name": "Warrior"}],
 	})
 

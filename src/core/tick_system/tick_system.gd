@@ -87,7 +87,7 @@ signal tick_fired(tick_number: int)
 ## is true when the delta exceeded offline_cap_seconds.
 signal offline_elapsed_seconds(seconds: float, cap_reached: bool)
 
-## Emitted when the wall-clock timestamp rewinds beyond REWIND_TOLERANCE_SECONDS,
+## Emitted when the wall-clock timestamp rewinds beyond rewind_tolerance_seconds,
 ## indicating a suspicious system-clock adjustment.
 signal flag_suspicious_timestamp_emitted(previous_ts: int, current_ts: int)
 
@@ -100,7 +100,7 @@ signal flag_suspicious_timestamp_emitted(previous_ts: int, current_ts: int)
 @export var offline_cap_seconds: int = 28_800
 
 ## Tolerance for backward clock jumps before flagging as suspicious, in seconds.
-@export var REWIND_TOLERANCE_SECONDS: int = 300
+@export var rewind_tolerance_seconds: int = 300
 
 ## Interval at which the session high-water timestamp is persisted, in seconds.
 @export var heartbeat_interval_seconds: int = 60
@@ -193,27 +193,20 @@ func _notification(what: int) -> void:
 ## Example:
 ##   tick_system._process(0.1)  # emits tick_fired(1) then tick_fired(2)
 func _process(delta: float) -> void:
-	# TODO (Story 008): heartbeat accumulator must still advance under UI pause
-	# (TR-time-034). Currently we early-return on both BG and UI-paused because
-	# there is no heartbeat code to gate. When heartbeat lands, restructure
-	# this so only the tick-emission branch is suppressed under UI pause.
+	# TODO(heartbeat): under UI pause, the heartbeat accumulator must still
+	# advance (TR-time-034); only tick emission is suppressed. When heartbeat
+	# lands, split this early-return so UI pause bypasses only the emission
+	# branch, not the whole function.
 	if _app_state != AppState.FOREGROUND or _ui_paused:
 		return
 	_tick_accumulator_seconds += delta
 	while _tick_accumulator_seconds >= _TICK_INTERVAL_SECONDS:
 		_tick_accumulator_seconds -= _TICK_INTERVAL_SECONDS
-		var _previous_counter: int = _sim_tick_counter
 		_sim_tick_counter += 1
-		assert(_sim_tick_counter > _previous_counter, \
-			"TickSystem: _sim_tick_counter decreased — monotonic invariant violated")
 		tick_fired.emit(_sim_tick_counter)  # synchronous — NEVER call_deferred
 
 # ---------------------------------------------------------------------------
 # Public API
-## Story 002 fills in accumulator + tick emission (done above).
-## Story 004 adds set_ui_paused (done below).
-## Story 008 wires SaveLoadSystem to call set_last_persist_ts /
-## set_session_high_water on heartbeat.
 # ---------------------------------------------------------------------------
 
 ## Returns the current wall-clock time as a Unix timestamp in milliseconds.

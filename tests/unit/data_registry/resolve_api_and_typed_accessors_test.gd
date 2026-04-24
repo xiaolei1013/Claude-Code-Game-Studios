@@ -21,6 +21,7 @@
 extends GdUnitTestSuite
 
 const DataRegistryScript = preload("res://src/core/data_registry/data_registry.gd")
+const DataRegistryFixtures = preload("res://tests/fixtures/data_registry/fixture_helpers.gd")
 
 
 # ---------------------------------------------------------------------------
@@ -33,61 +34,6 @@ const DataRegistryScript = preload("res://src/core/data_registry/data_registry.g
 const FIXTURE_ROOT: String = "res://tests/fixtures/data_registry/resolve_api/"
 
 
-# ---------------------------------------------------------------------------
-# Helpers — fixture I/O (mirrors boot_scan_load_order_test.gd pattern)
-# ---------------------------------------------------------------------------
-
-## Creates the fixture directory tree and saves the provided content map.
-##
-## [param fixture_map]: Dictionary of shape
-##   { "category": [ { "id": "...", "display_name": "..." }, ... ] }
-## All categories present as keys will have their directories created even if
-## the value array is empty.
-func _write_fixtures(fixture_map: Dictionary) -> void:
-	for category: String in fixture_map:
-		var dir_path: String = FIXTURE_ROOT + category
-		DirAccess.make_dir_recursive_absolute(
-			ProjectSettings.globalize_path(dir_path)
-		)
-		for entry: Dictionary in fixture_map[category]:
-			var res: TestContentType = TestContentType.new()
-			res.id = entry.get("id", "")
-			res.display_name = entry.get("display_name", "")
-			ResourceSaver.save(
-				res,
-				"%s/%s.tres" % [dir_path, res.id if res.id != "" else "unnamed"]
-			)
-
-
-## Recursively removes a directory and all its contents.
-##
-## Deletes all files first, then removes the (now-empty) directory.
-## Handles one level of subdirectory depth — sufficient for the flat
-## fixture structure used in this test suite.
-func _remove_dir_recursive(path: String) -> void:
-	var abs_path: String = ProjectSettings.globalize_path(path)
-	var da: DirAccess = DirAccess.open(path)
-	if da == null:
-		return
-	da.list_dir_begin()
-	var entry: String = da.get_next()
-	while entry != "":
-		if entry == "." or entry == "..":
-			entry = da.get_next()
-			continue
-		var full: String = path + "/" + entry
-		if da.current_is_dir():
-			_remove_dir_recursive(full)
-		else:
-			DirAccess.remove_absolute(ProjectSettings.globalize_path(full))
-		entry = da.get_next()
-	da.list_dir_end()
-	DirAccess.remove_absolute(abs_path)
-
-
-## Tears down the entire FIXTURE_ROOT tree after each test.
-func _cleanup_fixtures() -> void:
-	_remove_dir_recursive(FIXTURE_ROOT.trim_suffix("/"))
 
 
 ## Boots a fresh DataRegistry pointing at FIXTURE_ROOT.
@@ -108,7 +54,7 @@ func _boot_registry() -> DataRegistry:
 # ---------------------------------------------------------------------------
 
 func after_test() -> void:
-	_cleanup_fixtures()
+	DataRegistryFixtures.cleanup(FIXTURE_ROOT)
 
 
 # ---------------------------------------------------------------------------
@@ -119,7 +65,7 @@ func after_test() -> void:
 # ---------------------------------------------------------------------------
 func test_resolve_valid_id_returns_cached_resource_and_identity_equality() -> void:
 	# Arrange
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [{"id": "hero_warrior", "display_name": "Warrior"}],
 		"enemies": [],
 		"biomes": [],
@@ -161,7 +107,7 @@ func test_resolve_valid_id_returns_cached_resource_and_identity_equality() -> vo
 # ---------------------------------------------------------------------------
 func test_resolve_missing_id_returns_null_with_warn_behavior() -> void:
 	# Arrange — warrior loaded, berserker absent; WARN is the default
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [{"id": "hero_warrior", "display_name": "Warrior"}],
 		"enemies": [],
 		"biomes": [],
@@ -194,7 +140,7 @@ func test_resolve_missing_id_returns_null_with_warn_behavior() -> void:
 # ---------------------------------------------------------------------------
 func test_resolve_unknown_content_type_returns_null_without_crash() -> void:
 	# Arrange — minimal registry in READY state
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [],
 		"enemies": [],
 		"biomes": [],
@@ -258,7 +204,7 @@ func test_resolve_before_registry_ready_returns_null() -> void:
 # ---------------------------------------------------------------------------
 func test_resolve_assert_behavior_returns_null_after_assert_fires() -> void:
 	# Arrange — ASSERT mode, warrior loaded, berserker absent
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [{"id": "hero_warrior", "display_name": "Warrior"}],
 		"enemies": [],
 		"biomes": [],
@@ -293,7 +239,7 @@ func test_resolve_assert_behavior_returns_null_after_assert_fires() -> void:
 # ---------------------------------------------------------------------------
 func test_get_all_by_type_returns_full_array_with_identity_equality() -> void:
 	# Arrange — 3 classes + 2 enemies
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [
 			{"id": "hero_warrior", "display_name": "Warrior"},
 			{"id": "hero_mage", "display_name": "Mage"},
@@ -370,7 +316,7 @@ func test_get_all_by_type_before_registry_ready_returns_empty_array() -> void:
 # ---------------------------------------------------------------------------
 func test_resolve_rename_transparent_id_based_lookup() -> void:
 	# Arrange — Step 1: create warrior.tres with id="hero_warrior", boot registry
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [{"id": "hero_warrior", "display_name": "Warrior"}],
 		"enemies": [],
 		"biomes": [],

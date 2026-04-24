@@ -15,12 +15,6 @@ extends Node
 ## ADR-0006: DataRegistry boot scan strategy + state machine contract
 ## ADR-0003: Autoload Rank Table (rank 1; zero-arg _init invariant — Amendment #3)
 ## ADR-0011: Per-type validator specifications + load-time validation semantics
-##
-## Story 001: skeleton (state machine, signals, stubs).
-## Story 003: _boot_scan() body (enumeration + ResourceLoader.load calls).
-## Story 004: resolve() + get_all_by_type() + MissingIdBehavior enum.
-## Story 005: per-type validators, duplicate id detection, min_content_count.
-## Story 007: hot_reload() body (re-enumeration pass).
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -83,6 +77,15 @@ enum MissingIdBehavior {
 	ASSERT,
 }
 
+## Canonical reason strings emitted by [signal registry_error].
+##
+## Tests and consumers MUST compare against these constants rather than raw
+## string literals — prevents silent typo-drift between producer and listener.
+const ERROR_INVALID_ID: String = "InvalidId"
+const ERROR_DUPLICATE_ID: String = "DuplicateId"
+const ERROR_MIN_CONTENT_COUNT: String = "MinContentCount"
+const ERROR_INVALID_FIELD: String = "InvalidField"
+
 # ---------------------------------------------------------------------------
 # Signals
 # ---------------------------------------------------------------------------
@@ -99,8 +102,6 @@ signal registry_error(reason: String, details: Dictionary)
 
 ## Emitted after a successful hot-reload re-enumeration pass (debug builds only).
 ## [param content_type] names the content category that was refreshed.
-## Emission body is Story 007; this story only declares the signal and enforces
-## the OS.is_debug_build() + state == READY preconditions.
 signal hot_reload_complete(content_type: String)
 
 # ---------------------------------------------------------------------------
@@ -274,10 +275,7 @@ func _ready() -> void:
 ##   [/codeblock]
 func resolve(content_type: String, id: String) -> Resource:
 	if state != State.READY:
-		push_warning(
-			"[DataRegistry] resolve called before registry_ready: content_type=%s id=%s"
-			% [content_type, id]
-		)
+		_warn_not_ready("resolve", "content_type=%s id=%s" % [content_type, id])
 		return null
 	var category: Dictionary = _categories.get(content_type, {})
 	if not category.has(id):
@@ -298,6 +296,10 @@ func resolve(content_type: String, id: String) -> Resource:
 ## fields (ADR-0006 read-only contract).  Use [method Resource.duplicate] for
 ## mutable copies.
 ##
+## Allocates a new Array on every call. Callers reading repeatedly (e.g. UI
+## refresh, offline replay) MUST cache the returned array — do NOT call inside
+## [code]_process[/code], resolve loops, or per-tick handlers.
+##
 ## Example:
 ##   [codeblock]
 ##   var all_classes: Array[Resource] = DataRegistry.get_all_by_type("classes")
@@ -306,10 +308,7 @@ func resolve(content_type: String, id: String) -> Resource:
 ##   [/codeblock]
 func get_all_by_type(content_type: String) -> Array[Resource]:
 	if state != State.READY:
-		push_warning(
-			"[DataRegistry] get_all_by_type called before registry_ready: content_type=%s"
-			% content_type
-		)
+		_warn_not_ready("get_all_by_type", "content_type=%s" % content_type)
 		return []
 	var category: Dictionary = _categories.get(content_type, {})
 	var out: Array[Resource] = []
@@ -325,18 +324,16 @@ func get_all_by_type(content_type: String) -> Array[Resource]:
 ##   - OS.is_debug_build() must be true (stripped from release exports)
 ##   - state must be READY (guards against re-entrant or premature calls)
 ##
-## The full re-enumeration body and hot_reload_complete emission are Story 007.
-## This stub exists to lock the precondition contract and signal declaration.
+## The full re-enumeration body and hot_reload_complete emission are pending —
+## this stub exists to lock the precondition contract and signal declaration.
 ##
 ## Example:
 ##   DataRegistry.hot_reload("heroes")  # refreshes hero .tres files in-editor
-func hot_reload(content_type: String) -> void:
+func hot_reload(_content_type: String) -> void:
 	if not OS.is_debug_build():
 		return
 	if state != State.READY:
 		return
-	# Full re-enumeration body is Story 007.
-	# hot_reload_complete.emit(content_type) will be called here by Story 007.
 
 # ---------------------------------------------------------------------------
 # Private methods
@@ -440,14 +437,14 @@ func _load_category(category: String) -> bool:
 		# --- Step 2 & 3: id non-empty + snake_case check (TR-005) ---
 		var resource_id: String = _extract_resource_id(loaded)
 		if resource_id.is_empty():
-			_transition_to_error("InvalidId", {
+			_transition_to_error(ERROR_INVALID_ID, {
 				"reason": "empty_id",
 				"content_type": category,
 				"path": full_path,
 			})
 			return false
 		if _snake_case_id_regex.search(resource_id) == null:
-			_transition_to_error("InvalidId", {
+			_transition_to_error(ERROR_INVALID_ID, {
 				"reason": "not_snake_case",
 				"content_type": category,
 				"path": full_path,
@@ -462,7 +459,7 @@ func _load_category(category: String) -> bool:
 				"[DataRegistry] DUPLICATE ID: '%s' in %s — %s vs %s. Second file skipped."
 				% [resource_id, category, path_a, full_path]
 			)
-			_transition_to_error("DuplicateId", {
+			_transition_to_error(ERROR_DUPLICATE_ID, {
 				"id": resource_id,
 				"content_type": category,
 				"paths": [path_a, full_path],
@@ -474,7 +471,7 @@ func _load_category(category: String) -> bool:
 		# subclass override of _validate_resource_fields() — see that method.
 		var field_error: String = _validate_resource_fields(category, loaded)
 		if not field_error.is_empty():
-			_transition_to_error("InvalidField", {
+			_transition_to_error(ERROR_INVALID_FIELD, {
 				"content_type": category,
 				"path": full_path,
 				"id": resource_id,
@@ -526,13 +523,21 @@ func _validate_min_content_count(category: String) -> bool:
 	var loaded_count: int = _categories[category].size()
 	var required: int = int(min_content_count.get(category, 0))
 	if loaded_count < required:
-		_transition_to_error("MinContentCount", {
+		_transition_to_error(ERROR_MIN_CONTENT_COUNT, {
 			"content_type": category,
 			"loaded": loaded_count,
 			"required": required,
 		})
 		return false
 	return true
+
+
+## Emits a structured "called before READY" warning for public accessors.
+##
+## Callers (resolve, get_all_by_type) pass the method name and a caller-specific
+## context suffix. Extracted to avoid drift between the two accessors' messages.
+func _warn_not_ready(method_name: String, context: String) -> void:
+	push_warning("[DataRegistry] %s called before registry_ready: %s" % [method_name, context])
 
 
 ## Best-effort lookup of the file path for an already-loaded resource id.
@@ -570,8 +575,7 @@ func _find_path_for_id(category: String, resource_id: String) -> String:
 ## [param category]: The content category being validated.
 ## [param resource]: The loaded resource instance to validate.
 ## Returns [code]""[/code] on pass; a non-empty error reason string on fail.
-func _validate_resource_fields(category: String, resource: Resource) -> String:
-	# Sprint 1 no-op. Concrete validators land with Core DB schema stories.
+func _validate_resource_fields(_category: String, _resource: Resource) -> String:
 	return ""
 
 

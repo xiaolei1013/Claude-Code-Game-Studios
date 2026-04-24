@@ -20,6 +20,7 @@
 extends GdUnitTestSuite
 
 const DataRegistryScript = preload("res://src/core/data_registry/data_registry.gd")
+const DataRegistryFixtures = preload("res://tests/fixtures/data_registry/fixture_helpers.gd")
 
 
 # ---------------------------------------------------------------------------
@@ -49,63 +50,6 @@ class _OrderRecordingRegistry extends DataRegistryScript:
 const FIXTURE_ROOT: String = "res://tests/fixtures/data_registry/boot_scan/"
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-## Creates the fixture directory tree and saves the provided content map.
-##
-## [param fixture_map]: Dictionary of shape
-##   { "category": [ { "id": "...", "display_name": "..." }, ... ] }
-## All categories present as keys will have their directories created even if
-## the value array is empty.
-func _write_fixtures(fixture_map: Dictionary) -> void:
-	for category: String in fixture_map:
-		var dir_path: String = FIXTURE_ROOT + category
-		DirAccess.make_dir_recursive_absolute(
-			ProjectSettings.globalize_path(dir_path)
-		)
-		for entry: Dictionary in fixture_map[category]:
-			var res: TestContentType = TestContentType.new()
-			res.id = entry.get("id", "")
-			res.display_name = entry.get("display_name", "")
-			ResourceSaver.save(
-				res,
-				"%s/%s.tres" % [dir_path, res.id if res.id != "" else "unnamed"]
-			)
-
-
-## Recursively removes a directory and all its contents.
-##
-## Deletes all files first, then removes the (now-empty) directory.
-## Handles one level of subdirectory depth — sufficient for the flat
-## fixture structure used in this test suite.
-func _remove_dir_recursive(path: String) -> void:
-	var abs_path: String = ProjectSettings.globalize_path(path)
-	var da: DirAccess = DirAccess.open(path)
-	if da == null:
-		return
-	da.list_dir_begin()
-	var entry: String = da.get_next()
-	while entry != "":
-		if entry == "." or entry == "..":
-			entry = da.get_next()
-			continue
-		var full: String = path + "/" + entry
-		if da.current_is_dir():
-			_remove_dir_recursive(full)
-		else:
-			DirAccess.remove_absolute(ProjectSettings.globalize_path(full))
-		entry = da.get_next()
-	da.list_dir_end()
-	# Remove .import sidecar files Godot may generate for .tres fixtures
-	# (they appear as siblings in the filesystem, not inside the dir).
-	DirAccess.remove_absolute(abs_path)
-
-
-## Tears down the entire FIXTURE_ROOT tree after each test.
-func _cleanup_fixtures() -> void:
-	_remove_dir_recursive(FIXTURE_ROOT.trim_suffix("/"))
 
 
 ## Creates a fresh DataRegistry pointing at FIXTURE_ROOT with
@@ -129,7 +73,7 @@ func _make_registry() -> DataRegistry:
 # ---------------------------------------------------------------------------
 
 func after_test() -> void:
-	_cleanup_fixtures()
+	DataRegistryFixtures.cleanup(FIXTURE_ROOT)
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +84,7 @@ func after_test() -> void:
 # ---------------------------------------------------------------------------
 func test_boot_scan_enumerates_tres_files_and_populates_categories() -> void:
 	# Arrange — write minimal fixtures: 2 classes, 1 enemy, empty categories
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [
 			{"id": "hero_warrior", "display_name": "Warrior"},
 			{"id": "hero_mage", "display_name": "Mage"},
@@ -191,7 +135,7 @@ func test_boot_scan_enumerates_tres_files_and_populates_categories() -> void:
 func test_boot_scan_load_order_matches_ordered_categories() -> void:
 	# Arrange — six empty category directories (no .tres content needed for
 	# this test; we only assert invocation order, not loaded content).
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [],
 		"enemies": [],
 		"biomes": [],
@@ -226,7 +170,7 @@ func test_boot_scan_load_order_matches_ordered_categories() -> void:
 # ---------------------------------------------------------------------------
 func test_boot_scan_skips_non_tres_files_in_category_directory() -> void:
 	# Arrange — write one valid .tres fixture
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [{"id": "warrior", "display_name": "Warrior"}],
 		"enemies": [],
 		"biomes": [],
@@ -273,7 +217,7 @@ func test_boot_scan_skips_non_tres_files_in_category_directory() -> void:
 # ---------------------------------------------------------------------------
 func test_boot_scan_does_not_enumerate_unknown_category_directories() -> void:
 	# Arrange — write the six canonical categories plus an extra "bonus_category"
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [{"id": "warrior", "display_name": "Warrior"}],
 		"enemies": [],
 		"biomes": [],
@@ -315,7 +259,7 @@ func test_boot_scan_does_not_enumerate_unknown_category_directories() -> void:
 # ---------------------------------------------------------------------------
 func test_boot_scan_data_root_path_override_redirects_scan() -> void:
 	# Arrange — fixture at non-default path (FIXTURE_ROOT, not res://assets/data)
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [{"id": "paladin", "display_name": "Paladin"}],
 		"enemies": [],
 		"biomes": [],
@@ -359,7 +303,7 @@ func test_boot_scan_lazy_load_categories_defaults_empty_and_extra_fields_ignored
 
 	# TR-026: author a fixture with a set_meta value (simulates an unknown field
 	# from a future content schema version). Godot silently ignores it on load.
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [{"id": "wizard", "display_name": "Wizard"}],
 		"enemies": [],
 		"biomes": [],
@@ -395,7 +339,7 @@ func test_boot_scan_lazy_load_categories_defaults_empty_and_extra_fields_ignored
 # ---------------------------------------------------------------------------
 func test_boot_scan_empty_category_directory_does_not_abort_scan() -> void:
 	# Arrange — valid .tres in classes, deliberately empty items/ directory
-	_write_fixtures({
+	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [{"id": "ranger", "display_name": "Ranger"}],
 		"enemies": [],
 		"biomes": [],
