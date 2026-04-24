@@ -34,6 +34,7 @@ tests/fixtures/data_registry/*/
 build/
 builds/
 bin/
+!addons/**/bin/
 obj/
 out/
 dist/
