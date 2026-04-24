@@ -9,10 +9,10 @@
 
 | Epic | System | GDD | Governing ADRs | Risk | Stories | Status |
 |---|---|---|---|---|---|---|
-| [save-load-system](save-load-system/EPIC.md) | Save/Load System | [save-load-system.md](../../design/gdd/save-load-system.md) | ADR-0003, 0004, 0005, 0007, 0014 | **HIGH** | Not yet created | Ready |
-| [tick-system](tick-system/EPIC.md) | Game Time & Tick System | [game-time-and-tick.md](../../design/gdd/game-time-and-tick.md) | ADR-0003, 0005, 0014 | MEDIUM | Not yet created | Ready |
-| [data-registry](data-registry/EPIC.md) | Data Loading System | [data-loading.md](../../design/gdd/data-loading.md) | ADR-0003, 0006, 0011 | MEDIUM | Not yet created | Ready |
-| [scene-manager](scene-manager/EPIC.md) | Scene/Screen Manager | [scene-screen-manager.md](../../design/gdd/scene-screen-manager.md) | ADR-0003, 0007, 0008, 0014 | **HIGH** | Not yet created | Ready |
+| [save-load-system](save-load-system/EPIC.md) | Save/Load System | [save-load-system.md](../../design/gdd/save-load-system.md) | ADR-0003, 0004, 0005, 0007, 0014 | **HIGH** | 15 (all Ready) | Ready |
+| [tick-system](tick-system/EPIC.md) | Game Time & Tick System | [game-time-and-tick.md](../../design/gdd/game-time-and-tick.md) | ADR-0003, 0005, 0014 | MEDIUM | 11 (all Ready) | Ready |
+| [data-registry](data-registry/EPIC.md) | Data Loading System | [data-loading.md](../../design/gdd/data-loading.md) | ADR-0003, 0006, 0011 | MEDIUM | 8 (all Ready) | Ready |
+| [scene-manager](scene-manager/EPIC.md) | Scene/Screen Manager | [scene-screen-manager.md](../../design/gdd/scene-screen-manager.md) | ADR-0003, 0007, 0008, 0014 | **HIGH** | 10 (all Ready) | Ready |
 
 **Foundation-layer flagged gap (not an epic)**: UI Framework / Theme (systems-index
 Foundation #4) has no standalone GDD. ADR-0008 + art bible cover architecturally;
@@ -72,7 +72,7 @@ _Deferred until Presentation epics are underway._
 
 ## Progress
 
-- **Foundation**: 4/4 epics defined (2026-04-24). Next: `/create-stories <epic-slug>` for each, then `/sprint-plan`.
+- **Foundation**: 4/4 epics defined, 4/4 decomposed into stories (2026-04-24). **44 stories total** (11 tick-system + 8 data-registry + 10 scene-manager + 15 save-load-system). Next: `/sprint-plan`.
 - **Core**: 0 epics defined.
 - **Feature**: 0 epics defined.
 - **Presentation**: 0 epics defined.
