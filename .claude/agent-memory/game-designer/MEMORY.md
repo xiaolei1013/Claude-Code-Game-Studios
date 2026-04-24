@@ -1,0 +1,2 @@
+- [Lantern Guild project context](project_lantern_guild.md) — session-based cozy fantasy idle-clicker on Godot 4.6; 4 GDDs complete
+- [User collaboration style](user_xiaolei.md) — experienced designer, provides locked contracts, prefers concrete numbers over hand-waving
