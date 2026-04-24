@@ -1,0 +1,1 @@
+- [Lantern Guild Economy — locked decisions & open flags](project_lantern_guild_economy.md) — Core gold formula values, tuning policy, open calibration flags for MVP playtest

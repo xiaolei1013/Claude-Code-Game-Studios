@@ -13,6 +13,7 @@ Desktop.ini
 .claude/settings.local.json
 CLAUDE.local.md
 production/session-logs/
+production/session-state/
 
 # === Internal Planning (not for public) ===
 
@@ -22,10 +23,18 @@ expansions/
 # Created on first use by /consistency-check and /architecture-review
 docs/consistency-failures.md
 
+# GdUnit4 HTML/XML test reports (regenerated on every test run)
+reports/
+
+# GdUnit4 test-run fixture subdirs (regenerated per test; only the canonical
+# helper files under tests/fixtures/data_registry/ belong in git)
+tests/fixtures/data_registry/*/
+
 # === Build Output ===
 build/
 builds/
 bin/
+!addons/**/bin/
 obj/
 out/
 dist/

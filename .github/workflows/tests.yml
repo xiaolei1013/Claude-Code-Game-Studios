@@ -1,0 +1,97 @@
+name: Automated Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  GODOT_VERSION: "4.6"
+
+jobs:
+  test:
+    name: Run GdUnit4 Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      # Install Godot 4.6 headless directly. barichello/godot-ci stops at 4.3
+      # and our code uses `@abstract` (4.5+) so we need >= 4.5.
+      - name: Install Godot ${{ env.GODOT_VERSION }}
+        run: |
+          set -euo pipefail
+          GODOT_URL="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -fL -o /tmp/godot.zip "$GODOT_URL"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          sudo install -m 0755 "/tmp/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          godot --version
+
+      # Import project resources so Godot generates .godot/ and the addon .uid
+      # files are honored. Without this first-pass import, scripts referenced
+      # by path like res://addons/gdUnit4/bin/GdUnitCmdTool.gd fail to load.
+      - name: Prime Godot project import
+        run: |
+          set +e
+          godot --headless --path . --import 2>&1 | tail -40
+          exit 0
+
+      - name: Run GdUnit4 Tests
+        id: gdunit
+        continue-on-error: true
+        run: |
+          set +e
+          godot --headless --path . -s -d \
+            res://addons/gdUnit4/bin/GdUnitCmdTool.gd \
+            --add res://tests/unit/ \
+            --add res://tests/integration/ \
+            --continue \
+            --ignoreHeadlessMode 2>&1 | tee /tmp/gdunit.log
+          exit 0
+
+      # Pass/fail gate driven by GdUnit4's "Statistics:" lines, not exit code.
+      # Godot often exits non-zero at headless shutdown even when every test
+      # passes (SIGABRT at teardown). Parsing the log is the authoritative gate.
+      - name: Verify Test Results
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ ! -f /tmp/gdunit.log ]; then
+            echo "::error::No GdUnit4 log produced — runner did not start"
+            exit 1
+          fi
+          tr -d '\r' < /tmp/gdunit.log \
+            | sed 's/\x1b\[[0-9;]*m//g' \
+            > /tmp/gdunit.clean.log
+          total_tests=0
+          total_errors=0
+          total_failures=0
+          while IFS= read -r line; do
+            t=$(echo "$line" | grep -oE '[0-9]+ test cases' | grep -oE '[0-9]+' || echo 0)
+            e=$(echo "$line" | grep -oE '[0-9]+ errors' | grep -oE '[0-9]+' || echo 0)
+            f=$(echo "$line" | grep -oE '[0-9]+ failures' | grep -oE '[0-9]+' || echo 0)
+            total_tests=$((total_tests + ${t:-0}))
+            total_errors=$((total_errors + ${e:-0}))
+            total_failures=$((total_failures + ${f:-0}))
+          done < <(grep "^Statistics:" /tmp/gdunit.clean.log || true)
+          echo "Aggregate: $total_tests test cases, $total_errors errors, $total_failures failures"
+          if [ "$total_tests" -eq 0 ]; then
+            echo "::error::No tests executed — check GdUnit4 log artifact"
+            exit 1
+          fi
+          if [ "$total_failures" -gt 0 ] || [ "$total_errors" -gt 0 ]; then
+            echo "::error::$total_failures failures, $total_errors errors across $total_tests tests"
+            exit 1
+          fi
+          echo "All $total_tests tests passed across the suite."
+
+      - name: Upload GdUnit4 Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gdunit-log
+          path: /tmp/gdunit.log

@@ -37,7 +37,7 @@
 #   Each entry: name, status, source, referenced_by[], attributes{}, added, revised
 
 version: 1
-last_updated: ""
+last_updated: 2026-04-20  # Dungeon Run Orchestrator GDD #13: 3 new constants (DISPATCH_DEBOUNCE_MS, OFFLINE_REPLAY_CHUNK_TICKS, MID_RUN_REASSIGN_WARNING_ENABLED) + 2 new formulas (attribute_kill_gold, attribute_floor_clear_bonus); referenced_by extensions for Combat formulas (formation_dps_per_tick, ticks_per_loop, floor_total_hp, formation_total_hp, floor_total_enemy_attack, survived, hp_bonus_factor) + Economy/Time constants (LOSING_RUN_LOOT_FACTOR, MATCHUP_GOLD_MULTIPLIER, TICKS_PER_SECOND, offline_cap_seconds)
 
 # ─── ENTITIES ────────────────────────────────────────────────────────────────
 # Named game-world objects: enemies, NPCs, characters, factions, bosses.
@@ -48,7 +48,194 @@ last_updated: ""
 # Attribute fields: any key stats that could appear in another GDD
 #   (health, damage, drops, faction, etc.)
 
-entities: []
+entities:
+  - name: warrior
+    status: active
+    source: design/gdd/hero-class-database.md
+    referenced_by:
+      - design/gdd/hero-class-database.md
+    tier: 1
+    role: tank
+    counter_archetype: bruiser
+    base_attack: 12
+    base_hp: 120
+    base_speed: 6
+    attack_per_level: 2
+    hp_per_level: 17
+    speed_per_level: 1
+    tick_output_contribution_l1: 2
+    tick_output_per_level: 1
+    added: 2026-04-19
+    revised: ""
+
+  - name: mage
+    status: active
+    source: design/gdd/hero-class-database.md
+    referenced_by:
+      - design/gdd/hero-class-database.md
+    tier: 1
+    role: striker
+    counter_archetype: caster
+    base_attack: 20
+    base_hp: 70
+    base_speed: 10
+    attack_per_level: 3
+    hp_per_level: 10
+    speed_per_level: 1
+    tick_output_contribution_l1: 3
+    tick_output_per_level: 1
+    added: 2026-04-19
+    revised: ""
+
+  - name: rogue
+    status: active
+    source: design/gdd/hero-class-database.md
+    referenced_by:
+      - design/gdd/hero-class-database.md
+    tier: 1
+    role: precision
+    counter_archetype: armored
+    base_attack: 14
+    base_hp: 55
+    base_speed: 16
+    attack_per_level: 2
+    hp_per_level: 8
+    speed_per_level: 2
+    tick_output_contribution_l1: 2
+    tick_output_per_level: 1
+    added: 2026-04-19
+    revised: ""
+
+  # Enemies (Forest Reach biome, all 8 MVP)
+  - name: hollow_brute
+    status: active
+    source: design/gdd/enemy-database.md
+    referenced_by:
+      - design/gdd/enemy-database.md
+    type: enemy
+    tier: 1
+    archetype: bruiser
+    biome: forest_reach
+    base_hp: 52
+    base_attack: 8
+    base_speed: 3
+    is_boss: false
+    added: 2026-04-19
+    revised: ""
+
+  - name: glowmoth
+    status: active
+    source: design/gdd/enemy-database.md
+    referenced_by:
+      - design/gdd/enemy-database.md
+    type: enemy
+    tier: 1
+    archetype: caster
+    biome: forest_reach
+    base_hp: 60
+    base_attack: 11
+    base_speed: 5
+    is_boss: false
+    added: 2026-04-19
+    revised: ""
+
+  - name: shellback
+    status: active
+    source: design/gdd/enemy-database.md
+    referenced_by:
+      - design/gdd/enemy-database.md
+    type: enemy
+    tier: 1
+    archetype: armored
+    biome: forest_reach
+    base_hp: 72
+    base_attack: 9
+    base_speed: 2
+    is_boss: false
+    added: 2026-04-19
+    revised: ""
+
+  - name: elder_boar
+    status: active
+    source: design/gdd/enemy-database.md
+    referenced_by:
+      - design/gdd/enemy-database.md
+    type: enemy
+    tier: 2
+    archetype: bruiser
+    biome: forest_reach
+    base_hp: 195
+    base_attack: 18
+    base_speed: 4
+    is_boss: false
+    added: 2026-04-19
+    revised: ""
+
+  - name: moss_druid
+    status: active
+    source: design/gdd/enemy-database.md
+    referenced_by:
+      - design/gdd/enemy-database.md
+    type: enemy
+    tier: 2
+    archetype: caster
+    biome: forest_reach
+    base_hp: 185
+    base_attack: 24
+    base_speed: 6
+    is_boss: false
+    added: 2026-04-19
+    revised: ""
+
+  - name: vined_knight
+    status: active
+    source: design/gdd/enemy-database.md
+    referenced_by:
+      - design/gdd/enemy-database.md
+    type: enemy
+    tier: 2
+    archetype: armored
+    biome: forest_reach
+    base_hp: 225
+    base_attack: 20
+    base_speed: 3
+    is_boss: false
+    added: 2026-04-19
+    revised: ""
+
+  - name: thorn_guardian
+    status: active
+    source: design/gdd/enemy-database.md
+    referenced_by:
+      - design/gdd/enemy-database.md
+    type: enemy
+    tier: 3
+    archetype: bruiser
+    biome: forest_reach
+    base_hp: 680
+    base_attack: 32
+    base_speed: 5
+    is_boss: false
+    added: 2026-04-19
+    revised: ""
+
+  - name: ancient_rootking
+    status: active
+    source: design/gdd/enemy-database.md
+    referenced_by:
+      - design/gdd/enemy-database.md
+      - design/gdd/biome-dungeon-database.md
+      - design/gdd/combat-resolution.md
+    type: enemy
+    tier: 3
+    archetype: bruiser
+    biome: forest_reach
+    base_hp: 4818  # Pass 2B (2026-04-20): raised 2200 → 4818 per Combat I.Q2 resolution. Precise: ceili(170 × 20 × 1.417) = ceili(4817.8) = 4818. Aligns F5 clear time to 170 s target under SPEED_BASE=2400, L13 W+M+R neutral matchup.
+    base_attack: 45
+    base_speed: 3
+    is_boss: true
+    added: 2026-04-19
+    revised: "2026-04-20 Pass 2B: base_hp 2200 → 4818 (F5 cascade, Combat I.Q2 CLOSED, Enemy DB Open Question CLOSED, Biome DB F5 HP registry check updated). 2026-04-19 Pass 2A: referenced_by extended to biome + combat."
 
 # Example (remove when first real entry is added):
 #
@@ -106,7 +293,284 @@ items: []
 #   output_range[min, max], added
 # Optional: expression (the actual formula), notes
 
-formulas: []
+formulas:
+  - name: drip_per_tick
+    status: active
+    source: design/gdd/economy-system.md
+    referenced_by:
+      - design/gdd/economy-system.md
+    variables:
+      - BASE_DRIP[floor_tier]
+      - formation_strength_factor
+      - matchup_drip_factor
+    output_range: [2, 60]
+    expression: "floor(BASE_DRIP[floor_tier] * formation_strength_factor * matchup_drip_factor)"
+    notes: "formation_strength_factor = clamp(1.0 + (avg_formation_level - 1) * 0.2, 1.0, 3.0) — see formation_strength_factor formula entry (owned by hero-roster.md) for full variable definitions. matchup_drip_factor defaults to 1.0; MATCHUP_DRIP_BONUS tuning knob enables a boost. Read by Dungeon Run Orchestrator and Offline Progression Engine."
+    added: 2026-04-18
+    revised: ""
+
+  - name: kill_bonus
+    status: deprecated
+    source: design/gdd/economy-system.md
+    referenced_by:
+      - design/gdd/economy-system.md
+      - design/gdd/enemy-database.md  # reference-only per Pass 4B-Economy A4
+    variables:
+      - BASE_KILL[enemy_tier]
+      - matchup_multiplier
+    output_range: [5, 120]
+    expression: "DEPRECATED — see attribute_kill_gold (Orchestrator is the canonical gold-attribution call-site per Pass 4B-Economy A4 2026-04-20)"
+    notes: "DEPRECATED 2026-04-20 (Pass 4B-Economy A4): Economy's `kill_bonus` formula is superseded by Orchestrator's `attribute_kill_gold(tier, advantaged, losing_run)` to eliminate the formula-duplication range conflict. Orchestrator owns losing_run state + applies LOSING_RUN_LOOT_FACTOR before calling Economy.add_gold. Original range [15, 120] assumed `BASE_KILL[1]=15` (also stale — Pass 4B-Economy A3 reconciled to 10) and did not account for the LOSING floor. Kept in the registry for historical trace; DO NOT use as an authoritative source."
+    added: 2026-04-18
+    revised: 2026-04-20
+
+  - name: recruit_cost
+    status: active
+    source: design/gdd/economy-system.md
+    referenced_by:
+      - design/gdd/economy-system.md
+    variables:
+      - BASE_RECRUIT[class_tier]
+      - RECRUIT_RATIO
+      - copies_owned
+    output_range: [150, 25920]
+    expression: "floor(BASE_RECRUIT[class_tier] * RECRUIT_RATIO ^ copies_owned)"
+    notes: "BASE_RECRUIT[tier_1]=150, BASE_RECRUIT[tier_2]=8000. RECRUIT_RATIO=1.8. copies_owned=0 for first purchase. Output range shown is the practical V1.0 3-copy window (150 to 25920); theoretical ceiling under MAX_ROSTER_SIZE=30 reaches ~2.55B gold for a 30th tier-1 copy. Read by Recruitment System."
+    added: 2026-04-18
+    revised: 2026-04-18
+
+  - name: level_cost
+    status: active
+    source: design/gdd/economy-system.md
+    referenced_by:
+      - design/gdd/economy-system.md
+    variables:
+      - BASE_LEVEL[class_tier]
+      - LEVEL_RATIO
+      - current_level
+    output_range: [40, 270213]
+    expression: "floor(BASE_LEVEL[class_tier] * LEVEL_RATIO ^ (current_level - 1))"
+    notes: "BASE_LEVEL[tier_1]=40, BASE_LEVEL[tier_2]=600. LEVEL_RATIO=1.6. current_level is hero level before upgrade (1-indexed). LEVEL_CAP=15. Read by Hero Leveling System."
+    added: 2026-04-18
+    revised: ""
+
+  - name: offline_elapsed_seconds
+    status: active
+    source: design/gdd/game-time-and-tick.md
+    referenced_by:
+      - design/gdd/game-time-and-tick.md
+    variables:
+      - t_current
+      - t_last_persist
+      - offline_cap_seconds
+      - REWIND_TOLERANCE_SECONDS
+    output_range: [0.0, 28800.0]
+    expression: "clamp(t_current - t_last_persist, 0, offline_cap_seconds); if delta < -REWIND_TOLERANCE_SECONDS then 0"
+    notes: "One-shot calculation at session launch. Output fed to Offline Progression Engine. Cap is a tuning knob (default 28800 = 8h)."
+    added: 2026-04-18
+    revised: ""
+
+  - name: offline_tick_budget
+    status: active
+    source: design/gdd/game-time-and-tick.md
+    referenced_by:
+      - design/gdd/game-time-and-tick.md
+    variables:
+      - elapsed_offline_seconds
+      - TICKS_PER_SECOND
+    output_range: [0, 576000]
+    expression: "floor(elapsed_offline_seconds * TICKS_PER_SECOND)"
+    notes: "Integer tick count fed to Offline Progression Engine. Max at default cap: 576000 ticks. Offline Engine must batch-replay this within ~500ms or chunk across frames."
+    added: 2026-04-18
+    revised: ""
+
+  - name: is_class_counter
+    status: active
+    source: design/gdd/hero-class-database.md
+    referenced_by:
+      - design/gdd/hero-class-database.md
+      - design/gdd/class-vs-enemy-matchup-resolver.md
+    variables:
+      - class_data
+      - enemy_archetype
+    output_range: [false, true]
+    expression: "class_data.counter_archetype == enemy_archetype"
+    notes: "Single string-equality check. Declared in Hero Class DB D.2; implemented by MatchupResolver._is_class_counter. Formation-level aggregation (majority threshold n > N/2 over heroes; for MVP FORMATION_SIZE=3 this means n>=2) lives in MatchupResolver Rule 6 + D.2. Threshold revised from boolean OR on 2026-04-19. If Class DB ever changes the counter check logic, MatchupResolver must change in lockstep."
+    added: 2026-04-19
+    revised: ""
+
+  - name: formation_strength_factor
+    status: active
+    source: design/gdd/hero-roster.md
+    referenced_by:
+      - design/gdd/hero-roster.md
+      - design/gdd/economy-system.md
+    variables:
+      - avg_formation_level
+      - LEVEL_CAP
+    output_range: [1.0, 3.0]
+    expression: "clamp(1.0 + (avg_formation_level - 1) * 0.2, 1.0, 3.0); empty formation returns 1.0 directly via guard clause"
+    notes: "Computed by HeroRoster.get_formation_strength(). Consumed by Economy's drip_per_tick formula. avg_formation_level is the arithmetic mean of current_level across heroes in active formation slots (skips empty slots). Clamp ceiling reached at avg_formation_level == 11."
+    added: 2026-04-19
+    revised: ""
+
+  - name: formation_dps_per_tick
+    status: active
+    source: design/gdd/combat-resolution.md
+    referenced_by:
+      - design/gdd/combat-resolution.md
+      - design/gdd/class-vs-enemy-matchup-resolver.md  # Pass 2B: Combat calls Resolver per-enemy to scale this raw rate
+      - design/gdd/dungeon-run-orchestrator.md         # cached on RunSnapshot at DISPATCHING per Orchestrator C.2
+    variables:
+      - hero.attack
+      - hero.speed
+      - SPEED_BASE
+    output_range: [0.0, 2.31]
+    expression: "sum(hero.attack * hero.speed for hero in formation) / SPEED_BASE; empty formation returns 0.0 via guard clause"
+    notes: "RAW throughput formula for Combat Resolution (Pass 2B: raw, not effective). Per-hero contribution = hero.attack * hero.speed / SPEED_BASE makes Rogue's high-speed identity mechanically distinct (Pillar 2). Effective per-enemy throughput = this × matchup_throughput_factor (MATCHUP_THROUGHPUT_FACTOR_ADV=1.5 or MATCHUP_THROUGHPUT_FACTOR_DIS=1.0) applied inside _kill_schedule_for_loop (Combat D.5 / Rule 10) — Pillar 3 mechanical payoff. Consumed by ticks_per_loop and _kill_schedule_for_loop. SPEED_BASE = 2400 default; tuning knob 800-6000. MVP upper bound 2.31 = 3× Rogue L15 (5544/2400) raw; advantaged effective upper bound 3.465 (2.31×1.5) against matched enemies; practical peak 1.723 raw (L15 W+M+R = 4136/2400); typical play band 0.207 raw (L1 W+M+R) through 1.417 raw (L13 W+M+R)."
+    added: 2026-04-19
+    revised: "2026-04-20 Pass 2B: clarified as RAW (per-enemy matchup factor applied downstream); referenced_by extended to Resolver. 2026-04-19 Pass 1: upper bound corrected 5.0 → 2.31 (3× Rogue L15 theoretical MVP max)."
+
+  - name: ticks_per_loop
+    status: active
+    source: design/gdd/combat-resolution.md
+    referenced_by:
+      - design/gdd/combat-resolution.md
+      - design/gdd/class-vs-enemy-matchup-resolver.md  # Pass 2B: Resolver consumed per-enemy inside the kill-schedule that derives this
+      - design/gdd/dungeon-run-orchestrator.md         # cached on RunSnapshot at DISPATCHING per Orchestrator C.2
+    variables:
+      - formation_dps_per_tick  # raw
+      - enemy.base_hp  # per-enemy
+      - matchup_throughput_factor  # per-enemy (MATCHUP_THROUGHPUT_FACTOR_ADV or _DIS)
+    output_range: [1, 28800]
+    expression: "_kill_schedule_for_loop(formation, floor).back().kill_tick; where the schedule accumulates kill_tick += ceili(enemy.base_hp / (formation_dps_per_tick × matchup_throughput_factor(enemy.archetype))) per enemy in expanded floor.enemy_list order (Combat Rule 10 / D.5)"
+    notes: "Loop cadence under continuous-respawn model (Combat Rule 7-8). Last entry of _kill_schedule_for_loop EQUALS this value (Pass 2B: derived, not independently computed). Pre-Pass-2B closed form `ceili(floor_total_hp / formation_dps_per_tick)` is retained only as the D.7 pacing-table cumulative-HP approximation (within ~1% of per-enemy canonical under neutral matchup). Bounded ≥1 via per-enemy ceili. Practical max under default SPEED_BASE: ~10629 ticks (L1 W+M+R on F5, neutral matchup). Uses GDScript 4.6 `ceili` (int-returning), NOT `ceil` (float-returning) — Combat D-header convention."
+    added: 2026-04-19
+    revised: "2026-04-20 Pass 2B: expression rewritten for per-enemy matchup routing; referenced_by extended. 2026-04-19 Pass 2A: ceil → ceili (GDScript 4.6 int-returning variant per Combat D-header convention)"
+
+  - name: floor_total_hp
+    status: active
+    source: design/gdd/combat-resolution.md
+    referenced_by:
+      - design/gdd/combat-resolution.md
+      - design/gdd/biome-dungeon-database.md
+      - design/gdd/dungeon-run-orchestrator.md  # informational read for snapshot diagnostics
+    variables:
+      - enemy.base_hp
+      - count
+    output_range: [216, 4818]
+    expression: "sum(enemy.base_hp * count for enemy in floor.enemy_list)"
+    notes: "Per-floor static value derived from Biome DB enemy_list. MVP values: F1=216, F2=308, F3=985, F4=2040, F5=4818 (Pass 2B: F5 raised from 2200 to hit 170 s clear-time target under SPEED_BASE=2400, L13 W+M+R neutral matchup). Re-validates against entity registry on Enemy DB updates."
+    added: 2026-04-19
+    revised: "2026-04-20 Pass 2B: upper bound 2200 → 4818 (F5 boss HP cascade, locked decision 3)"
+
+  - name: formation_total_hp
+    status: active
+    source: design/gdd/combat-resolution.md
+    referenced_by:
+      - design/gdd/combat-resolution.md
+      - design/gdd/dungeon-run-orchestrator.md  # transitive via hp_bonus_factor cached on RunSnapshot
+    variables:
+      - hero.hp (via stat_at_level)
+    output_range: [55, 1074]
+    expression: "sum(stat_at_level('hp', hero.class_data, hero.current_level) for hero in formation)"
+    notes: "Used by soft survivability check (D.6). Practical formations: solo L1 Rogue = 55 (min, 1-hero slot); L1 W+M+R = 245; L13 W+M+R = 665 (324+190+151); L15 W+M+R = 735 (mixed max); 3× Warrior L15 = 1074 (theoretical max, single-class tank stack). Single-hero range: L1 Rogue 55 → L15 Warrior 358."
+    added: 2026-04-19
+    revised: "2026-04-19 Pass 1: upper bound corrected 735 → 1074 (3× Warrior L15); L13 sum corrected 635 → 665."
+
+  - name: floor_total_enemy_attack
+    status: active
+    source: design/gdd/combat-resolution.md
+    referenced_by:
+      - design/gdd/combat-resolution.md
+      - design/gdd/dungeon-run-orchestrator.md  # transitive via hp_bonus_factor cached on RunSnapshot
+    variables:
+      - enemy.base_attack
+      - count
+    output_range: [35, 96]
+    expression: "sum(enemy.base_attack * count for enemy in floor.enemy_list)"
+    notes: "Used by soft survivability check (D.6). MVP values: F1=35, F2=53, F3=86, F4=96, F5=45. Note F5 (single boss) is lower than F4 (3 elites) — expected per Enemy DB calibration."
+    added: 2026-04-19
+    revised: ""
+
+  - name: survived
+    status: active
+    source: design/gdd/combat-resolution.md
+    referenced_by:
+      - design/gdd/combat-resolution.md
+      - design/gdd/dungeon-run-orchestrator.md  # cached as RunSnapshot.losing_run = !survived; gates LOSING_RUN_LOOT_FACTOR application per Orchestrator C.5/D.1
+    variables:
+      - hp_bonus_factor  # per Pass 2B; derived from formation_total_hp + floor_total_enemy_attack per hp_bonus_factor formula entry
+    output_range: [false, true]
+    expression: "hp_bonus_factor >= 0.5"
+    notes: "Pass 2B: redefined as the LOSING-run trigger derived from the continuous hp_bonus_factor (Combat Rule 9 / D.6). `survived = true` means LOSING_RUN_LOOT_FACTOR is NOT applied; `survived = false` (i.e., hp_bonus_factor < 0.5) triggers halving on all run gold including first-clear bonus (per locked Pass 2B decision 4 + Economy C.2.3). In MVP floors (F1-F5, enemy attack 35-96), `survived=false` is near-unreachable (lowest natural formation is L1 solo Rogue 55; on F4 attack 96: 55/96=0.573 → survived=true). Heroes never die during a run; this is a run-level economic signal only. Cleric V1.0 plugs in upstream by raising formation_total_hp via synergy multiplier."
+    added: 2026-04-19
+    revised: "2026-04-20 Pass 2B: redefined as hp_bonus_factor >= 0.5 (continuous Pillar 2). Old expression (formation_total_hp >= (1-SURVIVAL_MARGIN)*floor_total_enemy_attack) retired."
+
+  - name: hp_bonus_factor
+    status: active
+    source: design/gdd/combat-resolution.md
+    referenced_by:
+      - design/gdd/combat-resolution.md
+      - design/gdd/dungeon-run-orchestrator.md  # cached on RunSnapshot at DISPATCHING; derives losing_run gate per Orchestrator C.2
+    variables:
+      - formation_total_hp
+      - floor_total_enemy_attack
+    output_range: [0.0, 1.0]
+    expression: "mini(formation_total_hp / floor_total_enemy_attack, 1.0); 0.0 when floor_total_enemy_attack == 0 (divide-by-zero pre-guard per Combat E.3)"
+    notes: "Pillar 2 continuous throughput multiplier (Combat Rule 9 / D.6) applied inside _kill_schedule_for_loop alongside matchup_throughput_factor: effective_dps = formation_dps_per_tick × matchup_throughput_factor × hp_bonus_factor. Saturation at 1.0 means adequately-resourced formations carry no tempo penalty. Factor drops toward 0 when formation is severely under-HP vs the floor's aggregate enemy attack. MVP floors (F1-F5, enemy attack 35-96) almost always saturate; Warrior HP investment is economy-neutral in MVP and pays off on V1.0 hard content. hp_bonus_factor < 0.5 additionally triggers LOSING_RUN_LOOT_FACTOR via the `survived` field (see survived formula). Introduced 2026-04-20 Pass 2B to replace the boolean SURVIVAL_MARGIN cliff with a continuous curve (Pillar 1 posture strengthened)."
+    added: 2026-04-20
+    revised: ""
+
+  - name: action_cooldown_ticks
+    status: active
+    source: design/gdd/combat-resolution.md
+    referenced_by:
+      - design/gdd/combat-resolution.md
+    variables:
+      - combatant.speed
+      - SPEED_BASE
+    output_range: [1, 6000]
+    expression: "if combatant.speed <= 0: return 1; else: return maxi(1, floori(SPEED_BASE / combatant.speed))"
+    notes: "Conceptual per-combatant cooldown. NOT directly invoked in the closed-form throughput path (D.2 formation_dps_per_tick collapses cooldowns into a rate). Surfaced for legibility of speed semantics and as a defensive guard. Pre-guard `speed <= 0 → return 1` is mandatory and MUST run before the division (GDScript int division traps on zero divisor). The `maxi(1, ...)` clamp is belt-and-suspenders for the case `speed > SPEED_BASE` (floored division yields 0 → clamped to 1). Uses GDScript 4.6 `maxi`/`floori` (int-returning), NOT `max`/`floor` (float-returning) — Combat D-header convention. Resolves Class DB GDD #5 Open Question 4."
+    added: 2026-04-19
+    revised: "2026-04-19 Pass 2A: max/floor → maxi/floori; explicit speed<=0 pre-guard added per Combat D.1"
+
+  - name: attribute_kill_gold
+    status: active
+    source: design/gdd/dungeon-run-orchestrator.md
+    referenced_by:
+      - design/gdd/dungeon-run-orchestrator.md
+      - design/gdd/economy-system.md  # consumes the output via add_gold
+    variables:
+      - tier
+      - advantaged
+      - losing_run
+      - BASE_KILL[tier]
+      - MATCHUP_GOLD_MULTIPLIER
+      - LOSING_RUN_LOOT_FACTOR
+    output_range: [5, 120]
+    expression: "floori(BASE_KILL[tier] × matchup_multiplier × loot_factor); matchup_multiplier = MATCHUP_GOLD_MULTIPLIER if advantaged else 1.0; loot_factor = LOSING_RUN_LOOT_FACTOR if losing_run else 1.0"
+    notes: "Orchestrator's per-kill gold attribution formula (Orchestrator D.1). Bridges Combat's KillEvent stream to Economy's add_gold() entry point. Identical implementation in foreground (per-event) and offline (per-archetype × loops aggregated). Lower bound 5 = tier-1 kill, neutral, losing → floori(10 × 1.0 × 0.5). Upper bound 120 = tier-3 kill, advantaged, non-losing → floori(80 × 1.5 × 1.0). Pillar 3 audibility AND Pillar 1 LOSING-run-loot integration both flow through this single formula."
+    added: 2026-04-20
+    revised: ""
+
+  - name: attribute_floor_clear_bonus
+    status: active
+    source: design/gdd/dungeon-run-orchestrator.md
+    referenced_by:
+      - design/gdd/dungeon-run-orchestrator.md
+      - design/gdd/economy-system.md  # consumes the output via try_award_floor_clear
+    variables:
+      - floor_index
+      - losing_run
+      - FLOOR_CLEAR_BONUS[floor_index]
+      - LOSING_RUN_LOOT_FACTOR
+    output_range: [250, 18000]
+    expression: "floori(FLOOR_CLEAR_BONUS[floor_index] × loot_factor); loot_factor = LOSING_RUN_LOOT_FACTOR if losing_run else 1.0"
+    notes: "Orchestrator's first-clear bonus formula (Orchestrator D.2). Per Combat Rule 9 + Pass 2B locked decision 4: first-clear bonus IS halved on LOSING runs (not exempt). Lower bound 250 = F1 first-clear under LOSING → floori(500 × 0.5). Upper bound 18000 = F5 first-clear non-losing. Called by Orchestrator's try_award_floor_clear path (C.6 idempotency layer 2) — Economy's per-lifetime gate (Economy AC H-03, layer 3) is authoritative for actual payment. **Pass 4A indexing lock**: FLOOR_CLEAR_BONUS is **1-based** — FLOOR_CLEAR_BONUS[1]=F1, [2]=F2, [3]=F3, [4]=F4, [5]=F5. FLOOR_CLEAR_BONUS[0] is undefined (sentinel — access is a bug; Orchestrator guards with assert(floor_index >= 1 and floor_index <= 5)). Rationale: floor_index is 1-based throughout (F1–F5); matching [floor_index] directly avoids the [floor_index - 1] off-by-one footgun."
+    added: 2026-04-20
+    revised: 2026-04-20
 
 # Example:
 #
@@ -139,7 +603,234 @@ formulas: []
 #
 # Required fields: name, status, source, referenced_by, value, unit, added
 
-constants: []
+constants:
+  - name: GOLD_SANITY_CAP
+    status: active
+    source: design/gdd/economy-system.md
+    referenced_by:
+      - design/gdd/economy-system.md
+    value: 1000000000000
+    unit: gold
+    notes: "1 T gold. Engineering ceiling; silently clamps gold_balance. Never displayed to player. int64 max is ~9.2e18 — this cap leaves six orders of magnitude of headroom. Tuning knob in economy_config.tres."
+    added: 2026-04-18
+    revised: ""
+
+  - name: MATCHUP_GOLD_MULTIPLIER
+    status: active
+    source: design/gdd/economy-system.md
+    referenced_by:
+      - design/gdd/economy-system.md
+      - design/gdd/class-vs-enemy-matchup-resolver.md
+      - design/gdd/enemy-database.md
+      - design/gdd/dungeon-run-orchestrator.md
+    value: 1.5
+    unit: multiplier
+    notes: "Applied to kill_bonus when formation has class-counter advantage against the killed enemy's archetype (per-kill model, locked by Matchup Resolver GDD #10 Rule 8). Pillar 3 economic hook. Tuning knob in economy_config.tres. Safe range: 1.0–2.5. Resolver outputs is_matchup_advantaged boolean; Economy applies the multiplier."
+    added: 2026-04-18
+    revised: 2026-04-19
+
+  - name: LEVEL_CAP
+    status: active
+    source: design/gdd/economy-system.md
+    referenced_by:
+      - design/gdd/economy-system.md
+      - design/gdd/hero-roster.md
+      - design/gdd/combat-resolution.md
+    value: 15
+    unit: levels
+    notes: "Maximum hero level for all MVP classes. Applies to both Tier-1 and Tier-2 classes. Tuning knob in economy_config.tres. Safe range: 10–20. Hero Roster clamps current_level to this value via set_hero_level(). Combat Resolution uses LEVEL_CAP-clamped levels via stat_at_level."
+    added: 2026-04-18
+    revised: 2026-04-19
+
+  - name: RECRUIT_RATIO
+    status: active
+    source: design/gdd/economy-system.md
+    referenced_by:
+      - design/gdd/economy-system.md
+      - design/gdd/hero-roster.md
+    value: 1.8
+    unit: multiplier
+    notes: "Geometric ratio for per-copy recruit cost escalation. Each additional copy of the same class costs RECRUIT_RATIO times more than the previous copy. Tuning knob in economy_config.tres. Safe range: 1.2–2.5. Hero Roster's get_copies_owned(class_id) provides the exponent input."
+    added: 2026-04-18
+    revised: 2026-04-19
+
+  - name: LEVEL_RATIO
+    status: active
+    source: design/gdd/economy-system.md
+    referenced_by:
+      - design/gdd/economy-system.md
+      - design/gdd/hero-roster.md
+    value: 1.6
+    unit: multiplier
+    notes: "Geometric ratio for per-level cost escalation within a class. Tuning knob in economy_config.tres. Safe range: 1.3–2.0. Hero Roster's HeroInstance.current_level provides the exponent input."
+    added: 2026-04-18
+    revised: 2026-04-19
+
+  - name: TICKS_PER_SECOND
+    status: active
+    source: design/gdd/game-time-and-tick.md
+    referenced_by:
+      - design/gdd/game-time-and-tick.md
+      - design/gdd/dungeon-run-orchestrator.md
+    value: 20
+    unit: hertz
+    notes: "Simulation clock tick rate. 1 tick = 50ms. Integer so wall-seconds × rate = exact integer tick count (offline replay is audit-friendly). Read by Economy, Offline Engine, Dungeon Run Orchestrator."
+    added: 2026-04-18
+    revised: ""
+
+  - name: offline_cap_seconds
+    status: active
+    source: design/gdd/game-time-and-tick.md
+    referenced_by:
+      - design/gdd/game-time-and-tick.md
+      - design/gdd/dungeon-run-orchestrator.md
+    value: 28800
+    unit: seconds
+    notes: "Maximum creditable offline seconds (8 hours). Cozy-idle genre norm. Tuning knob — extend to 12h for launch generosity, contract to 6h if economy inflates."
+    added: 2026-04-18
+    revised: ""
+
+  - name: MAX_ROSTER_SIZE
+    status: active
+    source: design/gdd/hero-roster.md
+    referenced_by:
+      - design/gdd/hero-roster.md
+      - design/gdd/save-load-system.md
+    value: 30
+    unit: heroes
+    notes: "Hard cap on player-owned heroes. Anchored to (a) Roster Screen 5×6 grid layout at 1280×800 minimum spec preserving the 'whole guild at a glance' survey moment, and (b) Save/Load JSON growth + offline-replay perf bound. Tuning knob in roster_config.tres. Safe range: 15–50. Constraint: must be >= FORMATION_SIZE (validated at config load)."
+    added: 2026-04-19
+    revised: ""
+
+  - name: FORMATION_SIZE
+    status: active
+    source: design/gdd/hero-roster.md
+    referenced_by:
+      - design/gdd/hero-roster.md
+      - design/gdd/economy-system.md
+      - design/gdd/combat-resolution.md
+    value: 3
+    unit: slots
+    notes: "Number of active formation slots dispatched into a dungeon. MVP locked at 3 to preserve matchup combinatorics (Pillar 3) without flattening per-hero impact (Pillar 2). Tuning knob in roster_config.tres. Safe range: 1–5. Constraint: MAX_ROSTER_SIZE must be >= this. Combat Resolution iterates formation arrays bounded by FORMATION_SIZE."
+    added: 2026-04-19
+    revised: ""
+
+  - name: SPEED_BASE
+    status: active
+    source: design/gdd/combat-resolution.md
+    referenced_by:
+      - design/gdd/combat-resolution.md
+    value: 2400
+    unit: ticks
+    notes: "Single-knob recalibration of all combat throughput. Cooldown divisor (action_cooldown_ticks = maxi(1, floori(SPEED_BASE / speed))) AND DPS denominator (formation_dps_per_tick = sum(attack × speed) / SPEED_BASE). Tuning knob in combat_config.tres. Safe range: 800-6000. Default 2400 hits Biome targets across F1–F5 within ±~5% under Pass 2B calibration: F1=41s, F2=46s, F3=85s, F4=90s, F5=170s. Pass 2B (2026-04-20) closed two prior calibration items: F3 Biome target revised 60s → 85s (Combat I.Q1 CLOSED), and F5 boss HP raised 2200 → 4818 to lock 170s clear at L13 W+M+R neutral matchup via the closed-form ceili(170 × 20 × 1.417) = 4818 (Combat I.Q2 CLOSED). See Combat G.2 calibration table for the full SPEED_BASE × floor matrix."
+    added: 2026-04-19
+    revised: "2026-04-20 Pass 2B/Pass 3 reflexion: notes refreshed to reflect closure of Combat I.Q1 (F3 60→85s) and I.Q2 (F5 boss HP 2200→4818); maxi/floori notation aligned with Combat D-header convention; stale ~4900 estimate removed."
+
+  - name: SURVIVAL_MARGIN
+    status: deprecated
+    source: design/gdd/combat-resolution.md
+    referenced_by:
+      - design/gdd/combat-resolution.md
+    value: 0.2
+    unit: fraction
+    notes: "DEPRECATED 2026-04-20 in Pass 2B. Previously defined the soft-cliff lenience via `formation_total_hp >= (1 - SURVIVAL_MARGIN) × floor_total_enemy_attack`. Replaced by the continuous `hp_bonus_factor` formula (Combat D.6 / Rule 9) with a hard-coded LOSING trigger at `hp_bonus_factor < 0.5`. Entry retained with status=deprecated for save-data forward-compat. No new code path should read this value; combat_config.tres should omit the knob or leave it unused."
+    added: 2026-04-19
+    revised: "2026-04-20 Pass 2B: deprecated; replaced by continuous hp_bonus_factor formula in Combat D.6 (status: deprecated, retained for save-data forward-compat)"
+
+  - name: LOSING_RUN_LOOT_FACTOR
+    status: active
+    source: design/gdd/combat-resolution.md
+    referenced_by:
+      - design/gdd/combat-resolution.md
+      - design/gdd/dungeon-run-orchestrator.md
+      - design/gdd/economy-system.md
+      - docs/architecture/ADR-0002-losing-first-clear-reclaimable-on-win.md
+    value: 0.5
+    unit: multiplier
+    notes: "Loot multiplier applied when the Orchestrator's cached losing_run flag is true (hp_bonus_factor < 0.5 at DISPATCHING, per Combat D.6 / Rule 9). SCOPE (Pass 4B-Economy A2 — Pass 2B decision 4 superseded; further refined by Pass 5A/ADR-0002): applies to KILL GOLD + FLOOR-CLEAR BONUS only. NOT applied to drip (drip is run-outcome-independent by architecture; Economy's tick_fired subscription has no coupling to Orchestrator's losing_run state — see Economy review log Pass 4B-Economy A2). Routed exclusively via Orchestrator: _attribute_kill_gold and _attribute_floor_clear_bonus apply the factor before calling Economy.add_gold / Economy.try_award_floor_clear. Economy does not apply the factor independently. PASS 5A / ADR-0002 — 'no fail state' reclaim: on a LOSING first-clear, the halved floor-clear bonus is credited immediately and the remaining half is reclaimable on a subsequent non-LOSING clear via Economy's monotonic-credit gate (floor_clear_bonus_credited: Dictionary[int, int]). The permanency concern from the re-review's BLOCKING-2 is resolved by the delta-credit semantic — no content is permanently destroyed by a LOSING run. Tuning knob in combat_config.tres. Safe range: 0.5-0.95 (Pass 5B tightened lower bound from 0.0 — at 0.0 the halved floor-clear bonus is zero which, while handled defensively by try_award_floor_clear sub-AC 14-zero-bonus, violates the stated attribute_kill_gold/attribute_floor_clear_bonus output ranges (5-120 / 250-18000). For hard-content V1.0 floors, values in [0.5, 0.95] keep the penalty meaningful without collapsing the output range). Default 0.5 creates economic pressure to upgrade without ever blocking progression. Previously-listed 'drip' scope in this notes field (pre-Pass-4B-Economy) is REMOVED."
+    added: 2026-04-19
+    revised: "2026-04-20 Pass 5B: scope narrowed (drip removed per Pass 4B-Economy A2); reclaim semantic added per ADR-0002; safe range lower bound tightened 0.0 -> 0.5; referenced_by extended with economy-system.md + ADR-0002."
+
+  - name: MATCHUP_THROUGHPUT_FACTOR_ADV
+    status: active
+    source: design/gdd/combat-resolution.md
+    referenced_by:
+      - design/gdd/combat-resolution.md
+      - design/gdd/class-vs-enemy-matchup-resolver.md
+    value: 1.5
+    unit: multiplier
+    notes: "Per-enemy throughput multiplier applied to formation_dps_per_tick inside _kill_schedule_for_loop (Combat Rule 10 / D.5) when the formation crosses MatchupResolver's majority threshold (n > N/2 with n counter heroes, per Resolver Rule 6) for that enemy's archetype. Pillar 3 mechanical audibility knob — advantaged runs literally clear faster. Intentionally equal to MATCHUP_GOLD_MULTIPLIER (1.5) so Pillar 3's tempo payoff and gold payoff land on the same cadence. Tuning knob in combat_config.tres. Safe range: 1.0-2.5."
+    added: 2026-04-20
+    revised: ""
+
+  - name: MATCHUP_THROUGHPUT_FACTOR_DIS
+    status: active
+    source: design/gdd/combat-resolution.md
+    referenced_by:
+      - design/gdd/combat-resolution.md
+      - design/gdd/class-vs-enemy-matchup-resolver.md
+    value: 1.0
+    unit: multiplier
+    notes: "Per-enemy throughput multiplier applied to formation_dps_per_tick inside _kill_schedule_for_loop (Combat Rule 10 / D.5) when the formation does NOT cross MatchupResolver's majority threshold for that enemy's archetype. Default 1.0 = baseline (disadvantaged runs are never punished, only denied the advantaged bonus) — Pillar 1 posture: no fail states. Tuning knob in combat_config.tres. Safe range: 0.5-1.0. Values below 1.0 convert disadvantaged into a soft punishment signal and should NOT be used unless first-playtest evidence strongly justifies."
+    added: 2026-04-20
+    revised: ""
+
+  - name: DISPATCH_DEBOUNCE_MS
+    status: active
+    source: design/gdd/dungeon-run-orchestrator.md
+    referenced_by:
+      - design/gdd/dungeon-run-orchestrator.md
+    value: 250
+    unit: milliseconds
+    notes: "Anti-spam debounce on the Dispatch button — minimum interval between consecutive DISPATCHING transitions. Default 250 ms based on UI-design heuristic; first-playtest tuning per Orchestrator I.Q2. Tuning knob in orchestrator_config.tres. Safe range: 100–1000. Too low → accidental double-dispatch fires twice. Too high → button feels laggy / blocks intentional rapid re-dispatch."
+    added: 2026-04-20
+    revised: ""
+
+  - name: OFFLINE_REPLAY_CHUNK_TICKS
+    status: active
+    source: design/gdd/dungeon-run-orchestrator.md
+    referenced_by:
+      - design/gdd/dungeon-run-orchestrator.md
+    value: 0
+    unit: ticks
+    notes: "If non-zero, Offline Engine #12 splits offline replay into chunks of this size to amortize frame budget on resume. Default 0 = single-shot compute_offline_batch call per dispatched floor (current MVP design). First-playtest perf profiling decides whether chunking is needed (Orchestrator I.Q6). Tuning knob in orchestrator_config.tres. Safe range: 0–576000 (0 = disabled, 576000 = the 8h cap, anywhere in between for chunked behavior). Likely chunk size if enabled: 50000 ticks (~16ms per chunk on min-spec mobile)."
+    added: 2026-04-20
+    revised: ""
+
+  - name: MID_RUN_REASSIGN_WARNING_ENABLED
+    status: active
+    source: design/gdd/dungeon-run-orchestrator.md
+    referenced_by:
+      - design/gdd/dungeon-run-orchestrator.md
+      - design/gdd/hero-roster.md  # surfaced via Formation Assignment UX (#17 future) but Roster owns the hero-swap entry point
+    value: true
+    unit: boolean
+    notes: "If true, Formation Assignment Screen displays 'Reassigning will end your current run' confirmation before committing a hero swap during ACTIVE_FOREGROUND (Orchestrator C.7). Default true preserves Pillar 1 player trust — accidental reassignment must not silently lose run progress. Tuning knob in orchestrator_config.tres. Safe range: true / false. False is for testing or power-user opt-out only; not recommended for first-playtest builds."
+    added: 2026-04-20
+    revised: ""
+
+  - name: SAVE_LOAD_FLOAT_EPSILON
+    status: active
+    source: design/gdd/save-load-system.md
+    referenced_by:
+      - design/gdd/save-load-system.md
+    value: 0.00001
+    unit: float
+    notes: "Float-tolerance epsilon used by Save/Load consumers that need approximate comparison at the load boundary. Matches Godot's CMP_EPSILON / is_equal_approx default. Pass 4B-SaveLoad (2026-04-20) Rule 13: default is EXACT equality for floats that participate in boolean gates (e.g., hp_bonus_factor-vs-0.5 comparison); is_equal_approx with this epsilon is used only where the caller explicitly tolerates small drift. Denormals / NaN / Inf are authoring bugs — log + reject, do not apply epsilon. Defined as a class constant on SaveLoadSystem; consumers reference it rather than redefining locally."
+    added: 2026-04-20
+    revised: ""
+
+  - name: REWIND_TOLERANCE_SECONDS
+    status: active
+    source: design/gdd/game-time-and-tick.md
+    referenced_by:
+      - design/gdd/game-time-and-tick.md
+      - design/gdd/save-load-system.md
+    value: 300
+    unit: seconds
+    notes: "Grace window for benign clock-backward corrections including post-sleep NTP and laptop/Steam Deck wake. Rewinds beyond this set flag_suspicious_timestamp and zero offline credit. Hard anti-cheat escalation is owned by Save/Load. Revised 2026-04-19 from 60 to 300 per Time System GDD revision (post-sleep NTP corrections were false-positiving at 60s)."
+    added: 2026-04-18
+    revised: 2026-04-19
 
 # Example:
 #
