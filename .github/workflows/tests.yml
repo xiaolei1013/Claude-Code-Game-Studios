@@ -6,15 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  GODOT_VERSION: "4.6"
+
 jobs:
   test:
     name: Run GdUnit4 Tests
     runs-on: ubuntu-latest
-    # Use the Godot CI image so we don't have to install Godot from scratch.
-    # Supports Godot 4.x headless test runs out of the box. See
-    # https://github.com/abarichello/godot-ci
-    container:
-      image: barichello/godot-ci:4.3
 
     steps:
       - name: Checkout
@@ -22,10 +20,26 @@ jobs:
         with:
           lfs: true
 
-      # Direct GdUnit4 CLI invocation with the known-good flag set used in
-      # local dev: --continue (no fail-fast) + --ignoreHeadlessMode (the
-      # gdUnit4-action@v1 doesn't expose this flag, causing exit 134 SIGABRT
-      # at Godot shutdown after tests pass).
+      # Install Godot 4.6 headless directly. barichello/godot-ci stops at 4.3
+      # and our code uses `@abstract` (4.5+) so we need >= 4.5.
+      - name: Install Godot ${{ env.GODOT_VERSION }}
+        run: |
+          set -euo pipefail
+          GODOT_URL="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl -fL -o /tmp/godot.zip "$GODOT_URL"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          sudo install -m 0755 "/tmp/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
+          godot --version
+
+      # Import project resources so Godot generates .godot/ and the addon .uid
+      # files are honored. Without this first-pass import, scripts referenced
+      # by path like res://addons/gdUnit4/bin/GdUnitCmdTool.gd fail to load.
+      - name: Prime Godot project import
+        run: |
+          set +e
+          godot --headless --path . --import 2>&1 | tail -40
+          exit 0
+
       - name: Run GdUnit4 Tests
         id: gdunit
         continue-on-error: true
@@ -37,13 +51,11 @@ jobs:
             --add res://tests/integration/ \
             --continue \
             --ignoreHeadlessMode 2>&1 | tee /tmp/gdunit.log
-          # Exit code is unreliable (134 at shutdown even when all tests pass).
-          # The Verify step below is the authoritative pass/fail gate.
           exit 0
 
-      # Pass/fail gate driven by the test log, not the exit code. GdUnit4
-      # prints per-suite `Statistics: N test cases | E errors | F failures`
-      # lines; we sum them. Any error or failure fails the job.
+      # Pass/fail gate driven by GdUnit4's "Statistics:" lines, not exit code.
+      # Godot often exits non-zero at headless shutdown even when every test
+      # passes (SIGABRT at teardown). Parsing the log is the authoritative gate.
       - name: Verify Test Results
         if: always()
         run: |
@@ -52,7 +64,6 @@ jobs:
             echo "::error::No GdUnit4 log produced — runner did not start"
             exit 1
           fi
-          # Strip ANSI escape codes then parse Statistics lines.
           tr -d '\r' < /tmp/gdunit.log \
             | sed 's/\x1b\[[0-9;]*m//g' \
             > /tmp/gdunit.clean.log
