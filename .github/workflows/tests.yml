@@ -10,6 +10,11 @@ jobs:
   test:
     name: Run GdUnit4 Tests
     runs-on: ubuntu-latest
+    # Use the Godot CI image so we don't have to install Godot from scratch.
+    # Supports Godot 4.x headless test runs out of the box. See
+    # https://github.com/abarichello/godot-ci
+    container:
+      image: barichello/godot-ci:4.3
 
     steps:
       - name: Checkout
@@ -17,64 +22,65 @@ jobs:
         with:
           lfs: true
 
-      # Allow the action's exit code 134 (SIGABRT at Godot headless shutdown,
-      # see TD-005) to propagate without failing the job outright. We verify
-      # pass/fail by parsing the JUnit XML reports instead, which reflects the
-      # actual test outcome. If tests truly fail, the XML parser step below
-      # fails the job.
+      # Direct GdUnit4 CLI invocation with the known-good flag set used in
+      # local dev: --continue (no fail-fast) + --ignoreHeadlessMode (the
+      # gdUnit4-action@v1 doesn't expose this flag, causing exit 134 SIGABRT
+      # at Godot shutdown after tests pass).
       - name: Run GdUnit4 Tests
         id: gdunit
         continue-on-error: true
-        uses: MikeSchulze/gdUnit4-action@v1
-        with:
-          godot-version: '4.6'
-          paths: |
-            tests/unit
-            tests/integration
-          report-name: test-results
+        run: |
+          set +e
+          godot --headless --path . -s -d \
+            res://addons/gdUnit4/bin/GdUnitCmdTool.gd \
+            --add res://tests/unit/ \
+            --add res://tests/integration/ \
+            --continue \
+            --ignoreHeadlessMode 2>&1 | tee /tmp/gdunit.log
+          # Exit code is unreliable (134 at shutdown even when all tests pass).
+          # The Verify step below is the authoritative pass/fail gate.
+          exit 0
 
-      - name: Upload Test Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: reports/
-
-      # XML-based verification: if any test suite reports failures or errors,
-      # fail the job. Otherwise pass, even if the runner exited with a non-zero
-      # code from a shutdown crash.
+      # Pass/fail gate driven by the test log, not the exit code. GdUnit4
+      # prints per-suite `Statistics: N test cases | E errors | F failures`
+      # lines; we sum them. Any error or failure fails the job.
       - name: Verify Test Results
         if: always()
         run: |
           set -euo pipefail
-          shopt -s nullglob
-          xml_files=(reports/**/*.xml reports/*.xml)
-          if [ ${#xml_files[@]} -eq 0 ]; then
-            echo "::error::No JUnit XML reports produced — test runner may have crashed before writing results"
+          if [ ! -f /tmp/gdunit.log ]; then
+            echo "::error::No GdUnit4 log produced — runner did not start"
             exit 1
           fi
-          total_failures=0
-          total_errors=0
+          # Strip ANSI escape codes then parse Statistics lines.
+          tr -d '\r' < /tmp/gdunit.log \
+            | sed 's/\x1b\[[0-9;]*m//g' \
+            > /tmp/gdunit.clean.log
           total_tests=0
-          for xml in "${xml_files[@]}"; do
-            [ -f "$xml" ] || continue
-            # Extract failures="N" errors="N" tests="N" from <testsuite> tags.
-            while read -r line; do
-              f=$(echo "$line" | grep -oE 'failures="[0-9]+"' | grep -oE '[0-9]+' | head -1 || echo 0)
-              e=$(echo "$line" | grep -oE 'errors="[0-9]+"' | grep -oE '[0-9]+' | head -1 || echo 0)
-              t=$(echo "$line" | grep -oE 'tests="[0-9]+"' | grep -oE '[0-9]+' | head -1 || echo 0)
-              total_failures=$((total_failures + ${f:-0}))
-              total_errors=$((total_errors + ${e:-0}))
-              total_tests=$((total_tests + ${t:-0}))
-            done < <(grep -oE '<testsuite[^>]*>' "$xml" || true)
-          done
-          echo "Total: $total_tests tests, $total_failures failures, $total_errors errors"
-          if [ "$total_failures" -gt 0 ] || [ "$total_errors" -gt 0 ]; then
-            echo "::error::$total_failures test failures, $total_errors test errors"
-            exit 1
-          fi
+          total_errors=0
+          total_failures=0
+          while IFS= read -r line; do
+            t=$(echo "$line" | grep -oE '[0-9]+ test cases' | grep -oE '[0-9]+' || echo 0)
+            e=$(echo "$line" | grep -oE '[0-9]+ errors' | grep -oE '[0-9]+' || echo 0)
+            f=$(echo "$line" | grep -oE '[0-9]+ failures' | grep -oE '[0-9]+' || echo 0)
+            total_tests=$((total_tests + ${t:-0}))
+            total_errors=$((total_errors + ${e:-0}))
+            total_failures=$((total_failures + ${f:-0}))
+          done < <(grep "^Statistics:" /tmp/gdunit.clean.log || true)
+          echo "Aggregate: $total_tests test cases, $total_errors errors, $total_failures failures"
           if [ "$total_tests" -eq 0 ]; then
-            echo "::error::No tests were executed"
+            echo "::error::No tests executed — check GdUnit4 log artifact"
             exit 1
           fi
-          echo "All $total_tests tests passed."
+          if [ "$total_failures" -gt 0 ] || [ "$total_errors" -gt 0 ]; then
+            echo "::error::$total_failures failures, $total_errors errors across $total_tests tests"
+            exit 1
+          fi
+          echo "All $total_tests tests passed across the suite."
+
+      - name: Upload GdUnit4 Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gdunit-log
+          path: /tmp/gdunit.log
