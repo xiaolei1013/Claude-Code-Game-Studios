@@ -5,7 +5,7 @@
 > **Architecture Module**: `TickSystem` (autoload rank 0)
 > **Control Manifest Version**: 2026-04-24
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories tick-system`
+> **Stories**: 11 defined (all Ready)
 
 ## Overview
 
@@ -64,6 +64,24 @@ This epic is complete when:
 - Heartbeat envelope size ≤512 bytes (AC-TICK-11 BLOCKING)
 - `tick_fired` never emits during offline replay (CI grep assertion per ADR-0005)
 - No `Time.get_unix_time_from_system()` calls outside TickSystem (CI grep per ADR-0005)
+
+## Stories
+
+| # | Story | Type | Status | Governing ADR |
+|---|---|---|---|---|
+| 001 | TickSystem autoload skeleton | Logic | Ready | ADR-0005 (+ ADR-0003) |
+| 002 | Integer accumulator and `tick_fired` synchronous emission | Logic | Ready | ADR-0005 |
+| 003 | `_process(delta)` forbidden-as-economy-input and wall-clock single call site | Logic | Ready | ADR-0005 |
+| 004 | Platform BG/FG notifications and tick-emission pause with residual preservation | Integration | Ready | ADR-0005 |
+| 005 | First-launch bootstrap and `offline_elapsed_seconds` one-shot emission | Integration | Ready | ADR-0005 |
+| 006 | Formula D.2 — offline elapsed + forward clamp + rewind tolerance + int64 overflow | Logic | Ready | ADR-0005 |
+| 007 | Suspicious-timestamp flag + signal emission + log string | Logic | Ready | ADR-0005 |
+| 008 | Heartbeat persist coupling + Save/Load writer surface | Integration | Ready | ADR-0005 (+ ADR-0004) |
+| 009 | Offline replay coordination — `tick_fired` suppression + signal ordering invariant | Integration | Ready | ADR-0005, ADR-0014 |
+| 010 | Debug-only mock clock + `debug_emit_suspicious_timestamp` + runtime gate | Logic | Ready | ADR-0005 |
+| 011 | Performance verification — per-tick dispatch + offline replay budget + heartbeat envelope size | Integration (Performance) | Ready | ADR-0005 (+ ADR-0014) |
+
+**Dependency chain**: 001 → 002 → {003, 004} → {005 via 003, 008 via 004} → {006 via 005, 009 via 005} → 007 → 010 → 011. Stories 003 and 004 are parallelizable once 002 is done.
 
 ## Next Step
 
