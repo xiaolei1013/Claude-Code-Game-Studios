@@ -17,7 +17,14 @@ jobs:
         with:
           lfs: true
 
+      # Allow the action's exit code 134 (SIGABRT at Godot headless shutdown,
+      # see TD-005) to propagate without failing the job outright. We verify
+      # pass/fail by parsing the JUnit XML reports instead, which reflects the
+      # actual test outcome. If tests truly fail, the XML parser step below
+      # fails the job.
       - name: Run GdUnit4 Tests
+        id: gdunit
+        continue-on-error: true
         uses: MikeSchulze/gdUnit4-action@v1
         with:
           godot-version: '4.6'
@@ -32,3 +39,42 @@ jobs:
         with:
           name: test-results
           path: reports/
+
+      # XML-based verification: if any test suite reports failures or errors,
+      # fail the job. Otherwise pass, even if the runner exited with a non-zero
+      # code from a shutdown crash.
+      - name: Verify Test Results
+        if: always()
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          xml_files=(reports/**/*.xml reports/*.xml)
+          if [ ${#xml_files[@]} -eq 0 ]; then
+            echo "::error::No JUnit XML reports produced — test runner may have crashed before writing results"
+            exit 1
+          fi
+          total_failures=0
+          total_errors=0
+          total_tests=0
+          for xml in "${xml_files[@]}"; do
+            [ -f "$xml" ] || continue
+            # Extract failures="N" errors="N" tests="N" from <testsuite> tags.
+            while read -r line; do
+              f=$(echo "$line" | grep -oE 'failures="[0-9]+"' | grep -oE '[0-9]+' | head -1 || echo 0)
+              e=$(echo "$line" | grep -oE 'errors="[0-9]+"' | grep -oE '[0-9]+' | head -1 || echo 0)
+              t=$(echo "$line" | grep -oE 'tests="[0-9]+"' | grep -oE '[0-9]+' | head -1 || echo 0)
+              total_failures=$((total_failures + ${f:-0}))
+              total_errors=$((total_errors + ${e:-0}))
+              total_tests=$((total_tests + ${t:-0}))
+            done < <(grep -oE '<testsuite[^>]*>' "$xml" || true)
+          done
+          echo "Total: $total_tests tests, $total_failures failures, $total_errors errors"
+          if [ "$total_failures" -gt 0 ] || [ "$total_errors" -gt 0 ]; then
+            echo "::error::$total_failures test failures, $total_errors test errors"
+            exit 1
+          fi
+          if [ "$total_tests" -eq 0 ]; then
+            echo "::error::No tests were executed"
+            exit 1
+          fi
+          echo "All $total_tests tests passed."
