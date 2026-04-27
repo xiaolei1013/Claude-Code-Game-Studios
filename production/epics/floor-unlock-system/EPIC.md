@@ -3,9 +3,9 @@
 > **Layer**: Feature
 > **GDD**: `design/gdd/floor-unlock-system.md`
 > **Architecture Module**: `FloorUnlock` (autoload — rank governed by ADR-0003 Amendment table; item #3 in `CONSUMER_PATHS`)
-> **Control Manifest Version**: 2026-04-24
-> **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories floor-unlock-system`
+> **Control Manifest Version**: 2026-04-26
+> **Status**: Ready (stories authored 2026-04-27)
+> **Stories**: 9 stories authored — see table below
 
 ## Overview
 
@@ -70,10 +70,20 @@ which floors are available for dispatch).
 
 ## Stories
 
-Not yet created. Run `/create-stories floor-unlock-system` to author.
+| # | Story | Type | Status | TRs | ADR |
+|---|-------|------|--------|-----|-----|
+| 001 | Autoload skeleton + `_unlock_state` typed dict + fresh-save default | Logic | Ready | TR-001/002/003/005 | ADR-0003 + ADR-0011 |
+| 002 | Public read API + FloorState enum | Logic | Ready | TR-004/011/014 | ADR-0009 |
+| 003 | Biome availability + completeness + get_available_biomes | Logic | Ready | TR-023/024/020 | ADR-0011 |
+| 004 | BIOME_FLOOR_COUNT + handler guards + DI loggers | Integration | Ready | TR-012/013/021 | ADR-0009 + ADR-0011 |
+| 005 | advance_unlock + signal subscription + monotonicity | Integration | Ready | TR-006/007/008/009/010 | ADR-0007 + ADR-0014 + ADR-0003-A1 |
+| 006 | Save/Load consumer + per-value processing pipeline | Integration | Ready | TR-015/016/017/018/019/020/029 | ADR-0004 + ADR-0011 |
+| 007 | Orchestrator DISPATCHING gate wiring | Integration | Ready | TR-026 | ADR-0009 |
+| 008 | Offline replay parity (foreground vs offline lockstep) | Integration | Ready | TR-030/025 | ADR-0014 + ADR-0007 |
+| 009 | debug_unlock_all + UI fanfare losing/win equivalence | Logic + Integration | Ready | TR-022/027/028 | ADR-0002 |
+
+**Story sequencing**: 001 → 002 → 003 → 004 → 005 → 006 → 007 → 008 → 009 (linear; each builds on the prior). Sprint 9 candidate scope: Stories 001-007 form a complete production-ready FloorUnlock; 008-009 are post-launch invariants that can land later if Sprint 9 capacity is constrained.
 
 ## Next Step
 
-`/create-stories floor-unlock-system`. The Unlock/Victory Moment UI
-(Presentation epic — not yet decomposed) renders the unlock beat; this
-epic owns only the state machine.
+Run `/story-readiness production/epics/floor-unlock-system/story-001-autoload-skeleton-and-fresh-save-default.md` to validate the first story is implementation-ready, then `/dev-story` against it. The Unlock/Victory Moment UI (Presentation epic — not yet decomposed) renders the unlock beat; this epic owns only the state machine.

@@ -109,14 +109,24 @@ func test_add_hero_sets_default_level_one_and_xp_zero() -> void:
 	assert_int(instance.xp).is_equal(0)
 
 
-func test_add_hero_uses_placeholder_display_name_until_story_009() -> void:
+func test_add_hero_assigns_display_name_from_warrior_name_pool() -> void:
+	# Sprint 8 S8-N9 (Story 009) landed the name pool implementation —
+	# add_hero now assigns a display_name from the per-class NamePool resource
+	# instead of the legacy "Hero N" placeholder. Verify the new contract:
+	# the assigned name is a member of the warrior pool.
 	if not _data_registry_can_resolve_test_class():
 		push_warning("Skipped: DataRegistry not resolving TEST_CLASS_ID")
 		return
+	var pool: Resource = DataRegistry.resolve("name_pools", TEST_CLASS_ID)
+	if pool == null:
+		push_warning("Skipped: name_pools/warrior not resolvable in test env")
+		return
 	var hr: Node = _make_fresh_roster()
 	var instance: RefCounted = hr.add_hero(TEST_CLASS_ID)
-	# Placeholder format: "Hero %d" % instance_id
-	assert_str(instance.display_name).is_equal("Hero 1")
+	# Assigned display_name must be a member of the warrior pool (Sprint 8
+	# S8-N9 contract; replaces the pre-S8-N9 "Hero N" placeholder assertion).
+	var pool_names: Array = pool.get("names") as Array
+	assert_bool(pool_names.has(instance.display_name)).is_true()
 
 
 # ===========================================================================

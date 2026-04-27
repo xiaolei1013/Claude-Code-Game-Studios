@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="NamePool" format=3 uid="uid://b2npoolrogue0001"]
+
+[ext_resource type="Script" path="res://src/core/hero_roster/name_pool.gd" id="1_nprog"]
+
+[resource]
+script = ExtResource("1_nprog")
+id = "rogue"
+class_id = "rogue"
+display_name = "Rogue Names"
+names = Array[String](["Pip", "Wisp", "Reed", "Cinder", "Shade", "Briar", "Bay", "Vex", "Sly", "Rook", "Quill", "Twig", "Mote", "Knot", "Sprig", "Dusk", "Vine", "Lark", "Hush", "Echo", "Mose", "Drift"])

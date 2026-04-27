@@ -194,100 +194,100 @@ stories:
 
   - id: "S8-N1"
     name: "combat-resolution Story 010: perf bench + orchestrator synchronous integration (S7-N1 carry)"
-    file: "production/epics/combat-resolution/story-010-perf-bench.md"
+    file: "production/epics/combat-resolution/story-010-perf-bench-and-orchestrator-integration.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.5
-    blocker: "depends on S8-S1"
-    completed: ""
+    blocker: ""
+    completed: "2026-04-27"
 
   - id: "S8-N2"
     name: "matchup-resolver Story 005: determinism + offline-replay invariants (S7-N2 carry)"
-    file: "production/epics/matchup-resolver/story-005-determinism.md"
+    file: "production/epics/matchup-resolver/story-005-determinism-and-offline-replay-invariants.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.5
-    blocker: "depends on S8-S2"
-    completed: ""
+    blocker: ""
+    completed: "2026-04-27"
 
   - id: "S8-N3"
     name: "matchup-resolver Story 008: perf bench + structural CI lint (S7-N3 carry)"
-    file: "production/epics/matchup-resolver/story-008-perf-bench.md"
+    file: "production/epics/matchup-resolver/story-008-perf-bench-and-structural-lint.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.25
     blocker: ""
-    completed: ""
+    completed: "2026-04-27"
 
   - id: "S8-N4"
     name: "hero-roster Story 010: formation strength accessor + AC H-14 perf (S7-N4 carry)"
-    file: "production/epics/hero-roster/story-010-formation-strength.md"
+    file: "production/epics/hero-roster/story-010-formation-strength-and-accessors.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.25
     blocker: ""
-    completed: ""
+    completed: "2026-04-27"
 
   - id: "S8-N5"
     name: "dungeon-run-orchestrator Story 007: floor-clear bonus + 3-layer idempotency (S7-N5 carry)"
-    file: "production/epics/dungeon-run-orchestrator/story-007-floor-clear-bonus.md"
+    file: "production/epics/dungeon-run-orchestrator/story-007-floor-clear-and-idempotency.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.25
-    blocker: "depends on S8-S3"
-    completed: ""
+    blocker: ""
+    completed: "2026-04-27"
 
   - id: "S8-N6"
     name: "matchup-resolver Story 006: Orchestrator DI integration + spy-subclass test pattern (S7-N6 carry)"
-    file: "production/epics/matchup-resolver/story-006-orchestrator-di.md"
+    file: "production/epics/matchup-resolver/story-006-orchestrator-di-integration.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.25
     blocker: ""
-    completed: ""
+    completed: "2026-04-27"
 
   - id: "S8-N7"
     name: "matchup-resolver Story 007: Economy + Combat consumer wiring (S7-N7 carry)"
-    file: "production/epics/matchup-resolver/story-007-consumer-wiring.md"
+    file: "production/epics/matchup-resolver/story-007-economy-and-combat-consumer-wiring.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.25
     blocker: ""
-    completed: ""
+    completed: "2026-04-27"
 
   - id: "S8-N8"
     name: "Floor-unlock-system epic pre-flight: /create-stories floor-unlock-system (S7-N8 carry)"
     file: "production/epics/floor-unlock-system/EPIC.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.13
     blocker: ""
-    completed: ""
+    completed: "2026-04-27"
 
   - id: "S8-N9"
     name: "hero-roster Story 009: name pool generation (S6-N1 → S7 → S8 deferral chain)"
-    file: "production/epics/hero-roster/story-009-name-pool.md"
+    file: "production/epics/hero-roster/story-009-name-pool-generation.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.5
-    blocker: "depends on S8-S4"
-    completed: ""
+    blocker: ""
+    completed: "2026-04-27"
 
   - id: "S8-N10"
     name: "AD-ART-BIBLE sign-off: art bible 9-section completeness review"
     file: "design/art/art-bible.md"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-04-27"

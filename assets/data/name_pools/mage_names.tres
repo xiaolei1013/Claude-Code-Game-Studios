@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="NamePool" format=3 uid="uid://b2npoolmage00001"]
+
+[ext_resource type="Script" path="res://src/core/hero_roster/name_pool.gd" id="1_npmag"]
+
+[resource]
+script = ExtResource("1_npmag")
+id = "mage"
+class_id = "mage"
+display_name = "Mage Names"
+names = Array[String](["Liora", "Ash", "Wyn", "Caelin", "Sela", "Iona", "Ember", "Faye", "Linnea", "Mira", "Nyx", "Saoirse", "Tessa", "Vesper", "Yara", "Astra", "Cyra", "Elara", "Halia", "Reverie", "Sable"])

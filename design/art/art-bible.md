@@ -1,11 +1,11 @@
 # Art Bible: Lantern Guild
 
 *Created: 2026-04-18*
-*Status: v1.0 Draft*
+*Status: v1.0 Approved (Sprint 8 S8-N10 — 2026-04-27)*
 *Visual Identity Anchor: Lantern-Lit Pixel Diorama*
 *One-line visual rule: **Every scene must feel like a warm miniature you want to pick up.***
 
-> **Art Director Sign-Off (AD-ART-BIBLE)**: SKIPPED — Solo review mode. This bible is authored from the locked Visual Identity Anchor in `design/gdd/game-concept.md` and should be re-reviewed via `/gate-check` before committing to production asset work.
+> **Art Director Sign-Off (AD-ART-BIBLE)**: APPROVED WITH CONDITIONS — see `design/art/ad-art-bible-signoff-2026-04-27.md` for the full review report. Structural completeness 9/9; tonal consistency verified against Visual Identity Anchor + character profiles + UX specs. 4 non-blocking conditions tracked for Sprint 9+ polish (explicit §5↔character-profiles cross-links; §2/§9 post-playtest refresh; §8 budgets re-validation after first real-asset batch; accessibility-specialist cross-review).
 
 ---
 

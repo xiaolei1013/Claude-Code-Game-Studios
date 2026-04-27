@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="NamePool" format=3 uid="uid://b2npoolwarrior01"]
+
+[ext_resource type="Script" path="res://src/core/hero_roster/name_pool.gd" id="1_npwar"]
+
+[resource]
+script = ExtResource("1_npwar")
+id = "warrior"
+class_id = "warrior"
+display_name = "Warrior Names"
+names = Array[String](["Theron", "Garrick", "Bram", "Roderick", "Idris", "Kestrel", "Vael", "Hadrian", "Cedric", "Wren", "Ronan", "Alaric", "Brann", "Ewan", "Ferren", "Galen", "Hollis", "Ivar", "Joren", "Kael", "Lior", "Maren"])

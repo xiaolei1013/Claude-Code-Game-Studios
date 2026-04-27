@@ -133,10 +133,11 @@ func test_boot_scan_enumerates_tres_files_and_populates_categories() -> void:
 #   _load_category() is invoked in exactly ORDERED_CATEGORIES sequence.
 # ---------------------------------------------------------------------------
 func test_boot_scan_load_order_matches_ordered_categories() -> void:
-	# Arrange — seven empty category directories (no .tres content needed for
+	# Arrange — eight empty category directories (no .tres content needed for
 	# this test; we only assert invocation order, not loaded content).
 	# "config" appended in Sprint 2 / S2-M2 alongside the ORDERED_CATEGORIES
 	# extension that supports EconomyConfig loading.
+	# "name_pools" appended in Sprint 8 / S8-N9 for hero-roster name generation.
 	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [],
 		"enemies": [],
@@ -145,6 +146,7 @@ func test_boot_scan_load_order_matches_ordered_categories() -> void:
 		"items": [],
 		"matchup": [],
 		"config": [],
+		"name_pools": [],
 	})
 
 	var dr: _OrderRecordingRegistry = _OrderRecordingRegistry.new()
@@ -155,7 +157,7 @@ func test_boot_scan_load_order_matches_ordered_categories() -> void:
 	dr._ready()
 
 	# Assert — recorded order is exactly ORDERED_CATEGORIES
-	assert_int(dr.recorded_order.size()).is_equal(7)
+	assert_int(dr.recorded_order.size()).is_equal(8)
 	assert_str(dr.recorded_order[0]).is_equal("classes")
 	assert_str(dr.recorded_order[1]).is_equal("enemies")
 	assert_str(dr.recorded_order[2]).is_equal("biomes")
@@ -163,6 +165,7 @@ func test_boot_scan_load_order_matches_ordered_categories() -> void:
 	assert_str(dr.recorded_order[4]).is_equal("items")
 	assert_str(dr.recorded_order[5]).is_equal("matchup")
 	assert_str(dr.recorded_order[6]).is_equal("config")
+	assert_str(dr.recorded_order[7]).is_equal("name_pools")
 
 	# Cleanup
 	dr.free()
@@ -245,10 +248,11 @@ func test_boot_scan_does_not_enumerate_unknown_category_directories() -> void:
 	# Act
 	dr._ready()
 
-	# Assert — _categories contains only the seven ORDERED_CATEGORIES keys
-	# (six original + "config" added in Sprint 2 / S2-M2); "bonus_category"
-	# is absent (auto-discovery is forbidden per ADR-0006).
-	assert_int(dr._categories.keys().size()).is_equal(7)
+	# Assert — _categories contains only the eight ORDERED_CATEGORIES keys
+	# (six original + "config" added in Sprint 2 / S2-M2 + "name_pools" added
+	# in Sprint 8 / S8-N9); "bonus_category" is absent (auto-discovery is
+	# forbidden per ADR-0006).
+	assert_int(dr._categories.keys().size()).is_equal(8)
 	assert_bool(dr._categories.has("bonus_category")).is_false()
 	for cat: String in DataRegistry.ORDERED_CATEGORIES:
 		assert_bool(dr._categories.has(cat)).is_true()

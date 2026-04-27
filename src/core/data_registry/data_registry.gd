@@ -34,7 +34,7 @@ extends Node
 ## resources have no cross-references to other categories — the order is a
 ## load-time invariant, not a dependency declaration.
 const ORDERED_CATEGORIES: Array[String] = [
-	"classes", "enemies", "biomes", "dungeons", "items", "matchup", "config",
+	"classes", "enemies", "biomes", "dungeons", "items", "matchup", "config", "name_pools",
 ]
 
 # Snake_case id regex per ADR-0011 §Load-Time Validation Semantics.

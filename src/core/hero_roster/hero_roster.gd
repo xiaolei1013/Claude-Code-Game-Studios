@@ -477,9 +477,199 @@ func set_formation_slot(slot_index: int, hero_id: int) -> bool:
 ## "name_pools" category keyed by class_id (parameter renamed back to
 ## [code]class_id[/code] then).
 ##
-## TR-hero-roster-008 (placeholder); TR-hero-roster-021 (Story 009 final form)
-func _generate_name(_class_id: String, instance_id: int) -> String:
-	return "Hero %d" % instance_id
+## Sprint 8 S8-N9 (Story 009 — TR-022 / TR-023): name pool generation.
+##
+## Resolves the per-class NamePool via DataRegistry, computes the unused-name
+## subset by walking [member _heroes] for entries with the same class_id, and
+## returns a uniformly-random unused name. When the pool is exhausted (player
+## owns ≥pool-size heroes of the same class), falls back to "{base} the
+## {Ordinal}" pattern using the first pool name as the base (e.g.,
+## "Theron the Second" → "Theron the Third" → ...).
+##
+## Defensive: when DataRegistry can't resolve a NamePool for [param class_id]
+## (test env without name_pools, or unknown class), returns a "Hero N"
+## placeholder with push_warning. Production code paths require all MVP
+## class_ids to have a registered pool.
+##
+## TR-hero-roster-022 / TR-hero-roster-023 — ADR-0011 + ADR-0012
+const _ORDINALS: Array[String] = [
+	"Second", "Third", "Fourth", "Fifth", "Sixth",
+	"Seventh", "Eighth", "Ninth", "Tenth",
+]
+
+func _generate_name(class_id: String, instance_id: int) -> String:
+	var pool: Resource = DataRegistry.resolve("name_pools", class_id)
+	if pool == null or not ("names" in pool):
+		push_warning(
+			("[HeroRoster] _generate_name: no NamePool for class_id '%s' in DataRegistry; "
+			+ "falling back to 'Hero %d' placeholder")
+			% [class_id, instance_id]
+		)
+		return "Hero %d" % instance_id
+	var all_names: Array = pool.get("names") as Array
+	if all_names.is_empty():
+		push_warning(
+			"[HeroRoster] _generate_name: NamePool for '%s' has empty names array"
+			% class_id
+		)
+		return "Hero %d" % instance_id
+	# Compute the used-name set: existing heroes of THIS class that aren't
+	# already ordinal-fallback-named (those don't count against pool exhaustion).
+	var used: Dictionary = {}
+	for id: int in _heroes:
+		var inst: RefCounted = _heroes[id]
+		if "class_id" in inst and str(inst.class_id) == class_id:
+			used[str(inst.display_name)] = true
+	var unused: Array[String] = []
+	for n: Variant in all_names:
+		var name_str: String = str(n)
+		if not used.has(name_str):
+			unused.append(name_str)
+	# Pool not yet exhausted — uniform random from unused subset.
+	if not unused.is_empty():
+		return unused[randi() % unused.size()]
+	# Pool exhausted — ordinal fallback on the first pool name (TR-022).
+	# `ordinal_index` = how many heroes beyond the pool size we are. The first
+	# overflow gets "Second" (index 0); the next "Third" (index 1); etc. Past
+	# the ordinal table, we fall back to "the Many" rather than crash.
+	var base: String = str(all_names[0])
+	var pool_size: int = all_names.size()
+	var same_class_count: int = used.size()
+	var ordinal_index: int = same_class_count - pool_size
+	var ordinal: String = "the Many"
+	if ordinal_index >= 0 and ordinal_index < _ORDINALS.size():
+		ordinal = _ORDINALS[ordinal_index]
+	return "%s the %s" % [base, ordinal]
+
+
+# ---------------------------------------------------------------------------
+# Public accessors — Story 010 / S8-N4 (TR-017 / TR-018 / TR-024 / TR-026 / TR-027).
+#
+# Reads consumed by Combat (formation strength scaling), MatchupResolver
+# (formation hero list), and UI (sortable hero roster). All methods are
+# pure-function reads against [member _heroes] / [member _formation_slots] —
+# zero mutation side effects, no signals fired.
+# ---------------------------------------------------------------------------
+
+## Sort mode enum for [method get_all_heroes]. BY_CLASS is the default; UI
+## screens may override per their context (Recruitment shows BY_CLASS for
+## taxonomy clarity; Roster overview shows BY_LEVEL_DESC for progression
+## visibility; debug tools use BY_INSTANCE_ID for stable iteration).
+enum SortMode { BY_CLASS, BY_LEVEL_DESC, BY_INSTANCE_ID }
+
+
+## Computes the formation strength multiplier from the average level of
+## non-empty formation slots. Used by Combat as the "formation power"
+## scalar; downstream of [method get_formation_heroes].
+##
+## Formula (TR-017): [code]clamp(1.0 + (avg_level - 1) * 0.2, 1.0, 3.0)[/code]
+## where [code]avg_level = sum(current_level) / non_empty_count[/code] and
+## empty slots (id=0) are skipped. Empty formation guard returns 1.0
+## (no division by zero; the floor of the clamp range).
+##
+## Output range: [1.0, 3.0]. At level 1 (min) → 1.0; at level 11 → 3.0;
+## at level 12+ → still 3.0 (upper clamp). Player-facing UI may display
+## the value as a percentage (1.0 = 100% / 3.0 = 300%).
+##
+## Performance budget (AC H-14 / TR-024): p99 < 50µs over 1000 calls on
+## min-spec (Steam Deck 1280×800). MVP path is a tight integer accumulate
+## + one float division — easily within budget; perf test in
+## [code]tests/unit/hero_roster/formation_strength_and_accessors_test.gd[/code]
+## verifies the budget on dev hardware.
+##
+## Defensive: skips formation slots whose id doesn't resolve in
+## [member _heroes] (Story 007 boot validation should have cleared these,
+## but this method guards anyway for runtime robustness).
+##
+## TR-hero-roster-017, TR-hero-roster-018, TR-hero-roster-024 — ADR-0012
+func get_formation_strength() -> float:
+	var sum_levels: int = 0
+	var non_empty_count: int = 0
+	for slot_id: int in _formation_slots:
+		if slot_id == 0:
+			continue
+		if not _heroes.has(slot_id):
+			continue  # defensive — Story 007 boot validation should clear orphans
+		sum_levels += int((_heroes[slot_id] as RefCounted).current_level)
+		non_empty_count += 1
+	if non_empty_count == 0:
+		return 1.0
+	var avg: float = float(sum_levels) / float(non_empty_count)
+	return clampf(1.0 + (avg - 1.0) * 0.2, 1.0, 3.0)
+
+
+## Returns the heroes currently assigned to formation slots, ordered by
+## slot index. Empty slots (id=0) and orphan-id slots (id not in _heroes)
+## are silently skipped — the returned Array contains only valid
+## HeroInstance refs.
+##
+## Result Array length: 0 to FORMATION_SIZE (≤3 in MVP). Consumed by
+## Combat (per-tick formation iteration) and MatchupResolver (formation
+## input to resolve_formation_matchup) — both treat the empty case as
+## "no advantage" defensively.
+##
+## Output is a fresh Array on each call — caller may mutate without
+## affecting [member _formation_slots] state.
+##
+## TR-hero-roster-027 — ADR-0012
+func get_formation_heroes() -> Array:
+	var out: Array = []
+	for slot_id: int in _formation_slots:
+		if slot_id == 0:
+			continue
+		if not _heroes.has(slot_id):
+			continue
+		out.append(_heroes[slot_id])
+	return out
+
+
+## Returns all heroes in the roster, sorted per [param sort_mode].
+## Default sort is [code]BY_CLASS[/code] (alphabetic class_id ordering with
+## level-desc tiebreaker) — matches the Recruitment / Roster UI's taxonomy-
+## first display pattern.
+##
+## Sort modes (TR-026):
+##   - [code]BY_CLASS[/code]: alphabetic by class_id ascending; ties broken
+##     by current_level descending (highest-level same-class hero first).
+##     MVP simplification: alphabetic instead of DataRegistry registration
+##     order — flagged in story note as acceptable for V1.0.
+##   - [code]BY_LEVEL_DESC[/code]: current_level descending (highest first);
+##     no secondary sort (stable per Godot's sort_custom).
+##   - [code]BY_INSTANCE_ID[/code]: instance_id ascending — stable iteration
+##     for debug tools.
+##
+## Output is a fresh Array on each call — caller may mutate freely.
+##
+## TR-hero-roster-026 — ADR-0012
+func get_all_heroes(sort_mode: int = SortMode.BY_CLASS) -> Array:
+	var out: Array = []
+	for id: int in _heroes:
+		out.append(_heroes[id])
+	match sort_mode:
+		SortMode.BY_CLASS:
+			out.sort_custom(_sort_by_class_then_level_desc)
+		SortMode.BY_LEVEL_DESC:
+			out.sort_custom(_sort_by_level_desc)
+		SortMode.BY_INSTANCE_ID:
+			out.sort_custom(_sort_by_instance_id)
+	return out
+
+
+# Sort comparators — extracted as named methods rather than inline lambdas
+# so static typing analysis is happy and stack traces are readable.
+
+func _sort_by_class_then_level_desc(a: RefCounted, b: RefCounted) -> bool:
+	if a.class_id != b.class_id:
+		return a.class_id < b.class_id  # alphabetic ascending
+	return a.current_level > b.current_level  # level descending tiebreaker
+
+
+func _sort_by_level_desc(a: RefCounted, b: RefCounted) -> bool:
+	return a.current_level > b.current_level
+
+
+func _sort_by_instance_id(a: RefCounted, b: RefCounted) -> bool:
+	return a.instance_id < b.instance_id
 
 
 # ---------------------------------------------------------------------------

@@ -81,6 +81,21 @@ func _reset_spies() -> void:
 	_spy_validation_failed_calls.clear()
 
 
+# Sprint 8 S8-N5 follow-up: floor_cleared_first_time is now gated on
+# Economy.try_award_floor_clear's monotonic ledger (Layer 3 of the 3-layer
+# idempotency contract). Tests that exercise the signal must reset the
+# Economy autoload's _floor_clear_bonus_credited dict to {} so prior tests
+# in the same Godot run don't pollute floor-N state. Returns the autoload
+# Node for chained access (or null if Economy isn't reachable in this env).
+func _reset_economy_floor_clear_ledger() -> Node:
+	var economy: Node = get_node_or_null("/root/Economy") if get_tree() != null else null
+	if economy != null:
+		# Dict is typed; .clear() preserves type vs assigning {} which fails
+		# the static type check (same class of pitfall as Array[int].assign).
+		economy._floor_clear_bonus_credited.clear()
+	return economy
+
+
 # ===========================================================================
 # Group A: TR-014 — attribute_kill_gold formula
 # ===========================================================================
@@ -322,6 +337,7 @@ func test_boss_killed_fires_for_each_boss_in_event_batch() -> void:
 # ===========================================================================
 
 func test_floor_cleared_first_time_fires_on_first_clear() -> void:
+	_reset_economy_floor_clear_ledger()
 	_reset_spies()
 	var orch: Node = _make_orch()
 	orch.run_snapshot = RunSnapshotScript.new()
@@ -345,6 +361,7 @@ func test_floor_cleared_first_time_fires_on_first_clear() -> void:
 
 
 func test_floor_cleared_first_time_does_not_fire_twice_within_same_dispatch() -> void:
+	_reset_economy_floor_clear_ledger()
 	# TR-018 idempotency: orchestrator's floor_clear_emitted flag prevents
 	# re-emission. Combat reports the marker per-call; only the FIRST crossing
 	# emits the orchestrator-side fanfare.
@@ -373,6 +390,7 @@ func test_floor_cleared_first_time_does_not_fire_twice_within_same_dispatch() ->
 
 
 func test_dispatched_floor_index_and_biome_id_reset_on_run_ended_transition() -> void:
+	_reset_economy_floor_clear_ledger()
 	# Sprint 8 S8-S3 follow-up (code-review): the doc comments on
 	# _dispatched_floor_index / _dispatched_biome_id promise "Reset to 0/'' on
 	# RUN_ENDED". Without this, a stale floor_cleared_first_time payload could
@@ -383,7 +401,9 @@ func test_dispatched_floor_index_and_biome_id_reset_on_run_ended_transition() ->
 	orch.run_snapshot = RunSnapshotScript.new()
 	orch._combat_snapshot = CombatRunSnapshotScript.new()
 	orch._combat_snapshot.matchup_cache = {}
-	orch._dispatched_floor_index = 7
+	# floor 4 — within the [1,5] range Economy.try_award_floor_clear accepts
+	# (was floor 7 pre-S8-N5; tightened by the new assertion in _process_kill_events).
+	orch._dispatched_floor_index = 4
 	orch._dispatched_biome_id = "forest_reach"
 	orch.state = DungeonRunStateScript.State.ACTIVE_FOREGROUND
 
@@ -396,6 +416,7 @@ func test_dispatched_floor_index_and_biome_id_reset_on_run_ended_transition() ->
 
 
 func test_floor_cleared_first_time_carries_losing_run_flag_correctly() -> void:
+	_reset_economy_floor_clear_ledger()
 	_reset_spies()
 	var orch: Node = _make_orch()
 	orch.run_snapshot = RunSnapshotScript.new()

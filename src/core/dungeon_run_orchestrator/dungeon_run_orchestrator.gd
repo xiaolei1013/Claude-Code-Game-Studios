@@ -174,6 +174,11 @@ const MATCHUP_MULT_DIS: float = 0.7
 ## Half-loot per the GDD.
 const LOSING_RUN_LOOT_FACTOR: float = 0.5
 
+## Sprint 8 S8-N5 (Story 007) — per-floor first-clear gold bonus, 1-indexed
+## table per TR-015. floor_index 0 is undefined sentinel — assert raises in
+## debug if hit. Sourced from ADR-0013 §C floor-clear curve.
+const FLOOR_CLEAR_BONUS: Dictionary = {1: 100, 2: 250, 3: 500, 4: 1000, 5: 2500}
+
 ## The dispatched floor_index for the active run, captured at dispatch() entry.
 ## Drives the floor_cleared_first_time signal payload. Reset to 0 on RUN_ENDED.
 var _dispatched_floor_index: int = 0
@@ -551,14 +556,41 @@ func _process_kill_events(events: Variant) -> void:
 			boss_killed.emit(enemy_id_str)
 
 	if bool(events.get("first_clear_in_range")):
-		# Once-per-dispatch first-clear emission gate (TR-018). Idempotency
-		# flag lives on RunSnapshot — Combat reports the marker every call,
-		# but only the FIRST crossing fires the orchestrator-side fanfare.
+		# Sprint 8 S8-N5 (Story 007) — 3-layer idempotency:
+		#   Layer 1: Combat reports first_clear_in_range marker per-call (stateless)
+		#   Layer 2: run_snapshot.floor_clear_emitted gates per-dispatch re-entry
+		#   Layer 3: Economy.try_award_floor_clear's monotonic ledger gates
+		#           per-lifetime double-credit
+		# The floor_cleared_first_time signal fires only when ALL THREE gates
+		# pass — i.e. genuine first-ever clear of this floor in the player's
+		# lifetime. Within-dispatch re-entries return at Layer 2; cross-dispatch
+		# repeat clears at the same floor return at Layer 3.
 		if run_snapshot != null and not run_snapshot.floor_clear_emitted:
+			# Layer 2 gate passed — compute bonus + LOSING factor + route Economy.
+			var floor_idx: int = _dispatched_floor_index
+			var bonus: int = int(FLOOR_CLEAR_BONUS.get(floor_idx, 0))
+			# Defensive: assert range matches Economy.try_award_floor_clear contract.
+			# Empirical floor 0 / floor 6+ would fail Economy's range guard, so
+			# we mirror that here for early-return cleanliness.
+			assert(floor_idx >= 1 and floor_idx <= 5,
+					"floor_index out of range [1,5]: %d" % floor_idx)
+			if losing_run:
+				bonus = floori(float(bonus) * LOSING_RUN_LOOT_FACTOR)
+			# Layer 3: Economy monotonic-credit gate.
+			var awarded: bool = false
+			if economy_can_add_gold and bonus > 0 and economy.has_method("try_award_floor_clear"):
+				awarded = bool(economy.try_award_floor_clear(floor_idx, bonus))
+			# Layer 2 flag set regardless of awarded — prevents within-dispatch
+			# re-entry from re-calling Economy (whose monotonic gate would block
+			# anyway, but skipping the call is cheaper).
 			run_snapshot.floor_clear_emitted = true
-			floor_cleared_first_time.emit(
-				_dispatched_floor_index, _dispatched_biome_id, losing_run
-			)
+			# Signal fires only on genuine first-ever-clear (Economy gated).
+			# Subsequent dispatches that re-clear the same floor see awarded=false
+			# and DO NOT fire the player-facing fanfare — a critical UX rule per
+			# ADR-0002 (losing-first-clear reclaimable on win) so the fanfare
+			# stays a meaningful "first time you've EVER done this" moment.
+			if awarded:
+				floor_cleared_first_time.emit(floor_idx, _dispatched_biome_id, losing_run)
 		# Floor cleared — transition ACTIVE_FOREGROUND → RUN_ENDED.
 		var next_state: int = DungeonRunStateScript.validate_transition(
 			state, DungeonRunStateScript.TRIGGER_RUN_ENDED
