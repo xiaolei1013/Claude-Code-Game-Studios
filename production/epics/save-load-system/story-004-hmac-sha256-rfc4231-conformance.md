@@ -1,7 +1,7 @@
 # Story 004: HMAC-SHA256 GDScript wrapper + 7 RFC 4231 test vectors (BLOCKING gate)
 
 > **Epic**: save-load-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24

@@ -1,7 +1,7 @@
 # Story 002: Save envelope binary layout + little-endian encode/decode
 
 > **Epic**: save-load-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24

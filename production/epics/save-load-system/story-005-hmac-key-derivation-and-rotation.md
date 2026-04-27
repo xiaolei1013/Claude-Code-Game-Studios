@@ -1,7 +1,7 @@
 # Story 005: HMAC key derivation — multi-part assembly + N=2 build-version rotation
 
 > **Epic**: save-load-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24

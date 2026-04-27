@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="Biome" load_steps=3 format=3 uid="uid://b2forestreachb1"]
+
+[ext_resource type="Script" uid="uid://dap2c30cqt6to" path="res://src/core/biome_dungeon_database/biome.gd" id="1_bm"]
+[ext_resource type="Resource" uid="uid://b2frdungeon0001" path="res://assets/data/dungeons/forest_reach_dungeon_01.tres" id="2_dg"]
+
+[resource]
+script = ExtResource("1_bm")
+id = "forest_reach"
+display_name = "Forest Reach"
+primary_palette_key = "ember_dusk_amber"
+dominant_archetypes = Array[String](["bruiser", "caster", "armored"])
+dungeons = Array[Resource]([ExtResource("2_dg")])
+environmental_storytelling = Array[String](["abandoned lantern shrines lining the path", "moss-bearded standing stones older than the guild"])
+flavor_text = "The first wood the guild was founded to clear. The lanterns still burn here, but the forest has its own opinion about that."
+status = "active"

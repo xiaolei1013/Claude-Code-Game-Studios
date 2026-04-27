@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="HeroClass" format=3 uid="uid://b2magemvp00001"]
+
+[ext_resource type="Script" uid="uid://dvm75u02lhnb8" path="res://src/core/hero_class_database/hero_class.gd" id="1_hcmag"]
+
+[resource]
+script = ExtResource("1_hcmag")
+id = "mage"
+display_name = "Mage"
+tier = 1
+role = "striker"
+counter_archetype = "caster"
+base_attack = 20
+base_hp = 70
+base_speed = 10
+attack_per_level = 3
+hp_per_level = 10
+speed_per_level = 1
+tick_output_contribution_l1 = 3
+tick_output_per_level = 1
+sprite_path = "assets/art/classes/mage/sprite.png"
+portrait_path = "assets/art/classes/mage/portrait.png"
+icon_path = "assets/art/classes/mage/icon.png"
+flavor_text = "Speaker to the dusk-fire. Burns brightly, briefly, often."

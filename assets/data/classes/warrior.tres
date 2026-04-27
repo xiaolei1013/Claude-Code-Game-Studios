@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="HeroClass" format=3 uid="uid://b2warriormvp001"]
+
+[ext_resource type="Script" uid="uid://dvm75u02lhnb8" path="res://src/core/hero_class_database/hero_class.gd" id="1_hcwar"]
+
+[resource]
+script = ExtResource("1_hcwar")
+id = "warrior"
+display_name = "Warrior"
+tier = 1
+role = "tank"
+counter_archetype = "bruiser"
+base_attack = 12
+base_hp = 120
+base_speed = 6
+attack_per_level = 2
+hp_per_level = 17
+speed_per_level = 1
+tick_output_contribution_l1 = 2
+tick_output_per_level = 1
+sprite_path = "assets/art/classes/warrior/sprite.png"
+portrait_path = "assets/art/classes/warrior/portrait.png"
+icon_path = "assets/art/classes/warrior/icon.png"
+flavor_text = "Stalwart shieldbearer of the Lantern Guild. Where her blade holds, the line holds."

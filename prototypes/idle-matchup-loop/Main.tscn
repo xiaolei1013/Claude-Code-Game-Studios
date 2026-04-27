@@ -1,0 +1,129 @@
+[gd_scene load_steps=2 format=3 uid="uid://b0proto1matchup"]
+
+[ext_resource type="Script" path="res://prototype.gd" id="1_proto"]
+
+[node name="Main" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_proto")
+
+[node name="TickTimer" type="Timer" parent="."]
+unique_name_in_owner = true
+autostart = false
+
+[node name="Root" type="MarginContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="VBox" type="VBoxContainer" parent="Root"]
+theme_override_constants/separation = 12
+
+[node name="HeaderBar" type="HBoxContainer" parent="Root/VBox"]
+theme_override_constants/separation = 24
+
+[node name="LblGold" type="Label" parent="Root/VBox/HeaderBar"]
+unique_name_in_owner = true
+text = "Gold: 0"
+theme_override_font_sizes/font_size = 22
+
+[node name="LblTime" type="Label" parent="Root/VBox/HeaderBar"]
+unique_name_in_owner = true
+text = "Elapsed: 0 min"
+theme_override_font_sizes/font_size = 22
+
+[node name="LblPending" type="Label" parent="Root/VBox/HeaderBar"]
+unique_name_in_owner = true
+text = "Pending loot: 0"
+theme_override_font_sizes/font_size = 22
+
+[node name="LblRate" type="Label" parent="Root/VBox/HeaderBar"]
+unique_name_in_owner = true
+text = "Rate: 0.00 gold/min"
+theme_override_font_sizes/font_size = 18
+
+[node name="MidRow" type="HSplitContainer" parent="Root/VBox"]
+size_flags_vertical = 3
+split_offset = 360
+
+[node name="LeftPanel" type="VBoxContainer" parent="Root/VBox/MidRow"]
+theme_override_constants/separation = 8
+
+[node name="LblRosterTitle" type="Label" parent="Root/VBox/MidRow/LeftPanel"]
+text = "Roster"
+theme_override_font_sizes/font_size = 18
+
+[node name="RosterScroll" type="ScrollContainer" parent="Root/VBox/MidRow/LeftPanel"]
+size_flags_vertical = 3
+
+[node name="RosterBox" type="VBoxContainer" parent="Root/VBox/MidRow/LeftPanel/RosterScroll"]
+unique_name_in_owner = true
+theme_override_constants/separation = 4
+size_flags_horizontal = 3
+
+[node name="RightPanel" type="VBoxContainer" parent="Root/VBox/MidRow"]
+theme_override_constants/separation = 10
+
+[node name="LblFloor" type="Label" parent="Root/VBox/MidRow/RightPanel"]
+unique_name_in_owner = true
+text = "Floor —"
+theme_override_font_sizes/font_size = 20
+
+[node name="LblFloorFavors" type="Label" parent="Root/VBox/MidRow/RightPanel"]
+unique_name_in_owner = true
+text = "Favors: —"
+theme_override_font_sizes/font_size = 16
+
+[node name="BarFloor" type="ProgressBar" parent="Root/VBox/MidRow/RightPanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 24)
+max_value = 100.0
+
+[node name="LblFormationTitle" type="Label" parent="Root/VBox/MidRow/RightPanel"]
+text = "Formation (max 3)"
+theme_override_font_sizes/font_size = 18
+
+[node name="FormationBox" type="HBoxContainer" parent="Root/VBox/MidRow/RightPanel"]
+unique_name_in_owner = true
+theme_override_constants/separation = 8
+
+[node name="LblLogTitle" type="Label" parent="Root/VBox/MidRow/RightPanel"]
+text = "Event log"
+theme_override_font_sizes/font_size = 16
+
+[node name="LblEventLog" type="RichTextLabel" parent="Root/VBox/MidRow/RightPanel"]
+unique_name_in_owner = true
+size_flags_vertical = 3
+custom_minimum_size = Vector2(0, 120)
+bbcode_enabled = true
+scroll_following = true
+
+[node name="ActionBar" type="HBoxContainer" parent="Root/VBox"]
+theme_override_constants/separation = 12
+
+[node name="BtnCollect" type="Button" parent="Root/VBox/ActionBar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 48)
+text = "Collect Loot"
+
+[node name="BtnNextFloor" type="Button" parent="Root/VBox/ActionBar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 48)
+text = "Descend → next floor"
+disabled = true
+
+[node name="BtnCloseApp" type="Button" parent="Root/VBox/ActionBar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 48)
+text = "Simulate: close 30 min"
+
+[node name="LblRecruitTitle" type="Label" parent="Root/VBox"]
+text = "Recruit"
+theme_override_font_sizes/font_size = 18
+
+[node name="RecruitBox" type="HBoxContainer" parent="Root/VBox"]
+unique_name_in_owner = true
+theme_override_constants/separation = 12

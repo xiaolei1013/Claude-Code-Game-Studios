@@ -1,0 +1,61 @@
+[gd_resource type="Resource" script_class="Dungeon" load_steps=8 format=3 uid="uid://b2frdungeon0001"]
+
+[ext_resource type="Script" uid="uid://5r5078scb8my" path="res://src/core/biome_dungeon_database/dungeon.gd" id="1_dg"]
+[ext_resource type="Script" uid="uid://doafwgg4qfi2a" path="res://src/core/biome_dungeon_database/floor.gd" id="2_fl"]
+
+[sub_resource type="Resource" id="Floor_F1"]
+script = ExtResource("2_fl")
+id = "forest_reach_f1"
+display_name = "Floor 1: The Edge of the Wood"
+floor_index = 1
+enemy_list = [{"enemy_id": "hollow_brute", "count": 3}, {"enemy_id": "glowmoth", "count": 1}]
+expected_clear_time_seconds = 40
+is_boss_floor = false
+flavor_text = "The lantern's reach ends here. Beyond this line, the forest has its own opinion about visitors."
+
+[sub_resource type="Resource" id="Floor_F2"]
+script = ExtResource("2_fl")
+id = "forest_reach_f2"
+display_name = "Floor 2: The Thicket"
+floor_index = 2
+enemy_list = [{"enemy_id": "hollow_brute", "count": 2}, {"enemy_id": "glowmoth", "count": 1}, {"enemy_id": "shellback", "count": 2}]
+expected_clear_time_seconds = 55
+is_boss_floor = false
+flavor_text = "The path closes in. Something with a shell and bad intentions has claimed this part of the forest as its own."
+
+[sub_resource type="Resource" id="Floor_F3"]
+script = ExtResource("2_fl")
+id = "forest_reach_f3"
+display_name = "Floor 3: The Deep Grove"
+floor_index = 3
+enemy_list = [{"enemy_id": "elder_boar", "count": 2}, {"enemy_id": "moss_druid", "count": 2}, {"enemy_id": "vined_knight", "count": 1}]
+expected_clear_time_seconds = 85
+is_boss_floor = false
+flavor_text = "The trees here are older than the guild's founding. Whatever lives in them has been watching since before that."
+
+[sub_resource type="Resource" id="Floor_F4"]
+script = ExtResource("2_fl")
+id = "forest_reach_f4"
+display_name = "Floor 4: The Rootfall"
+floor_index = 4
+enemy_list = [{"enemy_id": "thorn_guardian", "count": 3}]
+expected_clear_time_seconds = 90
+is_boss_floor = false
+flavor_text = "The canopy has closed. Thorn lattices seal the sky. Three shapes in the dark are already moving."
+
+[sub_resource type="Resource" id="Floor_F5"]
+script = ExtResource("2_fl")
+id = "forest_reach_f5"
+display_name = "Floor 5: The Rootking's Hollow"
+floor_index = 5
+enemy_list = [{"enemy_id": "ancient_rootking", "count": 1}]
+expected_clear_time_seconds = 170
+is_boss_floor = true
+flavor_text = "The roots here remember everything. The Rootking is not angry. It simply cannot allow the guild to continue."
+
+[resource]
+script = ExtResource("1_dg")
+id = "forest_reach_dungeon_01"
+display_name = "Forest Reach — The First Descent"
+biome_id = "forest_reach"
+floors = Array[Resource]([SubResource("Floor_F1"), SubResource("Floor_F2"), SubResource("Floor_F3"), SubResource("Floor_F4"), SubResource("Floor_F5")])

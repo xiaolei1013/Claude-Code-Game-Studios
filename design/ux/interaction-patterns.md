@@ -45,6 +45,9 @@
 | Toast Notification | Feedback | Non-blocking transient message. | Gold drip, hero-leveled, first-clear-awarded | Draft |
 | Matchup Indicator | Game-Specific | Colorblind-safe advantage/neutral/disadvantage triple. | HUD, dispatch preview, formation editor | Draft |
 | Currency Counter | Game-Specific | Persistent header element showing gold balance with tweened update. | HUD header | Draft |
+| Lantern-Glow Backdrop | Decorative | Slow-loop ambient warmth backdrop for menu/intro screens. ≤2 fps cycle, ≤5% screen-area variance. | Main menu | Draft (added 2026-04-25) |
+| Modal Dim Overlay | Layout | 40% opacity translucent layer behind any modal — preserves spatial continuity with underlying screen. | Pause menu, settings, confirm-dismiss modals | Draft (added 2026-04-25) |
+| Compact Status Strip | Game-Specific | Read-only orientation footer reminding the player of current game state inside a modal context. | Pause menu | Draft (added 2026-04-25) |
 
 > **When this file grows**: As new screens are designed, add patterns here
 > rather than re-inventing them. A pattern belongs here if cited by two or
@@ -309,13 +312,197 @@ counter shows the running balance, not the delta.
 
 ---
 
+## 7. Lantern-Glow Backdrop
+
+**Category**: Decorative
+**Status**: Draft
+
+**When to Use**: Ambient warmth zones in menu / intro / hub screens where the
+Visual Identity Anchor's "warm miniature you want to pick up" feel must be
+delivered passively. The backdrop is a slow-loop animation behind the
+foreground UI, NOT a primary attention-grabber.
+
+**When NOT to Use**: Behind any text-dense or input-precision screen
+(roster grid, formation editor) — the loop variance, however subtle, can
+distract from precise interaction. Also do not use during gameplay
+(combat / dungeon run) where attention is on the playing surface.
+
+**Visual Treatment**:
+
+- A static base texture in the warm dusk-amber palette + a layered glow
+  texture that breathes in opacity / position over a 4-second loop cycle.
+- Loop cadence: ≤ 2 fps update rate (effective; underlying tween is smooth
+  but visually it shouldn't feel "animated", it should feel "alive").
+- Screen-area variance: ≤ 5% of total screen area changes opacity / position
+  per loop. Anything more becomes distracting.
+- Color temperature: stays in the amber-to-dusk-purple band per Art Bible
+  Section 1. Brightest peak is lantern gold for ≤ 800 ms per cycle.
+- Reduced-motion variant: replaces the loop with a single static composite
+  matching the loop's median frame. Same warmth, no motion.
+
+**Input Behavior**:
+
+- Non-interactive. Does not consume mouse / touch / keyboard input.
+- `mouse_filter = MOUSE_FILTER_IGNORE`.
+
+**Accessibility Notes**:
+
+- Reduced-motion (per ADR-0007) MUST disable the loop and use the static composite.
+- No information is conveyed by the backdrop; it is purely atmospheric.
+- Does not affect contrast on the foreground UI (verified: foreground text
+  contrast ≥ 4.5:1 against the brightest pixel in the backdrop loop).
+
+**Example Screens**: Main menu (the only MVP user; expect more in V1.0
+title-screen / unlock-celebration moments).
+
+**Implementation Notes (Godot 4.6)**:
+
+- `TextureRect` for the base + `TextureRect` for the glow layer, with the
+  glow layer's `modulate.a` and `position` tweened on a 4-second loop via
+  `create_tween().set_loops(0)`.
+- If `reduce_motion` is set, do NOT start the tween — set the glow layer's
+  modulate / position to its median values and leave it static.
+- Z-order: behind everything; first child of the menu's root Control.
+- Performance: avoid shaders for MVP; pure tween + texture composite stays
+  well under the per-frame budget. Revisit if HD-2D shader pass adopts a
+  unified post-processing path that can absorb this.
+
+---
+
+## 8. Modal Dim Overlay
+
+**Category**: Layout
+**Status**: Draft
+
+**When to Use**: Behind any modal element that should preserve spatial
+continuity with the underlying screen — pause menu, settings, confirm-dismiss
+modals, save-corrupted error modal. The dim overlay tells the player "the
+game is still here, you're just on top of it."
+
+**When NOT to Use**: Loading screens (where the underlying screen is not
+the destination — use a full-opacity loading screen instead). Also do not
+use behind toast notifications (toasts are non-blocking by definition).
+
+**Visual Treatment**:
+
+- Full-screen `ColorRect` (or theme-driven equivalent) covering the entire
+  viewport.
+- Color: dusk-purple (Art Bible Section 1 base) at 40% opacity. NOT pure
+  black — pure black breaks the warm-palette rule and signals "menu" rather
+  than "modal pause."
+- Animation: opacity 0% → 40% over 200 ms when the modal enters; reverses
+  on exit. Synchronized with the modal's own enter/exit transition.
+- Reduced-motion variant: instant snap to 40% (no fade).
+
+**Input Behavior**:
+
+- Mouse: click anywhere on the dim overlay dismisses the modal (treats
+  click-outside as "back"). The modal's own buttons take priority over the
+  dim overlay's click handler.
+- Touch: tap-anywhere dismissal mirrors mouse behavior — this is the
+  touch-friendly equivalent of pressing Esc.
+- Keyboard: dim overlay does not receive focus; Esc / Tab navigation are
+  owned by the modal itself.
+
+**Accessibility Notes**:
+
+- The dim overlay MUST NOT trap focus — focus management is the modal's
+  responsibility (see Confirm-Dismiss Modal pattern). The dim is purely
+  visual.
+- The dim overlay MUST be announced as a region change to screen readers
+  via `AccessKit` "modal opened" event — this signals to assistive tech
+  that the underlying screen is no longer interactive.
+- Click-outside-to-dismiss is a discoverability concern for keyboard-first
+  users. Pair with the Confirm-Dismiss Modal pattern's "tap anywhere
+  outside to resume" hint text on first invocations.
+
+**Example Screens**: Pause menu (primary MVP user); settings overlay; any
+confirm-dismiss modal.
+
+**Implementation Notes (Godot 4.6)**:
+
+- `ColorRect` filling the viewport with `color.a = 0.4` and `color.rgb` set
+  from the dusk-purple theme constant.
+- `gui_input` signal handler on the ColorRect treats `InputEventMouseButton`
+  press (left button) and `InputEventScreenTouch` press as dismiss triggers.
+- `mouse_filter = MOUSE_FILTER_STOP` — but the modal itself sits on top in
+  Z-order, so its own buttons receive input first.
+- The fade tween: `create_tween().tween_property(rect, "color:a", 0.4, 0.2)`.
+- Pair always with Confirm-Dismiss Modal pattern (#3) for the modal element
+  itself — this pattern is the BACKDROP, not the modal.
+
+---
+
+## 9. Compact Status Strip
+
+**Category**: Game-Specific
+**Status**: Draft
+
+**When to Use**: Read-only orientation footer inside a modal or overlay
+context — pause menu, save-corrupted recovery modal, return-from-distraction
+prompts. Reminds the player of current game state without re-implementing
+the full HUD.
+
+**When NOT to Use**: Inside the active HUD (the HUD itself is the canonical
+state display; this pattern is for modal-only contexts where the HUD is
+hidden or de-emphasized). Also do not use as a primary information surface —
+this is a *reminder*, not a *display*.
+
+**Visual Treatment**:
+
+- Single horizontal strip; ~28 px logical height; centered alignment within
+  its parent.
+- Typography: `theme_font_information` (smaller / dimmer than the modal's
+  primary text); 70% opacity vs the modal's primary text.
+- Format: short labels separated by an em-dash or middle-dot. Examples:
+  - `Floor 3: Wolf Hollow — 2,400 gold`
+  - `Forest Reach — Floor 2 — 312 gold (offline)`
+- Numeric values: locale-aware thousands separators per Localization
+  Considerations across all UX specs.
+- No interactive affordances — purely informational.
+
+**Input Behavior**:
+
+- Non-interactive. Does not consume input.
+- `mouse_filter = MOUSE_FILTER_IGNORE`.
+- `focus_mode = FOCUS_NONE` — Tab navigation skips it.
+
+**Accessibility Notes**:
+
+- Screen reader exposes the strip's text as a single sentence; punctuation
+  is preserved so the reader pauses naturally between fields.
+- No information here is unique to the strip — every value is also
+  available in the underlying screen's HUD or via the Currency Counter
+  pattern. The strip is redundancy in service of orientation, not novel
+  information delivery.
+- Reduced-motion: not applicable (no animation).
+
+**Example Screens**: Pause menu (primary MVP user); save-corrupted recovery
+modal (Sprint 4-5+); return-to-app screen orientation footer (V1.0+).
+
+**Implementation Notes (Godot 4.6)**:
+
+- `Label` (or `RichTextLabel` if rich formatting is needed for the em-dash).
+- Pull values via:
+  - `BiomeDungeonDatabase.get_biome_by_id(current_biome_id).display_name`
+  - `Floor.floor_index` from current Orchestrator state
+  - `Economy.get_gold_balance()` formatted via locale-aware integer formatter
+- Refresh cadence: re-render on parent modal's enter; do not subscribe to
+  `gold_changed` mid-modal (per modal-context pause: gold values are stable
+  during a modal session because TickSystem emission is suppressed; see
+  Pause Menu UX spec).
+
+---
+
 ## Status Definitions
 
 - **Draft**: Pattern is specified but not yet validated in a shipped screen.
 - **Stable**: Pattern has been implemented and validated in at least one screen.
 - **Deprecated**: Being phased out; do not use in new screens.
 
-All six patterns above are **Draft** as of 2026-04-24. They will be promoted to
+All nine patterns above are **Draft** as of 2026-04-25 (six original from
+Sprint 1; three added in Sprint 4 pre-flight: `Lantern-Glow Backdrop`,
+`Modal Dim Overlay`, `Compact Status Strip`). They will be promoted to
 **Stable** after they are implemented in the HUD v1.0 milestone and survive
 QA sign-off.
 

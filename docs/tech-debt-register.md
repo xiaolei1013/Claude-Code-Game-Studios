@@ -89,17 +89,23 @@ severity (LOW / MEDIUM / HIGH), and a Resolution condition describing what
 - **Category**: Tooling / CI
 - **Severity**: LOW
 - **Date opened**: 2026-04-24
-- **Context**: `tests/gdunit4_runner.gd` points at `res://addons/gdunit4/GdUnitRunner.gd`
-  (lowercase; file doesn't exist). GdUnit4 v6 CLI entry point is
-  `res://addons/gdUnit4/bin/GdUnitCmdTool.gd` (mixed-case) and requires
-  `--ignoreHeadlessMode` to run the full suite. The runner script and the CI
-  workflow referenced in `tests/README.md` both need updating.
-- **Resolution**: Update `tests/gdunit4_runner.gd` to call `GdUnitCmdTool`
-  directly, or replace it with a shell wrapper. Update
-  `.github/workflows/tests.yml` (if present) to use the corrected path with
-  `--ignoreHeadlessMode`. Local verification command that works today:
+- **Date resolved**: 2026-04-24
+- **Status**: **RESOLVED** by `3bc8c22` in PR #1
+- **Root cause**: PR #1 CI run surfaced a different problem from the one originally
+  hypothesized: all 48 tests pass, but Godot headless crashes at shutdown with
+  `SIGABRT (exit 134)`. The `MikeSchulze/gdUnit4-action@v1` propagates that
+  exit code as a job failure even when zero tests fail.
+- **Resolution**: Updated `.github/workflows/tests.yml` to mark the gdUnit4-action
+  step `continue-on-error: true`, then added a post-step that parses
+  `reports/**/*.xml` for `failures="N"` and `errors="N"` on `<testsuite>` tags.
+  The job now passes iff the JUnit XML shows zero test failures/errors,
+  regardless of the runner's exit code. If no XML is produced at all, the
+  job fails loudly (catches the "runner crashed before writing results" case).
+- **Local verification command** (still the known-good sequence for dev loop):
   `/Applications/Godot_mono.app/Contents/MacOS/Godot --headless --path . -s -d
   res://addons/gdUnit4/bin/GdUnitCmdTool.gd --add res://tests/ --continue
   --ignoreHeadlessMode`
-- **Blocks**: Automated CI gate enforcement on PRs/main pushes. Local runs
-  work with the known-good command above.
+- **Original `tests/gdunit4_runner.gd` fix** (wrong path) is NOT done yet —
+  the script still references `res://addons/gdunit4/GdUnitRunner.gd` which
+  doesn't exist. CI now works via the `MikeSchulze/gdUnit4-action` directly;
+  the runner script is orphaned and can be deleted or repointed in a follow-up.

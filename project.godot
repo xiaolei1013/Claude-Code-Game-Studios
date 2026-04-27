@@ -12,39 +12,41 @@ config_version=5
 
 config/name="Lantern Guild"
 config/description="Cozy fantasy idle-clicker — hero roster, dungeon runs, offline progression."
-config/features=PackedStringArray("4.6", "Forward Plus", "GDScript")
+config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
 
+BootNamespace="*res://src/core/boot_namespace/boot_namespace.gd"
+EngineBootstrap="*res://src/core/engine_bootstrap/engine_bootstrap.gd"
+RuntimeLocaleGuard="*res://src/core/runtime_locale_guard/runtime_locale_guard.gd"
 TickSystem="*res://src/core/tick_system/tick_system.gd"
 DataRegistry="*res://src/core/data_registry/data_registry.gd"
+SaveLoadSystem="*res://src/core/save_load_system/save_load_system.gd"
+Economy="*res://src/core/economy/economy.gd"
+HeroClassDatabase="*res://src/core/hero_class_database/hero_class_database.gd"
+EnemyDatabase="*res://src/core/enemy_database/enemy_database.gd"
+BiomeDungeonDatabase="*res://src/core/biome_dungeon_database/biome_dungeon_database.gd"
 
 [display]
 
 window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
-window/handheld/orientation=0
+
+[dotnet]
+
+project/assembly_name="Lantern Guild"
 
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")
 
-[input]
-
-; Input map lands as MVP screens are authored. Mouse + single-finger touch primary per
-; .claude/docs/technical-preferences.md — no keyboard nav, no gamepad, no right-click-exclusive.
-
 [physics]
 
-; 2D physics = Godot Physics 2D (Jolt is 3D-only per technical-preferences.md).
-; 3D physics setting below is inert for this project (no 3D content in MVP).
 3d/physics_engine="Jolt Physics"
 
 [rendering]
 
-renderer/rendering_method="forward_plus"
-rendering_device/driver.windows="d3d12"
 textures/canvas_textures/default_texture_filter=0
+rendering_device/driver.windows="d3d12"

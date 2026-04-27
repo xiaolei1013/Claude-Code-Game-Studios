@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2thornguardian"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "thorn_guardian"
+display_name = "Thorn Guardian"
+tier = 3
+archetype = "bruiser"
+biome = "forest_reach"
+base_hp = 680
+base_attack = 32
+base_speed = 5
+sprite_path = "assets/art/enemies/thorn_guardian/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Walks the boundary. The boundary thinks it walks back."
+is_boss = false

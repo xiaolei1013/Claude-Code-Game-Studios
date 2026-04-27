@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="HeroClass" format=3 uid="uid://b2roguemvp0001"]
+
+[ext_resource type="Script" uid="uid://dvm75u02lhnb8" path="res://src/core/hero_class_database/hero_class.gd" id="1_hcrog"]
+
+[resource]
+script = ExtResource("1_hcrog")
+id = "rogue"
+display_name = "Rogue"
+tier = 1
+role = "precision"
+counter_archetype = "armored"
+base_attack = 14
+base_hp = 55
+base_speed = 16
+attack_per_level = 2
+hp_per_level = 8
+speed_per_level = 2
+tick_output_contribution_l1 = 2
+tick_output_per_level = 1
+sprite_path = "assets/art/classes/rogue/sprite.png"
+portrait_path = "assets/art/classes/rogue/portrait.png"
+icon_path = "assets/art/classes/rogue/icon.png"
+flavor_text = "Three steps ahead, two strikes deep. Never where you last looked."

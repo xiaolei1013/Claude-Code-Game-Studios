@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2ancientrootki"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "ancient_rootking"
+display_name = "Ancient Rootking"
+tier = 3
+archetype = "bruiser"
+biome = "forest_reach"
+base_hp = 4818
+base_attack = 45
+base_speed = 3
+sprite_path = "assets/art/enemies/ancient_rootking/sprite.png"
+death_anim_key = "enemy_death_boss"
+flavor_text = "Older than the keep. The keep is part of it now."
+is_boss = true

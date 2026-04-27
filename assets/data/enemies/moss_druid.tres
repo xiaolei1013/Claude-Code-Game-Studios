@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2mossdruidtres"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "moss_druid"
+display_name = "Moss Druid"
+tier = 2
+archetype = "caster"
+biome = "forest_reach"
+base_hp = 185
+base_attack = 24
+base_speed = 6
+sprite_path = "assets/art/enemies/moss_druid/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Whispers a name the trees forgot. The trees still listen."
+is_boss = false

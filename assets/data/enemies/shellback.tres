@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2shellbacktres"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "shellback"
+display_name = "Shellback"
+tier = 1
+archetype = "armored"
+biome = "forest_reach"
+base_hp = 72
+base_attack = 9
+base_speed = 2
+sprite_path = "assets/art/enemies/shellback/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Older than the path you walked here. Patient as moss."
+is_boss = false

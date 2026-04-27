@@ -1,7 +1,7 @@
 # Story 001: SaveLoadSystem autoload skeleton + CONSUMER_PATHS + state machine
 
 > **Epic**: save-load-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24

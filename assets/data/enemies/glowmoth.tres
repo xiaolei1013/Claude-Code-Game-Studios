@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2glowmothtres1"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "glowmoth"
+display_name = "Glowmoth"
+tier = 1
+archetype = "caster"
+biome = "forest_reach"
+base_hp = 60
+base_attack = 11
+base_speed = 5
+sprite_path = "assets/art/enemies/glowmoth/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Lantern-drawn and patient. Burns slow, burns true."
+is_boss = false

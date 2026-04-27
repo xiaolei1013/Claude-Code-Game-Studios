@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2vinedknighttr"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "vined_knight"
+display_name = "Vined Knight"
+tier = 2
+archetype = "armored"
+biome = "forest_reach"
+base_hp = 225
+base_attack = 20
+base_speed = 3
+sprite_path = "assets/art/enemies/vined_knight/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "A pact with the bark. The blade comes second."
+is_boss = false

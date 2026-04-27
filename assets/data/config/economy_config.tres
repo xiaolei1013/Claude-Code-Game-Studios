@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EconomyConfig" format=3 uid="uid://ceconomyconfig1"]
+
+[ext_resource type="Script" uid="uid://ksnqffbiotdb" path="res://src/core/economy/economy_config.gd" id="1_econconf"]
+
+[resource]
+script = ExtResource("1_econconf")
+id = "economy_config"
+display_name = "Economy Config"
+BASE_DRIP = Array[int]([2, 4, 7, 12, 8])
+MATCHUP_DRIP_BONUS = 1.0
+BASE_KILL = {1: 10, 2: 35, 3: 80}
+MATCHUP_GOLD_MULTIPLIER = 1.5
+BASE_RECRUIT = {1: 150, 2: 8000}
+RECRUIT_RATIO = 1.8
+BASE_LEVEL = {1: 40, 2: 600}
+LEVEL_RATIO = 1.6
+LEVEL_CAP = 15
+FLOOR_CLEAR_BONUS = {1: 500, 2: 1200, 3: 3000, 4: 7500, 5: 18000}
+GOLD_SANITY_CAP = 1000000000000
+offline_cap_seconds = 28800
+DISPLAY_K_THRESHOLD = 1000
+DISPLAY_M_THRESHOLD = 1000000
+DISPLAY_B_THRESHOLD = 1000000000
+DISPLAY_T_THRESHOLD = 1000000000000

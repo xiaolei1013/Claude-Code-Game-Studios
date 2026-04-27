@@ -26,10 +26,15 @@ extends Node
 ## edit to [member min_content_count] — auto-discovery from directory presence
 ## is FORBIDDEN per ADR-0006.
 ##
-## Order matters: [code]classes → enemies → biomes → dungeons → items → matchup[/code].
+## Order matters: [code]classes → enemies → biomes → dungeons → items → matchup → config[/code].
 ## Story 006 adds DAG cycle-detection on top of this fixed order.
+##
+## "config" was appended in Sprint 2 / S2-M2 to support [code]EconomyConfig[/code]
+## loading from [code]assets/data/config/[/code]. It is loaded last because tuning
+## resources have no cross-references to other categories — the order is a
+## load-time invariant, not a dependency declaration.
 const ORDERED_CATEGORIES: Array[String] = [
-	"classes", "enemies", "biomes", "dungeons", "items", "matchup",
+	"classes", "enemies", "biomes", "dungeons", "items", "matchup", "config",
 ]
 
 # Snake_case id regex per ADR-0011 §Load-Time Validation Semantics.
@@ -147,6 +152,12 @@ signal hot_reload_complete(content_type: String)
 ## absent — zero items is a valid MVP state; downstream Orchestrator gates item
 ## access on its own zero-count check.
 ##
+## [code]matchup[/code] was also lowered from 1 → 0 in Sprint 3 / S3-M8
+## (TD-006 closure): per ADR-0009, the Matchup Resolver is a code-level
+## DI pure-function module with no MVP-stage [code].tres[/code] content;
+## the [code]matchup/[/code] directory exists for forward-compat (V1.0
+## per-class matchup config tables) but is empty in MVP scope.
+##
 ## Override in dev/test via:
 ##   [code]registry.min_content_count = {"classes": 1, "enemies": 1}[/code]
 ## Set to [code]{}[/code] to disable all minimum-count enforcement (e.g. when
@@ -156,7 +167,8 @@ signal hot_reload_complete(content_type: String)
 	"enemies": 5,
 	"biomes": 1,
 	"dungeons": 1,
-	"matchup": 1,
+	"config": 1,
+	# matchup intentionally absent — see doc-comment above; code-level per ADR-0009
 }
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2hollowbrutetr"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "hollow_brute"
+display_name = "Hollow Brute"
+tier = 1
+archetype = "bruiser"
+biome = "forest_reach"
+base_hp = 52
+base_attack = 8
+base_speed = 3
+sprite_path = "assets/art/enemies/hollow_brute/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Driftwood given a grudge. Lurches at firelight."
+is_boss = false

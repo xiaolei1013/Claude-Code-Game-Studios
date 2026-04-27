@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2elderboartres"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "elder_boar"
+display_name = "Elder Boar"
+tier = 2
+archetype = "bruiser"
+biome = "forest_reach"
+base_hp = 195
+base_attack = 18
+base_speed = 4
+sprite_path = "assets/art/enemies/elder_boar/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Tusks like a debt collector. Memory longer than its hide."
+is_boss = false

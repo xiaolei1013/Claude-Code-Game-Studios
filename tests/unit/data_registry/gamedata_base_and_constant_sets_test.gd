@@ -60,8 +60,7 @@ func test_game_data_class_is_registered_with_id_and_display_name_fields() -> voi
 	assert_str(instance.id).is_equal("")
 	assert_str(instance.display_name).is_equal("")
 
-	# Cleanup
-	instance.free()
+	# No cleanup needed — GameData extends Resource (RefCounted); freed by refcounting.
 
 
 # ---------------------------------------------------------------------------
@@ -174,5 +173,4 @@ func test_game_data_subclass_inherits_id_and_display_name_without_redeclaration(
 	# Assert — inherited fields were not reset by writing to custom_field
 	assert_str(instance.id).is_equal("test_subclass_id")
 
-	# Cleanup
-	instance.free()
+	# No cleanup needed — GameData subclasses extend Resource (RefCounted).
