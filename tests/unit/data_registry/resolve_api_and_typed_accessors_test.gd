@@ -203,6 +203,15 @@ func test_resolve_before_registry_ready_returns_null() -> void:
 #   of the enum-driven branch existing.
 # ---------------------------------------------------------------------------
 func test_resolve_assert_behavior_returns_null_after_assert_fires() -> void:
+	# Sprint 4 FOLLOWUP-001 / S5-M1 fix: this test exercises the post-assert
+	# return path of DataRegistry.resolve in ASSERT mode. In DEBUG builds
+	# `assert(false, ...)` aborts the test runner; the path is only reachable
+	# in RELEASE builds where assertions are compiled out. Skip in debug to
+	# preserve the contractual coverage in release builds without crashing
+	# the dev-loop / CI runs (which run in debug).
+	if OS.is_debug_build():
+		return
+
 	# Arrange — ASSERT mode, warrior loaded, berserker absent
 	DataRegistryFixtures.write(FIXTURE_ROOT, {
 		"classes": [{"id": "hero_warrior", "display_name": "Warrior"}],

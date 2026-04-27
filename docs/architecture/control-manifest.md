@@ -1,9 +1,9 @@
 # Control Manifest
 
 > **Engine**: Godot 4.6 (GDScript)
-> **Last Updated**: 2026-04-24
-> **Manifest Version**: 2026-04-24
-> **ADRs Covered**: ADR-0001, ADR-0002, ADR-0003 (Amendments #1–#3), ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013, ADR-0014
+> **Last Updated**: 2026-04-26
+> **Manifest Version**: 2026-04-26
+> **ADRs Covered**: ADR-0001, ADR-0002, ADR-0003 (Amendments #1–#4), ADR-0004, ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0010, ADR-0011, ADR-0012, ADR-0013, ADR-0014
 > **Status**: Active — regenerate with `/create-control-manifest` when ADRs change
 
 `Manifest Version` is the date this manifest was generated. Story files embed this date when created. `/story-readiness` compares a story's embedded version to this field to detect stories written against stale rules. Always matches `Last Updated` — they are the same date, serving different consumers.

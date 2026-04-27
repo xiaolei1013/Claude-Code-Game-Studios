@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="SceneManagerConfig" format=3 uid="uid://csmconfig0001"]
+
+[ext_resource type="Script" path="res://src/core/scene_manager/scene_manager_config.gd" id="1_smconf"]
+
+[resource]
+script = ExtResource("1_smconf")
+id = "scene_manager_config"
+display_name = "Scene Manager Config"
+default_crossfade_ms = 150
+slide_duration_ms = 180
+fade_to_black_ms = 300
+push_modal_ms = 180
+touch_feedback_scale = 1.05
+touch_feedback_ms = 80
+transition_input_policy = 0

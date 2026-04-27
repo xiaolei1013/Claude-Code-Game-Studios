@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="RosterConfig" format=3 uid="uid://crosterconfig01"]
+
+[ext_resource type="Script" path="res://src/core/hero_roster/roster_config.gd" id="1_rosterconf"]
+
+[resource]
+script = ExtResource("1_rosterconf")
+id = "roster_config"
+display_name = "Roster Config"
+max_roster_size = 30
+formation_size = 3
+level_cap = 15

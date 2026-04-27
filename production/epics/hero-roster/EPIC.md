@@ -5,7 +5,7 @@
 > **Architecture Module**: `HeroRoster` (autoload — rank position governed by ADR-0003 Amendment table)
 > **Control Manifest Version**: 2026-04-24
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories hero-roster`
+> **Stories**: 10 defined (Ready)
 
 ## Overview
 
@@ -58,11 +58,23 @@ Full per-TR detail: `docs/architecture/requirements-traceability.md` §Feature L
 
 ## Stories
 
-Not yet created. Run `/create-stories hero-roster` to break this epic into
-implementable stories embedding ADR-0012, ADR-0004, and Pass-5F-propagation
-canonical naming.
+| # | Story | Type | Status | ADR |
+|---|-------|------|--------|-----|
+| 001 | HeroInstance RefCounted class + 5-field schema + to_dict / from_dict | Logic | Ready | ADR-0011 + 0012 |
+| 002 | HeroRoster autoload skeleton + state fields + encapsulation | Logic | Ready | ADR-0012 + 0003 |
+| 003 | roster_config.tres tuning knobs | Config/Data | Ready | ADR-0012 |
+| 004 | add_hero + signals (hero_recruited / hero_leveled / hero_removed) | Logic | Ready | ADR-0012 |
+| 005 | set_hero_level + set_formation_slot mutations | Logic | Ready | ADR-0012 |
+| 006 | get_save_data / load_save_data round-trip + signal suppression | Integration | Ready | ADR-0004 + 0012 |
+| 007 | Boot validation order + orphan handling + last-write-wins | Integration | Ready | ADR-0012 |
+| 008 | First-launch Theron seed | Logic | Ready | ADR-0012 |
+| 009 | Name pool generation + DataRegistry name_pools category | Integration | Ready | ADR-0012 + 0011 |
+| 010 | Formation strength + accessors + AC H-14 perf | Logic (Performance) | Ready | ADR-0012 |
+
+**Type breakdown**: 6 Logic + 3 Integration + 1 Config/Data.
+**TR coverage**: TR-hero-roster-001..030 (full epic scope).
+**Dependency order**: Story 001 → 002 → 003 → 004 → 005 → 006 → 007; Story 008/009/010 depend on 002+004 and may parallel-develop.
 
 ## Next Step
 
-`/create-stories hero-roster` — produces story files at
-`production/epics/hero-roster/story-*.md`.
+`/story-readiness production/epics/hero-roster/story-001-hero-instance-resource.md` to validate the first story, then `/dev-story` to begin implementation when Sprint 6 starts.

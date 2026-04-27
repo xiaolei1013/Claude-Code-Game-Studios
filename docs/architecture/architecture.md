@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Version | 0.1 (Draft) — amended 2026-04-22 (rank table + module ownership: ranks 8 and 9 vacated per ADR-0003 Amendment #2; `_init(args)` cascade corrected per Amendment #3 — see §Autoload Rank Table + §API Boundaries) + ADR-0011 (Core Resource Schemas) Accepted 2026-04-22d — `Floor` opaque type now fully locked; archetype + role constant sets centralized + ADR-0012 (Hero Roster Mutation + HeroInstance Identity) Accepted 2026-04-22 — HeroRoster rank 7 mutation API + HeroInstance identity contract + boot validation order + cross-save stability invariant locked + ADR-0013 (Economy State + Cost Curves + Offline Batch Contract) Accepted 2026-04-22 — Economy rank 3 state shape + 7-method public API + cost curves `recruit_cost(class_id, copies)` + `level_cost(tier, level)` + `compute_offline_batch` closed-form drip + 4 new forbidden patterns (hardcoded-balance / losing-run-read / offline-replay-emit / negative-spend); economy-system.md Pass-ADR-0013-SYNC closes 4 signature drift items + ADR-0014 (Offline Replay Batch Chunking + RunSnapshot Schema) Accepted 2026-04-22 — OfflineProgressionEngine rank 15 autoload + adaptive time-budgeted chunking (target 12ms/chunk) + `await get_tree().process_frame` main-thread yield + RunSnapshot save-persisted schema (11 fields + 2 Arrays) + HeroInstance allowlist exception to ADR-0012 forbidden pattern + OQ-4 resolved via time-gated cozy modal (silent <100ms, cozy modal ≥100ms) + 5 new forbidden patterns (progressed-signal-domain-subscriber, heroinstance-cache-outside-runsnapshot-allowlist, offline-summary-field-expansion-without-version-bump, per-chunk-domain-signal-emission, worker-thread-pool-for-offline-replay-in-mvp) |
-| Last Updated | 2026-04-22 (post `/architecture-decision` ADR-0014 landing + Accept promotion + registry lockstep + Pass-ADR-0014-SYNC notes applied to dungeon-run-orchestrator.md + hero-roster.md + save-load-system.md + game-time-and-tick.md) |
+| Last Updated | 2026-04-22 (post `/architecture-decision` ADR-0014 landing + Accept promotion + registry lockstep + Pass-ADR-0014-SYNC notes applied to dungeon-run-orchestrator.md + hero-roster.md + save-load-system.md + game-time-and-tick.md) + 2026-04-26 — OQ-8 closure (SceneManager rank 8 assignment per ADR-0003 Amendment #4 / story S5-M4) |
 | Engine | Godot 4.6 (pinned 2026-02-12) |
 | Renderer | Forward+ (Vulkan desktop / Metal macOS / D3D12 Windows) |
 | Language | GDScript (static-typed) |
@@ -105,9 +105,9 @@ identifier (or scene name for Presentation modules).
 │  Economy · HeroClassDatabase · EnemyDatabase · BiomeDungeonDatabase     │
 │  AudioSystem (minimal MVP)                                              │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  FOUNDATION LAYER (Autoloads, rank 0-2)                                 │
+│  FOUNDATION LAYER (Autoloads, rank 0-2, 8)                              │
 │  TickSystem (rank 0) · DataRegistry (rank 1) · SaveLoadSystem      │
-│  (rank 2) · SceneManager (rank as Node, not ranked) · UIFramework │
+│  (rank 2) · SceneManager (rank 8) · UIFramework                    │
 │  (theme resource, not autoload)                                         │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  PLATFORM LAYER (Godot 4.6)                                             │
@@ -132,7 +132,7 @@ autoload's signal in its own `_ready()` — VERIFIED via empirical probe
 | 5 | `EnemyDatabase` | Core | Typed accessor over enemy `.tres` resources |
 | 6 | `BiomeDungeonDatabase` | Core | Typed accessor over biome + dungeon + floor `.tres` resources |
 | 7 | `HeroRoster` | Feature | Owns `Array[HeroInstance]`; recruit, level-up, deletion |
-| 8 | *[VACANT]* | — | Reserved-vacant — see §Non-Autoload Pure-Function Modules below |
+| 8 | `SceneManager` | Foundation | Persistent root scene orchestration; four-state machine (UNINITIALIZED/IDLE/TRANSITIONING/PAUSED); screen routing |
 | 9 | *[VACANT]* | — | Reserved-vacant — see §Non-Autoload Pure-Function Modules below |
 | 10 | `FloorUnlockSystem` | Feature | Owns unlocked-floor set; subscribes to `DungeonRunOrchestrator.floor_cleared_first_time` |
 | 11 | `FormationAssignment` | Feature | Owns active formation; emits `formation_browse_opened` (read) and `formation_reassignment_committed` (write) |
@@ -141,7 +141,7 @@ autoload's signal in its own `_ready()` — VERIFIED via empirical probe
 | 14 | `DungeonRunOrchestrator` | Feature | State machine: `NO_RUN → DISPATCHING → ACTIVE_FOREGROUND/OFFLINE_REPLAY → RUN_ENDED` |
 | 15 | `OfflineProgressionEngine` | Feature | Wall-clock delta computation at session start, drives offline replay batches into Combat + Economy |
 
-**Ranks 8 and 9 are deliberately vacant** (per ADR-0003 Amendment #2, 2026-04-22). The `MatchupResolver` and `CombatResolver` modules that originally occupied these slots are non-autoload `RefCounted` instance classes injected into `DungeonRunOrchestrator` via public setters (`set_matchup_resolver` / `set_combat_resolver`) with lazy-default construction in `_ready()` — see §Non-Autoload Pure-Function Modules. Downstream ranks were intentionally NOT renumbered (per ADR-0003 §Editing Protocol, reorders require a superseding ADR; vacating slots is the safer change). The `_init(args)` phrasing in earlier drafts is superseded by ADR-0003 Amendment #3 — Godot autoload Nodes cannot have required-arg `_init` (autoload.md Claim 4 [VERIFIED]).
+**Rank 8 is now occupied by `SceneManager` (Foundation)** (per ADR-0003 Amendment #4, 2026-04-26 — story S5-M4 closed OQ-8). **Rank 9 is deliberately vacant** (per ADR-0003 Amendment #2, 2026-04-22). The `MatchupResolver` and `CombatResolver` modules that originally occupied ranks 8 and 9 are non-autoload `RefCounted` instance classes injected into `DungeonRunOrchestrator` via public setters (`set_matchup_resolver` / `set_combat_resolver`) with lazy-default construction in `_ready()` — see §Non-Autoload Pure-Function Modules. Downstream ranks were intentionally NOT renumbered (per ADR-0003 §Editing Protocol, reorders require a superseding ADR; claiming a vacant slot is the permitted alternative). The `_init(args)` phrasing in earlier drafts is superseded by ADR-0003 Amendment #3 — Godot autoload Nodes cannot have required-arg `_init` (autoload.md Claim 4 [VERIFIED]).
 
 ### Non-Autoload Pure-Function Modules
 
@@ -302,7 +302,7 @@ For each module: **Owns** (sole writer), **Exposes** (read API), **Consumes**
 - **Exposes**: `recruit(class_id) -> HeroInstance`, `remove(hero_id)`, signal `hero_recruited(hero)`, `hero_removed(hero_id)`, `roster_changed`.
 - **Consumes**: `HeroClassDatabase.get_by_id()`, `Economy.try_spend()` (delegated to Recruitment).
 
-#### MatchupResolver (NON-AUTOLOAD — rank 8 vacant)
+#### MatchupResolver (NON-AUTOLOAD — historically rank 8; rank 8 now occupied by SceneManager per ADR-0003 Amendment #4 / story S5-M4)
 
 - **Class**: `class_name MatchupResolver extends RefCounted` (production subclass: `DefaultMatchupResolver`). NOT autoloaded — lazily constructed inside `DungeonRunOrchestrator._ready()` via `DefaultMatchupResolver.new()` (zero-arg, non-autoload RefCounted) IF `_matchup_resolver` is still null at `_ready()` time. Tests pre-inject spy subclasses via `DungeonRunOrchestrator.set_matchup_resolver(spy)` BEFORE `_ready()` fires (per `dungeon-run-orchestrator.md` §J.3 Mode 1). See ADR-0003 Amendment #2 + #3, ADR-0009, `dungeon-run-orchestrator.md` §J.1 (locked Option A wiring), and `design/gdd/class-vs-enemy-matchup-resolver.md`.
 - **Owns**: NOTHING. Stateless: zero class-scope vars, zero signals, no caches, no RNG, no time-dependent reads.

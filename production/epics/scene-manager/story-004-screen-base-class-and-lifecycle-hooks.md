@@ -1,10 +1,10 @@
 # Story 004: `Screen extends Control` base class + four lifecycle hooks + CI grep enforcement
 
 > **Epic**: scene-manager
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
-> **Manifest Version**: 2026-04-24
+> **Manifest Version**: 2026-04-26
 
 ## Context
 
@@ -138,4 +138,55 @@
 ## Dependencies
 
 - **Depends on**: None (parallelizable with Story 002; Story 003 calls into the hooks and therefore consumes this story's contract)
-- **Unlocks**: Story 003 (calls `on_enter` / `on_exit`), Story 007 (calls `on_pause` / `on_resume`)
+- **Unlocks**: Story 003 (calls `on_enter` / `on_exit`) — already landed via duck typing in S5-M5; Story 007 (calls `on_pause` / `on_resume`)
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-26
+**Sprint**: Sprint 5 (S5-M6)
+**Criteria**: 4/4 passing (zero deferred)
+**Test Evidence**: Unit test at `tests/unit/scene_manager/screen_base_class_test.gd` (16/16 PASS, 0 orphans) + CI gate at `tools/ci/check_screen_hooks.sh` wired into `.github/workflows/tests.yml` (positive + negative path verification)
+**Code Review**: Complete — APPROVED verdict (godot-gdscript-specialist + qa-tester reviews; G-1 BLOCKING gap addressed inline via negative-path CI step; G-2/G-3 advisories deferred)
+**Gates skipped per solo mode**: QL-TEST-COVERAGE, LP-CODE-REVIEW
+
+**Files created**:
+- `src/core/scene_manager/screen.gd` (80 lines) — `class_name Screen extends Control` with `@export transition_override_ms: int = 0` + 4 empty-body lifecycle hooks (on_enter/on_exit/on_pause/on_resume) + ADR-0007 Risks Note 1 (TWEEN_PAUSE_BOUND) + Risks Note 4 (PROCESS_MODE_PAUSABLE) doc-comment warnings.
+- `tools/ci/check_screen_hooks.sh` (114 lines) — Bash CI guard scanning every `extends Screen` .gd file for all four lifecycle hooks. Line-anchored regex `^func hook(` prevents comment false-positives. Excludes base class + tests/fixtures/. macOS bash 3.2 portable (uses `while read` instead of `mapfile`). ripgrep with grep fallback.
+- `tests/fixtures/bad_screen_missing_hook.gd.fixture` — negative-test fixture (extends Screen, declares 3 hooks, omits on_resume). `.fixture` suffix prevents Godot auto-import.
+- `tests/unit/scene_manager/screen_base_class_test.gd` (270 lines) — 16 tests across 5 groups (TR-005 hooks declared / TR-028 export / ADR-0007 doc warnings / 7-placeholder refactor verification / fixture sanity).
+
+**Files modified**:
+- 7 placeholder screen scripts at `assets/screens/{main_menu,guild_hall,recruitment,formation_assignment,dungeon_run_view,victory_moment,return_to_app}/*.gd` — `extends Control` → `extends Screen`; comment text updated.
+- `.github/workflows/tests.yml` — added "Check Screen lifecycle hooks" step (positive path) BEFORE GdUnit4 + "Verify Screen lint catches missing hooks (negative path)" step (added during `/code-review` to address QA-flagged G-1 gap). Both are hard gates.
+
+**Critical fixes during implementation**:
+1. **macOS bash 3.2 lacks `mapfile`** → CI script uses portable `while IFS= read -r` loop. Verified locally + works in Ubuntu CI.
+2. **`grep --exclude-dir` takes bare directory name, not absolute path** → fallback path fixed to use `--exclude-dir="fixtures"`. Defense-in-depth: post-filter at line 72 catches anything that slips through.
+3. **`class_name Screen` not resolved in headless test runner** → required `godot --headless --path . --import` to rebuild class registry. Test file uses `preload + ScreenScript.new()` to bypass class_name resolution. Pattern matches save_load_system test precedent.
+4. **Agent paused mid-task at step 4** → completed unit test file + CI workflow integration inline.
+5. **G-1 BLOCKING (CI negative-path never exercised in CI)** addressed inline by adding the second CI workflow step that copies the fixture, runs the script, expects exit 1 + "missing hook" message, then cleans up. **Verified locally**: positive path PASS (7/7), negative path FAIL exit 1 with correct message, cleanup restores positive path.
+
+**Out-of-scope adherence**: clean. **Did NOT modify `src/core/scene_manager/scene_manager.gd`** — the duck-typing pattern (`if old_screen.has_method("on_exit")`) continues to work correctly when subclasses formally extend Screen, and Story 005 will refactor the duck-typing once Tween animations replace the lifecycle-call timing.
+
+**Deviations (advisory, all documented in this Completion Notes section)**:
+1. Story line 107 specified a wrong-arity override test fixture — DEFERRED to Story 005 (SceneManager direct hook calls will exercise GDScript runtime arity errors).
+2. Story line 119 specified a comment-containing-hook-name false-positive test — DEFERRED. The line-anchored regex already filters correctly; tracked for future test depth expansion.
+3. `@abstract` keyword (Godot 4.5+) for compile-time hook enforcement — ADR amendment candidate.
+4. Group D loop-vs-individual tests reduce per-screen traceability in CI reports — acceptable for 7 placeholders.
+
+**Tech debt advisories** (deferred, non-blocking):
+- Future Story 005: add wrong-arity override test fixture
+- Future test depth: add comment-only-hook-name fixture
+- Future ADR amendment: evaluate `@abstract` keyword for compile-time hook enforcement
+
+**Regression**: `tests/unit/save_load/` 88/88 PASS post-changes; `tests/integration/scene_manager/` 42/42 PASS; `tests/unit/scene_manager/` 29/29 PASS (13 skeleton + 16 base class).
+
+**Cumulative project**: **159 tests green** (29 unit scene_manager + 42 integration scene_manager + 88 save_load).
+
+**Sprint 5 progress**: 4/10 Must Have done. **SceneManager core (Stories 001-004) FULLY landed** — formal Screen base class enforced via CI grep + unit tests + 7 placeholders refactored. The remaining Must Have stories are M7 (Tween + leak guard, Story 005), M8 (modal overlay, Story 007), M1+M2 (cleanup carryovers), and M9+M10 (pre-flight `/create-stories`).
+
+**Unlocks**:
+- Story 005 (S5-M7) — Tween transitions + `_active_transition_tween` leak guard. Will refactor scene_manager.gd to remove duck-typing in favor of formal Screen-typed calls.
+- Story 007 (S5-M8) — Modal overlay + `_modal_pause_count`. Will call `on_pause` / `on_resume` on the current Screen.

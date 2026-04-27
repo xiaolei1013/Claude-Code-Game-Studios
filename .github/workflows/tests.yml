@@ -31,6 +31,40 @@ jobs:
           sudo install -m 0755 "/tmp/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
           godot --version
 
+      # Static lint: every `extends Screen` script declares all four lifecycle
+      # hooks (on_enter / on_exit / on_pause / on_resume). Per ADR-0007: silent
+      # omission of any hook is FORBIDDEN. Hard CI gate — fails fast before
+      # the (slower) GdUnit4 suite runs.
+      - name: Check Screen lifecycle hooks
+        run: bash tools/ci/check_screen_hooks.sh
+
+      # Negative-path verification: the lint script must FAIL when a hook is
+      # missing. Without this, a future refactor of check_screen_hooks.sh that
+      # silently breaks the failure path would pass CI undetected. We move the
+      # known-bad fixture into the scan path, run the script, expect exit 1
+      # AND the message "missing hook(s): on_resume", then restore.
+      - name: Verify Screen lint catches missing hooks (negative path)
+        run: |
+          set -euo pipefail
+          NEG_DIR="assets/screens/_negative_test"
+          mkdir -p "$NEG_DIR"
+          # Copy fixture (renamed to .gd so it gets scanned)
+          cp tests/fixtures/bad_screen_missing_hook.gd.fixture "$NEG_DIR/bad_screen.gd"
+          # Trap to clean up even on failure
+          trap 'rm -rf "$NEG_DIR"' EXIT
+          # Expect non-zero exit + missing-hook message
+          if output=$(bash tools/ci/check_screen_hooks.sh 2>&1); then
+            echo "::error::check_screen_hooks.sh did NOT fail on a script missing on_resume"
+            echo "$output"
+            exit 1
+          fi
+          if ! echo "$output" | grep -q "missing hook"; then
+            echo "::error::check_screen_hooks.sh failed but did not report 'missing hook'"
+            echo "$output"
+            exit 1
+          fi
+          echo "OK: lint correctly caught missing hook in fixture."
+
       # Import project resources so Godot generates .godot/ and the addon .uid
       # files are honored. Without this first-pass import, scripts referenced
       # by path like res://addons/gdUnit4/bin/GdUnitCmdTool.gd fail to load.

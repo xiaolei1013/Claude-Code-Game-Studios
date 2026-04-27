@@ -5,7 +5,7 @@
 > **Architecture Module**: `CombatResolver` (`extends RefCounted`, stateless DI service)
 > **Control Manifest Version**: 2026-04-24
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories combat-resolution`
+> **Stories**: 10 — authored 2026-04-26 via S6-M11 pre-flight
 
 ## Overview
 
@@ -69,12 +69,28 @@ production).
 
 ## Stories
 
-Not yet created. Run `/create-stories combat-resolution` to author. **Note**:
-Combat depends on hero-roster (`HeroInstance` records as snapshot input) and
-matchup-resolver (DI dependency). Implement those first, OR stub them via
-spy subclasses for parallel work.
+| # | Story | Type | Status | TR Coverage | ADR |
+|---|-------|------|--------|-------------|-----|
+| 001 | CombatResolver base + 4 value types + equals() | Logic | Ready | TR-001/013/014/015/016/017/028 | ADR-0010 |
+| 002 | combat_config.tres tuning constants | Config/Data | Ready | TR-031 | ADR-0010 + ADR-0013 |
+| 003 | DefaultCombatResolver + action_cooldown_ticks | Logic | Ready | TR-004/005/011/032 | ADR-0010 |
+| 004 | formation_dps + hp_bonus_factor + survived/losing_run | Logic | Ready | TR-006/008/009 | ADR-0010 |
+| 005 | _kill_schedule_for_loop + effective_dps + ticks_to_kill | Logic | Ready | TR-007/010/011/025 | ADR-0010 |
+| 006 | emit_events_in_range (foreground entry) | Logic | Ready | TR-002/014/026/029 | ADR-0010 |
+| 007 | compute_offline_batch + foreground/offline parity | Integration | Ready | TR-002/003/015/021/022/023 | ADR-0010 + ADR-0014 |
+| 008 | MatchupResolver DI + per-archetype call cache | Integration | Ready | TR-004/012/030 | ADR-0010 + ADR-0009 |
+| 009 | Edge cases + signal-free + RNG-free invariants | Logic | Ready | TR-018/019/020/027/030 | ADR-0010 |
+| 010 | Perf budget + Orchestrator synchronous integration | Integration | Ready | TR-024/029 | ADR-0010 + ADR-0014 |
+
+**Authored**: 2026-04-26 via Sprint 6 Story M11 (`/create-stories combat-resolution`).
+**Solo review mode**: QA-lead story-readiness gate skipped per `production/review-mode.txt = solo`. Stories carry minimal QA test sketches; full qa-lead pass deferred to story implementation time.
+
+**Dependency note**: Combat depends on hero-roster (`HeroInstance` records as snapshot input) and matchup-resolver (DI dependency). hero-roster Foundation lands in Sprint 6 (M1-M6 — Complete); matchup-resolver epic stories were authored in S6-M10. Sprint 7+ may interleave matchup-resolver Stories 001-002 with combat Stories 001-005 for parallel progress.
 
 ## Next Step
 
-`/create-stories combat-resolution`. This is the deterministic math kernel
-the Vertical Slice's dungeon-run loop calls every tick.
+Stories are backlog-ready for Sprint 7+. Critical path for Vertical Slice — this
+is the deterministic math kernel the Vertical Slice's dungeon-run loop calls every tick.
+Begin implementation with Story 001
+(`/story-readiness production/epics/combat-resolution/story-001-resolver-base-and-value-types.md`)
+when sprint capacity allows.

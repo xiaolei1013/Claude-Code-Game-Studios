@@ -1,0 +1,14 @@
+# Test fixture: a "Screen subclass" missing the on_resume hook.
+# Used by tools/ci/check_screen_hooks.sh smoke test to verify the grep catches
+# the missing hook. Suffix .fixture prevents Godot from auto-loading it.
+extends Screen
+
+func on_enter() -> void:
+    pass
+
+func on_exit() -> void:
+    pass
+
+func on_pause() -> void:
+    pass
+# on_resume intentionally omitted to test CI grep

@@ -1,10 +1,10 @@
 # Story 005: Tween-based 5 standard transitions + `_active_transition_tween` leak guard + H-01 timing
 
 > **Epic**: scene-manager
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
-> **Manifest Version**: 2026-04-24
+> **Manifest Version**: 2026-04-26
 
 ## Context
 
@@ -150,5 +150,59 @@
 
 ## Dependencies
 
-- **Depends on**: Story 001 (TransitionLayer + ColorRect exist), Story 003 (`_execute_transition` infrastructure), Story 004 (`Screen.transition_override_ms` export)
+- **Depends on**: Story 001 (TransitionLayer + ColorRect exist) ✅ Complete, Story 003 (`_execute_transition` infrastructure) ✅ Complete, Story 004 (`Screen.transition_override_ms` export) ✅ Complete
 - **Unlocks**: Story 006 (CEREMONY transition parallel path), Story 007 (PUSH_MODAL timing reused for modal push), Story 008 (transition can be aborted mid-tween), Story 009 (`reduce_motion` clamps into this story's timing constants), Story 010 (H-11 memory-leak soak exercises this story's leak-guard)
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-26
+**Sprint**: Sprint 5 (S5-M7)
+**Criteria**: 10/10 passing (8 TRs + AC H-01 BLOCKING + AC H-02 BLOCKING)
+**Test Evidence**:
+- `tests/unit/scene_manager/tween_transitions_test.gd` (25 tests, all PASS)
+- `tests/integration/scene_manager/crossfade_timing_test.gd` (13 tests, all PASS — was 12; +1 spy hook test added during /code-review)
+**Code Review**: Complete — APPROVED verdict (godot-gdscript-specialist + qa-tester reviews; 2 BLOCKING-class fixes addressed inline; advisory items deferred with named follow-up paths)
+**Gates skipped per solo mode**: QL-TEST-COVERAGE, LP-CODE-REVIEW
+
+**Files modified**:
+- `src/core/scene_manager/scene_manager.gd` — 425 → 893 lines (+468). Added `_active_transition_tween: Tween` + `_current_transition_type: int` fields, `InputPolicy` enum (BLOCK / QUEUE_ONE), 4 timing constants (CROSSFADE 150 / SLIDE 180 / FADE_TO_BLACK 300 / PUSH_MODAL 180 ms), `_get_transition_layer()` + `_get_transition_color_rect()` lazy resolvers per ADR-0003 hot-reload. Refactored `_execute_transition` to dispatch by transition type; replaced the old `call_deferred("_complete_swap")` instant-swap with 4 tween dispatchers (`_transition_cross_fade`, `_transition_slide` handles SLIDE_UP/DOWN/LEFT, `_transition_fade_to_black`, `_transition_push_modal`). All four use the leak-guard pattern (`if _active_transition_tween != null and _active_transition_tween.is_valid(): _active_transition_tween.kill()` BEFORE `create_tween()`). Tween created on TransitionLayer (PROCESS_MODE_ALWAYS) per ADR-0007 Risks Note 1 + 2. Single `_on_transition_finished` handler sets state=IDLE, emits `transition_complete`, drains queue. CEREMONY transition stub-falls-back to CROSS_FADE with push_warning (Story 006 territory). **Removed** the old `_complete_swap` method (logic inlined into per-transition swap callbacks). **Removed duck-typing** for `on_exit`/`on_enter` since Story 004 (S5-M6) now formally enforces Screen base class via CI grep — calls are direct. Evidence logging via `print()` with `[SCENE_MANAGER_TIMING]` prefix on every cross-fade in debug builds (start/end/duration/PASS|FAIL_OR_HEADLESS_COMPRESSED).
+- `tests/integration/scene_manager/request_screen_and_node_swap_test.gd` — pattern shift from "await 2 process frames" (instant swap) to "await sm.transition_complete" (tween-driven). Added `_await_transition(sm)` helper. All 24 existing tests use the new pattern.
+- `tests/integration/scene_manager/crossfade_timing_test.gd` — strengthened wall-clock assertion bound (was `>= 0`, now `>= 100 AND <= 250`). Added new B-01b test using SpyScreen subclass for direct hook timestamp verification (AC H-02 contract).
+
+**Files created**:
+- `tests/unit/scene_manager/tween_transitions_test.gd` — 25 tests across 5 groups (TR-020 create_tween primitive / TR-024 ease_out_quad slides / leak-guard pattern source-grep / TR-029 InputPolicy enum / timing constants).
+- `tests/integration/scene_manager/crossfade_timing_test.gd` — 13 tests covering AC H-01 (150ms timing — both structural and wall-clock advisory) + AC H-02 (lifecycle hook order signal-sequence + direct spy timestamp) + TR-034 screen_changed signal + leak guard runtime behavior.
+- `tests/fixtures/spy_screen.gd` — `class_name SpyScreen extends Screen` with `hook_log: Array[Dictionary]` recording each lifecycle hook invocation timestamp. Used by AC H-02 spy test. Lives in `tests/fixtures/` so CI grep (`tools/ci/check_screen_hooks.sh`) excludes it from production scanning.
+
+**Critical fixes during implementation + /code-review**:
+1. **Tween.is_valid() semantics** — agent's claim "Godot auto-invalidates completed tweens" is wrong. Reality: `is_valid()` stays true while bound to a live node; only `is_running()` flips false. Fixed two leak-guard test assertions inline (`is_valid().is_false()` → `is_running().is_false()`) with corrected doc-comments. Leak-guard pattern itself is correct — `kill()` is idempotent.
+2. **`_transition_cross_fade` ignored per-screen override** — hardcoded `_CROSSFADE_HALF_MS=0.075` instead of calling `_get_crossfade_duration_ms(new_screen)`. Fixed: cross-fade now dynamically computes `half_s = (total_ms/1000 - overlap_s) / 2` honoring the per-screen `transition_override_ms`. The slide / fade-to-black / push_modal dispatchers already honored the override.
+3. **AC H-02 missing direct hook timestamps** — original B-01 test used signal-sequence proxy (screen_changed before transition_complete), which doesn't catch a regression where on_exit is silently skipped. Added `tests/fixtures/spy_screen.gd` with timestamp recording in all 4 hooks; new `test_scene_manager_lifecycle_hooks_fire_in_strict_order` injects two SpyScreen subclasses into `_screen_registry` via `PackedScene.pack()`, transitions A→B, asserts `spy_a.on_enter_ts ≤ spy_a.on_exit_ts ≤ spy_b.on_enter_ts` directly per story line 119.
+4. **Wall-clock advisory test was non-asserting** (just `>= 0`) — strengthened to `>= 100 AND <= 250 ms`. A-01 structural test remains the BLOCKING gate (`_last_crossfade_authored_ms == 150`).
+
+**Story-spec deviation (acceptable, documented)**:
+- Slide and PUSH_MODAL dispatchers fire `on_enter` BEFORE `tween_start` (not inside a tween_callback). Justification: slide animation needs the new screen visible in the tree when it starts (no occluding ColorRect like cross-fade has). Story line 16 phrasing "tween end → B.on_enter" applies cleanly to cross-fade and fade-to-black only; slide/modal need swap-first by structural necessity. The AC H-02 spy test validates the cross-fade ordering; slide ordering is verified by signal-sequence proxy (state goes TRANSITIONING + screen visible during slide).
+
+**Tech debt advisories deferred** (non-blocking):
+- `_CROSSFADE_HALF_MS` constant name misleading (stores seconds; rename to `_CROSSFADE_HALF_S`)
+- Whole-file structural grep tests have over-broad scope; could be function-scoped
+- TR-032 stdout `[SCENE_MANAGER_TIMING]` logging not asserted by test
+- `transition_override_ms < 0` clamp path not tested
+- `_await_transition` helper has no explicit timeout
+- Unit test E-07 is a tautology (`_last_crossfade_authored_ms == 0` on freshly instantiated node)
+- 893-line `scene_manager.gd` may warrant dispatcher extraction in a future cleanup pass
+
+**Regression**: `tests/unit/save_load/` 88/88 PASS; `tests/unit/scene_manager/` 53/53 PASS; `tests/integration/scene_manager/` 55/55 PASS (was 54; +1 spy test).
+
+**Cumulative project**: **196 tests green** (53 + 55 + 88).
+
+**Sprint 5 progress**: 5/10 Must Have done. **SceneManager visual transition layer complete** — 5 standard transitions animate, leak guard verified, lifecycle hooks fire in contractual order, per-screen `transition_override_ms` honored across all 4 dispatchers.
+
+**Unlocks**:
+- Story 006 (S5 Should Have S5-S1): CEREMONY transition via AnimationPlayer — parallel path; replaces the current CEREMONY-falls-back-to-CROSS_FADE stub.
+- Story 007 (S5-M8): Modal overlay + pause counter — reuses PUSH_MODAL timing, calls `on_pause`/`on_resume` on Screen.
+- Story 008 (S5 Should Have S5-S2): `scene_boundary_persist` emission — gates into `_execute_transition`.
+- Story 009 (S5-N1): `reduce_motion` clamp — clamps the 4 timing constants to ≤50ms.
+- Story 010 (S5-N2): H-11 memory-leak soak — exercises the leak-guard over 10+ transitions.

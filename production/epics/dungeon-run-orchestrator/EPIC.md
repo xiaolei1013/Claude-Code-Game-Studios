@@ -5,7 +5,7 @@
 > **Architecture Module**: `DungeonRunOrchestrator` (autoload — rank 6+ governed by ADR-0003 Amendment table)
 > **Control Manifest Version**: 2026-04-24
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories dungeon-run-orchestrator`
+> **Stories**: 12 defined (Ready)
 
 ## Overview
 
@@ -74,11 +74,24 @@ transition, hard-stopping on `save_failed`.
 
 ## Stories
 
-Not yet created. Run `/create-stories dungeon-run-orchestrator` to author.
-**This is the Vertical Slice's core gameplay loop.**
+| # | Story | Type | Status | ADRs |
+|---|-------|------|--------|------|
+| 001 | RunSnapshot RefCounted + 5-state FSM + state-trigger matrix | Logic | Ready | ADR-0014 + 0010 |
+| 002 | Orchestrator autoload skeleton + DI setters + lazy resolvers | Logic | Ready | ADR-0009 + 0003 |
+| 003 | DISPATCHING validation (empty formation, floor unlock, debounce) | Logic | Ready | ADR-0010 |
+| 004 | Formation snapshot deep-copy + floor by id + matchup cache build | Logic | Ready | ADR-0010 + 0014 |
+| 005 | ACTIVE_FOREGROUND tick subscription + dup-tick guard | Integration | Ready | ADR-0010 + 0005 |
+| 006 | Kill attribution gold + Economy routing + 4 owned signals | Logic | Ready | ADR-0013 + 0010 |
+| 007 | Floor-clear bonus + once-per-dispatch + 3-layer idempotency | Integration | Ready | ADR-0002 + 0013 |
+| 008 | Mid-run formation reassignment terminates run | Integration | Ready | ADR-0001 |
+| 009 | ACTIVE_OFFLINE_REPLAY compute + D.4 loop-walk + parity | Integration | Ready | ADR-0014 + 0010 |
+| 010 | Save/Load consumer contract + RunSnapshot round-trip | Integration | Ready | ADR-0004 + 0014 |
+| 011 | Offline replay error path + floor_was_valid distinguisher | Integration | Ready | ADR-0014 |
+| 012 | Per-tick performance budget AC (TR-019, ≤2ms p95) | Logic (Performance) | Ready | ADR-0010 |
+
+**Type breakdown**: 5 Logic + 6 Integration + 1 Logic-Performance.
+**TR coverage**: TR-orchestrator-001..032 (full epic scope; 17/17 BLOCKING re-review items closed).
 
 ## Next Step
 
-`/create-stories dungeon-run-orchestrator`. Pair with HeroRoster +
-MatchupResolver + CombatResolution epics — these four together compose the
-playable core loop that closes the Pre-Production → Production gate.
+`/story-readiness production/epics/dungeon-run-orchestrator/story-001-run-snapshot-and-state-machine.md` to validate, then `/dev-story` to begin implementation when Sprint 6 starts. **This is the Vertical Slice's core gameplay loop.** Pair implementation with HeroRoster + MatchupResolver + CombatResolution epics — these four together compose the playable core loop that closes the Pre-Production → Production gate.

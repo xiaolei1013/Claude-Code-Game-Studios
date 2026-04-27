@@ -5,7 +5,7 @@
 > **Architecture Module**: `MatchupResolver` (`extends RefCounted`, NOT an autoload — DI service)
 > **Control Manifest Version**: 2026-04-24
 > **Status**: Ready
-> **Stories**: Not yet created — run `/create-stories matchup-resolver`
+> **Stories**: 8 — authored 2026-04-26 via S6-M10 pre-flight
 
 ## Overview
 
@@ -63,9 +63,23 @@ DungeonRunOrchestrator's `_ready()` for production.
 
 ## Stories
 
-Not yet created. Run `/create-stories matchup-resolver` to author.
+| # | Story | Type | Status | TR Coverage | ADR |
+|---|-------|------|--------|-------------|-----|
+| 001 | MatchupResolver base + MatchupResult value type | Logic | Ready | TR-001/002/005/006/007/030 | ADR-0009 |
+| 002 | DefaultMatchupResolver + `_is_class_counter` + `resolve_formation_matchup` | Logic | Ready | TR-003/008/010/011/012/013/014/016/017/020 | ADR-0009 |
+| 003 | `resolve_floor_matchup` + edge-case error guards | Logic | Ready | TR-009/015/018/019 | ADR-0009 |
+| 004 | `effectiveness_label` hook (S4-N1 quick-spec carryover) | Logic | Ready | epic DoD | ADR-0009 |
+| 005 | Determinism + offline-replay invariants | Integration | Ready | TR-021/022/023/024/025/029 | ADR-0009 + ADR-0014 |
+| 006 | Orchestrator DI integration + spy-subclass test pattern | Integration | Ready | TR-004/026/032 | ADR-0009 + ADR-0003-A3 |
+| 007 | Economy + Combat consumer wiring | Integration | Ready | TR-027/028 | ADR-0009 + ADR-0010 + ADR-0013 |
+| 008 | Perf bench + structural CI lint + equality test pattern | Logic | Ready | TR-030/031/033 | ADR-0009 |
+
+**Authored**: 2026-04-26 via Sprint 6 Story M10 (`/create-stories matchup-resolver`).
+**Solo review mode**: QA-lead story-readiness gate skipped per `production/review-mode.txt = solo`. Stories carry minimal QA test case sketches; full qa-lead pass deferred to story implementation time.
 
 ## Next Step
 
-`/create-stories matchup-resolver`. Critical path for Vertical Slice — this
-is Pillar 3's load-bearing mechanism.
+Stories are backlog-ready for Sprint 7+. Critical path for Vertical Slice — this
+is Pillar 3's load-bearing mechanism. Begin implementation with Story 001
+(`/story-readiness production/epics/matchup-resolver/story-001-matchup-resolver-base-and-result-type.md`)
+when sprint capacity allows.

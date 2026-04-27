@@ -1,0 +1,9 @@
+; Placeholder Theme resource — authored by the UI Framework epic.
+; This file exists solely so that the preload("res://assets/ui/parchment_theme.tres")
+; in main_root.gd resolves at boot without error (ADR-0008 §Parchment theme structure).
+; Real parchment palette, fonts, StyleBoxes, and color constants will be populated
+; by the UI Framework epic. Do NOT add content here manually.
+
+[gd_resource type="Theme" format=3]
+
+[resource]

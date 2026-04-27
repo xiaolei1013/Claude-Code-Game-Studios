@@ -1,10 +1,10 @@
 # Story 002: SceneManager autoload skeleton + four-state machine + DataRegistry gating
 
 > **Epic**: scene-manager
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
-> **Manifest Version**: 2026-04-24
+> **Manifest Version**: 2026-04-26
 
 ## Context
 
@@ -157,5 +157,43 @@
 
 ## Dependencies
 
-- **Depends on**: Story 001 (MainRoot.tscn exists so the autoload can resolve node paths)
+- **Depends on**: Story 001 (MainRoot.tscn exists so the autoload can resolve node paths) — ✅ Complete (2026-04-26)
 - **Unlocks**: Story 003 (autoload instance + state enum + `_queued_request` slot are prerequisites for `request_screen` body)
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-26
+**Sprint**: Sprint 5 (S5-M4)
+**Criteria**: 5/5 passing (zero deferred)
+**Test Evidence**: Unit test at `tests/unit/scene_manager/scene_manager_autoload_skeleton_test.gd` — 13/13 PASS, 0 errors, 0 failures, 0 orphans, 83ms
+**Code Review**: Complete — APPROVED verdict (godot-gdscript-specialist + qa-tester reviews; QA-flagged gaps F2/F4/F5 addressed inline before close)
+**Gates skipped per solo mode**: QL-TEST-COVERAGE, LP-CODE-REVIEW
+
+**Files created**:
+- `src/core/scene_manager/scene_manager.gd` (254 lines) — Foundation autoload, rank 8. `extends Node`, no `class_name` (Sprint 1 lesson — autoload identifier already global). 4-state enum + 7-value TransitionType enum + 3 signal declarations + `_init() -> void: pass` (ADR-0003 Amendment #3) + `_ready()` with DataRegistry gating + late-subscription fallback. Public API stubs for `request_screen` (queues while UNINITIALIZED), `push_overlay`, `pop_overlay`. Private `_get_screen_container()` helper for Stories 003+.
+- `tests/unit/scene_manager/scene_manager_autoload_skeleton_test.gd` (294 lines after fixes) — 13 tests across 4 groups (TR-001+TR-009 / TR-012 / Amendment #3 / AC H-06 partial).
+
+**Files modified**:
+- `project.godot` — `SceneManager="*res://src/core/scene_manager/scene_manager.gd"` added after BiomeDungeonDatabase
+- `docs/architecture/ADR-0003-autoload-rank-table-canonical.md` — **Amendment #4 added (2026-04-26)**: rank 8 reassigned VACANT → SceneManager (Foundation), closing OQ-8. Per §Editing Protocol, claiming a vacant slot is preferred over reordering existing entries (which would have been required to insert at rank 7).
+- `docs/architecture/architecture.md` — §Autoload Rank Table row 8 updated; "Ranks 8 and 9 deliberately vacant" footnote rewritten to "Rank 9 is deliberately vacant" only; stale "rank 8 vacant" reference at line 305 corrected.
+- `docs/architecture/control-manifest.md` — Manifest Version bumped 2026-04-24 → **2026-04-26**; ADRs Covered list updated to "ADR-0003 (Amendments #1–#4)".
+
+**Critical decision (proactively resolved)**: SceneManager → rank 8. Story recommended "6 or 7" but those slots were occupied (rank 6 = BiomeDungeonDatabase, rank 7 = HeroRoster documented-but-unimplemented). Per ADR-0003 line 374, "leaving slots vacant is preferable to a reorder (which §Editing Protocol forbids without a superseding ADR)". Inserting at rank 7 would have been a forbidden reorder; claiming the vacant rank 8 was the editing-protocol-conformant move. ADR Amendment #4 documents this. **OQ-8 CLOSED.**
+
+**Deviations (advisory, all addressed)**:
+1. Story originally embedded Manifest Version 2026-04-24; this story's implementation bumped manifest to 2026-04-26 in lockstep with ADR-0003 Amendment #4. Story file Manifest Version field updated to 2026-04-26 at close.
+2. Test file initially had a misleading docstring claiming a `get_queued_request()` accessor — corrected to accurately describe direct-attribute access (GDScript underscore is convention only).
+3. Test B-01 originally constructed a 4-element array (would not catch a fifth State value being added). Strengthened with `State.size() == 4` + `State.keys().size() == 4` enum-introspection assertions to catch contract drift.
+4. Test A-03 originally only checked `current_screen == null`; added `current_screen_id == ""` companion assertion.
+
+**Regression**: `tests/unit/save_load/` 88/88 PASS post-autoload addition; `tests/integration/scene_manager/` 18/18 PASS (S5-M3 still green).
+
+**Tech debt advisories deferred** (non-blocking, may be addressed in Story 003 or as a tech-debt ticket):
+- F1: AC #5 ADR amendment half not auto-tested at runtime (relies on manual grep + `/architecture-review` for drift detection)
+- F3: Late-subscription fallback path not isolated from forward-subscription path
+- F6: `is_connected("registry_ready", ...)` not directly asserted
+
+**Unlocks**: S5-M5 (SceneManager Story 003 — `request_screen` body) is now implementable. The autoload instance, state enum, TransitionType enum, and `_queued_request` slot are all ready for the body fill.

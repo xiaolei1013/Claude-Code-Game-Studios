@@ -1,7 +1,7 @@
 # Story 001: MainRoot.tscn persistent-root scene + four CanvasLayer children
 
 > **Epic**: scene-manager
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Integration
 > **Manifest Version**: 2026-04-24
@@ -97,3 +97,31 @@
 
 - **Depends on**: None (foundational scene composition)
 - **Unlocks**: Story 002 (SceneManager skeleton references `MainRoot` node paths)
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-26
+**Sprint**: Sprint 5 (S5-M3)
+**Criteria**: 4/4 passing (zero deferred)
+**Test Evidence**: Integration test at `tests/integration/scene_manager/mainroot_scene_composition_test.gd` — 18/18 PASS, 0 errors, 0 failures, 0 orphans
+**Code Review**: Complete — APPROVED verdict (godot-gdscript-specialist + qa-tester reviews; gaps flagged were resolved inline before close)
+**Gates skipped per solo mode**: QL-TEST-COVERAGE, LP-CODE-REVIEW
+
+**Files created**:
+- `src/core/scene_manager/MainRoot.tscn` — root Control + 4 children (PersistentHUDLayer/ScreenContainer/TransitionLayer/OverlayLayer) + Fade ColorRect + InputBlock placeholder
+- `src/core/scene_manager/main_root.gd` — `class_name MainRoot extends Control`; `_ready()` assigns parchment theme; ADR-0007 process-mode doc-comment included
+- `assets/ui/parchment_theme.tres` — empty Theme placeholder (UI Framework epic owns real authoring)
+- `tests/integration/scene_manager/mainroot_scene_composition_test.gd` — 18 tests across 4 groups (TR-002 / TR-019 / ADR-0008 cascade / project.godot wiring)
+
+**Files modified**:
+- `project.godot` — `run/main_scene = "res://src/core/scene_manager/MainRoot.tscn"` set in `[application]`
+
+**Deviations (advisory, documented)**:
+1. `MainRoot extends Control` instead of `extends Node` per Implementation Note line 49. Justification: `Node` has no `theme` property in Godot 4.x; only `Control` and `Window` satisfy ADR-0008's `MainRoot.theme = preload(...)` cascade requirement. Story line 49 + ADR-0007 architecture diagram contradict ADR-0008 §Decision; the implementation chose the only working option and documented the rationale in the script's doc-comment.
+2. ADR-0007 architecture diagram (`MainRoot (Node)`) and this story's Implementation Note should be amended to `MainRoot (Control)` for alignment. Logged as TD-008.
+
+**Regression**: Sprint 4 save_load test suite re-run post-`project.godot` edit: 88/88 PASS, 0 regressions.
+
+**Unlocks**: S5-M4 (SceneManager autoload skeleton — Story 002) can now reference `MainRoot` node paths and theme cascade.

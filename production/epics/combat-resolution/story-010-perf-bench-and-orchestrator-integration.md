@@ -1,0 +1,58 @@
+# Story 010: Performance budget + Orchestrator synchronous integration
+
+> **Epic**: combat-resolution
+> **Status**: Ready
+> **Layer**: Feature
+> **Type**: Integration
+> **Manifest Version**: 2026-04-26
+
+## Context
+
+**GDD**: `design/gdd/combat-resolution.md` §K + GDD §C.5
+**Requirements**: TR-combat-024, 029
+**Governing ADR**: ADR-0010 + ADR-0014 (chunked offline replay)
+**Decision**: AC-14 perf budget — `compute_offline_batch(576000 ticks)` ≤100ms p95 on CI runner; ≤200ms p95 on min-spec mobile. Combat does NOT subscribe to `TickSystem.tick_fired`; Orchestrator invokes Combat synchronously within its `_on_tick` handler (TR-029). The bench is a perf-test gate that hard-fails CI on regression.
+
+**Engine**: Godot 4.6 | **Risk**: MEDIUM (perf budget is tight; ADR-0014 chunking landed specifically to keep this achievable)
+
+## Acceptance Criteria
+
+- [ ] TR-024: bench harness `tests/perf/combat_resolver_perf_test.gd` runs `compute_offline_batch(576000 ticks)` 20 times; p95 wall-time ≤100ms on CI runner. Failure hard-fails CI.
+- [ ] TR-024 mobile: documented manual bench protocol on Steam Deck (≤200ms p95) — not blocking CI but tracked in `production/qa/perf-baseline.md`.
+- [ ] TR-029: integration test — Orchestrator with injected real CombatResolver, simulating 1000 ticks; verify Combat is called synchronously (call ordering in test logs) and Combat itself does NOT call `TickSystem.tick_fired.connect`
+- [ ] Bench produces a JSON record at `tests/perf/baselines/combat_resolver_576k.json` with median + p95 + p99 + max for trend tracking
+
+## Implementation Notes
+
+```gdscript
+# tests/perf/combat_resolver_perf_test.gd
+func test_compute_offline_batch_576k_under_100ms_p95() -> void:
+    var snapshot := _build_synthetic_snapshot()
+    var times: Array[int] = []
+    for i in range(20):
+        var t0 := Time.get_ticks_usec()
+        DefaultCombatResolverScript.new().compute_offline_batch(snapshot, 576000)
+        times.append(Time.get_ticks_usec() - t0)
+    times.sort()
+    var p95_us: int = times[int(20 * 0.95)]
+    assert_int(p95_us).is_less(100_000)  # 100ms in microseconds
+```
+
+For the Orchestrator integration test, an existing dungeon-run-orchestrator story can spy on `TickSystem.tick_fired` connect calls and assert Combat does NOT appear in the connection list.
+
+## QA Test Cases
+
+- 576k-tick batch p95 ≤100ms on CI ubuntu-latest
+- 20-iteration variance: max < 2× median (sanity check for GC stalls)
+- Combat source grep for `TickSystem.tick_fired.connect` → 0 hits
+- Orchestrator-driven 1000-tick foreground sim: Combat called once per tick range, never auto-subscribes
+
+## Test Evidence
+**Required**:
+- `tests/perf/combat_resolver_perf_test.gd`
+- `tests/integration/combat_resolution/orchestrator_synchronous_invocation_test.gd`
+- `production/qa/perf-baseline.md` (manual mobile bench notes)
+
+## Dependencies
+- Depends on: Stories 001-009 (resolver complete); dungeon-run-orchestrator Story 005 (tick subscription wiring lives there)
+- Unlocks: Pre-Production → Production gate-PASS (perf budget gate)

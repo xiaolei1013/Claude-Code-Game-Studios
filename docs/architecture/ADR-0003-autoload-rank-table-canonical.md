@@ -10,7 +10,7 @@ Accepted
 
 ## Last Verified
 
-2026-04-22
+2026-04-26
 
 ## Decision Makers
 
@@ -94,7 +94,7 @@ Rank 4  — HeroClassDatabase                (Core)
 Rank 5  — EnemyDatabase                    (Core)
 Rank 6  — BiomeDungeonDatabase             (Core)
 Rank 7  — HeroRoster                       (Feature)
-Rank 8  — [VACANT — see §Non-Autoload Pure-Function Modules]
+Rank 8  — SceneManager (Foundation)
 Rank 9  — [VACANT — see §Non-Autoload Pure-Function Modules]
 Rank 10 — FloorUnlockSystem                (Feature)
 Rank 11 — FormationAssignment              (Feature)
@@ -104,9 +104,9 @@ Rank 14 — DungeonRunOrchestrator           (Feature)
 Rank 15 — OfflineProgressionEngine         (Feature)
 ```
 
-**Rank 8 and 9 are deliberately vacant.** Per amendment #2 (2026-04-22), `ClassEnemyMatchupResolver` and `CombatResolution` were removed from the autoload table because their GDDs specify them as non-autoload `RefCounted` instance classes injected into `DungeonRunOrchestrator` via `_init(combat_resolver, matchup_resolver)`. Downstream ranks were NOT renumbered — leaving the slots empty is preferable to reordering (per §Editing protocol, reordering is forbidden without a superseding ADR). See §Non-Autoload Pure-Function Modules below.
+**Rank 8 is now occupied by SceneManager (Foundation)** per Amendment #4 (2026-04-26 — story S5-M4 closed OQ-8). **Rank 9 is deliberately vacant.** Per Amendment #2 (2026-04-22), `ClassEnemyMatchupResolver` and `CombatResolution` were removed from the autoload table because their GDDs specify them as non-autoload `RefCounted` instance classes. Rank 8's vacant slot has been claimed by SceneManager per the editing protocol (claiming a vacant slot is preferred over reordering). Rank 9 downstream was NOT renumbered — leaving the slot empty is preferable to reordering (per §Editing protocol, reordering is forbidden without a superseding ADR). See §Non-Autoload Pure-Function Modules below.
 
-`SceneManager`, `UIFramework` (theme resource), and `AudioSystem` are not in the rank table — they are either non-autoloads or the rank is implementation-detail (for AudioSystem, "after DataRegistry" is the only constraint).
+`SceneManager` is at rank 8 (see Amendment #4, 2026-04-26). `UIFramework` (theme resource) and `AudioSystem` are not in the rank table — they are either non-autoloads or the rank is implementation-detail (for AudioSystem, "after DataRegistry" is the only constraint).
 
 ### Non-autoload pure-function modules
 
@@ -421,3 +421,25 @@ Any new autoload-registered script MUST satisfy: if `_init` is declared, all its
 **Second lesson — read the relevant GDD §J.x section BEFORE Step 4.5**: ADR-0009's initial draft proposed a `wire_dependencies` pattern that contradicted `dungeon-run-orchestrator.md` §J.1's already-locked Option A. The conflict was caught mid-lockstep-edit and rolled back. Generalizes: ADR authoring MUST read any GDD wiring section (e.g., §J Wiring model, §F Dependencies, §C Architecture) before proposing a new wiring mechanism. Cross-referencing locked GDD decisions is a Step 2 requirement, not a Step 4.5 specialist-review concern.
 
 **Cross-reference**: the full lazy-default-with-setters contract — signatures, CI invariants, test construction idiom, parity with `dungeon-run-orchestrator.md` §J.1 — is codified in ADR-0009 §Decision. ADR-X01 (Combat snapshot shape, upcoming) will cite this amendment when adopting the parallel setter (`set_combat_resolver`) for CombatResolver injection.
+
+### Amendment #4 — 2026-04-26: Rank 8 reassigned from VACANT to SceneManager (Foundation) — OQ-8 closure
+
+Story S5-M4 (SceneManager autoload skeleton + four-state machine + DataRegistry gating) required assigning a concrete rank for the `SceneManager` autoload. OQ-8 was left open in the original rank table with a recommendation of "6 or 7".
+
+**Analysis at implementation time (2026-04-26)**:
+- Ranks 0–6 are occupied by TickSystem through BiomeDungeonDatabase.
+- Rank 7 is occupied by HeroRoster (Feature layer, unimplemented but reserved).
+- Rank 8 was VACANT per Amendment #2.
+- Rank 9 is VACANT per Amendment #2.
+- Inserting SceneManager at rank 7 would push HeroRoster to rank 8 = a REORDER = **forbidden** per §Editing Protocol without a superseding ADR.
+- Claiming rank 8 (VACANT slot) is explicitly **allowed** per §Editing Protocol: "leaving slots vacant is preferable to a reorder; claiming a vacant slot is permitted."
+
+**Decision**: SceneManager is assigned rank 8 (Foundation layer). This closes OQ-8.
+
+**Impact**:
+- Rank table in `architecture.md` §Autoload Rank Table updated: rank 8 row changed from `[VACANT]` to `SceneManager (Foundation)`.
+- Rank 9 remains vacant (Amendment #2 footnote updated from "ranks 8 and 9 are vacant" to "rank 9 is vacant").
+- `project.godot [autoload]` — `SceneManager` entry added after `BiomeDungeonDatabase` (last entry in the current autoload section, satisfying rank-8 position).
+- Amendment #2's "non-autoload modules occupy these slots" rationale is superseded for rank 8 only; rank 9 retains the Amendment #2 vacant designation.
+- `SceneManager` is NOT a Save/Load consumer — no `CONSUMER_PATHS` change needed.
+- Lockstep edit is complete: (a) this ADR amended, (b) `architecture.md` updated, (c) `project.godot` updated.

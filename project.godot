@@ -14,6 +14,7 @@ config/name="Lantern Guild"
 config/description="Cozy fantasy idle-clicker — hero roster, dungeon runs, offline progression."
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
+run/main_scene="res://src/core/scene_manager/MainRoot.tscn"
 
 [autoload]
 
@@ -27,6 +28,9 @@ Economy="*res://src/core/economy/economy.gd"
 HeroClassDatabase="*res://src/core/hero_class_database/hero_class_database.gd"
 EnemyDatabase="*res://src/core/enemy_database/enemy_database.gd"
 BiomeDungeonDatabase="*res://src/core/biome_dungeon_database/biome_dungeon_database.gd"
+HeroRoster="*res://src/core/hero_roster/hero_roster.gd"
+SceneManager="*res://src/core/scene_manager/scene_manager.gd"
+DungeonRunOrchestrator="*res://src/core/dungeon_run_orchestrator/dungeon_run_orchestrator.gd"
 
 [display]
 

@@ -1,0 +1,46 @@
+[gd_scene load_steps=2 format=3 uid="uid://mainroot_persistent"]
+
+[ext_resource type="Script" path="res://src/core/scene_manager/main_root.gd" id="1_mainroot"]
+
+[node name="MainRoot" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_mainroot")
+
+[node name="PersistentHUDLayer" type="CanvasLayer" parent="."]
+process_mode = 3
+layer = 10
+
+[node name="ScreenContainer" type="Node" parent="."]
+process_mode = 1
+
+[node name="TransitionLayer" type="CanvasLayer" parent="."]
+process_mode = 3
+layer = 100
+
+[node name="Fade" type="ColorRect" parent="TransitionLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+modulate = Color(1, 1, 1, 0)
+
+[node name="InputBlock" type="Control" parent="TransitionLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="OverlayLayer" type="CanvasLayer" parent="."]
+process_mode = 3
+layer = 110

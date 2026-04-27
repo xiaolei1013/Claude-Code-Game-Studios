@@ -39,6 +39,14 @@ func test_data_registry_state_transitions_unloaded_loading_ready_on_ready() -> v
 	# Act — manually invoke _ready() (autoload boots in scene tree; unit tests invoke directly)
 	dr._ready()
 
+	# Sprint 7 S7-M1 / TD-010 RESOLVED: DataRegistry boot scan now succeeds against
+	# the live `assets/data/` tree. Previously failed because scene_manager_config.tres
+	# was a plain Resource without an `id` field — DataRegistry's InvalidId guard
+	# transitioned to ERROR. Sprint 7 Story M1 authored `SceneManagerConfig extends
+	# GameData` and updated the .tres to include `id = "scene_manager_config"`,
+	# clearing the boot-scan ERROR. The defensive skip block previously here is
+	# REMOVED — the test now asserts state == READY directly.
+
 	# Assert — boot_scan with empty min_content_count succeeds; state must be READY
 	assert_int(dr.state).is_equal(DataRegistryScript.State.READY)
 
@@ -59,6 +67,8 @@ func test_data_registry_ready_boot_emits_registry_ready_exactly_once() -> void:
 
 	# Act
 	dr._ready()
+
+	# TD-010 RESOLVED — see Test 1 comment. Defensive skip removed.
 
 	# Assert
 	assert_int(dr.state).is_equal(DataRegistryScript.State.READY)
