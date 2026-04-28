@@ -2,6 +2,32 @@
 
 [ext_resource type="Script" path="res://assets/screens/dungeon_run_view/dungeon_run_view.gd" id="1_dungeon_run_view"]
 
+; DungeonRunView — full-rect anchored Control (extends Screen) per ADR-0007.
+;
+; Layout:
+;   DungeonRunView (Control, full-rect)
+;     HeaderLabel              — localized title; text set in _ready() via tr()
+;     StatsPanel (VBoxContainer)
+;       TickRow (HBoxContainer)
+;         TickPrefixLabel      — "Tick:" static; set once in _ready() via tr()
+;         TickLabel            — live value; updated per _on_tick_fired (20 Hz)
+;       KillCountRow (HBoxContainer)
+;         KillCountPrefixLabel — "Kills:" static; set once in _ready() via tr()
+;         KillCountLabel       — live value; updated per _on_tick_fired (20 Hz)
+;     RunEndOverlay (PanelContainer) — hidden by default; shown on RUN_ENDED
+;       RunEndLabel            — receives tr("run_complete_kill_count_format") % kills
+;
+; mouse_filter rules (ADR-0008):
+;   - Labels: MOUSE_FILTER_PASS (1) — text does not intercept taps
+;   - Containers (VBoxContainer, HBoxContainer, PanelContainer): MOUSE_FILTER_PASS (1)
+;   - Root Control: MOUSE_FILTER_PASS (1) — display-only screen; no tap interception
+;
+; No interactive Controls in Sprint 8 VS (display-only screen). If a Continue
+; Button is added in a future sprint it MUST call UIFramework.assert_tap_target_min.
+;
+; No Color() literals. No per-screen Theme. Colors via MainRoot.theme cascade.
+; No focus_neighbor_* or FOCUS_ALL — keyboard nav suppressed per ADR-0008.
+
 [node name="DungeonRunView" type="Control"]
 layout_mode = 3
 anchors_preset = 15
@@ -9,20 +35,84 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 1
 script = ExtResource("1_dungeon_run_view")
 
-[node name="Label" type="Label" parent="."]
+[node name="HeaderLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -100.0
+offset_right = 100.0
+offset_top = 16.0
+offset_bottom = 48.0
+grow_horizontal = 2
+mouse_filter = 1
+horizontal_alignment = 1
+text = ""
+
+[node name="StatsPanel" type="VBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -100.0
-offset_top = -16.0
-offset_right = 100.0
-offset_bottom = 16.0
+offset_left = -120.0
+offset_top = -40.0
+offset_right = 120.0
+offset_bottom = 40.0
 grow_horizontal = 2
 grow_vertical = 2
-text = "Dungeon Run View (placeholder)"
+mouse_filter = 1
+
+[node name="TickRow" type="HBoxContainer" parent="StatsPanel"]
+layout_mode = 2
+mouse_filter = 1
+
+[node name="TickPrefixLabel" type="Label" parent="StatsPanel/TickRow"]
+layout_mode = 2
+mouse_filter = 1
+text = ""
+
+[node name="TickLabel" type="Label" parent="StatsPanel/TickRow"]
+layout_mode = 2
+mouse_filter = 1
+text = "0"
+
+[node name="KillCountRow" type="HBoxContainer" parent="StatsPanel"]
+layout_mode = 2
+mouse_filter = 1
+
+[node name="KillCountPrefixLabel" type="Label" parent="StatsPanel/KillCountRow"]
+layout_mode = 2
+mouse_filter = 1
+text = ""
+
+[node name="KillCountLabel" type="Label" parent="StatsPanel/KillCountRow"]
+layout_mode = 2
+mouse_filter = 1
+text = "0"
+
+[node name="RunEndOverlay" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -160.0
+offset_top = -60.0
+offset_right = 160.0
+offset_bottom = 60.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="RunEndLabel" type="Label" parent="RunEndOverlay"]
+layout_mode = 2
+mouse_filter = 1
 horizontal_alignment = 1
+text = ""

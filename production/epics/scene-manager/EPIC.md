@@ -1,11 +1,11 @@
 # Epic: Scene Manager
 
-> **Layer**: Foundation
+> **Layer**: Foundation (kernel) + Presentation (concrete screens, Stories 011–013)
 > **GDD**: `design/gdd/scene-screen-manager.md`
-> **Architecture Module**: `SceneManager` (autoload rank ≥6, OQ-8 unassigned)
-> **Control Manifest Version**: 2026-04-24
+> **Architecture Module**: `SceneManager` (autoload rank 8 per ADR-0003 Amendment #4)
+> **Control Manifest Version**: 2026-04-26
 > **Status**: Ready
-> **Stories**: 10 defined (all Ready)
+> **Stories**: 13 defined (Stories 001–010 = SM kernel; Stories 011–013 = first concrete screens for Sprint 8 VS)
 
 ## Overview
 
@@ -97,8 +97,13 @@ This epic is complete when:
 | 008 | `scene_boundary_persist` narrow trigger + `save_failed` abort path + cozy modal | Integration | Ready | ADR-0007 (+ ADR-0004) |
 | 009 | `reduce_motion` accessibility flag + offline-replay cozy-modal coordination | Integration | Ready | ADR-0007 (+ ADR-0014, ADR-0008) |
 | 010 | Edge cases (input-block, back-to-back queue, BG mid-transition) + performance verification (H-10, H-11, H-12) | Integration (Performance) | Ready | ADR-0007 (+ ADR-0008, ADR-0005) |
+| 011 | Formation Assignment Screen — picker + floor selector + Dispatch button (Sprint 8 S8-M1) | UI | Ready | ADR-0007 (+ ADR-0008) |
+| 012 | Dungeon Run View — live tick + kill_count display + RUN_ENDED overlay (Sprint 8 S8-M2) | UI | Ready | ADR-0007 (+ ADR-0008) |
+| 013 | Run-end → MainMenu transition (RUN_ENDED auto-route) (Sprint 8 S8-M3) | Integration | Ready | ADR-0007 |
 
-**Dependency chain**: 001 → 002 → {003 ∥ 004} → 005 → {006, 007} → 008 → 009 → 010. Stories 003 and 004 are parallelizable once 002 is done (003 calls the hooks; 004 declares them — contract-by-coordination). Stories 006 and 007 are parallelizable once 005 is done. Story 010 is the final verification across all prior invariants (H-04, H-05, H-09, H-10, H-11, H-12 evidence).
+**Dependency chain (kernel)**: 001 → 002 → {003 ∥ 004} → 005 → {006, 007} → 008 → 009 → 010. Stories 003 and 004 are parallelizable once 002 is done (003 calls the hooks; 004 declares them — contract-by-coordination). Stories 006 and 007 are parallelizable once 005 is done. Story 010 is the final verification across all prior invariants (H-04, H-05, H-09, H-10, H-11, H-12 evidence).
+
+**Dependency chain (Sprint 8 VS screens)**: 011 → 012 → 013. Story 011 (Formation Assignment) drives end-to-end dispatch. Story 012 (Dungeon Run View) needs 011 to reach a live ACTIVE_FOREGROUND run during integration tests. Story 013 (run-end auto-route) needs 012's run-end detection surface. All three depend only on already-Done kernel stories 003/004 — they DO NOT depend on 005–010 being complete (those are kernel polish and can land in parallel or after).
 
 ## Next Step
 

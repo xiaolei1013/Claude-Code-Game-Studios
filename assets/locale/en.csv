@@ -1,0 +1,15 @@
+keys,en
+formation_assignment_title,Formation
+formation_assignment_instructional_header,Send your guild to:
+slot_empty_label,Empty
+slot_selected_badge,Selected
+dispatch_button,Dispatch
+dispatch_error_empty_formation,Assign at least one hero to your formation.
+dispatch_error_floor_locked,That floor is locked.
+dispatch_error_generic,Something went wrong. Try again.
+recruit_a_hero_label,Recruit a hero to begin.
+floor_label_forest_reach_1,Forest Reach — Floor 1
+dungeon_run_view_title,Dungeon Run
+tick_label_prefix,Tick:
+kill_count_label_prefix,Kills:
+run_complete_kill_count_format,Run Complete — %d kills

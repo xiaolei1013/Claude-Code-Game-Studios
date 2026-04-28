@@ -22,7 +22,11 @@ func test_hero_roster_autoload_node_resolves() -> void:
 func test_hero_roster_heroes_field_is_dictionary() -> void:
 	var hr: Node = get_tree().root.get_node_or_null("HeroRoster")
 	assert_object(hr).is_not_null()
-	# Dictionary type and empty at boot (no auto-seed; Story 008 owns first-launch seed)
+	# Reset to empty-roster state (Sprint 8 S8-M4 hotfix wired call_deferred
+	# seed in autoload _ready, so the live autoload may have Theron seeded by
+	# the time tests run. Reset for skeleton-shape verification per ADR-0003).
+	hr.load_save_data({"heroes": [], "formation_slots": [0, 0, 0], "next_instance_id": 1})
+	# Dictionary type, empty after reset
 	assert_bool(hr._heroes is Dictionary).is_true()
 	assert_int((hr._heroes as Dictionary).size()).is_equal(0)
 
@@ -34,9 +38,11 @@ func test_hero_roster_heroes_field_is_dictionary() -> void:
 func test_hero_roster_formation_slots_is_array_of_int_size_three() -> void:
 	var hr: Node = get_tree().root.get_node_or_null("HeroRoster")
 	assert_object(hr).is_not_null()
+	# Reset to empty-roster state (see test_hero_roster_heroes_field_is_dictionary).
+	hr.load_save_data({"heroes": [], "formation_slots": [0, 0, 0], "next_instance_id": 1})
 	var slots: Array = hr._formation_slots
 	assert_int(slots.size()).is_equal(3)
-	# All slots are 0 (empty) at boot
+	# All slots are 0 (empty) after reset
 	for slot in slots:
 		assert_int(slot).is_equal(0)
 
@@ -48,6 +54,8 @@ func test_hero_roster_formation_slots_is_array_of_int_size_three() -> void:
 func test_hero_roster_next_instance_id_starts_at_one() -> void:
 	var hr: Node = get_tree().root.get_node_or_null("HeroRoster")
 	assert_object(hr).is_not_null()
+	# Reset to empty-roster state (see test_hero_roster_heroes_field_is_dictionary).
+	hr.load_save_data({"heroes": [], "formation_slots": [0, 0, 0], "next_instance_id": 1})
 	# Value 1 — monotonic positive; first add_hero (Story 004) will assign id=1
 	# then increment to 2 AFTER success.
 	assert_int(hr._next_instance_id).is_equal(1)

@@ -199,6 +199,50 @@ func test_get_formation_heroes_skips_orphan_slot_ids() -> void:
 
 
 # ===========================================================================
+# Group B-2: get_formation_slot — per-slot read accessor (Story 011 closure)
+# ===========================================================================
+# Documented as public API in design/gdd/hero-roster.md §C Rule 10 for the
+# Formation Assignment Screen (#23). Added in Story 011 to replace direct
+# _formation_slots reads from screen code.
+
+func test_hero_roster_get_formation_slot_returns_id_for_occupied_slot() -> void:
+	# Arrange
+	var hr: Node = _make_fresh_roster()
+	_inject_hero(hr, 1, "warrior", 5)
+	_inject_hero(hr, 2, "mage", 3)
+	hr._formation_slots.assign([1, 2, 0])
+
+	# Act + Assert
+	assert_int(hr.get_formation_slot(0)).is_equal(1)
+	assert_int(hr.get_formation_slot(1)).is_equal(2)
+	assert_int(hr.get_formation_slot(2)).is_equal(0)  # explicit empty
+
+
+func test_hero_roster_get_formation_slot_returns_zero_for_empty_slot() -> void:
+	# Arrange
+	var hr: Node = _make_fresh_roster()
+	hr._formation_slots.assign([0, 0, 0])
+
+	# Act + Assert
+	assert_int(hr.get_formation_slot(0)).is_equal(0)
+	assert_int(hr.get_formation_slot(1)).is_equal(0)
+	assert_int(hr.get_formation_slot(2)).is_equal(0)
+
+
+func test_hero_roster_get_formation_slot_out_of_range_returns_zero() -> void:
+	# Arrange
+	var hr: Node = _make_fresh_roster()
+	_inject_hero(hr, 1, "warrior", 5)
+	hr._formation_slots.assign([1, 0, 0])
+
+	# Act + Assert — out-of-range returns 0 rather than raising (defensive
+	# contract, matching set_formation_slot's bounds-check behavior).
+	assert_int(hr.get_formation_slot(-1)).is_equal(0)
+	assert_int(hr.get_formation_slot(3)).is_equal(0)
+	assert_int(hr.get_formation_slot(99)).is_equal(0)
+
+
+# ===========================================================================
 # Group C: TR-026 — get_all_heroes default BY_CLASS sort
 # ===========================================================================
 

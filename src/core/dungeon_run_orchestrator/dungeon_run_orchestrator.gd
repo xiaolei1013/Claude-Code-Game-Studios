@@ -87,6 +87,21 @@ var _combat_snapshot: RefCounted = null
 ## TR-orchestrator-026, TR-orchestrator-027
 signal validation_failed(reason: String, payload: Dictionary)
 
+## Emitted by [method _set_state] after every state assignment where the new
+## state differs from the prior state ([code]new_state != old_state[/code]).
+##
+## Consumers (e.g., DungeonRunView) subscribe to detect state transitions such
+## as ACTIVE_FOREGROUND → RUN_ENDED without polling [member state] per tick.
+## The signal fires AFTER [member state] is written to [param new_state], so
+## listeners observe the current value via [member state].
+##
+## [param new_state]: the state that was just entered (matches [member state]
+## at the time the signal fires).
+## [param old_state]: the state that was just exited.
+##
+## Story 012 — AC-6 (preferred RUN_ENDED detection path over tick polling).
+signal state_changed(new_state: int, old_state: int)
+
 ## Sprint 8 S8-S3 (Story 006 — TR-025): per-kill notification signal. Emitted
 ## once per kill event during [method _process_kill_events]. Payload is the
 ## kill's tier (drives Economy's BASE_KILL[tier] table), the enemy archetype
@@ -400,6 +415,8 @@ func dispatch(formation: Array, floor_index: int, biome_id: String) -> void:
 func _set_state(new_state: int) -> void:
 	if new_state == state:
 		return  # No-op self-transition.
+	# Capture prior state BEFORE mutation so the signal payload is accurate.
+	var old_state: int = state
 	# Fire exit hooks for the OUTGOING state.
 	if state == DungeonRunStateScript.State.ACTIVE_FOREGROUND:
 		_exit_active_foreground()
@@ -407,6 +424,9 @@ func _set_state(new_state: int) -> void:
 	# Fire entry hooks for the INCOMING state.
 	if state == DungeonRunStateScript.State.ACTIVE_FOREGROUND:
 		_enter_active_foreground()
+	# Emit state_changed AFTER state is written and hooks are run so listeners
+	# observe the fully-settled new state (Story 012 AC-6).
+	state_changed.emit(new_state, old_state)
 
 
 ## Connects the [signal TickSystem.tick_fired] subscription. Called by

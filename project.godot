@@ -12,15 +12,16 @@ config_version=5
 
 config/name="Lantern Guild"
 config/description="Cozy fantasy idle-clicker — hero roster, dungeon runs, offline progression."
+run/main_scene="res://src/core/scene_manager/MainRoot.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
-run/main_scene="res://src/core/scene_manager/MainRoot.tscn"
 
 [autoload]
 
 BootNamespace="*res://src/core/boot_namespace/boot_namespace.gd"
 EngineBootstrap="*res://src/core/engine_bootstrap/engine_bootstrap.gd"
 RuntimeLocaleGuard="*res://src/core/runtime_locale_guard/runtime_locale_guard.gd"
+LocaleLoader="*res://src/core/locale_loader/locale_loader.gd"
 TickSystem="*res://src/core/tick_system/tick_system.gd"
 DataRegistry="*res://src/core/data_registry/data_registry.gd"
 SaveLoadSystem="*res://src/core/save_load_system/save_load_system.gd"

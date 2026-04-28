@@ -208,6 +208,20 @@ func _init() -> void:
 func _ready() -> void:
 	_load_config()
 	_resize_formation_slots()
+	# Sprint 8 S8-M4 hotfix: wire first-launch seed for the AUTOLOAD instance only.
+	# seed_first_launch_state() is the public Theron-seed function (S8-S5 closure)
+	# that was defined but never invoked at boot. Call deferred so it runs at
+	# end-of-frame, AFTER any same-frame load_save_data() calls populate
+	# _heroes from a saved game. The seed_first_launch_state() guard refuses
+	# to seed a non-empty roster, so this is idempotent and safe.
+	#
+	# Gate: only the autoload instance (resolvable as `/root/HeroRoster`) seeds.
+	# Test fixtures that instantiate fresh HeroRoster nodes via add_child do NOT
+	# match this guard, preserving the empty initial state required by unit tests.
+	if get_tree() != null and get_tree().root != null:
+		var autoload_node: Node = get_tree().root.get_node_or_null("HeroRoster")
+		if autoload_node == self:
+			call_deferred("seed_first_launch_state")
 
 
 ## Loads roster_config.tres via DataRegistry and validates it. On any failure,
@@ -621,6 +635,27 @@ func get_formation_heroes() -> Array:
 			continue
 		out.append(_heroes[slot_id])
 	return out
+
+
+## Returns the hero instance_id occupying formation slot [param slot_index],
+## or [code]0[/code] if the slot is empty or [param slot_index] is out of range.
+##
+## Documented as public API in design/gdd/hero-roster.md §C (Rule 10) for the
+## Formation Assignment Screen (#23). Out-of-range slot_index returns 0 rather
+## than raising — matches set_formation_slot's defensive validation contract.
+##
+## TR-hero-roster (formation slot read-accessor — companion to set_formation_slot)
+##
+## Example:
+##   [codeblock]
+##   var slot0_hero: int = HeroRoster.get_formation_slot(0)
+##   if slot0_hero != 0:
+##       var hero: HeroInstance = HeroRoster.get_hero(slot0_hero)
+##   [/codeblock]
+func get_formation_slot(slot_index: int) -> int:
+	if slot_index < 0 or slot_index >= _formation_slots.size():
+		return 0
+	return _formation_slots[slot_index]
 
 
 ## Returns all heroes in the roster, sorted per [param sort_mode].
