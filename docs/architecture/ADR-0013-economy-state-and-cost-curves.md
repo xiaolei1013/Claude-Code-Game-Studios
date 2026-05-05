@@ -925,4 +925,35 @@ Review mode `production/review-mode.txt = solo`. Per `.claude/docs/director-gate
 
 ## Amendments
 
-*(None yet.)*
+### Amendment #1 — 2026-05-05: Offline-replay per-chunk accumulator + flush_offline_signals method
+
+Per `design/gdd/offline-progression-engine.md` §F + OQ-OE-6: OfflineProgressionEngine drives multi-chunk offline replay. The original ADR-0013 design (`compute_offline_batch` emits ONE aggregate `gold_changed` at the end) assumed a single-call pattern. The OfflineProgressionEngine GDD requires a multi-call pattern (chunk → chunk → chunk → flush). This amendment adds the per-chunk accumulator + flush surface.
+
+**What changed**:
+
+1. **New private state**:
+   - `_offline_pending_delta: int = 0` — cumulative gold delta accumulated across chunks during a replay.
+   - `_offline_pending_first_clears: Array[int] = []` — floor indices that hit the first-clear gate during replay, queued for post-replay aggregate emission.
+
+2. **Per-call emit-site behavior change**:
+   - `add_gold` (line ~221): when `_is_offline_replay == true`, accumulates `actual_delta` into `_offline_pending_delta` instead of emitting `gold_changed`. Else: emits per-call as before.
+   - `try_spend` (line ~273): when `_is_offline_replay == true`, accumulates `-amount` into `_offline_pending_delta`. Else: emits per-call as before.
+   - `try_award_floor_clear` (line ~325): when `_is_offline_replay == true` AND `is_first == true`, appends `floor_index` to `_offline_pending_first_clears`. Else: emits `first_clear_awarded` per-call as before.
+   - **No behavior change for the non-replay (foreground) path** — every existing test against foreground emit semantics passes unchanged. The amendment is additive at the offline-replay boundary only.
+
+3. **New public method**:
+   - `flush_offline_signals() -> void` — emits ONE aggregate `gold_changed(balance, _offline_pending_delta, "offline_replay_aggregate")` (only if delta is non-zero), then `first_clear_awarded(floor_index)` for each accumulated floor (in insertion order), then clears all 3 accumulators (the delta, the first-clears, and the `_is_offline_replay` flag itself). Idempotent on empty accumulators (no-op + flag clears safely).
+
+4. **Cross-system contract**: OfflineProgressionEngine (rank 15, unimplemented) owns the call site for `flush_offline_signals()`. The engine sets `_is_offline_replay = true` before its chunk loop, calls `compute_offline_batch(chunk_size)` per chunk, and calls `flush_offline_signals()` AFTER all chunks. Signal suppression during replay is the performance budget mechanism (per OfflineProgressionEngine GDD §C.3 — naive per-tick `gold_changed` would consume 230 ms of dispatch overhead alone on a 576k-tick worst case).
+
+**Backward-compatibility**: The original ADR-0013 §C.6 doc-comment for `compute_offline_batch` stated "emits one aggregate `gold_changed` after replay completes" — this implied a single-call pattern where `compute_offline_batch` itself emits. With the multi-chunk pattern, that emit is now the responsibility of `flush_offline_signals` (called by OfflineProgressionEngine after the last chunk). When `compute_offline_batch` is implemented in Sprint 12+ Story 010, its body MUST NOT call `gold_changed.emit` directly — instead it accumulates into `_offline_pending_delta` (via the per-call mutation paths above) and relies on OfflineProgressionEngine to flush.
+
+**Forbidden-pattern surface unchanged**: ADR-0013's existing forbidden patterns (`hardcoded_balance_value_outside_economy_config`, `economy_reads_losing_run_state`, `economy_signal_emission_during_offline_replay`, `try_spend_with_non_positive_amount`) all hold. The new accumulator behavior is the IMPLEMENTATION of `economy_signal_emission_during_offline_replay` enforcement — instead of just suppressing, it accumulates for later aggregate emission.
+
+**Testing**: Sprint 11 S11-X6 ships a 12-test suite (`tests/unit/economy/flush_offline_signals_test.gd`) covering: per-call accumulation in offline replay; aggregate emit on flush; flush clears `_is_offline_replay` flag; idempotent flush on empty; non-replay behavior unchanged.
+
+**Lockstep edits**:
+- (a) This ADR amended ✓
+- (b) `economy.gd` modified ✓
+- (c) `economy-system.md` GDD §C.6 will be updated in lockstep with Sprint 12+ Story 010 (when `compute_offline_batch` body lands) — current GDD §C.6 documents the single-call pattern; the multi-chunk pattern is documented in OfflineProgressionEngine GDD §C.2.
+- (d) `forbidden_patterns.yaml` (CI) — no new patterns added; existing `economy_signal_emission_during_offline_replay` enforces correctly.

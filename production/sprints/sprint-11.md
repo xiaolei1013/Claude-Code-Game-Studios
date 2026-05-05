@@ -503,8 +503,37 @@ Closes the Recruitment GDD §F + OQ-RC-4 prereq for Sprint 12+ Recruitment Story
 
 **Remaining tractable autonomous prereqs** flagged in the 3 newly-authored GDDs:
 - ✓ HeroRoster.get_copies_owned (S11-X5 — done)
-- Economy.flush_offline_signals + ADR-0013 Amendment (~0.5d) — OfflineProgressionEngine GDD §F + OQ-OE-6
-- Orchestrator.flush_offline_signals (~0.25d) — OfflineProgressionEngine GDD §F + OQ-OE-6
+- ✓ Economy.flush_offline_signals + ADR-0013 Amendment #1 (S11-X6 — done)
+- DungeonRunOrchestrator.flush_offline_signals (~0.25d) — OfflineProgressionEngine GDD §F + OQ-OE-6
 - ADR-X04 authoring (Recruitment determinism) (~0.5d) — Recruitment GDD §J Story 0a
 
 Each is a single autonomous-friendly round (~30-45 min shape).
+
+### S11-X6 — Economy.flush_offline_signals + ADR-0013 Amendment #1 — DONE 2026-05-05
+
+Closes the OfflineProgressionEngine GDD §F + OQ-OE-6 prereq for the Economy half. The original ADR-0013 design (`compute_offline_batch` emits ONE aggregate `gold_changed` at the end) assumed a single-call pattern. OfflineProgressionEngine GDD §C.2 requires a multi-call pattern (chunk → chunk → chunk → flush). This story extends Economy to support both shapes.
+
+**What shipped — code**:
+- `src/core/economy/economy.gd`:
+  - New `_offline_pending_delta: int = 0` accumulator + `_offline_pending_first_clears: Array[int] = []` accumulator.
+  - 3 emit-site modifications (`add_gold` line ~221, `try_spend` line ~273, `try_award_floor_clear` line ~325): when `_is_offline_replay == true`, accumulate into the appropriate buffer instead of emitting per-call. **No behavior change for the non-replay foreground path** — every existing test against foreground emit semantics passes unchanged.
+  - New `flush_offline_signals() -> void` method: emits ONE aggregate `gold_changed(balance, _offline_pending_delta, "offline_replay_aggregate")` (only if delta non-zero), then `first_clear_awarded(floor_index)` for each accumulated floor in insertion order, then clears all 3 accumulators (delta + first-clears + `_is_offline_replay` flag). Idempotent on empty accumulators.
+
+**What shipped — docs**:
+- `docs/architecture/ADR-0013-economy-state-and-cost-curves.md` — new **Amendment #1** (2026-05-05) documenting the per-chunk accumulator + flush_offline_signals API + cross-system contract (OfflineProgressionEngine owns the call site) + backward-compatibility note (`compute_offline_batch` body in Sprint 12+ Story 010 must NOT emit `gold_changed` directly; relies on OfflineProgressionEngine to flush). Lockstep edit checklist documents 4 items: ADR ✓, code ✓, economy-system.md GDD §C.6 update deferred to Sprint 12+ Story 010, forbidden_patterns.yaml unchanged.
+
+**Verification**:
+- New unit suite `tests/unit/economy/flush_offline_signals_test.gd` — **13/13 PASS** (174ms total), 5 groups:
+  - Group A (2): non-replay path UNCHANGED — add_gold + try_spend emit per-call as before.
+  - Group B (3): per-call accumulation during offline replay — add_gold + try_spend + mixed both accumulate, no per-call signals fire.
+  - Group C (5): flush emits aggregate gold_changed (cumulative, "offline_replay_aggregate" reason); flush clears `_is_offline_replay`; flush clears `_offline_pending_delta`; zero-net-delta flush does NOT emit (no zero-noise); flush idempotent on empty accumulator.
+  - Group D (2): first_clear_awarded accumulation in order; mixed gold + first-clears flush both aggregates.
+  - Group E (1): public API method existence lock.
+- Full unit + integration sweep: **1219 / 1219 PASS, 0 errors / 0 failures** (was 1206 + 13 new tests).
+- **No regressions** in existing economy tests (autoload skeleton + add_gold + try_spend + try_award_floor_clear suites all green) — the additive amendment preserves foreground-path behavior exactly.
+
+**Sprint 11 progress after S11-X6**: 17 commits this session. Sprint 11: 3.5/4 Must Haves + 1/5 Should Haves + 9 bonus stories (007a + M3b + M3c + X1 + X2 + X3 + X4 + X5 + X6).
+
+**Remaining autonomous prereqs**:
+- DungeonRunOrchestrator.flush_offline_signals (~0.25d) — symmetric to S11-X6 but for orchestrator-side first-clear accumulation. Smaller scope.
+- ADR-X04 authoring (Recruitment determinism) (~0.5d) — picks OQ-RC-1/2/3 candidates.

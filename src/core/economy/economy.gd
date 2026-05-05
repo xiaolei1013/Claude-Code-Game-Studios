@@ -117,9 +117,32 @@ var _floor_clear_bonus_credited: Dictionary[int, int] = {}
 ## emissions are suppressed inside [method add_gold] and
 ## [method try_award_floor_clear] to avoid blowing the 500 ms offline budget
 ## on signal dispatch (ADR-0013 §C.6 — 230 ms dispatch cost at 576k ticks).
-## NOT persisted. Reset to false after compute_offline_batch completes.
+## NOT persisted. Reset to false after compute_offline_batch completes (or on
+## flush_offline_signals per ADR-0013 Amendment #1 / Sprint 11 S11-X6).
 ## ADR-0013 §Requirements — GDD §C.6
 var _is_offline_replay: bool = false
+
+## Cumulative gold delta accumulated during the current offline replay window.
+## Per ADR-0013 Amendment #1 (Sprint 11 S11-X6): when [member _is_offline_replay]
+## is true, add_gold + try_spend + try_award_floor_clear's gold side-effects
+## accumulate here instead of emitting [signal gold_changed] per-call. The
+## aggregate is flushed by [method flush_offline_signals] which emits ONE
+## [signal gold_changed] with the cumulative delta + reason
+## [code]"offline_replay_aggregate"[/code].
+##
+## Cleared by [method flush_offline_signals] post-emit.
+var _offline_pending_delta: int = 0
+
+## Floor indices pending [signal first_clear_awarded] aggregate emission per
+## ADR-0013 Amendment #1. When [member _is_offline_replay] is true and a
+## [method try_award_floor_clear] call matches the first-clear gate, the
+## floor_index is appended here instead of emitting per-call. Flushed in
+## insertion order by [method flush_offline_signals].
+##
+## Per OfflineProgressionEngine GDD §C.3 signal suppression policy:
+## first_clear_awarded fires POST-replay for each first-cleared floor in the
+## offline window (not per-chunk).
+var _offline_pending_first_clears: Array[int] = []
 
 ## Resolved EconomyConfig instance from DataRegistry. Populated in _ready().
 ## Null if DataRegistry has not yet reached READY state (e.g. during boot
@@ -195,7 +218,12 @@ func add_gold(amount: int) -> void:
 	else:
 		_gold_balance = projected
 	_lifetime_gold_earned += amount  # statistic — unclamped; takes the requested amount even if balance clamped
-	if not _is_offline_replay:
+	# ADR-0013 Amendment #1: during offline replay, accumulate the delta
+	# instead of emitting per-call. flush_offline_signals emits the aggregate
+	# post-replay.
+	if _is_offline_replay:
+		_offline_pending_delta += actual_delta
+	else:
 		gold_changed.emit(_gold_balance, actual_delta, "add_gold")
 
 
@@ -242,7 +270,10 @@ func try_spend(amount: int, reason: String) -> bool:
 	if _gold_balance < amount:
 		return false  # insufficient — no signal, no mutation (AC H-05)
 	_gold_balance -= amount
-	if not _is_offline_replay:
+	# ADR-0013 Amendment #1: accumulate negative delta during offline replay.
+	if _is_offline_replay:
+		_offline_pending_delta += -amount
+	else:
 		gold_changed.emit(_gold_balance, -amount, reason)
 	return true
 
@@ -291,8 +322,15 @@ func try_award_floor_clear(floor_index: int, bonus_amount: int) -> bool:
 	var is_first: bool = already == 0  # captured before add_gold mutates any state
 	add_gold(delta)  # routes through the canonical mutation site; updates lifetime
 	_floor_clear_bonus_credited[floor_index] = bonus_amount
-	if is_first and not _is_offline_replay:
-		first_clear_awarded.emit(floor_index)
+	# ADR-0013 Amendment #1: during offline replay, accumulate first-clear
+	# floor indices for post-replay aggregate emission (preserves
+	# OfflineProgressionEngine GDD §C.3 contract: first_clear_awarded fires
+	# POST-replay for each first-cleared floor in the offline window).
+	if is_first:
+		if _is_offline_replay:
+			_offline_pending_first_clears.append(floor_index)
+		else:
+			first_clear_awarded.emit(floor_index)
 	return true
 
 
@@ -317,6 +355,42 @@ func try_award_floor_clear(floor_index: int, bonus_amount: int) -> bool:
 ## ADR-0013 §Requirements — GDD §C.5, §C.6, §D.6 — ADR-X02
 func compute_offline_batch(tick_budget: int) -> OfflineResult:
 	return null  # Story 010
+
+
+## Drains per-chunk-suppressed offline-replay signals into single aggregate
+## emissions, then clears [member _is_offline_replay].
+##
+## Sprint 11 S11-X6 / ADR-0013 Amendment #1. Called by OfflineProgressionEngine
+## after the chunk-iteration loop completes per OfflineProgressionEngine GDD
+## §C.2 (rank 15 boot-time orchestrator). Per the GDD §C.3 signal-suppression
+## policy:
+##   - [signal gold_changed] fires ONCE with the cumulative delta (reason
+##     [code]"offline_replay_aggregate"[/code]) — only if the cumulative
+##     delta is non-zero (no zero-delta noise emit).
+##   - [signal first_clear_awarded] fires ONCE per accumulated floor index
+##     in the order they were appended.
+##   - [member _is_offline_replay] is cleared to [code]false[/code] AFTER
+##     the aggregate emissions (so any subscribers that re-enter Economy
+##     during the emission see the post-replay flag state).
+##
+## Idempotent: calling on an empty / already-flushed accumulator is a no-op
+## (no signals fire, flag clears safely).
+##
+## Sprint 12+ OfflineProgressionEngine implementation owns the call site;
+## this method is the API surface the engine binds against.
+##
+## ADR-0013 Amendment #1, OfflineProgressionEngine GDD §F (Story 0a).
+func flush_offline_signals() -> void:
+	# Aggregate gold_changed emit (only if non-zero — zero-delta is silent).
+	if _offline_pending_delta != 0:
+		gold_changed.emit(_gold_balance, _offline_pending_delta, "offline_replay_aggregate")
+	# Aggregate first_clear_awarded emits in insertion order.
+	for floor_index: int in _offline_pending_first_clears:
+		first_clear_awarded.emit(floor_index)
+	# Clear accumulators + replay flag.
+	_offline_pending_delta = 0
+	_offline_pending_first_clears.clear()
+	_is_offline_replay = false
 
 
 ## Returns the economy state for serialisation by SaveLoadSystem.
