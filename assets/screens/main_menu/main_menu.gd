@@ -4,9 +4,21 @@
 ## on main_menu after a RUN_ENDED auto-route (Story 013) can start another run
 ## without restarting the build. Sprint 9+ replaces this placeholder with the
 ## real MainMenu content (settings, credits, quit, etc.).
+##
+## Sprint 10 S10-M2: wires UIFramework touch feedback onto the dispatch button
+## (Art Bible §7 Animation Feel — 1.05× scale pulse for tap responsiveness).
 extends Screen
 
+const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
+
 @onready var _dispatch_nav_button: Button = $DispatchNavButton
+
+
+func _ready() -> void:
+	# Touch feedback is wired in _ready (one-time, .tscn-defined Button) so it
+	# survives screen re-entry without double-connection. UIFramework's meta
+	# sentinel makes wire_touch_feedback idempotent regardless of call site.
+	UIFrameworkScript.wire_touch_feedback(_dispatch_nav_button)
 
 
 func on_enter() -> void:

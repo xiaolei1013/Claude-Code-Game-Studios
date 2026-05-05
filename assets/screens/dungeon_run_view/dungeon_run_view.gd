@@ -51,6 +51,9 @@
 ##   stops firing — correct behavior; overlay closes before ticks resume.
 ##
 ## Story 012 — Sprint 8 S8-M2 | Story 013 — Sprint 8 S8-M3
+## Sprint 10 S10-M4: subscribes to HeroRoster.hero_leveled and surfaces a level-up
+## toast for the felt-progression moment (first time a hero levels up after a run).
+## Toast auto-dismisses after LEVEL_UP_TOAST_LIFETIME_SEC.
 extends Screen
 
 # ---------------------------------------------------------------------------
@@ -73,6 +76,11 @@ const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/d
 ## is now [0, 2000]; the Story 013 Sprint 8 constraint of [0, 350] is
 ## superseded by playtest evidence. See sprint-9.md S9-M2 closure note.
 const RUN_END_DWELL_MS: int = 1500
+
+## Lifetime in seconds for the S10-M4 level-up toast. AC: "auto-dismisses ~3s".
+## Pattern: 0–2.4 s held visible at full alpha; 2.4–3.0 s fade-out via Tween.
+const LEVEL_UP_TOAST_LIFETIME_SEC: float = 3.0
+const LEVEL_UP_TOAST_FADE_START_SEC: float = 2.4
 
 # ---------------------------------------------------------------------------
 # @onready node references (matched to .tscn node names)
@@ -160,6 +168,12 @@ func on_enter() -> void:
 	if not DungeonRunOrchestrator.state_changed.is_connected(_on_state_changed):
 		DungeonRunOrchestrator.state_changed.connect(_on_state_changed)
 
+	# Sprint 10 S10-M4: subscribe to HeroRoster.hero_leveled so the orchestrator's
+	# stub XP grant on floor-clear surfaces a player-visible toast. Disconnected
+	# in on_exit (AC-5 lifecycle hygiene). Idempotent via is_connected guard.
+	if not HeroRoster.hero_leveled.is_connected(_on_hero_leveled):
+		HeroRoster.hero_leveled.connect(_on_hero_leveled)
+
 	# Initial render — snap labels to the current snapshot (covers the case
 	# where this screen is shown after DISPATCHING has already begun and ticks
 	# have already advanced the snapshot before on_enter fires).
@@ -193,7 +207,16 @@ func on_enter() -> void:
 ## one frame after on_enter detected an already-RUN_ENDED state. Defers ensure
 ## the SceneManager has settled its current TRANSITIONING→IDLE before we kick
 ## off the next transition. Sprint 8 S8-M4 hotfix.
+##
+## Sprint 9 S9-M2 hotfix (2026-05-05): the fast path was bypassing
+## RUN_END_DWELL_MS — when combat resolves during FADE_TO_BLACK into this
+## screen, on_enter detects RUN_ENDED and routed straight to main_menu the next
+## frame, leaving the player no time to see the overlay or kill_count. Awaiting
+## the dwell here makes the fast path match the slow-path behavior in
+## _on_state_changed (line 299).
 func _deferred_run_end_route() -> void:
+	if RUN_END_DWELL_MS > 0:
+		await get_tree().create_timer(RUN_END_DWELL_MS / 1000.0).timeout
 	SceneManager.request_screen("main_menu", SceneManager.TransitionType.CROSS_FADE)
 
 
@@ -209,6 +232,10 @@ func on_exit() -> void:
 	# Disconnect state_changed.
 	if DungeonRunOrchestrator.state_changed.is_connected(_on_state_changed):
 		DungeonRunOrchestrator.state_changed.disconnect(_on_state_changed)
+
+	# Sprint 10 S10-M4: mirror the on_enter hero_leveled subscription.
+	if HeroRoster.hero_leveled.is_connected(_on_hero_leveled):
+		HeroRoster.hero_leveled.disconnect(_on_hero_leveled)
 
 
 ## Called by SceneManager when a modal overlay opens on top of this screen.
@@ -322,6 +349,74 @@ func _refresh_display() -> void:
 	_kill_count_label.text = str(orch_snapshot.kill_count)
 
 
+# ---------------------------------------------------------------------------
+# Sprint 10 S10-M4 — level-up toast (felt-progression moment)
+# ---------------------------------------------------------------------------
+
+## Handles [signal HeroRoster.hero_leveled] while the dungeon_run_view is
+## active. Resolves the hero's display_name from HeroRoster, formats a
+## localized toast string, and shows a transient Label that fades out and
+## queue_frees itself after [const LEVEL_UP_TOAST_LIFETIME_SEC].
+##
+## Multiple level-ups in close succession (e.g., a 3-hero formation all
+## leveling on the same floor clear) each get their own toast, vertically
+## stacked just below the header.
+##
+## Localization key: [code]"hero_level_up_toast_format"[/code]; falls back to
+## "%s reached level %d!" plain-format when the locale doesn't define the key.
+##
+## ADR-0008 §Touch parity: this toast is purely informational — no input
+## required to dismiss. mouse_filter is IGNORE so it never blocks tap-through.
+func _on_hero_leveled(instance_id: int, _old_level: int, new_level: int) -> void:
+	# Resolve display_name from the live roster. Defensive: if the hero is no
+	# longer in the roster (mid-run remove), skip the toast.
+	var display_name: String = ""
+	for hero: Variant in HeroRoster.get_all_heroes():
+		if hero == null:
+			continue
+		if "instance_id" in hero and int(hero.get("instance_id")) == instance_id:
+			if "display_name" in hero:
+				display_name = String(hero.get("display_name"))
+			break
+	if display_name.is_empty():
+		display_name = str(instance_id)
+
+	var toast: Label = Label.new()
+	toast.name = "LevelUpToast_%d" % instance_id
+	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# S10-N1: hoisted safe-format pattern via UIFramework.format_localized.
+	toast.text = UIFrameworkScript.format_localized(
+		"hero_level_up_toast_format", [display_name, new_level]
+	)
+	# Anchor to top-center, just below HeaderLabel; stack subsequent toasts
+	# below by counting existing live toasts.
+	toast.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	toast.position = Vector2(0, 56 + _live_level_up_toast_count() * 28)
+	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_child(toast)
+
+	# Held visible for FADE_START_SEC, then fade modulate.a from 1.0 → 0.0
+	# over the remaining lifetime, then queue_free. Tween is owned by the toast
+	# so it auto-cleans if the screen exits early (Tween freed with parent).
+	var tween: Tween = toast.create_tween()
+	tween.tween_interval(LEVEL_UP_TOAST_FADE_START_SEC)
+	tween.tween_property(
+		toast, "modulate:a", 0.0,
+		LEVEL_UP_TOAST_LIFETIME_SEC - LEVEL_UP_TOAST_FADE_START_SEC
+	)
+	tween.tween_callback(toast.queue_free)
+
+
+## Counts currently-live level-up toasts so newly-spawned toasts stack instead
+## of overlapping. A toast is "live" while it has not yet been queue_freed.
+func _live_level_up_toast_count() -> int:
+	var n: int = 0
+	for child: Node in get_children():
+		if child is Label and child.name.begins_with("LevelUpToast_"):
+			n += 1
+	return n
+
+
 ## Shows the run-end overlay with a localized summary containing the final
 ## kill_count. Sets [member _overlay_shown] so subsequent calls are no-ops.
 ##
@@ -335,14 +430,8 @@ func _refresh_display() -> void:
 ## requires no player input to continue — Story 013 owns the auto-route).
 func _show_run_end_overlay(final_kill_count: int) -> void:
 	_overlay_shown = true
-	# Safe format: in headless/test environments tr() returns the key string,
-	# which contains no '%d' specifier. Guard against the "not all arguments
-	# converted" error by only applying the '%' operator when the format string
-	# actually contains a format specifier. Fallback appends the count as a
-	# plain suffix so the overlay text is still human-readable.
-	var fmt: String = tr("run_complete_kill_count_format")
-	if "%" in fmt:
-		_run_end_label.text = fmt % final_kill_count
-	else:
-		_run_end_label.text = fmt + " " + str(final_kill_count)
+	# S10-N1: hoisted safe-format pattern via UIFramework.format_localized.
+	_run_end_label.text = UIFrameworkScript.format_localized(
+		"run_complete_kill_count_format", [final_kill_count]
+	)
 	_run_end_overlay.visible = true

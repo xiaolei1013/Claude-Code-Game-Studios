@@ -10,7 +10,7 @@ Accepted
 
 ## Last Verified
 
-2026-04-22
+2026-05-05 (TD-008 amendment — MainRoot type Node → Control)
 
 ## Decision Makers
 
@@ -108,12 +108,21 @@ Cross-GDD naming drift correction: architecture.md uses `SceneScreenManager` as 
 `MainRoot.tscn` is the always-loaded root scene containing four `CanvasLayer` children:
 
 ```
-MainRoot (Node)
+MainRoot (Control)                                 — extends Control (NOT Node) so the
+│                                                    `theme` property exists and the canonical
+│                                                    parchment_theme.tres cascades to every Control
+│                                                    descendant. ADR-0008 §Architecture diagram
+│                                                    requires `MainRoot.theme = preload(...)` which
+│                                                    is only available on Control / Window in Godot
+│                                                    4.x. Implementation: src/core/scene_manager/main_root.gd
+│                                                    `class_name MainRoot extends Control`.
 ├── PersistentHUDLayer  (CanvasLayer, layer=10)   — persistent HUD elements; PROCESS_MODE_ALWAYS
 ├── ScreenContainer     (Node)                     — current screen swapped here; PROCESS_MODE_PAUSABLE
 ├── TransitionLayer     (CanvasLayer, layer=100)   — transition compositing; always above screens; PROCESS_MODE_ALWAYS
 └── OverlayLayer        (CanvasLayer, layer=110)   — modal overlays above transitions; PROCESS_MODE_ALWAYS
 ```
+
+**Sprint 10 S10-S2 amendment (2026-05-05, TD-008)**: the diagram above previously read `MainRoot (Node)`. ADR-0008 §Architecture diagram + the actual `src/core/scene_manager/main_root.gd` implementation require `Control` so the theme cascade works. Existing implementation was already correct (Sprint 5 onward); this is a pure documentation fix. No code change required. The ScreenContainer remains a `Node` (it doesn't need theme; it's a swap point). The Layer children remain `CanvasLayer` (they correctly bypass Control's layout system for compositing).
 
 `current_screen` is exactly one Control-based Node child of `ScreenContainer`. Swapping calls:
 

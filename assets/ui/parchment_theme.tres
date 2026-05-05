@@ -1,9 +1,281 @@
-; Placeholder Theme resource — authored by the UI Framework epic.
-; This file exists solely so that the preload("res://assets/ui/parchment_theme.tres")
-; in main_root.gd resolves at boot without error (ADR-0008 §Parchment theme structure).
-; Real parchment palette, fonts, StyleBoxes, and color constants will be populated
-; by the UI Framework epic. Do NOT add content here manually.
+; parchment_theme.tres — canonical UI theme.
+;
+; Authored: Sprint 10 S10-M1 (2026-05-05).
+; Source of truth: design/art/art-bible.md §4 (palette) + §7 (typography / preserving warm miniature).
+; Architecture contract: docs/architecture/ADR-0008-ui-framework-dual-focus-parity-and-theme.md.
+;
+; Loaded once at boot via src/core/scene_manager/main_root.gd:
+;   theme = preload("res://assets/ui/parchment_theme.tres")
+; Cascades to every Control descendant of MainRoot.
+;
+; PALETTE (Art Bible §4 — hex → linear-srgb floats below):
+;   Guild Amber     #C8872A  Color(0.7843, 0.5294, 0.1647, 1)  player territory / pressed buttons
+;   Lantern Gold    #F2B83B  Color(0.9490, 0.7216, 0.2314, 1)  reward / hover accent / identity headers
+;   Parchment Cream #EDE0C4  Color(0.9294, 0.8784, 0.7686, 1)  panel ground
+;   Dusk Purple     #5B4A72  Color(0.3569, 0.2902, 0.4471, 1)  dungeon / disadvantage
+;   Moss Sage       #7A8C5E  Color(0.4784, 0.5490, 0.3686, 1)  forest / nature
+;   Ember Rust      #A84C2F  Color(0.6588, 0.2980, 0.1843, 1)  danger
+;   Slate Ink       #2C2838  Color(0.1725, 0.1569, 0.2196, 1)  typography / shadow / outline
+;
+; FONT STRATEGY (interim — pending TTF sourcing):
+;   ADR-0008 specifies info_font.ttf + identity_font.ttf at assets/ui/fonts/.
+;   These TTFs are not yet sourced. Theme uses SystemFont with humanist-serif and
+;   display-serif OS fallback chains so the visual identity reads correctly without
+;   a network/license dependency. When custom fonts are sourced (S10 follow-up or
+;   Sprint 12 polish), swap the SystemFont sub-resources for FontFile loads pointing
+;   at the new TTFs — no Theme key changes required.
+;
+; THEME VARIATIONS:
+;   ParchmentPanel    (PanelContainer)  warmer document panel with thicker border
+;   IdentityHeader    (Label)           illuminated-manuscript display tier (≥24px floor)
+;   SelectedSlotButton (Label)          formation_assignment "Selected" badge — Lantern Gold
+;                                       on Parchment Cream with Slate Ink outline.
+;                                       Referenced by formation_assignment.gd:245.
 
-[gd_resource type="Theme" format=3]
+[gd_resource type="Theme" load_steps=10 format=3]
+
+; --------------------------------------------------------------------------
+; Fonts (SystemFont fallback chains — see header note)
+; --------------------------------------------------------------------------
+
+[sub_resource type="SystemFont" id="info_font"]
+font_names = PackedStringArray("Iowan Old Style", "Palatino", "Palatino Linotype", "Georgia", "Cambria", "serif")
+subpixel_positioning = 1
+font_weight = 400
+
+[sub_resource type="SystemFont" id="identity_font"]
+font_names = PackedStringArray("Trajan Pro", "Cinzel", "Cardo", "EB Garamond", "Baskerville", "Hoefler Text", "serif")
+subpixel_positioning = 1
+font_weight = 600
+
+; --------------------------------------------------------------------------
+; Panel styleboxes
+; --------------------------------------------------------------------------
+
+; Default panel — neutral parchment ground with thin Slate Ink border.
+; Used by Panel + PanelContainer (default Control class).
+[sub_resource type="StyleBoxFlat" id="panel_default"]
+content_margin_left = 12.0
+content_margin_top = 10.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
+bg_color = Color(0.9294, 0.8784, 0.7686, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.1725, 0.1569, 0.2196, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+shadow_color = Color(0.1725, 0.1569, 0.2196, 0.12)
+shadow_size = 4
+shadow_offset = Vector2(0, 2)
+
+; ParchmentPanel theme variation — warmer document panel.
+; Thicker Slate Ink border + extra padding + soft warm vignette via shadow.
+; Use via panel.theme_type_variation = &"ParchmentPanel" or
+; UIFramework.apply_parchment_panel(panel) once that helper lands (S10-M2).
+[sub_resource type="StyleBoxFlat" id="panel_parchment"]
+content_margin_left = 18.0
+content_margin_top = 14.0
+content_margin_right = 18.0
+content_margin_bottom = 14.0
+bg_color = Color(0.9294, 0.8784, 0.7686, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.1725, 0.1569, 0.2196, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+shadow_color = Color(0.7843, 0.5294, 0.1647, 0.18)
+shadow_size = 8
+shadow_offset = Vector2(0, 3)
+
+; Overlay dim plate — Slate Ink at low alpha, used by OverlayLayer / run-end overlay
+; backgrounds. Per Art Bible §7 "lantern-underlit background": "60-70% opacity, desaturated".
+; Theme variation key: OverlayDimPlate (PanelContainer base).
+[sub_resource type="StyleBoxFlat" id="overlay_dim"]
+content_margin_left = 0.0
+content_margin_top = 0.0
+content_margin_right = 0.0
+content_margin_bottom = 0.0
+bg_color = Color(0.1725, 0.1569, 0.2196, 0.65)
+border_width_left = 0
+border_width_top = 0
+border_width_right = 0
+border_width_bottom = 0
+
+; --------------------------------------------------------------------------
+; Button styleboxes — four states (normal / hover / pressed / disabled).
+; focus state is suppressed by UIFramework.suppress_keyboard_focus per ADR-0008.
+; --------------------------------------------------------------------------
+
+; Normal — slightly settled cream (darker than panel ground so buttons read as
+; raised affordances on the parchment), thin Slate Ink border.
+[sub_resource type="StyleBoxFlat" id="btn_normal"]
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+bg_color = Color(0.8980, 0.8353, 0.7098, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.1725, 0.1569, 0.2196, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+; Hover (mouse-focus path of 4.6 dual-focus) — Lantern Gold border + subtle
+; expand_margin so the button appears to "warm up" without a scale tween.
+; Per Art Bible §7 Animation Feel: "warmth pulse, like a coal glowing with breath."
+[sub_resource type="StyleBoxFlat" id="btn_hover"]
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+bg_color = Color(0.8980, 0.8353, 0.7098, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9490, 0.7216, 0.2314, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+expand_margin_left = 1.0
+expand_margin_top = 1.0
+expand_margin_right = 1.0
+expand_margin_bottom = 1.0
+shadow_color = Color(0.9490, 0.7216, 0.2314, 0.25)
+shadow_size = 4
+
+; Pressed (tap state) — Guild Amber bg with Parchment Cream font_color for max
+; tactile feedback. Per ADR-0008 §Parchment theme structure.
+[sub_resource type="StyleBoxFlat" id="btn_pressed"]
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+bg_color = Color(0.7843, 0.5294, 0.1647, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.1725, 0.1569, 0.2196, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+; Disabled — desaturated cream with reduced alpha; font_disabled_color further
+; softens the text. Communicates "not actionable" without removing the button.
+[sub_resource type="StyleBoxFlat" id="btn_disabled"]
+content_margin_left = 16.0
+content_margin_top = 10.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+bg_color = Color(0.8627, 0.8275, 0.7373, 0.55)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.1725, 0.1569, 0.2196, 0.45)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+; --------------------------------------------------------------------------
+; Theme block — control-class color/font/style assignments + variations.
+; --------------------------------------------------------------------------
 
 [resource]
+default_font = SubResource("info_font")
+default_font_size = 16
+
+; ----- Label (default body label) --------------------------------------
+Label/colors/font_color = Color(0.1725, 0.1569, 0.2196, 1)
+Label/colors/font_outline_color = Color(0.9294, 0.8784, 0.7686, 0)
+Label/font_sizes/font_size = 16
+Label/constants/outline_size = 0
+
+; ----- RichTextLabel (uses default_color, not font_color) --------------
+RichTextLabel/colors/default_color = Color(0.1725, 0.1569, 0.2196, 1)
+RichTextLabel/font_sizes/normal_font_size = 16
+RichTextLabel/font_sizes/bold_font_size = 16
+RichTextLabel/font_sizes/italics_font_size = 16
+RichTextLabel/font_sizes/bold_italics_font_size = 16
+
+; ----- Button — full state coverage (focus suppressed at runtime) ------
+Button/colors/font_color = Color(0.1725, 0.1569, 0.2196, 1)
+Button/colors/font_hover_color = Color(0.7843, 0.5294, 0.1647, 1)
+Button/colors/font_pressed_color = Color(0.9294, 0.8784, 0.7686, 1)
+Button/colors/font_hover_pressed_color = Color(0.9294, 0.8784, 0.7686, 1)
+Button/colors/font_disabled_color = Color(0.1725, 0.1569, 0.2196, 0.5)
+Button/font_sizes/font_size = 18
+Button/styles/normal = SubResource("btn_normal")
+Button/styles/hover = SubResource("btn_hover")
+Button/styles/pressed = SubResource("btn_pressed")
+Button/styles/hover_pressed = SubResource("btn_pressed")
+Button/styles/disabled = SubResource("btn_disabled")
+
+; ----- CheckButton / OptionButton inherit Button styles (Godot defaults)
+
+; ----- Panel + PanelContainer ------------------------------------------
+Panel/styles/panel = SubResource("panel_default")
+PanelContainer/styles/panel = SubResource("panel_default")
+
+; ----- LineEdit (basic — covers any text-input use) --------------------
+LineEdit/colors/font_color = Color(0.1725, 0.1569, 0.2196, 1)
+LineEdit/colors/caret_color = Color(0.7843, 0.5294, 0.1647, 1)
+LineEdit/colors/selection_color = Color(0.9490, 0.7216, 0.2314, 0.45)
+LineEdit/font_sizes/font_size = 16
+
+; ----- Separators (Slate Ink hairlines) --------------------------------
+HSeparator/constants/separation = 8
+VSeparator/constants/separation = 8
+
+; --------------------------------------------------------------------------
+; Theme variations
+; --------------------------------------------------------------------------
+
+; ParchmentPanel — warmer document framing for primary screen panels.
+; Apply via panel.theme_type_variation = &"ParchmentPanel" or (post S10-M2)
+; UIFramework.apply_parchment_panel(panel).
+ParchmentPanel/base_type = &"PanelContainer"
+ParchmentPanel/styles/panel = SubResource("panel_parchment")
+
+; OverlayDimPlate — full-screen darkened plate for OverlayLayer / run-end overlay.
+; bg fills entire rect; child Control sets its own ParchmentPanel on top.
+OverlayDimPlate/base_type = &"PanelContainer"
+OverlayDimPlate/styles/panel = SubResource("overlay_dim")
+
+; IdentityHeader — illuminated-manuscript display tier. Used for biome titles,
+; victory banners, screen headers. ≥24px per Art Bible §7 typography floor;
+; this variation uses 32px.
+IdentityHeader/base_type = &"Label"
+IdentityHeader/fonts/font = SubResource("identity_font")
+IdentityHeader/font_sizes/font_size = 32
+IdentityHeader/colors/font_color = Color(0.9490, 0.7216, 0.2314, 1)
+IdentityHeader/colors/font_outline_color = Color(0.1725, 0.1569, 0.2196, 1)
+IdentityHeader/constants/outline_size = 2
+
+; SelectedSlotButton — formation_assignment "Selected" badge label.
+; Lantern Gold on Parchment Cream with Slate Ink outline = clear visual
+; differentiation from default Slate Ink slot text per S9-M1 closure note.
+; Sized to read at-a-glance without dominating the slot button.
+SelectedSlotButton/base_type = &"Label"
+SelectedSlotButton/fonts/font = SubResource("info_font")
+SelectedSlotButton/font_sizes/font_size = 16
+SelectedSlotButton/colors/font_color = Color(0.9490, 0.7216, 0.2314, 1)
+SelectedSlotButton/colors/font_outline_color = Color(0.1725, 0.1569, 0.2196, 1)
+SelectedSlotButton/constants/outline_size = 2

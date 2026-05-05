@@ -79,6 +79,21 @@ func _ready() -> void:
 	for btn: Variant in find_children("*", "Button", true, false):
 		UIFrameworkScript.assert_tap_target_min(btn as Control)
 
+	# S10-M2: apply ParchmentPanel theme variation to the three section panels
+	# so they pick up the warmer document framing from parchment_theme.tres
+	# (border, padding, warm vignette shadow). STANDARD pattern keeps the
+	# default mouse_filter — these panels are interactive containers that
+	# should still consume taps that miss their child controls.
+	UIFrameworkScript.apply_parchment_panel($RosterPanel)
+	UIFrameworkScript.apply_parchment_panel($FormationPanel)
+	UIFrameworkScript.apply_parchment_panel($FloorSelectorPanel)
+
+	# S10-M2: touch-feedback pulse on the static .tscn-defined buttons.
+	# Wired in _ready (one-time) so re-entry into on_enter doesn't re-wire;
+	# UIFramework's meta sentinel makes wire_touch_feedback idempotent anyway.
+	UIFrameworkScript.wire_touch_feedback(_dispatch_button)
+	UIFrameworkScript.wire_touch_feedback(_floor_button)
+
 
 # ---------------------------------------------------------------------------
 # Screen lifecycle hooks (ADR-0007 — all four MUST be declared)
@@ -197,6 +212,7 @@ func _refresh_roster_panel() -> void:
 		btn.pressed.connect(_on_hero_button_pressed.bind(hero.instance_id))
 		_roster_list.add_child(btn)
 		UIFrameworkScript.assert_tap_target_min(btn)
+		UIFrameworkScript.wire_touch_feedback(btn)
 
 
 ## Rebuilds the formation slot buttons from the live HeroRoster state.
@@ -230,6 +246,7 @@ func _refresh_formation_panel() -> void:
 		btn.pressed.connect(_on_slot_button_pressed.bind(i))
 		_slots_hbox.add_child(btn)
 		UIFrameworkScript.assert_tap_target_min(btn)
+		UIFrameworkScript.wire_touch_feedback(btn)
 		# S9-M1 active-slot affordance: add a "Selected" badge Label as a child
 		# of the active slot button. MOUSE_FILTER_IGNORE per ADR-0008 §mouse_filter
 		# defaults ("decorative TextureRects IGNORE") — taps pass straight through

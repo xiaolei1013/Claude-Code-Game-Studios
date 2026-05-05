@@ -151,6 +151,14 @@ Sprint 9 Must Have items B-1/B-2/B-3 are explicitly the gate-clearing work surfa
   - **STRUCTURAL LIMITATION**: Test #3 (control: dwell=0 completes in <2s) implemented as structural assertion only — `RUN_END_DWELL_MS` is a `const`, can't be runtime-overridden without var refactor. Documented in test comments.
 - ADR compliance: ADR-0007 lifecycle hooks intact; ADR-0010 combat snapshot untouched; documented deviation from Story 013 Sprint 8 AC-3.
 
+#### S9-M2 Hotfix Amendment — Fast-path dwell regression (2026-05-05)
+- **Discovered**: S9-M4 fresh-eyes playtest (2026-05-05) — runs still completed in <2s and kill_count was not visible despite RUN_END_DWELL_MS = 1500.
+- **Root cause**: `dungeon_run_view.gd` has two RUN_ENDED handlers. The slow path (`_on_state_changed`) had the dwell. The fast path (`on_enter` defensive branch added by S8-M4 hotfix when state == RUN_ENDED at mount time) called `_deferred_run_end_route` which fired `request_screen("main_menu")` one frame later — bypassing the dwell entirely. The playtester consistently hit the fast path because combat resolves faster than the FADE_TO_BLACK transition (~300ms) into dungeon_run_view.
+- **Why tests passed**: `run_pacing_minimum_duration_test.gd` Tests 1/2/4 emit `state_changed` AFTER the screen mounts (slow path). No test exercised the fast path until this hotfix.
+- **Fix**: `_deferred_run_end_route()` now awaits the same `RUN_END_DWELL_MS` timer before calling `request_screen`, making both paths converge. Single-file change at `assets/screens/dungeon_run_view/dungeon_run_view.gd:196-208`.
+- **Regression test added**: `tests/integration/dungeon_run_orchestrator/run_pacing_minimum_duration_test.gd::test_run_pacing_fast_path_dwell_holds_when_run_ended_at_on_enter` — sets state=RUN_ENDED before on_enter, asserts ≥1500ms elapsed before queued request appears. Pre-hotfix would fail at ~10-50ms; post-hotfix passes at ~1500ms.
+- **Verdict**: COMPLETE WITH NOTES (amended) — original AC met for slow path; fast path retroactively covered.
+
 ### S9-M3 — Locale CSV authoring — COMPLETE WITH NOTES (2026-04-28)
 - Verdict: **COMPLETE WITH NOTES**
 - Files: `assets/locale/en.csv` (NEW; 14 keys with EN values), `src/core/locale_loader/locale_loader.gd` (NEW; CSV → TranslationServer programmatic loader, ~80 lines), `project.godot` (registered `LocaleLoader` autoload after `RuntimeLocaleGuard`, before `TickSystem`), `tests/integration/scene_manager/formation_assignment_screen_test.gd` (key-passthrough assertion updated to accept translated value)

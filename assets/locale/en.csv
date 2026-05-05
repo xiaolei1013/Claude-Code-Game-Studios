@@ -13,3 +13,4 @@ dungeon_run_view_title,Dungeon Run
 tick_label_prefix,Tick:
 kill_count_label_prefix,Kills:
 run_complete_kill_count_format,Run Complete — %d kills
+hero_level_up_toast_format,%s reached level %d!

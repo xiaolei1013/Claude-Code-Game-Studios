@@ -8,12 +8,52 @@
 #
 # Covers: TR-orchestrator-023 (autoload + lazy-default), TR-orchestrator-024
 #         (3 DI setters + spy-injection-before-_ready).
+#
+# Sprint 10 S10-S4: live-autoload contamination cleanup. Several tests in
+# Group A / C / G read the live autoload at /root/DungeonRunOrchestrator and
+# assume it's in boot-fresh state (NO_RUN, null run_snapshot, default
+# resolvers). When this suite runs as part of the full gdUnit4 session,
+# earlier integration suites may have left the live autoload in a dispatched
+# state — breaking the assumption.
+#
+# Strategy: act as a hygiene barrier. before_test() resets the live autoload
+# to clean state (regardless of what inherited state we got). after_test()
+# resets again so this suite does NOT propagate any state we mutated to
+# downstream suites. Net effect: this suite is order-independent within the
+# session, and its presence in the run actively cleans up cross-suite
+# orchestrator contamination from earlier suites.
 extends GdUnitTestSuite
 
 const OrchestratorScript = preload("res://src/core/dungeon_run_orchestrator/dungeon_run_orchestrator.gd")
 const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/dungeon_run_state.gd")
 const DefaultMatchupResolverScript = preload("res://src/core/matchup_resolver/default_matchup_resolver.gd")
 const DefaultCombatResolverScript = preload("res://src/core/combat/default_combat_resolver.gd")
+
+
+# ---------------------------------------------------------------------------
+# Live-autoload reset helpers (Sprint 10 S10-S4)
+# ---------------------------------------------------------------------------
+
+func _reset_live_orchestrator_state() -> void:
+	# Reset the live autoload's mutable runtime state to NO_RUN + null
+	# run_snapshot. Resolvers and error_logger are left as-is because the
+	# lazy-default + DI tests in this suite construct fresh instances and do
+	# not rely on the live autoload's resolver slots. If a future test does
+	# rely on them, extend this reset to re-instantiate Default*Resolver and
+	# clear _error_logger to null.
+	var live: Node = get_tree().root.get_node_or_null("DungeonRunOrchestrator")
+	if live == null:
+		return
+	live.state = DungeonRunStateScript.State.NO_RUN
+	live.run_snapshot = null
+
+
+func before_test() -> void:
+	_reset_live_orchestrator_state()
+
+
+func after_test() -> void:
+	_reset_live_orchestrator_state()
 
 
 # ===========================================================================

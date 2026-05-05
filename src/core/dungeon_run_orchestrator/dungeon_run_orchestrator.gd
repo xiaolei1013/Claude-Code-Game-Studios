@@ -604,6 +604,18 @@ func _process_kill_events(events: Variant) -> void:
 			# re-entry from re-calling Economy (whose monotonic gate would block
 			# anyway, but skipping the call is cheaper).
 			run_snapshot.floor_clear_emitted = true
+			# Sprint 10 S10-M4: stub XP grant — +1 level per dispatched-formation
+			# hero on floor clear. Gated by the same Layer 2 floor_clear_emitted
+			# flag so within-dispatch re-entry does not double-grant. The grant
+			# uses HeroRoster.set_hero_level which clamps to level_cap and emits
+			# hero_leveled (UI subscribers route that into a level-up toast).
+			# Stub formula; Sprint 11 replaces with proper XP-based curve.
+			# Roster is dependency-injected so unit tests can pass a fresh
+			# HeroRoster instance instead of mutating the live autoload.
+			var roster_for_grant: Node = (
+				get_node_or_null("/root/HeroRoster") if get_tree() != null else null
+			)
+			_grant_stub_levels_to_formation(roster_for_grant)
 			# Signal fires only on genuine first-ever-clear (Economy gated).
 			# Subsequent dispatches that re-clear the same floor see awarded=false
 			# and DO NOT fire the player-facing fanfare — a critical UX rule per
@@ -639,6 +651,63 @@ func attribute_kill_gold(tier: int, advantaged: bool, losing_run: bool) -> int:
 	var matchup_mult: float = MATCHUP_MULT_ADV if advantaged else MATCHUP_MULT_DIS
 	var loot_factor: float = LOSING_RUN_LOOT_FACTOR if losing_run else 1.0
 	return floori(float(base) * matchup_mult * loot_factor)
+
+
+## Sprint 10 S10-M4 — stub XP grant.
+##
+## Grants +1 level to every hero in the dispatched formation on a successful
+## floor clear. Resolves the live HeroRoster autoload (test-env safe via
+## get_node_or_null guard) and calls [code]set_hero_level(id, current_level + 1)[/code]
+## per hero. [member HeroRoster.set_hero_level] handles level_cap clamping and
+## emits [signal HeroRoster.hero_leveled] which the dungeon_run_view toast
+## subscribes to (S10-M4 UI half).
+##
+## Caller must gate this with the Layer 2 [code]run_snapshot.floor_clear_emitted[/code]
+## flag so within-dispatch re-entry does not double-grant.
+##
+## Scope (stub): flat +1 per clear regardless of run outcome. Sprint 11 replaces
+## this with a proper XP-based progression curve per the economy/progression GDD.
+## The S10-M4 risk-register entry explicitly authorizes this scope-reduction:
+## "If grant logic absent, scope-reduce to 'feedback only on a stub-grant' —
+## defer real grant formula to Sprint 11 alongside save-persist work."
+func _grant_stub_levels_to_formation(roster: Node) -> void:
+	if run_snapshot == null:
+		return
+	var fs: Dictionary = run_snapshot.formation_snapshot
+	var ids_v: Variant = fs.get("instance_ids", [])
+	if not (ids_v is Array):
+		return
+	var ids: Array = ids_v as Array
+	if ids.is_empty():
+		return
+	if roster == null:
+		return
+	if not roster.has_method("set_hero_level") or not roster.has_method("get_all_heroes"):
+		return
+	# Build {id → current_level} once (avoid one tree-traversing get_all_heroes
+	# call per hero in the formation; engine-code rule: no repeated tree queries
+	# inside a loop).
+	var level_by_id: Dictionary = {}
+	for hero: Variant in roster.get_all_heroes():
+		if hero == null:
+			continue
+		if not ("instance_id" in hero) or not ("current_level" in hero):
+			continue
+		level_by_id[int(hero.get("instance_id"))] = int(hero.get("current_level"))
+	for hero_id_v: Variant in ids:
+		var hero_id: int = int(hero_id_v)
+		# instance_id 0 represents an empty slot — skip.
+		if hero_id == 0:
+			continue
+		if not level_by_id.has(hero_id):
+			# Hero may have been removed from the roster between dispatch and
+			# clear (no MVP UI path produces this, but defensive against future
+			# remove_hero-during-run use cases).
+			continue
+		var cur_lvl: int = int(level_by_id[hero_id])
+		# set_hero_level clamps to level_cap; +1 past cap is a no-op + warning
+		# at the HeroRoster layer, which is the desired behavior.
+		roster.set_hero_level(hero_id, cur_lvl + 1)
 
 
 # ---------------------------------------------------------------------------

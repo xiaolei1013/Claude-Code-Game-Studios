@@ -1,11 +1,25 @@
 # Story 016: Save-persist pipeline end-to-end — full envelope + heartbeat + scene-boundary trigger
 
 > **Epic**: save-load-system
-> **Status**: Ready
+> **Status**: BLOCKED (2026-05-05) — see "Block Reason" below
 > **Layer**: Foundation
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26
-> **Sprint Mapping**: S9-S1 (sprint-9.md "Save-persist pipeline end-to-end")
+> **Sprint Mapping**: S9-S1 (sprint-9.md) → S10-M1 (sprint-10.md initial draft) → **deferred to Sprint 11** (revised 2026-05-05 after `/dev-story` Phase 2 discovery)
+
+## Block Reason — added 2026-05-05 by /dev-story
+
+The "Dependencies" section below claims Stories 007/008/011/012 are Complete. **Code state contradicts this**:
+
+- `src/core/save_load_system/save_load_system.gd:925` — `_on_scene_boundary_persist` body is `pass  # Story 012 (scene-boundary persist)` (Story 012 STUB, not Complete)
+- `src/core/tick_system/tick_system.gd:196` — `# TODO(heartbeat)` comment; heartbeat accumulator does not exist; no caller wires `request_heartbeat_persist` (Story 011 NOT IMPLEMENTED)
+- `src/core/scene_manager/scene_manager.gd:148` — `scene_boundary_persist` signal declared; `:147` comment says "Story 008 implements emission" (Story 008 emission status unverified)
+
+This story's 2.0-day estimate assumed all wiring already existed. Realistic scope to actually land save-persist end-to-end is 5–7 days because Stories 011 + 012 (and possibly 008) need to ship first.
+
+**Resolution**: deferred to Sprint 11 as a focused save-persist workstream (target stories: 008 verification + 011 + 012 + 016 + 009). See sprint-10.md "Sprint 11 reservation" section and sprint-11.md (when authored).
+
+**Original story content below is preserved verbatim — re-evaluate when this story un-blocks.**
 
 ## Context
 

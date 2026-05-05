@@ -1,23 +1,20 @@
-## UIFramework — Sprint 8 minimum stub per ADR-0008.
+## UIFramework — non-autoload static helper module (class_name UIFramework).
 ##
-## Non-autoload static helper module (class_name UIFramework). NOT registered in
-## the ADR-0003 rank table. Accessed via UIFramework.method_name() static calls.
-## No Node, no _ready(), no signals from the framework itself.
+## NOT registered in the ADR-0003 rank table. Accessed via
+## UIFramework.method_name() static calls. No Node, no _ready(), no signals
+## from the framework itself.
 ##
-## Sprint 8 VS scope: implements the two helpers required by Story 011
-## (FormationAssignment screen). Full surface documented in ADR-0008 §Module
-## structure; remaining helpers are deferred to the UIFramework authoring epic.
-##
-## ## TODO (ADR-0008 Required Patterns — post Story 011):
-## - `apply_parchment_panel(panel, pattern)` — theme_type_variation binder for
-##   ParchmentPanel / DECORATIVE panels. Blocked on parchment_theme.tres content
-##   authoring (empty Theme placeholder for Sprint 8 VS).
-## - `wire_touch_feedback(control)` — 1.05× scale pulse, 80 ms, 1-frame return.
-##   Blocked on Art Bible §7 Animation Feel integration pass (post Sprint 8).
+## Public API (ADR-0008 §Module structure):
+##   - assert_tap_target_min(control)         — debug-only 44×44 tap-target check
+##   - suppress_keyboard_focus(root)          — single-focus-mode walk
+##   - apply_parchment_panel(panel, pattern)  — ParchmentPanel theme variation binder
+##   - wire_touch_feedback(control)           — 1.05× scale pulse, 80 ms, 1-frame return
 ##
 ## Governing ADR: ADR-0008 (§Module structure, §Tap-target enforcement,
-##                            §Single-focus-mode strategy)
-## Story: Story 011 — Formation Assignment Screen
+##                            §Single-focus-mode strategy, §Touch feedback)
+## History: Sprint 8 Story 011 (assert_tap_target_min + suppress_keyboard_focus);
+##          Sprint 10 S10-M2 (apply_parchment_panel + wire_touch_feedback —
+##          unblocked once parchment_theme.tres content was authored in S10-M1).
 class_name UIFramework
 
 # ---------------------------------------------------------------------------
@@ -32,6 +29,33 @@ class_name UIFramework
 ##
 ## ADR-0008 §Tap-target enforcement
 const MIN_TAP_TARGET_LOGICAL_PX: int = 44
+
+## Touch-feedback pulse magnitude. Per Art Bible §7 Animation Feel:
+## "scale pulse of approximately 1.05× for 80ms, followed by return to 1.0×".
+const TOUCH_PULSE_SCALE: Vector2 = Vector2(1.05, 1.05)
+
+## Touch-feedback pulse expand duration in seconds (80 ms).
+const TOUCH_PULSE_EXPAND_SEC: float = 0.08
+
+## Touch-feedback pulse return duration in seconds (~1 frame at 60 fps).
+const TOUCH_PULSE_RETURN_SEC: float = 0.016
+
+## Meta-key sentinel that marks a Control as already wired for touch feedback.
+## Prevents double-connection if [code]wire_touch_feedback[/code] is called more
+## than once on the same Control (e.g., across re-entry into a screen's
+## [code]on_enter()[/code]). Lambdas connected to a signal have no stable
+## identity for [code]is_connected[/code] checks, so a meta sentinel is the
+## simplest idempotency guard.
+const _TOUCH_FEEDBACK_META: StringName = &"ui_framework_touch_feedback_wired"
+
+## ParchmentPanel application pattern.
+## - [code]STANDARD[/code]: panel intercepts taps (mouse_filter unchanged from
+##   the panel's own setting; defaults to STOP for PanelContainer).
+## - [code]DECORATIVE[/code]: purely-visual panel that should not intercept
+##   taps; mouse_filter is forced to PASS so child controls receive input.
+##
+## ADR-0008 §apply_parchment_panel.
+enum PanelPattern { STANDARD, DECORATIVE }
 
 
 # ---------------------------------------------------------------------------
@@ -109,3 +133,156 @@ static func suppress_keyboard_focus(root: Control) -> void:
 			continue
 		if ctrl is BaseButton:
 			ctrl.focus_mode = Control.FOCUS_NONE
+
+
+# ---------------------------------------------------------------------------
+# Parchment-panel binder
+# ---------------------------------------------------------------------------
+
+## Applies the [code]ParchmentPanel[/code] theme variation to [param panel] and
+## sets the [code]mouse_filter[/code] policy according to [param pattern].
+##
+## Use this in a screen's [code]_ready()[/code] for any [code]PanelContainer[/code]
+## (or [code]Panel[/code], or any [code]Control[/code] subclass that resolves
+## a [code]theme_type_variation[/code]) that should render with the warm-document
+## styling defined in [code]parchment_theme.tres[/code].
+##
+## Pass [code]PanelPattern.DECORATIVE[/code] for purely-visual panels (parchment
+## backgrounds, ink ornament wrappers) so they do not intercept taps from
+## interactive children. Pass [code]PanelPattern.STANDARD[/code] (the default)
+## for panels that legitimately consume tap events at their own level.
+##
+## Idempotent: setting the same [code]theme_type_variation[/code] twice is a
+## no-op cost; setting [code]mouse_filter[/code] twice is also free.
+##
+## Example:
+##   [codeblock]
+##   func _ready() -> void:
+##       UIFramework.apply_parchment_panel($RosterPanel)
+##       UIFramework.apply_parchment_panel($BackgroundOrnament,
+##           UIFramework.PanelPattern.DECORATIVE)
+##   [/codeblock]
+##
+## ADR-0008 §apply_parchment_panel + §mouse_filter default policy.
+static func apply_parchment_panel(panel: Control, pattern: PanelPattern = PanelPattern.STANDARD) -> void:
+	if panel == null:
+		push_error("[UIFramework] apply_parchment_panel called with null panel.")
+		return
+	panel.theme_type_variation = &"ParchmentPanel"
+	if pattern == PanelPattern.DECORATIVE:
+		panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	# else STANDARD: leave mouse_filter at the panel's existing value (theme
+	# defaults to STOP for PanelContainer; instances may override per-screen).
+
+
+# ---------------------------------------------------------------------------
+# Touch-feedback pulse
+# ---------------------------------------------------------------------------
+
+## Wires a 1.05× scale pulse (80 ms expand, 1-frame return) onto [param control]
+## that fires every time the Control receives a mouse-button-down or screen-touch-
+## down [code]gui_input[/code] event.
+##
+## Per Art Bible §7 Animation Feel: "every tap produces an immediate visual
+## response within one frame (16ms). The response is a scale pulse of
+## approximately 1.05× for 80ms, followed by return to 1.0×. This must be felt
+## on mobile before it is seen — the scale is small, but it is instant."
+##
+## Idempotent: a meta sentinel ([code]_TOUCH_FEEDBACK_META[/code]) prevents
+## double-wiring if this is called repeatedly on the same Control (e.g., across
+## screen re-entry into [code]on_enter()[/code]). When the Control is freed,
+## the bound Callable is automatically released by Godot.
+##
+## Per ADR-0008 §wire_touch_feedback: the pulse is opt-in per interactive
+## Control rather than encoded in the theme, both because Theme cannot tween
+## animations and because performance-dense screens (DungeonRunView) may opt
+## out per-element to keep tween count bounded.
+##
+## Example:
+##   [codeblock]
+##   func on_enter() -> void:
+##       UIFramework.wire_touch_feedback(%DispatchButton)
+##   [/codeblock]
+##
+## ADR-0008 §Touch feedback (1.05× scale, 80ms) — owned by individual screens.
+static func wire_touch_feedback(control: Control) -> void:
+	if control == null:
+		push_error("[UIFramework] wire_touch_feedback called with null control.")
+		return
+	if control.has_meta(_TOUCH_FEEDBACK_META):
+		return
+	control.set_meta(_TOUCH_FEEDBACK_META, true)
+	control.gui_input.connect(_on_touch_feedback_input.bind(control))
+
+
+## Internal — handles a [code]gui_input[/code] event and dispatches a touch
+## pulse on mouse-button-down or screen-touch-down. Bound to the wired Control
+## via [code]Callable.bind(control)[/code] in [method wire_touch_feedback].
+static func _on_touch_feedback_input(event: InputEvent, control: Control) -> void:
+	if event is InputEventMouseButton:
+		if (event as InputEventMouseButton).pressed:
+			_play_touch_pulse(control)
+	elif event is InputEventScreenTouch:
+		if (event as InputEventScreenTouch).pressed:
+			_play_touch_pulse(control)
+
+
+## Safe-format wrapper around [code]tr()[/code] localization keys with format
+## specifiers.
+##
+## In headless / test environments, [code]tr(key)[/code] returns the raw key
+## string when the locale isn't loaded — and the raw key contains no
+## [code]%[/code] specifier, so applying [code]raw_key % args[/code] raises
+## "not all arguments converted during string formatting". This helper checks
+## for a [code]%[/code] in the format string and only substitutes when one is
+## present; otherwise it returns the format with the args appended as a
+## space-separated suffix so the final text is still human-readable.
+##
+## Hoisted from screen-level duplicate implementations in S10-N1 (Sprint 10
+## tr() safe-format pattern). Callers were
+## [code]dungeon_run_view._show_run_end_overlay[/code] and
+## [code]dungeon_run_view._on_hero_leveled[/code]; both can now call
+## [code]UIFramework.format_localized(key, args)[/code] uniformly.
+##
+## Example:
+##   [codeblock]
+##   var text: String = UIFramework.format_localized(
+##       "hero_level_up_toast_format", [hero_name, new_level])
+##   # Loaded EN: "Theron reached level 2!"
+##   # Headless test env: "hero_level_up_toast_format Theron 2"
+##   [/codeblock]
+##
+## ADR-0008 §Localization-ready.
+##
+## Note on the underlying lookup: Object's [code]tr()[/code] method is an
+## instance method (not static), so this static helper uses
+## [code]TranslationServer.translate(StringName)[/code] — the singleton API
+## that [code]tr()[/code] wraps. Result is identical for the main locale path;
+## context-specific translations (the second [code]tr()[/code] argument) are
+## not supported here. Add an overload if a caller needs it.
+static func format_localized(key: String, args: Array) -> String:
+	var fmt: String = String(TranslationServer.translate(StringName(key)))
+	if "%" in fmt:
+		return fmt % args
+	# No format specifier — append args as a space-separated suffix.
+	if args.is_empty():
+		return fmt
+	var parts: PackedStringArray = PackedStringArray()
+	for arg: Variant in args:
+		parts.append(str(arg))
+	return fmt + " " + " ".join(parts)
+
+
+## Internal — plays the 1.05× scale pulse via Tween. Centers
+## [code]pivot_offset[/code] on the Control's current size so the pulse reads
+## as a centered "warm bump" rather than a top-left zoom. Safe to call on a
+## just-freed or out-of-tree Control (no-ops if the Control is invalid).
+static func _play_touch_pulse(control: Control) -> void:
+	if control == null or not is_instance_valid(control):
+		return
+	if not control.is_inside_tree():
+		return
+	control.pivot_offset = control.size * 0.5
+	var tween: Tween = control.create_tween()
+	tween.tween_property(control, "scale", TOUCH_PULSE_SCALE, TOUCH_PULSE_EXPAND_SEC)
+	tween.tween_property(control, "scale", Vector2.ONE, TOUCH_PULSE_RETURN_SEC)

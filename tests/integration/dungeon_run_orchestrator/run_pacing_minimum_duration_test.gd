@@ -315,3 +315,69 @@ func test_run_pacing_idempotency_holds_during_dwell_window() -> void:
 		screen.on_exit()
 	screen.queue_free()
 	await get_tree().process_frame
+
+
+# ===========================================================================
+# Test 5 — Fast path (run already RUN_ENDED at on_enter time) honors dwell.
+#
+# Regression test for the S9-M2 hotfix (2026-05-05). The "slow path" via
+# _on_state_changed already had the dwell. The "fast path" (run completes
+# during the FADE_TO_BLACK transition INTO this screen, so on_enter sees
+# state == RUN_ENDED with no signal incoming) was bypassing the dwell entirely
+# — _deferred_run_end_route fired request_screen one frame after on_enter,
+# giving the player no time to perceive the overlay or final kill_count.
+#
+# Sub-2-second runs in the live build (playtest 2026-05-05) consistently hit
+# the fast path because combat resolves faster than FADE_TO_BLACK (~300 ms).
+#
+# This test simulates the fast path: state is set to RUN_ENDED BEFORE on_enter,
+# then on_enter is called. Asserts elapsed time from on_enter →
+# request_screen is ≥1500 ms (the same dwell as the slow path).
+# ===========================================================================
+
+func test_run_pacing_fast_path_dwell_holds_when_run_ended_at_on_enter() -> void:
+	# Arrange — orchestrator is ALREADY in RUN_ENDED before the screen mounts.
+	# This mirrors the production fast path: combat resolved during the
+	# FADE_TO_BLACK transition into dungeon_run_view, so by the time on_enter
+	# fires, state is RUN_ENDED and no state_changed signal will be incoming.
+	var snap: RunSnapshot = _seed_run_snapshot(45, 9)
+	DungeonRunOrchestrator.state = DungeonRunStateScript.State.RUN_ENDED
+	DungeonRunOrchestrator.run_snapshot = snap
+
+	SceneManager.state = SceneManager.State.TRANSITIONING
+	SceneManager._queued_request = {}
+
+	# Act — mount the screen (on_enter detects RUN_ENDED via the defensive
+	# branch on dungeon_run_view.gd line 179 and call_deferred()s the route).
+	var t_start_ms: int = Time.get_ticks_msec()
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	# Assert — fast path detected the already-RUN_ENDED state and showed overlay.
+	assert_bool(screen._overlay_shown).is_true()
+	assert_bool(screen._routed).is_true()
+
+	# Poll until the queued request appears OR a generous timeout (5000 ms cap
+	# at 3x dwell so a missing dwell fails clearly within bounded test time).
+	var poll_deadline_ms: int = t_start_ms + 5000
+	while SceneManager._queued_request.is_empty() and Time.get_ticks_msec() < poll_deadline_ms:
+		await get_tree().process_frame
+
+	var t_end_ms: int = Time.get_ticks_msec()
+	var elapsed_ms: int = t_end_ms - t_start_ms
+
+	# Assert — elapsed must be at least the dwell minimum. WITHOUT the hotfix
+	# this asserts in the ~10-50 ms range (the call_deferred fires next frame).
+	# WITH the hotfix this asserts in the ~1500 ms range (await timer.timeout).
+	# 50 ms slack for create_timer scheduling jitter (matches Test 2).
+	assert_int(elapsed_ms).is_greater_equal(S9M2_MINIMUM_DWELL_MS - 50)
+
+	# Assert — the queue contains "main_menu" (route fired after the dwell).
+	assert_bool(SceneManager._queued_request.is_empty()).is_false()
+	assert_str(SceneManager._queued_request.get("screen_id", "")).is_equal("main_menu")
+
+	# Cleanup
+	if screen.has_method("on_exit"):
+		screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
