@@ -362,3 +362,35 @@ Closes 1 of the 3 missing consumer autoloads. FloorUnlockSystem's GDD is the onl
 - **S11-M4 end-to-end story 016 integration test** — depends on the two autoload gaps + OfflineProgressionEngine.
 
 The first three are Sprint 12+ design / asset / implementation work; S11-M4 follows.
+
+### S11-X2 — FormationAssignment System GDD authoring — DONE 2026-05-05
+
+Closes 1 of the 2 missing CONSUMER_PATHS GDDs. Recruitment GDD remains as the next Sprint 12+ design candidate.
+
+**Approach**: faithful translation from existing cross-system references rather than design-invention. Sources synthesized:
+- `architecture.md` §FormationAssignment — public API + signal contract.
+- `architecture.md` rank table row 11 — autoload position.
+- `ADR-0001` — mid-run-reassignment-option-(a) decision (the load-bearing design decision this GDD codifies the system-side surface for).
+- `hero-roster.md` Rule 10 — formation slots co-located with Roster; FormationAssignment is the sole writer.
+- `dungeon-run-orchestrator.md` §C.7 + Pass 4C — read/write signal split rationale (formation_browse_opened informational, formation_reassignment_committed write-intent).
+- `formation_assignment_screen.gd` (Sprint 8 Story 011) — existing screen UX informs §H acceptance criteria.
+
+**What shipped**: `design/gdd/formation-assignment-system.md` — 383 lines, 10 sections (8 required A-H + 2 supplemental I-J).
+
+**Coverage**:
+- §A Overview — codifies the controller-not-model role.
+- §B Player Fantasy — three feel-states (browsable without consequence, confirmable via clear intent, not a strategic puzzle). The cozy-preservation Pillar 1 commitment is the design lever.
+- §C Detailed Rules — public API (`browse(formation)`, `commit(new_formation)`, `get_save_data() -> {}`, `load_save_data` no-op); signal declarations with payload schemas; state-ownership boundary with HeroRoster (FormationAssignment owns NO persistent state in MVP); ADR-0001 mid-run reassignment policy; confirmation dialog UX boundary (screen-side, not system-side); single-writer enforcement (Rule 10 boundary + CI grep forbidden-pattern).
+- §D Formulas — commit ordering invariant (all writes before signal emit).
+- §E Edge Cases — 10 cases including empty formation, invalid hero_id mid-write, the canonical "browse during active run" cozy preservation case, autoload absent at boot.
+- §F Dependencies — Hard deps (HeroRoster, SaveLoadSystem, autoload registry); reverse subscribers (Orchestrator on commit signal per ADR-0001).
+- §G Tuning Knobs — `MID_RUN_REASSIGN_WARNING_ENABLED` (screen-side, not system-side); V1.0 forward-compat (named-presets surface).
+- §H Acceptance Criteria — 13 testable ACs including AC-FA-09 (the canonical cozy-preservation test: browse during active run does NOT end the run) + AC-FA-12 (CI grep forbidden-pattern for single-writer enforcement).
+- §I 6 Open Questions surfaced for V1.0 consideration (named presets, history undo, cross-screen browse intent, etc.).
+- §J Sprint 12+ implementation pre-sequenced as 7 stories totaling ~2.5d (longest is Story 5 — refactor formation_assignment_screen.gd to route through the new autoload instead of calling HeroRoster directly).
+
+**systems-index.md** row 17 updated — status promoted from "Not Started" to "Authored 2026-05-05 (Sprint 11 S11-X2 — first design pass)" with full GDD summary + bidirectional dependencies.
+
+**Consumer-ecosystem gap update**: with this GDD authored, the autonomous-friendly path forward to closing the FormationAssignment autoload is unblocked (Sprint 12+ Story 1 implementation against this GDD is straightforward — see §J). The remaining Recruitment GDD authoring is the symmetric task; OfflineProgressionEngine GDD authoring is the third missing piece (more technically complex per ADR-0014 batch chunking + time-budgeted yield strategy).
+
+**Sprint 11 progress after S11-X2**: 13 commits this session. Sprint 11 itself: 3.5/4 Must Haves + 1/5 Should Haves. Bonuses: Story 007a + S11-M3b + S11-M3c + S11-X1 (FloorUnlock implementation) + S11-X2 (FormationAssignment GDD). The session has produced a substantial body of design + implementation work spanning multiple sprints' worth of nominal scope.
