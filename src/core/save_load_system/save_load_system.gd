@@ -469,19 +469,33 @@ func request_full_persist(reason: String) -> void:
 	save_completed.emit(reason)
 
 
-## Requests a heartbeat partial-envelope persist (time fields only).
+## Requests a heartbeat persist via the canonical full-persist path.
 ##
-## STUB — persist body lands in Story 011 (heartbeat partial-envelope).
+## Sprint 11 S11-M2b — Story 011 SaveLoadSystem-side. Per Save/Load GDD §C.7
+## "Heartbeat (every 60 s) | overwrites current slot" — heartbeat = full
+## persist with reason="heartbeat". The "partial-envelope" terminology in
+## the Sprint 4 stub doc-comment is SUPERSEDED by Pass-5+ which standardized
+## heartbeat = full persist sharing one envelope schema.
 ##
-## [param time_fields]: Dictionary carrying the time-related fields to persist.
-##   Keys and schema defined in Story 011.
+## [param time_fields] is accepted for API stability with
+## [code]TickSystem._fire_heartbeat[/code] (S11-M2a) but is unused —
+## [method request_full_persist] already updates TickSystem's
+## [code]last_persist_ts[/code] via [code]set_last_persist_ts[/code] on
+## successful write per ADR-0005 single-call-site invariant.
+##
+## Coalesce + state-guard + envelope + atomic write + signal emission are all
+## handled by the underlying [method request_full_persist] body.
 ##
 ## Example:
-##   SaveLoadSystem.request_heartbeat_persist({"last_ts": TickSystem.now_ms()})
+##   SaveLoadSystem.request_heartbeat_persist({"last_ts_ms": TickSystem.now_ms()})
 ##
-## ADR-0004 §Heartbeat contract, Story 011
+## ADR-0004 §Heartbeat contract, Story 011 / S11-M2b
 func request_heartbeat_persist(time_fields: Dictionary) -> void:
-	pass  # Story 011
+	# Explicit acknowledge of the parameter so the static-typing linter
+	# doesn't warn about unused. The dict is small (2 keys per S11-M2a) and
+	# discarded; no allocation concern.
+	var _unused: Dictionary = time_fields
+	request_full_persist("heartbeat")
 
 # ---------------------------------------------------------------------------
 # Private methods
@@ -1071,14 +1085,30 @@ func _on_flag_suspicious_timestamp_emitted(previous_ts: int, current_ts: int) ->
 
 ## Handles [signal SceneManager.scene_boundary_persist].
 ##
-## Called when the scene manager crosses a scene boundary that requires a full
-## persist (e.g. dungeon run → town transition). In Story 012, this handler
-## awaits scene teardown, then triggers a full persist before scene load.
+## Sprint 11 S11-M3 — Story 012. Triggers a full persist with the reason
+## prefixed [code]"scene_boundary:"[/code] so consumers (telemetry,
+## sentinels, debug UI) can distinguish scene-boundary persists from
+## heartbeat-triggered persists at the [signal save_completed] subscriber.
 ##
-## STUB — body lands in Story 012 (scene-boundary persist).
+## SceneManager fires [signal SceneManager.scene_boundary_persist] before
+## entering [code]dungeon_run_view[/code] AND after exiting
+## [code]victory_moment[/code] (per Sprint 11 S11-M1 / Story 008). The
+## current emission is synchronous; SceneManager does NOT yet
+## [code]await[/code] the [signal save_completed] / [signal save_failed]
+## response from this handler. The full async-signal pattern per Save/Load
+## GDD Rule 5 row 5 ("scene-boundary persist = async-signal pattern —
+## SceneManager `await`s `save_completed`/`save_failed` before committing
+## transition") lands when SceneManager's emit-call gets the
+## [code]await[/code] pair — that wiring is a SceneManager-side change in
+## a follow-up story (S11-M3b).
 ##
-## [param reason]: Human-readable label from SceneManager for the boundary event.
+## In this handler's scope: trigger the full persist with the reason
+## propagated. The save_completed / save_failed signal fires from
+## [method request_full_persist]'s success / failure paths.
 ##
-## ADR-0007, TR-save-load-032, Story 012
+## [param reason]: Human-readable label from SceneManager for the boundary
+##   event (e.g., "pre_dungeon_entry", "post_victory_exit").
+##
+## ADR-0007, TR-save-load-032, Story 012 / S11-M3
 func _on_scene_boundary_persist(reason: String) -> void:
-	pass  # Story 012 (scene-boundary persist)
+	request_full_persist("scene_boundary:" + reason)

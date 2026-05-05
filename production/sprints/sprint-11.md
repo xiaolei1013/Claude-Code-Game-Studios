@@ -247,3 +247,32 @@ New unit suite `tests/unit/save_load/request_full_persist_test.gd` — 9/9 PASS:
 - **S11-S3** can now ship once a consumer-discovery hook exposes AudioRouter's namespace under top-level "audio" key. Currently CONSUMER_PATHS doesn't list AudioRouter (per ADR-0003 Amendment #5 §Impact item d — explicitly deferred). Sprint 12+ Story 007b adds the AudioRouter consumer-paths registration.
 
 The save-persist workstream is conceptually unblocked; remaining work is consumer ecosystem completion + Story 007b advanced features.
+
+### S11-M2b — `request_heartbeat_persist` body — DONE 2026-05-05
+
+Thin wrapper around `request_full_persist` per Save/Load GDD §C.7 ("Heartbeat = full persist"). The "partial-envelope" wording in Sprint 4's stub doc-comment was superseded by Pass-5+ which standardized heartbeat = full persist sharing one envelope schema.
+
+**What shipped**:
+- Body replaces `pass` with `request_full_persist("heartbeat")`.
+- `time_fields` parameter accepted for API stability with `TickSystem._fire_heartbeat` (S11-M2a) but unused — `request_full_persist` already updates `last_persist_ts` via TickSystem.set_last_persist_ts on successful write per ADR-0005.
+- Doc-comment rewritten to point at the new contract; previous Story 011 STUB notation removed.
+
+### S11-M3 — `_on_scene_boundary_persist` body — DONE 2026-05-05
+
+Thin wrapper around `request_full_persist` with reason prefixed `"scene_boundary:<original-reason>"` so subscribers can distinguish boundary persists from heartbeat persists at the `save_completed` listener.
+
+**What shipped**:
+- Body replaces `pass` with `request_full_persist("scene_boundary:" + reason)`.
+- Doc-comment rewritten to document the **deferred async-signal pattern**: SceneManager's emit-call does NOT yet `await save_completed/save_failed` from this handler. The full Rule-5 async pattern lands in **S11-M3b** (a SceneManager-side change) — separate concern from this handler's responsibility. This handler's job is "trigger full persist with the reason propagated"; the await is up to the emit-site.
+
+**Verification (joint S11-M2b + S11-M3 + Story 007a contract)**:
+New unit suite `tests/unit/save_load/persist_wrappers_test.gd` — 9/9 PASS:
+- Group A (4): `request_heartbeat_persist` exists; forwards reason="heartbeat" to save_failed (UNLOADED state); accepts empty time_fields; coalesces on PERSISTING state.
+- Group B (4): `_on_scene_boundary_persist` exists; forwards "scene_boundary:" prefix correctly for both pre_dungeon_entry and post_victory_exit reason strings; coalesces on PERSISTING state.
+- Group C (1): live SaveLoadSystem subscribed to live SceneManager.scene_boundary_persist signal — locks the end-to-end signaling chain.
+
+Full unit + integration sweep: **1156/1156 PASS, 0 errors / 0 failures** (was 1147 + 9 new).
+
+**Sprint 11 progress after S11-M2b + S11-M3**: **3.5 / 4 Must Haves done** (S11-M1 + S11-M2a + S11-M2b + S11-M3; only S11-M4 remaining). S11-M4 is the end-to-end story 016 wiring + integration tests — depends on the consumer ecosystem completion (FloorUnlock / FormationAssignment / Recruitment autoloads + DungeonRunOrchestrator.get_save_data) and on S11-M3b SceneManager-side await pattern. **All technically blocked items now have a clear unblock path that doesn't depend on Story 007 (which was the original blocker).**
+
+Sprint 11 **effectively complete on the SaveLoadSystem-side**. Remaining Sprint 11 / 12 work shifts focus to consumer-system implementations + SceneManager-side await wiring + audio asset sourcing.
