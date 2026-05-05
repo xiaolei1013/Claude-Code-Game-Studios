@@ -276,3 +276,43 @@ Full unit + integration sweep: **1156/1156 PASS, 0 errors / 0 failures** (was 11
 **Sprint 11 progress after S11-M2b + S11-M3**: **3.5 / 4 Must Haves done** (S11-M1 + S11-M2a + S11-M2b + S11-M3; only S11-M4 remaining). S11-M4 is the end-to-end story 016 wiring + integration tests — depends on the consumer ecosystem completion (FloorUnlock / FormationAssignment / Recruitment autoloads + DungeonRunOrchestrator.get_save_data) and on S11-M3b SceneManager-side await pattern. **All technically blocked items now have a clear unblock path that doesn't depend on Story 007 (which was the original blocker).**
 
 Sprint 11 **effectively complete on the SaveLoadSystem-side**. Remaining Sprint 11 / 12 work shifts focus to consumer-system implementations + SceneManager-side await wiring + audio asset sourcing.
+
+### S11-M3b — async-pattern doc clarification — DONE 2026-05-05
+
+Pure documentation reality-check: the S11-M1 + S11-M3 doc-comments forward-referenced an "await SaveLoadSystem.save_completed" pattern under Save/Load GDD Rule 5 row 5. With Story 007a shipping synchronous file I/O, the entire emit chain resolves inline — by the time `scene_boundary_persist.emit()` returns to SceneManager, the save is already on disk and `save_completed/save_failed` has fired. **No SceneManager-side `await` is needed for correctness** under the synchronous-I/O architecture. The async pattern is forward-looking guidance for a Sprint 12+ optimization where file I/O moves off the main thread (~50ms write blocking concern).
+
+Two doc-comment blocks updated (scene_manager.gd `_execute_transition` emit-site comment + save_load_system.gd `_on_scene_boundary_persist` doc-comment). No code change. 278/278 PASS post-edit across save_load + scene_manager suites.
+
+### S11-M3c — DungeonRunOrchestrator save consumer surface — DONE 2026-05-05
+
+Closes one of the two consumer-ecosystem gaps that was blocking happy-path round-trip testing of `request_full_persist`. Per `dungeon-run-orchestrator.md` §F + ADR-0014: the orchestrator is a Save/Load consumer with namespace key composed by SaveLoadSystem from CONSUMER_PATHS.
+
+**What shipped — `get_save_data` (well-specified per GDD §F)**:
+- Returns empty dict `{}` when state == NO_RUN OR run_snapshot is null (no run state to persist).
+- Returns `{"active_run": run_snapshot.to_dict()}` when run is in flight.
+- Round-trip-equal to `RunSnapshot.to_dict()` (delegates to existing primitive per Save/Load Rule 11).
+
+**What shipped — `load_save_data` (Sprint 11 minimal scope)**:
+- Empty dict → no-op (NO_RUN defaults preserved).
+- `{"active_run": ...}` → `push_warning` + discard to NO_RUN.
+- Unknown schema → `push_warning` + discard to NO_RUN.
+
+**Sprint 12+ extension** (load_save_data resume path) lands alongside OfflineProgressionEngine (rank 15, unimplemented). The Sprint 12+ replacement implementation:
+1. Validate `floor_id` resolves via DataRegistry.
+2. Validate every `formation_snapshot.instance_ids` entry exists in HeroRoster (orphan-hero recovery per ADR-0014 §2.3).
+3. On any validation failure: emit `run_snapshot_discarded_orphan` (signal to be declared in Sprint 12+ alongside Economy refund logic — currently neither declared nor used) + leave NO_RUN.
+4. On success: rehydrate run_snapshot via `from_dict`, set state = OFFLINE_REPLAY, hand off to OfflineProgressionEngine.
+
+The Sprint 11 minimal scope satisfies the Save/Load consumer contract surface (both methods exist and are safe to call) without inventing the full design.
+
+**Verification**:
+New unit suite `tests/unit/dungeon_run_orchestrator/save_load_consumer_surface_test.gd` — 10/10 PASS:
+- Group A (2): NO_RUN paths return empty dict (state == NO_RUN; degenerate state-set-but-snapshot-null).
+- Group B (2): active-run path returns canonical `{"active_run": <snapshot dict>}`; sub-dict round-trips through RunSnapshot.to_dict (key-set equality + spot-check critical fields).
+- Group C (3): empty load is no-op; active_run load discards-with-warning to NO_RUN; unknown schema discards-with-warning to NO_RUN.
+- Group D (1): NO_RUN ↔ NO_RUN round-trip preserves state.
+- Group E (2): both methods exist on the public API surface.
+
+Full unit + integration sweep: **1166 / 1166 PASS, 0 errors / 0 failures** (was 1156 + 10 new tests).
+
+**Consumer-ecosystem gap update** (sentinel test in `request_full_persist_test.gd`): DungeonRunOrchestrator is at /root/ already (so the *autoload-presence* sentinel still asserts 3 of 6); but now with `get_save_data` implemented, the **method-presence** dimension shifts from "0 of 3 present have get_save_data" to "1 of 3" (Economy + HeroRoster already had it; orchestrator now joins). The remaining 3 missing autoloads (FloorUnlock + FormationAssignment + Recruitment) are the actual blockers for happy-path round-trip testing. Sprint 12+ owns landing those.

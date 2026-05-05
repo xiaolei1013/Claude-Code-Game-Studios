@@ -906,3 +906,74 @@ func _resolve_floor(biome_id: String, floor_index: int) -> Resource:
 	if floor_index < 1 or floor_index > floors.size():
 		return null
 	return floors[floor_index - 1] as Resource
+
+
+# ---------------------------------------------------------------------------
+# Save/Load consumer surface — per design/gdd/dungeon-run-orchestrator.md
+# §F save-load row + ADR-0004 + ADR-0014. Namespace key "DungeonRunOrchestrator"
+# (the autoload's node name) is composed by SaveLoadSystem from CONSUMER_PATHS.
+# ---------------------------------------------------------------------------
+
+## Returns this autoload's persisted save state per the Save/Load consumer
+## contract. Schema per the GDD §F Save/Load row:
+##   - Empty dict [code]{}[/code] when no run is active (state == NO_RUN).
+##   - [code]{"active_run": <RunSnapshot.to_dict()>}[/code] when a run is in
+##     flight (state in {DISPATCHING, ACTIVE_FOREGROUND, OFFLINE_REPLAY,
+##     RUN_ENDED}).
+##
+## Active-run save is the offline-progression persistence path: the player
+## closed the app mid-run and OfflineProgressionEngine (rank 15, currently
+## unimplemented) replays the offline-elapsed ticks on next launch via
+## [method load_save_data] + [method compute_offline_run].
+##
+## ADR-0014 §RunSnapshot save-persisted schema, TR-orchestrator-003
+func get_save_data() -> Dictionary:
+	if state == DungeonRunStateScript.State.NO_RUN or run_snapshot == null:
+		return {}
+	return {"active_run": run_snapshot.to_dict()}
+
+
+## Hydrates this autoload from a save dict produced by [method get_save_data].
+##
+## **Sprint 11 minimal scope** (S11-M3c, 2026-05-05): the active-run resume
+## path requires OfflineProgressionEngine (rank 15) to replay the offline-
+## elapsed delta before this autoload can return to a meaningful in-flight
+## state. OfflineProgressionEngine is unimplemented (Sprint 12+ scope). In
+## the meantime, this method satisfies the Save/Load consumer contract
+## (method exists + safe to call) but discards any persisted active_run with
+## a [code]push_warning[/code]. The state machine stays at NO_RUN per the
+## fresh-instance default.
+##
+## **Sprint 12+ extension**: resume path lands alongside
+## OfflineProgressionEngine. The replacement implementation:
+##   1. Validate the snapshot's [code]floor_id[/code] resolves via DataRegistry.
+##   2. Validate every [code]formation_snapshot.instance_ids[/code] entry
+##      exists in HeroRoster (orphan-hero recovery per ADR-0014 §2.3).
+##   3. On any validation failure: emit
+##      [code]run_snapshot_discarded_orphan[/code] (signal to be declared in
+##      Sprint 12+ alongside Economy refund logic) + leave NO_RUN.
+##   4. On success: rehydrate run_snapshot via from_dict, set state =
+##      OFFLINE_REPLAY, hand off to OfflineProgressionEngine.
+##
+## ADR-0014 §RunSnapshot persistence; design/gdd/dungeon-run-orchestrator.md §F
+func load_save_data(d: Dictionary) -> void:
+	if d.is_empty():
+		# Saved state was NO_RUN — defaults preserved (state=NO_RUN, run_snapshot=null).
+		return
+	if d.has("active_run"):
+		# Sprint 11 minimal scope: discard with warning. Sprint 12+ adds
+		# OfflineProgressionEngine + signal-based orphan recovery.
+		push_warning(
+			"[DungeonRunOrchestrator] load_save_data: 'active_run' present in " +
+			"save dict but resume path is deferred to Sprint 12+ " +
+			"(OfflineProgressionEngine rank 15 unimplemented). Saved run " +
+			"discarded; orchestrator stays at NO_RUN. Sprint 12+ adds the " +
+			"actual replay + orphan-hero recovery per ADR-0014."
+		)
+		# Defaults preserved (state=NO_RUN, run_snapshot=null).
+		return
+	# Unknown schema variant — defensive log + preserve defaults.
+	push_warning(
+		"[DungeonRunOrchestrator] load_save_data: unknown save dict schema " +
+		"(keys=%s); preserving defaults." % str(d.keys())
+	)
