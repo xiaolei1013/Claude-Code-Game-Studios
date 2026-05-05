@@ -529,11 +529,22 @@ func _execute_transition(screen_id: String, transition: int) -> void:
 	# (declaration above): "before entering dungeon_run_view AND after exiting
 	# victory_moment". Other transitions DO NOT fire it.
 	#
-	# Sprint 11 timing: synchronous emission. Story 012 (S11-M3) extends the
-	# emission with `await SaveLoadSystem.save_completed` to gate the transition
-	# on persist completion per Save/Load GDD Rule 5 row 5 async-signal pattern.
-	# That `await` lands when SaveLoadSystem._on_scene_boundary_persist body is
-	# implemented (currently STUB body=pass).
+	# Persist timing — synchronous (Sprint 11 reality, S11-M3b clarification
+	# 2026-05-05). Trace the chain: `scene_boundary_persist.emit(reason)` blocks
+	# (Godot signal emission is synchronous) → `SaveLoadSystem._on_scene_boundary_persist`
+	# runs → `request_full_persist` runs → file I/O (FileAccess.open / store_buffer
+	# / DirAccess.rename_absolute) is synchronous → `save_completed` (or
+	# `save_failed`) emits → control returns up the chain to this site. By the
+	# time `emit()` returns here, the save is already on disk and the result
+	# signal has already fired. **No SceneManager-side `await` is needed for
+	# correctness** with the current synchronous-I/O architecture.
+	#
+	# The Save/Load GDD Rule 5 row 5 "async-signal pattern" is a Sprint 12+
+	# guidance for the case where file I/O moves off the main thread (to avoid
+	# blocking the ~50 ms write duration). When that optimization lands, this
+	# emit point gets `await SaveLoadSystem.save_completed` (or the multi-
+	# signal race helper). For MVP synchronous I/O, the existing synchronous
+	# emit is the right shape.
 	if screen_id == "dungeon_run_view":
 		scene_boundary_persist.emit("pre_dungeon_entry")
 

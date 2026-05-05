@@ -1092,15 +1092,20 @@ func _on_flag_suspicious_timestamp_emitted(previous_ts: int, current_ts: int) ->
 ##
 ## SceneManager fires [signal SceneManager.scene_boundary_persist] before
 ## entering [code]dungeon_run_view[/code] AND after exiting
-## [code]victory_moment[/code] (per Sprint 11 S11-M1 / Story 008). The
-## current emission is synchronous; SceneManager does NOT yet
-## [code]await[/code] the [signal save_completed] / [signal save_failed]
-## response from this handler. The full async-signal pattern per Save/Load
-## GDD Rule 5 row 5 ("scene-boundary persist = async-signal pattern —
-## SceneManager `await`s `save_completed`/`save_failed` before committing
-## transition") lands when SceneManager's emit-call gets the
-## [code]await[/code] pair — that wiring is a SceneManager-side change in
-## a follow-up story (S11-M3b).
+## [code]victory_moment[/code] (per Sprint 11 S11-M1 / Story 008).
+##
+## Persist timing — synchronous (Sprint 11 reality, S11-M3b clarification
+## 2026-05-05). [method request_full_persist] does file I/O inline
+## (FileAccess.open / store_buffer / DirAccess.rename_absolute are all
+## synchronous in Godot 4.6). By the time [signal SceneManager.scene_boundary_persist]
+## emit returns, this handler has finished AND
+## [signal save_completed]/[signal save_failed] has already fired. **No
+## SceneManager-side `await` is needed for correctness** under the
+## synchronous-I/O architecture. Save/Load GDD Rule 5 row 5
+## "async-signal pattern" is forward-looking guidance for a Sprint 12+
+## optimization where file I/O moves off the main thread (avoids blocking
+## the ~50 ms write duration). For MVP synchronous I/O, the chain is fully
+## resolved before emit returns.
 ##
 ## In this handler's scope: trigger the full persist with the reason
 ## propagated. The save_completed / save_failed signal fires from
