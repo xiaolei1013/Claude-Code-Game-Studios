@@ -205,3 +205,45 @@ First Sprint 11 Should Have closed pre-emptively. Independent of save-persist ma
 - Full unit + integration sweep: **1138/1138 PASS, 0 errors / 0 failures** (was 1115 — +23 new tests, no regressions).
 
 **Sprint 11 progress after S11-S2**: 1/4 Must Haves done + 1/5 Should Haves done. Audio MVP groundwork laid for Sprint 12+ Stories 3-5 to land cue handlers without re-doing the connection plumbing.
+
+### Story 007a — `request_full_persist` body (happy-path orchestration) — DONE 2026-05-05
+
+Investigation reversed prior "Story 007 = 2-3d" deferral. Existing primitives (HMAC, envelope, XOR mask, consumer resolution, state machine, signals) are extensive and well-tested; what was missing was the orchestration layer. Realistic scope: ~90 minutes. Honoring the deferral discipline lesson: "investigate before deferring" cuts both ways.
+
+**What shipped**:
+- New `@export var save_file_path: String = "user://save_slot_1.dat"` knob per Pass-5A. Test fixtures override this to redirect persist to a fixture-isolated path; production never touches it (override.cfg attack vector blocked by ADR-0004 §Forbidden Patterns — knob is `@export`, not ProjectSettings).
+- `request_full_persist(reason)` body fully implemented:
+  - Coalesce check on PERSISTING (existing behavior).
+  - Explicit guard: state must be READY (otherwise emit save_failed with ERR_UNAVAILABLE — `_transition_to` on illegal source state would silently no-op, leaving the body in a state-inconsistent ghost-write trajectory).
+  - Iterate `CONSUMER_PATHS`, namespace each consumer's `get_save_data()` payload under the autoload's node name → root_dict.
+  - JSON-encode, XOR-mask via `_apply_xor_mask` + `_generate_mask` + `_derive_mask_seed`.
+  - Compose envelope via `_compose_envelope`, then HMAC-sign over (header + masked_payload) using current-build tag from `_derive_integrity_tags` and overwrite the zero-padded placeholder at envelope footer.
+  - Atomic write: `FileAccess.open(.tmp)` → `store_buffer` (abort on false per Save/Load GDD Rule 7) → `close` → `DirAccess.rename_absolute(.tmp → save_file_path)` (Error return per Godot 4.x). On any failure: cleanup .tmp, emit `save_failed(reason, error_code)`, transition back to READY.
+  - Update `TickSystem.set_last_persist_ts` via `tick_system.now_ms() / 1000` per ADR-0005 single-call-site invariant — direct `Time.get_unix_time_from_system()` call from this site would violate the invariant. (Caught + fixed mid-implementation by the existing CI grep `test_wall_clock_single_call_site_exactly_one_in_src`.)
+  - Emit `save_completed(reason)` on success.
+
+**Deferred (intentionally) to Story 007b**:
+- `.bak` rotation (`DirAccess.copy(.dat → .dat.bak)` per Save/Load GDD Rule 7 step 7).
+- `_meta` sub-schema fields (slot_index, save_sequence_number, tamper_suspicious_count, backup_restore_events).
+- FLAGS bit handling (FLAGS.bit0 = save_is_flagged_tampered).
+- Cross-tag rekey persistence (`_needs_rekey_persist` field landed in earlier story; clearing it on successful persist is Story 007b).
+
+**Verification — what could be tested today**:
+New unit suite `tests/unit/save_load/request_full_persist_test.gd` — 9/9 PASS:
+- Group A (2): `save_file_path` export exists with canonical default; writable for fixture isolation.
+- Group B (3): state-transition guards — UNLOADED rejects with save_failed/ERR_UNAVAILABLE; LOADING rejects with save_failed/ERR_UNAVAILABLE; PERSISTING coalesces silently (no save_failed emit, push_warning only).
+- Group C (3): public API contract — method exists; save_completed declared; save_failed declared.
+- Group D (1): **sentinel test** documenting the happy-path coverage gap (CONSUMER_PATHS expects 6 autoloads; only 3 exist today — Economy/HeroRoster/DungeonRunOrchestrator — and DungeonRunOrchestrator lacks `get_save_data`). This test is intentionally a tripwire: when consumers complete in Sprint 12+, the count assertion `is_equal(3)` will fail, signaling that this sentinel should be deleted in lockstep with adding happy-path round-trip coverage.
+
+**Verification — what's blocked**:
+- Happy-path round-trip (envelope → file → re-read → HMAC verify → JSON match): blocked by 3 missing consumer autoloads + DungeonRunOrchestrator.get_save_data. `_resolve_consumer` calls `get_tree().quit(1)` on missing consumer per ADR-0004 §Consumer Contract; happy-path testing against the live autoload would crash the test process. Sprint 12+ unblocks.
+- Atomic-write semantics, TickSystem.set_last_persist_ts call, save_completed emit on success: same blocker.
+
+**Full unit + integration sweep post-Story-007a**: **1147/1147 PASS, 0 errors / 0 failures** (was 1138 + 9 new — no regressions; the wall-clock single-call-site invariant catch-and-fix landed mid-session before the sweep).
+
+**Sprint 11 progress after Story 007a**: This is significant. Story 007 was the dependency that blocked S11-M2b (heartbeat persist body), S11-M3 (scene-boundary persist body), S11-S3 (audio settings persistence round-trip). With Story 007a's `request_full_persist` body landed:
+- **S11-M2b** can now ship — `request_heartbeat_persist` body is a thin wrapper around `request_full_persist("heartbeat")`. Sprint 12+ work, but no longer blocked-on-Story-007.
+- **S11-M3** can now ship — `_on_scene_boundary_persist` body calls `request_full_persist(reason)` + adds the `await save_completed/save_failed` async-signal pattern per Save/Load GDD Rule 5. Same status: now unblocked.
+- **S11-S3** can now ship once a consumer-discovery hook exposes AudioRouter's namespace under top-level "audio" key. Currently CONSUMER_PATHS doesn't list AudioRouter (per ADR-0003 Amendment #5 §Impact item d — explicitly deferred). Sprint 12+ Story 007b adds the AudioRouter consumer-paths registration.
+
+The save-persist workstream is conceptually unblocked; remaining work is consumer ecosystem completion + Story 007b advanced features.

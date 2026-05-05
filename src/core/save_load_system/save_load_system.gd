@@ -199,6 +199,24 @@ var _state: State = State.UNLOADED
 ## ADR-0004 §N=2 rotation, TR-save-load-021
 var _needs_rekey_persist: bool = false
 
+
+# ---------------------------------------------------------------------------
+# Tuning knobs (designer / test-fixture configurable)
+# ---------------------------------------------------------------------------
+
+## Path to the save-slot file. Defaults to the canonical V1.0 single-slot path.
+## TEST-OVERRIDE: tests may write through this field to redirect persist to a
+## per-test fixture path. Production must not touch it (production sets the
+## path via the const default).
+##
+## ADR-0004 §Tuning Knobs (Pass-5A — `save_file_path`); ADR-0004 §Forbidden
+## Patterns: surfacing as a ProjectSettings setting is FORBIDDEN per the
+## production-build-guard rule (override.cfg attack vector).
+##
+## Sprint 11 Story 007a: this knob lands so request_full_persist can target
+## test-isolated paths without modifying production path semantics.
+@export var save_file_path: String = "user://save_slot_1.dat"
+
 # ---------------------------------------------------------------------------
 # Built-in virtual methods
 # ---------------------------------------------------------------------------
@@ -307,8 +325,148 @@ func request_full_persist(reason: String) -> void:
 			"(reason='%s') — new trigger coalesced (TR-save-load-046)." % reason
 		)
 		return
-	# Story 007 wires the full consumer loop and state transitions here.
-	pass
+	# Guard: persist is only valid from READY. Per Save/Load GDD state-machine
+	# transition table, READY → PERSISTING is the only legal entry into this
+	# code path. _transition_to(PERSISTING) below would push_warning + no-op
+	# silently from any other state — making the rest of this body a state-
+	# inconsistent ghost write. Explicit guard prevents that.
+	if _state != State.READY:
+		push_warning(
+			"SaveLoadSystem.request_full_persist: state=%d not READY — " % _state +
+			"persist trigger ignored (reason='%s'). Save data must be loaded " % reason +
+			"before persistence can fire."
+		)
+		save_failed.emit(reason, ERR_UNAVAILABLE)
+		return
+
+	# Sprint 11 Story 007a — happy-path implementation. Defers .bak rotation,
+	# _meta sub-schema (slot_index / save_sequence_number), FLAGS bit, and
+	# cross-tag rekey persistence to Story 007b. Existing primitives provide
+	# all the cryptographic + envelope plumbing — this method orchestrates.
+
+	_transition_to(State.PERSISTING)
+
+	# 1. Iterate CONSUMER_PATHS, namespace each consumer's payload under the
+	#    node's name. Per Save/Load GDD: consumer-discovery is hardcoded
+	#    (CONSUMER_PATHS) — production must not duck-type new consumers in.
+	var root_dict: Dictionary = {}
+	for path: String in CONSUMER_PATHS:
+		var node: Node = _resolve_consumer(path)
+		if node == null:
+			# _resolve_consumer already called push_error + get_tree().quit(1).
+			# Restore READY state so a subsequent test or recovery attempt is
+			# not blocked, and emit save_failed for any subscriber that needs
+			# to react to the abort.
+			_transition_to(State.READY)
+			save_failed.emit(reason, ERR_DOES_NOT_EXIST)
+			return
+		if not node.has_method("get_save_data"):
+			push_error(
+				"SaveLoadSystem.request_full_persist: %s has no get_save_data — " % path +
+				"fatal architecture violation per ADR-0004 §Consumer Contract."
+			)
+			_transition_to(State.READY)
+			save_failed.emit(reason, ERR_METHOD_NOT_FOUND)
+			return
+		var consumer_dict: Variant = node.call("get_save_data")
+		if not (consumer_dict is Dictionary):
+			push_error(
+				"SaveLoadSystem.request_full_persist: %s.get_save_data did not return " % path +
+				"a Dictionary (got %s). Skipping persist." % typeof(consumer_dict)
+			)
+			_transition_to(State.READY)
+			save_failed.emit(reason, ERR_INVALID_DATA)
+			return
+		# Namespace under the node's name (e.g., "Economy", "HeroRoster"). This
+		# matches the Save/Load GDD canonical contract: the top-level dict has
+		# one key per consumer, named after the autoload, value = consumer's
+		# get_save_data() return.
+		root_dict[node.name] = consumer_dict
+
+	# 2. Encode the assembled dict to UTF-8 JSON bytes.
+	var json_string: String = JSON.stringify(root_dict)
+	var plaintext: PackedByteArray = json_string.to_utf8_buffer()
+
+	# 3. Apply XOR mask per ADR-0004 §XOR mask layer (obfuscation, not encryption).
+	var mask_seed: PackedByteArray = _derive_mask_seed(CURRENT_SAVE_VERSION)
+	var mask: PackedByteArray = _generate_mask(mask_seed, plaintext.size())
+	var masked_payload: PackedByteArray = _apply_xor_mask(plaintext, mask)
+
+	# 4. Compose envelope (header + masked_payload + zero-padded HMAC placeholder).
+	#    FLAGS = 0 in Story 007a (Story 007b adds FLAGS.bit0 tamper flag handling).
+	var envelope: PackedByteArray = _compose_envelope(masked_payload, 0)
+
+	# 5. Compute HMAC over (header + masked_payload) using current-build tag,
+	#    then overwrite the zero-padded placeholder in the envelope footer.
+	var tags: Array[PackedByteArray] = _derive_integrity_tags()
+	var hmac_input: PackedByteArray = envelope.slice(0, envelope.size() - _HMAC_SIZE)
+	var hmac: PackedByteArray = _integrity_wrap(tags[0], hmac_input)
+	for i: int in _HMAC_SIZE:
+		envelope.encode_u8(envelope.size() - _HMAC_SIZE + i, hmac.decode_u8(i))
+
+	# 6. Atomic write: open .tmp, store_buffer with abort-on-false (per Save/Load
+	#    GDD Rule 7), close (auto-flush), rename .tmp → final path. The .bak
+	#    rotation is deferred to Story 007b.
+	var tmp_path: String = save_file_path + ".tmp"
+	var tmp_file: FileAccess = FileAccess.open(tmp_path, FileAccess.WRITE)
+	if tmp_file == null:
+		var open_err: int = FileAccess.get_open_error()
+		push_error(
+			"SaveLoadSystem.request_full_persist: FileAccess.open(%s) failed — " % tmp_path +
+			"error=%d (reason='%s')" % [open_err, reason]
+		)
+		_transition_to(State.READY)
+		save_failed.emit(reason, open_err)
+		return
+	var store_ok: bool = tmp_file.store_buffer(envelope)
+	tmp_file.close()
+	if not store_ok:
+		# Best-effort cleanup of the partial .tmp; leaving it is acceptable per
+		# Rule 6 (next-launch cleanup deletes stale .tmp files).
+		DirAccess.remove_absolute(tmp_path)
+		push_error(
+			"SaveLoadSystem.request_full_persist: store_buffer returned false — " +
+			"aborted persist; reason='%s'" % reason
+		)
+		_transition_to(State.READY)
+		save_failed.emit(reason, ERR_FILE_CANT_WRITE)
+		return
+
+	# 7. Atomic rename .tmp → final. DirAccess.rename returns Error (not bool;
+	#    Save/Load GDD Rule 7 emphasis on Godot 4.x return type).
+	var rename_err: int = DirAccess.rename_absolute(tmp_path, save_file_path)
+	if rename_err != OK:
+		# .tmp stays on disk; .dat is untouched. Next launch's Rule 6 cleanup
+		# handles the stale .tmp.
+		push_error(
+			"SaveLoadSystem.request_full_persist: DirAccess.rename(%s -> %s) " % [tmp_path, save_file_path] +
+			"failed with Error=%d. Prior .dat preserved." % rename_err
+		)
+		_transition_to(State.READY)
+		save_failed.emit(reason, rename_err)
+		return
+
+	# 8. Update TickSystem's last-persist timestamp. Routes through TickSystem's
+	#    cached wall clock per ADR-0005 single-call-site invariant — direct
+	#    Time.get_unix_time_from_system() call from this site would violate the
+	#    invariant (only TickSystem._read_wall_clock_unix_time may make that
+	#    call). The cache is refreshed every heartbeat (S11-M2a _fire_heartbeat)
+	#    + every BG entry; few-seconds-stale wall time is acceptable for the
+	#    last_persist_ts use case (offline-progression delta has minutes/hours
+	#    resolution). Defensive null-check for test envs that boot SaveLoadSystem
+	#    alone.
+	var tick_system: Node = get_node_or_null("/root/TickSystem")
+	if tick_system != null and tick_system.has_method("set_last_persist_ts") and tick_system.has_method("now_ms"):
+		var now_ms_int: int = int(tick_system.now_ms())
+		# Skip the update if TickSystem's cache is cold (now_ms returns 0
+		# before any wall-clock read this session). A zero last_persist_ts
+		# would be misinterpreted by offline-progression as "never persisted".
+		if now_ms_int > 0:
+			tick_system.set_last_persist_ts(now_ms_int / 1000)
+
+	# 9. Success: transition back to READY + emit save_completed.
+	_transition_to(State.READY)
+	save_completed.emit(reason)
 
 
 ## Requests a heartbeat partial-envelope persist (time fields only).
