@@ -358,10 +358,10 @@ func _fire_heartbeat() -> void:
 ## state.  When [param paused] is [code]false[/code], tick emission resumes
 ## from the preserved accumulator residual (TR-time-010).
 ##
-## NOTE (Story 008): Once the heartbeat accumulator lands, [method _process]
-## must be restructured so the heartbeat still advances under UI pause while
-## only the tick-emission branch is suppressed.  See the TODO comment in
-## [method _process].
+## RESOLVED (Sprint 11 S11-M2a, 2026-05-05): the heartbeat accumulator now
+## advances independently of UI pause; only tick emission is suppressed when
+## [member _ui_paused] is true. See [method _process] for the restructured
+## flow and [member _heartbeat_accumulator_seconds] for the heartbeat-side state.
 ##
 ## TR-time-034 — ADR-0005
 ##
