@@ -394,3 +394,40 @@ Closes 1 of the 2 missing CONSUMER_PATHS GDDs. Recruitment GDD remains as the ne
 **Consumer-ecosystem gap update**: with this GDD authored, the autonomous-friendly path forward to closing the FormationAssignment autoload is unblocked (Sprint 12+ Story 1 implementation against this GDD is straightforward — see §J). The remaining Recruitment GDD authoring is the symmetric task; OfflineProgressionEngine GDD authoring is the third missing piece (more technically complex per ADR-0014 batch chunking + time-budgeted yield strategy).
 
 **Sprint 11 progress after S11-X2**: 13 commits this session. Sprint 11 itself: 3.5/4 Must Haves + 1/5 Should Haves. Bonuses: Story 007a + S11-M3b + S11-M3c + S11-X1 (FloorUnlock implementation) + S11-X2 (FormationAssignment GDD). The session has produced a substantial body of design + implementation work spanning multiple sprints' worth of nominal scope.
+
+### S11-X3 — Recruitment System GDD authoring — DONE 2026-05-05
+
+Closes the LAST of the 2 missing CONSUMER_PATHS GDDs. Combined with S11-X2 (FormationAssignment GDD) and S11-X1 (FloorUnlock implementation), the consumer ecosystem is now **design-complete** (4 of 6 implemented; remaining 2 are GDD-authored + Sprint 12+ implementation away from happy-path Story 007 round-trip testing).
+
+**Approach**: faithful translation from existing cross-system references. Sources synthesized:
+- `architecture.md` §Recruitment (rank 12) — public API + signal contract.
+- `architecture.md` ADR-X04 entry — locks the design surface but defers determinism + cadence + cost-curve interaction to a future ADR.
+- `economy-system.md` §C.3.1 + §D.3 — recruit_cost formula + try_spend transaction.
+- `hero-roster.md` §C — add_hero / max_roster_size mutation API.
+- `ADR-0013` — recruit_cost(class_id, copies_owned) signature locked.
+- `ADR-0012` — HeroRoster mutation API.
+
+**What shipped**: `design/gdd/recruitment-system.md` — 501 lines, 10 sections (8 required A-H + 2 supplemental I-J).
+
+**Coverage**:
+- §A Overview — orchestrator pattern + ADR-X04 deferral framing (the GDD locks API surface; ADR-X04 picks pool determinism).
+- §B Player Fantasy — anticipation-not-anxiety (deterministic cost curve; no gachapon: spend → known outcome); ownership progression (cost scales with copies_owned per ADR-0013); reward-not-punishment (insufficient-gold + roster-full are soft messages, no penalty).
+- §C Detailed Rules — public API (`try_recruit(pool_index) -> RecruitOutcome`, `get_recruit_pool`, `get_recruit_cost`, `refresh_pool`); 5-state RecruitOutcome enum (SUCCESS / INSUFFICIENT_GOLD / ROSTER_FULL / INVALID_POOL_INDEX / UNRESOLVABLE_CLASS_ID); 5-step transaction flow (validate → resolve → capacity → cost → atomic); atomic transaction discipline with post-spend refund rollback path; single-writer enforcement (HeroRoster.add_hero CI grep mirroring S11-X2's formation_slot_write pattern); Save/Load consumer surface deferred to MVP empty-payload (Option A — session-only) with ADR-X04 forward-compat for Option B/C migration.
+- §D Formulas — cost lookup delegates to Economy.recruit_cost (no local math); pool composition strategy is ADR-X04-pending (3 candidates analyzed); refresh cadence is ADR-X04-pending (3 candidates analyzed).
+- §E Edge Cases — 10 cases including roster-full + insufficient-gold + corrupt-pool-entry + add_hero contract violation triggering refund + first-launch ordering (rank 12 > rank 7 > rank 3 — Recruitment._ready runs after HeroRoster + Economy).
+- §F Dependencies — hard deps (Economy + HeroRoster + HeroClassDatabase + DataRegistry + SaveLoadSystem); cross-system contract addition required (`HeroRoster.count_by_class(class_id) -> int` helper needed — Sprint 12+ Story 0b lockstep edit on hero-roster.md + ADR-0012 Amendment).
+- §G Tuning Knobs — cost-curve owned by Economy (not duplicated); pool-tuning ADR-X04-pending; debug `debug_force_recruit_pool` for tests.
+- §H Acceptance Criteria — 14 testable ACs including AC-RC-04 (atomic happy path) + AC-RC-09 (add_hero contract violation refund) + AC-RC-11 (cost-stability invariant — get_recruit_cost matches Economy.recruit_cost) + AC-RC-14 (CI grep single-writer enforcement).
+- §I 7 Open Questions including OQ-RC-1/2/3 (the three ADR-X04 questions); OQ-RC-4 (count_by_class HeroRoster API addition); OQ-RC-7 (V1.0 multi-recruit signal arity).
+- §J Sprint 12+ implementation pre-sequenced as 8 stories totaling ~3.0d (after ADR-X04 Story 0a + count_by_class Story 0b prereqs).
+
+**systems-index.md** row 14 updated — status promoted from "Not Started" to "Authored 2026-05-05 (Sprint 11 S11-X3 — first design pass; pending ADR-X04)" with full GDD summary + bidirectional dependencies.
+
+**Consumer-ecosystem closure**: with S11-X3 GDD authored, the 2 missing CONSUMER_PATHS GDDs (FormationAssignment + Recruitment) both have first-design-pass GDDs. Remaining work to fully unblock happy-path Story 007 round-trip testing:
+1. Sprint 12+ FormationAssignment autoload skeleton implementation (per S11-X2 §J Story 1).
+2. Sprint 12+ Recruitment ADR-X04 + autoload skeleton implementation (per S11-X3 §J Story 0a + Story 1).
+After both autoloads exist, the request_full_persist sentinel test can be deleted and replaced with a real round-trip test.
+
+**Sprint 11 progress after S11-X3**: 14 commits this session. Sprint 11: 3.5/4 Must Haves + 1/5 Should Haves. Bonuses: Story 007a + S11-M3b + S11-M3c + S11-X1 + S11-X2 + S11-X3.
+
+The autonomous-execution session has now produced design coverage for **every architectural module that's flagged as MVP-required**. The remaining design work is OfflineProgressionEngine (rank 15, ADR-0014-referenced but no GDD), which is the deepest of the three GDD authoring tasks (ADR-0014 documents batch chunking + time-budgeted yield strategy in detail, but the GDD that translates the ADR into implementation contracts is unauthored).
