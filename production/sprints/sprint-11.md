@@ -431,3 +431,49 @@ After both autoloads exist, the request_full_persist sentinel test can be delete
 **Sprint 11 progress after S11-X3**: 14 commits this session. Sprint 11: 3.5/4 Must Haves + 1/5 Should Haves. Bonuses: Story 007a + S11-M3b + S11-M3c + S11-X1 + S11-X2 + S11-X3.
 
 The autonomous-execution session has now produced design coverage for **every architectural module that's flagged as MVP-required**. The remaining design work is OfflineProgressionEngine (rank 15, ADR-0014-referenced but no GDD), which is the deepest of the three GDD authoring tasks (ADR-0014 documents batch chunking + time-budgeted yield strategy in detail, but the GDD that translates the ADR into implementation contracts is unauthored).
+
+### S11-X4 — OfflineProgressionEngine GDD authoring — DONE 2026-05-05
+
+Closes the LAST design-coverage gap for MVP-architectural-required modules. Every CONSUMER_PATHS autoload (S11-X1 FloorUnlock + S11-X2 FormationAssignment + S11-X3 Recruitment) + this engine now has GDD coverage. Remaining work to ship the cozy idle-game register end-to-end is **implementation-only** — no design surface invention required.
+
+**Approach**: faithful translation from ADR-0014 (the load-bearing source) + cross-system references. Sources synthesized:
+- `ADR-0014` — Offline Replay Batch Chunking + RunSnapshot Schema (Accepted 2026-04-22). All 7 timing knobs locked at the ADR level.
+- `ADR-0005` — TickSystem dual-clock contract (signal source for offline_elapsed_seconds + offline_cap_seconds knob ownership).
+- `ADR-0013` — Economy compute_offline_batch + OfflineResult shape.
+- `architecture.md` rank 15 row + OfflineProgressionEngine API section + offline-replay flow diagram.
+- `economy-system.md` §C.6 — offline-replay strategy (signal suppression flag, hybrid replay path).
+- `dungeon-run-orchestrator.md` §C.4 — Pass-I.15-fix offline replay floor_cleared_first_time emission.
+- `game-time-and-tick.md` — TickSystem.offline_elapsed_seconds + offline_cap_seconds.
+- `game-concept.md` §6 — Return-to-App fantasy framing.
+
+**What shipped**: `design/gdd/offline-progression-engine.md` — 553 lines, 10 sections (8 required A-H + 2 supplemental I-J).
+
+**Coverage**:
+- §A: boot-time orchestrator role; ADR-0014 translation framing; HIGH-RISK system warning (failure modes ship as user-visible rage moments).
+- §B: Return-to-App fantasy (4 feel-states); cozy modal copy register; cap as respect-the-time mechanic, not punishment.
+- §C: 7 sub-sections — public API + OfflineSummary class (7 fields locked); batch chunking algorithm (full pseudocode); signal suppression policy (5 ADR-0014 forbidden patterns); cap handling; progress modal threshold; HeroInstance-caching allowlist exception (3 specifically-allowlisted call sites + CI grep enforcement); save consumer surface (NOT in CONSUMER_PATHS — engine has no persisted state of its own).
+- §D: 4 formulas — tick conversion (TickSystem-anchored); cap clipping; adaptive chunk-size adjustment; worst-case replay budget analysis (8h × 20Hz = 576k ticks; ~3.2s wall time including yields, exceeds the older 500ms budget cited in architecture.md, superseded by ADR-0014's two-budget split).
+- §E: 10 edge cases — cold launch, sub-1s offline, exactly-cap, 24h+ elapsed, two-replays-in-flight, listener exceptions, mid-chunk crash recovery, post-emit-pre-acknowledge crash (OQ-OE-1), autoload-absent (degraded but non-crash), await-hangs (OQ-OE-2 defensive timeout).
+- §F: hard deps (TickSystem + Orchestrator + Economy + SceneManager); cross-system contract additions required (`Economy.flush_offline_signals` + `DungeonRunOrchestrator.flush_offline_signals` — Sprint 12+ Story 0a lockstep edits with Economy GDD update + ADR-0013 Amendment for Economy).
+- §G: 7 timing knobs (ADR-0014-locked); offline_cap_seconds (TickSystem-owned, do not duplicate); debug `debug_force_offline_seconds`; V1.0 forward-compat `OFFLINE_PERSIST_SUMMARY_BETWEEN_REPLAY_AND_ACK` for OQ-OE-1.
+- §H: 16 testable ACs including AC-OE-12 (5s ADVISORY total wall budget) + AC-OE-13 (16ms BLOCKING per-chunk CPU budget) + AC-OE-15 (HeroInstance allowlist boundary CI grep enforcement) + AC-OE-16 (cold-launch path: no replay, no Return-to-App).
+- §I: 7 Open Questions including OQ-OE-1 (persist summary between replay-complete and screen-acknowledge — Pillar 1 No-Fail-State concern); OQ-OE-2 (defensive await timeout); OQ-OE-6 (flush_offline_signals cross-system addition).
+- §J: Sprint 12+ pre-sequenced as 10 stories totaling ~4.5d (largest of the three GDD-authoring follow-ups: FormationAssignment ~2.5d, Recruitment ~3.0d, OfflineProgressionEngine ~4.5d). Pre-implementation Story 0a (cross-system contract additions) MUST land before Stories 4-6 to avoid integration churn.
+
+**systems-index.md** row 12 updated — status promoted from "Not Started" to "Authored 2026-05-05 (Sprint 11 S11-X4 — first design pass)" with full GDD summary + bidirectional dependencies.
+
+**Sprint 11 progress after S11-X4**: 15 commits this session. Sprint 11 itself: 3.5/4 Must Haves + 1/5 Should Haves. Bonuses now spanning 7 stories: Story 007a + S11-M3b + S11-M3c + S11-X1 (FloorUnlock impl) + S11-X2 (FormationAssignment GDD) + S11-X3 (Recruitment GDD) + S11-X4 (OfflineProgressionEngine GDD).
+
+**Design coverage closure**: the project now has GDD coverage for every MVP-architectural-required module per `architecture.md` System Layer Map. The remaining missing GDD per `systems-index.md` is row 28 (Audio System — already closed by S10-M3 in Sprint 10). All system rows that were "Not Started" at session start that this session has authored:
+- Row 12 Offline Progression Engine — Authored S11-X4 ✓
+- Row 14 Recruitment System — Authored S11-X3 ✓
+- Row 17 Formation Assignment System — Authored S11-X2 ✓
+
+The remaining "Not Started" rows in systems-index are Presentation/UI/Polish layers (HD-2D pipeline, VFX, Settings overlay, etc.) which are post-MVP scope per `game-concept.md` Vertical Slice / Alpha / V1.0 tiers.
+
+**The autonomous loop has now exhausted the GDD-authoring queue for MVP-required modules**. Remaining genuinely tractable autonomous work:
+- **Sprint 12+ implementation against the 3 newly-authored GDDs** (FormationAssignment / Recruitment / OfflineProgressionEngine) — but these are 2.5d + 3.0d + 4.5d = 10d of focused implementation work, larger than recent autonomous rounds.
+- **Pre-implementation prereqs**: ADR-X04 authoring (recruitment determinism, ~0.5d); HeroRoster.count_by_class API addition (~0.25d hero-roster.md GDD edit + ADR-0012 Amendment); Economy + Orchestrator flush_offline_signals additions (Sprint 12+ Story 0a, ~0.5d combined).
+- Each of those prereqs is autonomous-friendly individually (~30-60 min shape similar to recent commits).
+
+After those land, the consumer ecosystem fully closes and the request_full_persist sentinel test can be deleted with happy-path round-trip coverage.
