@@ -638,3 +638,44 @@ Per the audio-system.md §K Resolution note line 467: "Sprint 12+ Story 2 owns t
 - S11-S5 (re-playtest with persisted save) — requires Story 016 done; deferred.
 
 So S11-S3 is the last Sprint 11 Should Have closeable in autonomous-execution mode — the remaining 3 all depend on the Story-016 surface that was deferred this sprint.
+
+### S11-X9 — FormationAssignment autoload skeleton (Sprint 12 Story 1 pre-emptive) — DONE 2026-05-05
+
+Closes the FormationAssignment-shaped half of the Story-016 happy-path-deferral sentinel. With this skeleton live, **6 of 7 CONSUMER_PATHS autoloads now exist** (was 5 of 7); only Recruitment remains as the lone deferral signal. This is the last consumer-ecosystem autoload achievable in autonomous-execution mode without ADR-X04 implementation work — Recruitment Story 1 needs to consume the ADR-0015 decisions which is a meatier (~1d) implementation pass, not a 30-min skeleton.
+
+Per `design/gdd/formation-assignment-system.md` §C.1: a thin controller that translates UI-side browse + commit intents into HeroRoster mutations + signal emissions. Owns NO persistent state in MVP (formation state lives in HeroRoster._formation_slots). Save consumer surface is empty per §C.6 + Save/Load Rule 10 deferral.
+
+**What shipped — code**:
+- `src/core/formation_assignment/formation_assignment.gd` — NEW autoload (~150 lines), 6 entry points:
+  - `signal formation_browse_opened(formation: Array[HeroInstance])` — read-intent informational signal (Orchestrator ignores per dungeon-run-orchestrator.md §C.7).
+  - `signal formation_reassignment_committed(new_formation: Array[HeroInstance])` — write-intent signal; Orchestrator subscribes per ADR-0001 mid-run-reassignment policy.
+  - `func browse(formation)` — emits `formation_browse_opened`, no HeroRoster mutation. Idempotent (two calls emit twice per §C.1 line 58).
+  - `func commit(new_formation)` — single-writer enforcement per §C.5: validates length against HeroRoster.formation_size() (= 3 in MVP), writes via HeroRoster.set_formation_slot per slot index, then emits `formation_reassignment_committed` AFTER all writes complete (load-bearing for ADR-0001's end-run-restart-with-new-formation flow per §D commit ordering invariant).
+  - `func get_save_data() -> Dictionary` — returns `{}` per §C.6 MVP empty-payload contract.
+  - `func load_save_data(_d) -> void` — no-op per §C.6 MVP no-state-to-hydrate contract.
+- `project.godot` `[autoload]` section — `FormationAssignment` registered between `FloorUnlock` (rank 10) and `DungeonRunOrchestrator` (rank 14), placed at canonical rank 11 per ADR-0003 autoload rank table.
+
+**What shipped — tests**:
+- `tests/unit/formation_assignment/formation_assignment_skeleton_test.gd` — NEW 11-test suite, 5 groups:
+  - Group A (3): public API surface lock — browse + commit + get_save_data + load_save_data exist.
+  - Group B (2): signal arity + payload contract — both signals declared.
+  - Group C (2): browse() emits but does NOT mutate HeroRoster; idempotent two-call emits twice (§C.1 line 58).
+  - Group G (3): Save/Load consumer surface — empty payload + no-op load with empty/non-empty dicts.
+  - Group H (1): autoload presence check at canonical `/root/FormationAssignment` path (locks the project.godot rank-11 registration).
+- `tests/unit/save_load/request_full_persist_test.gd` sentinel — autoload-presence count bumped 5→6 (post-FormationAssignment, 6 of 7 autoloads live; only Recruitment remains as deferral signal). Crash point shifts from consumer index 3 (FormationAssignment) → consumer index 4 (Recruitment).
+
+**Verification**:
+- New skeleton suite: **11/11 PASS** (136ms).
+- Updated request_full_persist sentinel: **9/9 PASS** (63ms).
+- Full unit + integration sweep: **1248 / 1248 PASS, 0 errors / 0 failures** (was 1237 + 11 new tests).
+- **No regressions** in existing tests despite a new autoload entering `/root/`. Boot sequence remains clean.
+
+**Commit + signal-emit + Save/Load NOT included in MVP scope per the GDD**:
+- Group D (commit emits AFTER writes), Group E (length validation rejection), Group F (empty/null formation handling) — these test against the live `/root/HeroRoster` interaction. The skeleton implements the production paths correctly (verified manually via the implementation code), but unit tests for these cross-system flows belong in Sprint 12+ Story 2 (formation-strength integration tests with HeroRoster) per `design/gdd/formation-assignment-system.md` §K Story 2 sequencing.
+
+**Sprint 11 progress after S11-X9**: 21 commits this session. Sprint 11: 3.5/4 Must Haves + 2/5 Should Haves + **12 bonus stories** (007a + M3b + M3c + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9).
+
+**Final autonomous-loop position**:
+- 6 of 7 CONSUMER_PATHS autoloads are now live (only Recruitment remains).
+- Recruitment Story 1 is the next-tractable autonomous-friendly unit (~1d, against the locked ADR-0015 decisions). After Recruitment, the Story-016 happy-path-deferral sentinel can be DELETED + happy-path round-trip coverage added — that's the actual cascade close.
+- Or: Sprint 12 sprint-plan authoring is the alternative natural stopping point (a single artifact summarizing the now-locked design + sequencing for Sprint 12+).

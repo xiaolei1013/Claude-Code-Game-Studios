@@ -5,21 +5,20 @@
 #   /root/FormationAssignment, /root/Recruitment, /root/DungeonRunOrchestrator,
 #   /root/AudioRouter
 #
-# Live as of 2026-05-05 (after S11-X1 / S11-S3 lockstep edit):
+# Live as of 2026-05-05 (after S11-X9 FormationAssignment skeleton):
 #   - Economy (rank 3) ✓ has get_save_data
 #   - HeroRoster (rank 7) ✓ has get_save_data
 #   - FloorUnlock (rank 10) ✓ has get_save_data (S11-X1)
+#   - FormationAssignment (rank 11) ✓ has get_save_data (S11-X9, returns {})
 #   - DungeonRunOrchestrator (rank 14) ✓ has get_save_data (S11-M3c)
 #   - AudioRouter (rank 16) ✓ has get_save_data (S11-S2 + S11-S3 registration)
-#   - FormationAssignment ✗ unimplemented
 #   - Recruitment ✗ unimplemented
 #
-# 5/7 autoloads present + with get_save_data. _resolve_consumer calls
+# 6/7 autoloads present + with get_save_data. _resolve_consumer calls
 # get_tree().quit(1) on missing consumers per ADR-0004 §Consumer Contract;
 # happy-path testing against the live autoload would crash the test process
-# at FormationAssignment lookup (consumer index 3) — index-3 crash precedes
-# AudioRouter at index 6, so adding AudioRouter does not change crash-point
-# semantics for the existing tests.
+# at Recruitment lookup (consumer index 4 — moved from index 3 because
+# FormationAssignment at index 3 now succeeds).
 #
 # Tests below cover:
 #   - State-transition guards (UNLOADED rejects with save_failed emit).
@@ -201,27 +200,27 @@ func test_happy_path_persist_coverage_intentionally_deferred_until_consumer_ecos
 	# FloorUnlock, FormationAssignment, Recruitment, DungeonRunOrchestrator,
 	# AudioRouter}.
 	#
-	# As of 2026-05-05 (post-S11-S3), 5 of 7 exist as live autoloads with
-	# get_save_data: Economy + HeroRoster + FloorUnlock (S11-X1) +
-	# DungeonRunOrchestrator (S11-M3c) + AudioRouter (S11-S2/S11-S3). The
-	# remaining 2 (FormationAssignment + Recruitment) are unimplemented.
-	# Calling request_full_persist from READY state would crash via
-	# _resolve_consumer's get_tree().quit(1) at FormationAssignment lookup
-	# (consumer index 3) — index-3 crash precedes AudioRouter at index 6,
-	# so adding AudioRouter does not change crash-point semantics.
+	# As of 2026-05-05 (post-S11-X9 FormationAssignment skeleton), 6 of 7 exist
+	# as live autoloads with get_save_data: Economy + HeroRoster + FloorUnlock
+	# (S11-X1) + FormationAssignment (S11-X9) + DungeonRunOrchestrator (S11-M3c)
+	# + AudioRouter (S11-S2/S11-S3). The remaining 1 (Recruitment) is
+	# unimplemented. Calling request_full_persist from READY state would crash
+	# via _resolve_consumer's get_tree().quit(1) at Recruitment lookup
+	# (consumer index 4 — moved from index 3 since FormationAssignment now
+	# succeeds).
 	#
 	# This sentinel test documents the remaining gap in CI output. It will
-	# be deleted in the same Sprint 12+ commit that lands FormationAssignment
-	# + Recruitment autoloads and adds happy-path round-trip coverage
-	# (envelope round-trip, atomic write semantics, TickSystem
-	# .set_last_persist_ts call, save_completed emit).
+	# be deleted in the same Sprint 12+ commit that lands the Recruitment
+	# autoload and adds happy-path round-trip coverage (envelope round-trip,
+	# atomic write semantics, TickSystem.set_last_persist_ts call,
+	# save_completed emit).
 	var sl: Node = get_tree().root.get_node_or_null("SaveLoadSystem")
 	assert_int(sl.CONSUMER_PATHS.size()).is_equal(7)
-	# Verify the autoload-presence gap explicitly: 5 of 7 present today.
+	# Verify the autoload-presence gap explicitly: 6 of 7 present today.
 	var present: int = 0
 	for path: String in sl.CONSUMER_PATHS:
 		if get_tree().root.get_node_or_null(path) != null:
 			present += 1
 	# Hard equality so this fails if the situation changes (signal to delete
 	# this sentinel + add happy-path coverage).
-	assert_int(present).is_equal(5)
+	assert_int(present).is_equal(6)

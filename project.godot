@@ -32,6 +32,7 @@ BiomeDungeonDatabase="*res://src/core/biome_dungeon_database/biome_dungeon_datab
 HeroRoster="*res://src/core/hero_roster/hero_roster.gd"
 SceneManager="*res://src/core/scene_manager/scene_manager.gd"
 FloorUnlock="*res://src/core/floor_unlock_system/floor_unlock_system.gd"
+FormationAssignment="*res://src/core/formation_assignment/formation_assignment.gd"
 DungeonRunOrchestrator="*res://src/core/dungeon_run_orchestrator/dungeon_run_orchestrator.gd"
 AudioRouter="*res://src/core/audio_router/audio_router.gd"
 
