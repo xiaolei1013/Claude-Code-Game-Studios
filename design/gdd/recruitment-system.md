@@ -93,7 +93,7 @@ func get_recruit_pool() -> Array[String]
 ## Returns the cost (in gold) for the recruit at pool_index. Read-side
 ## convenience for screen UI — equivalent to:
 ##   Economy.recruit_cost(get_recruit_pool()[pool_index],
-##                        HeroRoster.count_by_class(class_id))
+##                        HeroRoster.get_copies_owned(class_id))
 ## but routed through this system so the screen has a single API surface
 ## for "what's the cost for this row."
 ##
@@ -167,7 +167,7 @@ try_recruit(pool_index):
       return ROSTER_FULL (no spend, no add)
 
   STEP 3: Cost lookup
-    var copies_owned: int = HeroRoster.count_by_class(class_id)  // helper §F
+    var copies_owned: int = HeroRoster.get_copies_owned(class_id)  // helper §F
     var cost: int = Economy.recruit_cost(class_id, copies_owned)
     if cost < 0: return UNRESOLVABLE_CLASS_ID  // ADR-0013 sentinel
                                                  // (defensive — should match
@@ -246,7 +246,7 @@ cost = recruit_cost(class_id, copies_owned)
 
 where `tier = DataRegistry.resolve("classes", class_id).tier` per ADR-0006 / ADR-0011 (Economy resolves internally).
 
-Recruitment's `get_recruit_cost(pool_index)` is a thin wrapper that supplies the `copies_owned` argument from `HeroRoster.count_by_class(class_id)`.
+Recruitment's `get_recruit_cost(pool_index)` is a thin wrapper that supplies the `copies_owned` argument from `HeroRoster.get_copies_owned(class_id)`.
 
 ### D.2 Pool composition strategy (ADR-X04-pending)
 
@@ -323,7 +323,7 @@ Hypothetical: a `floor_cleared_first_time` signal handler (which triggers a pool
 | System | Why | Surface used |
 |---|---|---|
 | `Economy` (rank 3) | Cost curve + atomic gold-spend | `recruit_cost(class_id, copies_owned) -> int`; `try_spend(amount, reason) -> bool`; `add_gold(amount, reason) -> void` (refund path only) |
-| `HeroRoster` (rank 7) | Roster mutation target + `copies_owned` lookup + capacity check | `add_hero(class_id) -> RefCounted`; `count_by_class(class_id) -> int` (helper to be added in Sprint 12+ alongside Recruitment impl); `get_all_heroes()`; `max_roster_size() -> int` |
+| `HeroRoster` (rank 7) | Roster mutation target + `copies_owned` lookup + capacity check | `add_hero(class_id) -> RefCounted`; `get_copies_owned(class_id) -> int` (helper to be added in Sprint 12+ alongside Recruitment impl); `get_all_heroes()`; `max_roster_size() -> int` |
 | `HeroClassDatabase` (rank 4) | Class-id resolution + class metadata for pool composition | `DataRegistry.resolve("classes", id) -> Resource` (via the standard DataRegistry lookup pattern, not a HeroClassDatabase-specific method) |
 | `DataRegistry` (rank 1) | The actual class-id resolver | `resolve("classes", id)` |
 | `SaveLoadSystem` (rank 2) | Consumer-discovery iteration includes `/root/Recruitment` per CONSUMER_PATHS | `get_save_data() -> Dictionary`; `load_save_data(d: Dictionary) -> void` |
@@ -332,7 +332,7 @@ Hypothetical: a `floor_cleared_first_time` signal handler (which triggers a pool
 
 This GDD identifies one HeroRoster API gap that Sprint 12+ implementation will close:
 
-- **`HeroRoster.count_by_class(class_id: String) -> int`** — helper that returns the count of heroes in `_heroes` whose `class_id` matches. Used by Recruitment to pass `copies_owned` to `Economy.recruit_cost`. NOT currently in hero-roster.md §C. **Adding this method is a hero-roster.md GDD update + ADR-0012 Amendment** in lockstep with Recruitment Sprint 12+ Story 1.
+- **`HeroRoster.get_copies_owned(class_id: String) -> int`** — helper that returns the count of heroes in `_heroes` whose `class_id` matches. Used by Recruitment to pass `copies_owned` to `Economy.recruit_cost`. NOT currently in hero-roster.md §C. **Adding this method is a hero-roster.md GDD update + ADR-0012 Amendment** in lockstep with Recruitment Sprint 12+ Story 1.
 
 ### Signal-source dependencies
 
@@ -353,7 +353,7 @@ Post-ADR-X04 (if Candidate 2 cadence is "on dungeon-clear"):
 
 This GDD's contracts cross-reference:
 - `economy-system.md` §C.3.1 + §D.3 — recruit_cost formula + try_spend contract.
-- `hero-roster.md` §C — add_hero / max_roster_size / count_by_class (count_by_class is a Sprint 12+ addition flagged in §F above).
+- `hero-roster.md` §C — add_hero / max_roster_size / get_copies_owned (get_copies_owned is a Sprint 12+ addition flagged in §F above).
 - `architecture.md` rank 12 row + Recruitment API section.
 - `architecture.md` ADR-X04 row — locked at "TBD pool generation determinism + refresh cadence + cost curve interaction."
 - `save-load-system.md` Rule 10 — consumer contract shape.
@@ -426,7 +426,7 @@ Pre: Inject a spy HeroRoster where add_hero returns null even though max_roster_
 Mutating the returned Array does NOT mutate internal pool state. Asserts: `get_recruit_pool().clear()` does not affect the next `get_recruit_pool()` call's return.
 
 **AC-RC-11 — get_recruit_cost matches Economy.recruit_cost contract**
-For each entry in pool, get_recruit_cost(i) == Economy.recruit_cost(pool[i], HeroRoster.count_by_class(pool[i])). Locks the cost-stability invariant: cost shown to player matches cost charged at try_recruit time (provided no recruit happens between the calls).
+For each entry in pool, get_recruit_cost(i) == Economy.recruit_cost(pool[i], HeroRoster.get_copies_owned(pool[i])). Locks the cost-stability invariant: cost shown to player matches cost charged at try_recruit time (provided no recruit happens between the calls).
 
 **AC-RC-12 — pool_refreshed signal fires on refresh_pool() call**
 Connect a spy. Call refresh_pool. Asserts: signal fired exactly once; payload equals the new pool.
@@ -461,8 +461,10 @@ Does each pool slot have an independent `copies_owned` count, or is `copies_owne
 - **Global per-class**: a Warrior in pool slot 0 always shows the cost based on roster's current Warrior count, regardless of how many Warriors are in the pool.
 - **Recommended**: global per-class is simpler + matches ADR-0013's cost-curve assumption (`copies_owned` is a roster-count, not a pool-count).
 
-**OQ-RC-4 — count_by_class HeroRoster API addition**
-Recruitment needs `HeroRoster.count_by_class(class_id) -> int` to compute `copies_owned`. This method is NOT currently in hero-roster.md §C. Adding it is a Sprint 12+ hero-roster.md GDD update + ADR-0012 Amendment in lockstep with Recruitment Story 1. Out of MVP scope; ADR-X04 OR a separate ADR-0012 Amendment owns the lockstep edit.
+**OQ-RC-4 — get_copies_owned HeroRoster API addition — RESOLVED 2026-05-05 (S11-X5)**
+~~Recruitment needs `HeroRoster.get_copies_owned(class_id) -> int` to compute `copies_owned`. This method is NOT currently in hero-roster.md §C. Adding it is a Sprint 12+ hero-roster.md GDD update + ADR-0012 Amendment in lockstep with Recruitment Story 1. Out of MVP scope; ADR-X04 OR a separate ADR-0012 Amendment owns the lockstep edit.~~
+
+**Resolution (S11-X5)**: Investigation found that `hero-roster.md` §C.B.1 read-API table line 111 ALREADY specified `get_copies_owned(class_id: String) -> int` — the method was designed but never implemented. Sprint 11 S11-X5 ships the implementation in `src/core/hero_roster/hero_roster.gd` with a 10-test suite (`tests/unit/hero_roster/get_copies_owned_test.gd`). No ADR-0012 Amendment needed — the method was already in the spec; this is a closure of an unimplemented designed-API. Sprint 12+ Recruitment Story 0b prereq is now complete.
 
 **OQ-RC-5 — `_warning_logger` / `_error_logger` DI consistency**
 Sprint 12+ implementation should adopt the DI-logger pattern used by FloorUnlockSystem (S11-X1) + FormationAssignment GDD §C.1 for testability. Not a design decision — a code-style consistency.
@@ -484,7 +486,7 @@ This GDD describes the design surface; ADR-X04 must be authored BEFORE Sprint 12
 
 1. **Pre-implementation (~0.25d each)**:
    - **Story 0a — ADR-X04 authoring** — pick OQ-RC-1/2/3 candidates per playtest data. Output: `docs/architecture/ADR-XXXX-recruitment-pool-determinism.md`.
-   - **Story 0b — `HeroRoster.count_by_class` API addition** — hero-roster.md GDD update + ADR-0012 Amendment + implementation + tests.
+   - **Story 0b — `HeroRoster.get_copies_owned` API addition** — hero-roster.md GDD update + ADR-0012 Amendment + implementation + tests.
 
 2. **Recruitment implementation (~2.0d total)**:
    - **Story 1 (~0.5d)** — `Recruitment` autoload skeleton + project.godot rank-12 lockstep + ADR-0003 Amendment.

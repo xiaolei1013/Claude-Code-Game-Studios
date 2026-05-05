@@ -673,6 +673,29 @@ func get_formation_slot(slot_index: int) -> int:
 ##   - [code]BY_INSTANCE_ID[/code]: instance_id ascending — stable iteration
 ##     for debug tools.
 ##
+## Returns the count of heroes in the roster whose [code]class_id[/code] matches
+## [param class_id]. Used by Recruitment to compute [code]copies_owned[/code]
+## for [code]Economy.recruit_cost(class_id, copies_owned)[/code] per ADR-0013
+## cost-curve contract.
+##
+## Returns 0 for an unknown class_id (the value is "no copies of this class
+## are in the roster", which is the correct semantic for recruit-cost lookup
+## even when class_id refers to a future / unreleased class).
+##
+## O(n) over the roster size (n ≤ MAX_ROSTER_SIZE = 30 per default config).
+##
+## Sprint 11 S11-X5 — added per Recruitment GDD §F + OQ-RC-4 (Sprint 12+
+## Story 0b lockstep). ADR-0012 Amendment #1 documents this addition as
+## an additive read-API extension (no existing API surface changes).
+func get_copies_owned(class_id: String) -> int:
+	var n: int = 0
+	for id: int in _heroes:
+		var hero: RefCounted = _heroes[id]
+		if hero != null and "class_id" in hero and String(hero.get("class_id")) == class_id:
+			n += 1
+	return n
+
+
 ## Output is a fresh Array on each call — caller may mutate freely.
 ##
 ## TR-hero-roster-026 — ADR-0012

@@ -477,3 +477,34 @@ The remaining "Not Started" rows in systems-index are Presentation/UI/Polish lay
 - Each of those prereqs is autonomous-friendly individually (~30-60 min shape similar to recent commits).
 
 After those land, the consumer ecosystem fully closes and the request_full_persist sentinel test can be deleted with happy-path round-trip coverage.
+
+### S11-X5 — HeroRoster.get_copies_owned implementation — DONE 2026-05-05
+
+Closes the Recruitment GDD §F + OQ-RC-4 prereq for Sprint 12+ Recruitment Story 0b. Investigation found that `hero-roster.md` §C.B.1 read-API table line 111 ALREADY specified `get_copies_owned(class_id: String) -> int` — the method was designed but never implemented. Sprint 11 S11-X5 ships the implementation; no ADR-0012 Amendment needed (method was in the spec already).
+
+**What shipped**:
+- `src/core/hero_roster/hero_roster.gd`: new `get_copies_owned(class_id: String) -> int` method. O(n) iteration over `_heroes`; counts entries where `hero.class_id == class_id`. Returns 0 for unknown class_ids (correct semantic for recruit-cost lookup even when class_id refers to a future / unreleased class).
+- `tests/unit/hero_roster/get_copies_owned_test.gd`: NEW 10-test suite, 5 groups:
+  - Group A (3): empty roster + unknown class_id + empty string all return 0.
+  - Group B (2): single-hero match returns 1; three warriors return 3.
+  - Group C (2): mixed-class roster — independent counts per class_id; total-matches-roster-size invariant.
+  - Group D (2): case-sensitivity (class_id is a stable identifier per ADR-0011, case mismatches are different IDs); read-only (no state mutation).
+  - Group E (1): public API method existence lock.
+
+**Implementation note (caught + fixed mid-session)**: my Recruitment GDD (S11-X3) referenced the method as `count_by_class` based on the architecture.md pseudocode + function-name-by-verb-pattern reasoning. But hero-roster.md §C.B.1 line 111 had ALREADY locked the name as `get_copies_owned` (matching the Economy contract's `recruit_cost(class_id, copies_owned)` arg name). Renamed implementation + tests + recruitment-system.md GDD + systems-index.md to `get_copies_owned` — the canonical hero-roster.md spec wins. Saved as a future autonomous-session note: when GDDs cross-reference, **the upstream system's GDD is canonical** for its own API surface (Recruitment is a consumer of HeroRoster; Recruitment's GDD must use HeroRoster's GDD-locked names, not invent its own).
+
+**OQ-RC-4 marked RESOLVED** in recruitment-system.md §I with a strikethrough + resolution note pointing at this commit.
+
+**Verification**:
+- New test suite: 10/10 PASS (130ms).
+- Full unit + integration sweep: TBD (verify post-edit).
+
+**Sprint 11 progress after S11-X5**: 16 commits this session. Sprint 11: 3.5/4 Must Haves + 1/5 Should Haves + 8 bonus stories: Story 007a + S11-M3b + S11-M3c + S11-X1 (FloorUnlock impl) + S11-X2 (FormationAssignment GDD) + S11-X3 (Recruitment GDD) + S11-X4 (OfflineProgressionEngine GDD) + S11-X5 (HeroRoster.get_copies_owned).
+
+**Remaining tractable autonomous prereqs** flagged in the 3 newly-authored GDDs:
+- ✓ HeroRoster.get_copies_owned (S11-X5 — done)
+- Economy.flush_offline_signals + ADR-0013 Amendment (~0.5d) — OfflineProgressionEngine GDD §F + OQ-OE-6
+- Orchestrator.flush_offline_signals (~0.25d) — OfflineProgressionEngine GDD §F + OQ-OE-6
+- ADR-X04 authoring (Recruitment determinism) (~0.5d) — Recruitment GDD §J Story 0a
+
+Each is a single autonomous-friendly round (~30-45 min shape).
