@@ -441,25 +441,17 @@ Repository-level grep finds at most one `HeroRoster.add_hero(` call site in `src
 
 ## I. Open Questions & ADR Candidates
 
-**OQ-RC-1 — Pool generation determinism (ADR-X04 question 1)**
-Is the recruit pool deterministic (RNG seeded from save state, replayable across save-load) or session-only (regenerated fresh on each load)?
-- **Pro deterministic**: predictability for speedrunners + cheat-resistance (a save file's pool can be verified against the seed); save → exit → reload → same pool means the player can plan around it.
-- **Pro session-only**: simpler implementation; forces the player to make decisions about the current session's pool without "save scumming" for better rolls; cozy-game register (the pool feels alive, not a fixed inventory).
-- **Recommended**: ADR-X04 picks based on playtest data + cheat-defense priorities.
+**OQ-RC-1 — Pool generation determinism (ADR-X04 question 1) — RESOLVED 2026-05-05 (S11-X8 / ADR-0015)**
+~~Is the recruit pool deterministic (RNG seeded from save state, replayable across save-load) or session-only (regenerated fresh on each load)?~~
+- **Resolution**: deterministic, save-seeded. `_save_pool_seed XOR _refresh_counter` drives `RandomNumberGenerator.seed`. Reload-after-close shows the same pool until the next refresh trigger fires (cozy UX); save-scum reload cannot re-roll the pool (cheat-defense). See ADR-0015 for full rationale + V1.0 cloud-save-validation enabling.
 
-**OQ-RC-2 — Refresh cadence (ADR-X04 question 2)**
-What triggers a pool refresh?
-- **On dungeon-clear**: ties to gameplay loop; new content as reward.
-- **On real-time interval (e.g., 5 min heartbeat)**: cozy-game "new shop arrived" register.
-- **On-demand (free or paid)**: player drives the loop; gold-cost variant ties refresh to economy.
-- **Hybrid**: free per-clear + paid on-demand.
-- **Recommended**: ADR-X04 picks; on-clear-or-on-demand-paid is the most cozy-compatible candidate per game-concept §6.
+**OQ-RC-2 — Refresh cadence (ADR-X04 question 2) — RESOLVED 2026-05-05 (S11-X8 / ADR-0015)**
+~~What triggers a pool refresh?~~
+- **Resolution**: on-clear + paid on-demand (hybrid). `floor_cleared_first_time` signal triggers a free refresh; `refresh_pool_paid()` lets the player force a refresh for `refresh_cost(refreshes_today)` gold (curve: `BASE × (1 + MULT × n)`, base=100, mult=2.0). Real-time-interval refresh REJECTED (FOMO + clock-tamper attack vector). See ADR-0015 §OQ-RC-2 + Alternative B for tradeoff analysis.
 
-**OQ-RC-3 — Cost-curve / pool interaction (ADR-X04 question 3)**
-Does each pool slot have an independent `copies_owned` count, or is `copies_owned` a global counter per class_id?
-- **Independent slot**: a pool can show "Warrior x1 cost", "Warrior x2 cost" simultaneously if the generator includes the same class twice. Encourages mixed-rarity pools.
-- **Global per-class**: a Warrior in pool slot 0 always shows the cost based on roster's current Warrior count, regardless of how many Warriors are in the pool.
-- **Recommended**: global per-class is simpler + matches ADR-0013's cost-curve assumption (`copies_owned` is a roster-count, not a pool-count).
+**OQ-RC-3 — Cost-curve / pool interaction (ADR-X04 question 3) — RESOLVED 2026-05-05 (S11-X8 / ADR-0015)**
+~~Does each pool slot have an independent `copies_owned` count, or is `copies_owned` a global counter per class_id?~~
+- **Resolution**: global per-class. `Recruitment.get_recruit_cost(pool_index)` reads `HeroRoster.get_copies_owned(class_id)` (roster count, not pool count). Aligns with ADR-0013's existing convention; same-class duplicate pool slots show the same cost (with the cost incrementing on the second row only AFTER the first is recruited, on next render). See ADR-0015 §OQ-RC-3 + Alternative C for tradeoff analysis.
 
 **OQ-RC-4 — get_copies_owned HeroRoster API addition — RESOLVED 2026-05-05 (S11-X5)**
 ~~Recruitment needs `HeroRoster.get_copies_owned(class_id) -> int` to compute `copies_owned`. This method is NOT currently in hero-roster.md §C. Adding it is a Sprint 12+ hero-roster.md GDD update + ADR-0012 Amendment in lockstep with Recruitment Story 1. Out of MVP scope; ADR-X04 OR a separate ADR-0012 Amendment owns the lockstep edit.~~

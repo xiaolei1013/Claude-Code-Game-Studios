@@ -564,6 +564,39 @@ Closes the OfflineProgressionEngine GDD §F + OQ-OE-6 prereq for the orchestrato
 **Sprint 11 progress after S11-X7**: 18 commits this session. Sprint 11: 3.5/4 Must Haves + 1/5 Should Haves + **10 bonus stories** (007a + M3b + M3c + X1 + X2 + X3 + X4 + X5 + X6 + X7).
 
 **Remaining autonomous prereq**:
-- ADR-X04 authoring (Recruitment determinism) (~0.5d) — picks OQ-RC-1/2/3 candidates per Recruitment GDD §I. After this, the consumer-ecosystem prereq stack closes completely; Sprint 12+ implementation can begin against fully-locked contracts.
+- ✓ ADR-X04 authoring → ADR-0015 (S11-X8 — done)
 
-The autonomous-execution session has now produced design + implementation work that effectively bridges Sprint 11 → Sprint 12 — all that remains is implementation of the 4 newly-designed systems (FormationAssignment + Recruitment + OfflineProgressionEngine + Audio MVP) against their locked GDDs.
+### S11-X8 — ADR-0015 Recruitment Pool Determinism + Refresh Cadence + Cost-Curve Interaction — DONE 2026-05-05
+
+Closes the FINAL autonomous prereq before Sprint 12+ Recruitment implementation. ADR-0015 picks all three OQ-RC-1/2/3 candidates from `recruitment-system.md` §I.
+
+**Decisions locked**:
+
+1. **OQ-RC-1 — Pool generation = deterministic, save-seeded.** `RandomNumberGenerator.seed = _save_pool_seed XOR _refresh_counter` per `_regenerate_pool` call. Save-namespace footprint: 3 new fields (`_save_pool_seed`, `_refresh_counter`, `_current_pool`). Reload-after-close preserves pool (cozy UX); save-scum reload cannot re-roll the pool (anti-cheat); V1.0 cloud-save validation enabled.
+
+2. **OQ-RC-2 — Refresh cadence = on-clear + paid on-demand (hybrid).** `floor_cleared_first_time` signal triggers a free refresh; `refresh_pool_paid()` lets the player force a refresh for `refresh_cost(refreshes_today: int) -> int` gold. Curve: `BASE × (1 + MULT × n)` with base=100, mult=2.0 initial values. Real-time-interval refresh REJECTED (FOMO + clock-tamper attack vector + cross-system coupling).
+
+3. **OQ-RC-3 — Cost-curve / pool interaction = global per-class.** `Recruitment.get_recruit_cost(pool_index)` reads `HeroRoster.get_copies_owned(class_id)` directly (roster count, NOT pool count). Aligns with ADR-0013's existing convention. Same-class duplicate pool slots show the same cost; cost-stability invariant (AC-RC-11) holds for normal play.
+
+**What shipped — docs**:
+- `docs/architecture/ADR-0015-recruitment-pool-determinism-and-refresh.md` — full ADR with standard sections: Status / Date / Engine Compatibility / ADR Dependencies / Context / Decision (3 OQ subsections) / Alternatives Considered (4 with rejection reasons) / Consequences (positive/negative/risks-table) / GDD Requirements Addressed / Performance Implications / Migration Plan / Validation Criteria (10 testable items) / Related Decisions / Open Questions (3 sub-questions deferred to Sprint 12+ Stories) / Specialist Review (game-designer + economy-designer + gameplay-programmer APPROVE; technical-director SKIPPED per solo mode).
+- `design/gdd/recruitment-system.md` §I OQ-RC-1/2/3 — all three open questions struck-through + RESOLVED tags + ADR-0015 link references.
+
+**Cross-system contract closure** — with this ADR:
+- Recruitment GDD §I has 4 of 7 OQs RESOLVED (OQ-RC-1, OQ-RC-2, OQ-RC-3, OQ-RC-4 all closed via Sprint 11 work).
+- Remaining OQ-RC-5/6/7 are non-blocking for MVP (DI-logger consistency, refund telemetry, V1.0 multi-recruit signal arity — all design polish).
+- Sprint 12+ Recruitment Story 0a ("ADR-X04 authoring") is now CLOSED; implementation can begin at Story 1 (autoload skeleton).
+
+**Verification**: documentation-only change; no test impact. Full unit + integration sweep remains **1228/1228 PASS**.
+
+**Sprint 11 progress after S11-X8**: 19 commits this session. Sprint 11: 3.5/4 Must Haves + 1/5 Should Haves + **11 bonus stories** (007a + M3b + M3c + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8).
+
+**The consumer-ecosystem prereq stack is now CLOSED.**
+
+The autonomous-execution session has produced design + implementation work that effectively bridges Sprint 11 → Sprint 12. **All four newly-designed systems** (FormationAssignment + Recruitment + OfflineProgressionEngine + Audio MVP) now have:
+- ✓ Full GDDs authored (8 required sections)
+- ✓ Save consumer surface specified
+- ✓ ADR-pending design questions RESOLVED (where they were in MVP scope)
+- ✓ Cross-system contract dependencies fulfilled (HeroRoster.get_copies_owned, Economy.flush_offline_signals, Orchestrator.flush_offline_signals)
+
+Sprint 12+ implementation can begin without further upstream design or contract work.
