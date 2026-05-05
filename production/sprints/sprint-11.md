@@ -173,3 +173,35 @@ This split honors the Sprint 10 deferral discipline lesson: S11-M2a is a tractab
 - Full unit + integration sweep: **1115/1115 PASS, 0 errors / 0 failures** (was 1103 — +12 new tests, no regressions). The cumulative test surface continues to grow with implementation.
 
 **Sprint 11 progress after S11-M2a**: 1.5/4 Must Haves done (S11-M1 + S11-M2a; S11-M2b deferred to Sprint 12).
+
+### S11-S2 — AudioRouter autoload skeleton + bus layout + ADR-0003 amendment — DONE 2026-05-05
+
+First Sprint 11 Should Have closed pre-emptively. Independent of save-persist machinery; cleanly executable in autonomous scope.
+
+**What shipped — code + assets**:
+- `src/core/audio_router/audio_router.gd` — full skeleton (extends Node autoload). Public API surface declared (volume control, mute, manual cue trigger escape hatches). Signal subscriptions wired at `_ready()` for the 6 sources required by audio-system.md §F (SceneManager.screen_changed; DungeonRunOrchestrator.state_changed/enemy_killed/boss_killed/floor_cleared_first_time; HeroRoster.hero_leveled; Economy.gold_changed). Save consumer surface implemented (`get_save_data` / `load_save_data`) namespaced under top-level key `"audio"` per audio-system.md §C.7. Default volumes per §G.
+  - **Stubs**: signal handler bodies (Sprint 12+ Story 3-5); `play_sfx` / `play_music` / `stop_music` (Sprint 12+ Story 3-4 — no AudioStream resources sourced yet).
+  - **Real**: `_apply_to_audio_server` writes through to AudioServer; mute drives Master to -INF per §E.5.
+- `assets/audio/audio_bus_layout.tres` — 8-bus hierarchy per §C.1: Master → Music{Ambient, Stinger} → Master; SFX{UI, Combat, Reward} → Master. Default bus volumes match §G defaults.
+
+**What shipped — config + docs**:
+- `project.godot`: AudioRouter added to `[autoload]` after DungeonRunOrchestrator; new `[audio]` section points at `audio_bus_layout.tres`.
+- `docs/architecture/architecture.md` §Autoload Rank Table: row appended for **rank 16 = AudioRouter (Core / Audio)**. Trailing prose updated to document the new rank.
+- `docs/architecture/ADR-0003-autoload-rank-table-canonical.md` — new **Amendment #5** (2026-05-05) documenting the AudioRouter rank assignment + analysis + impact + lockstep-edit checklist. Header date + Last Verified updated.
+- `design/gdd/audio-system.md` §I.1 (OQ-AS-1) marked **RESOLVED 2026-05-05** with full resolution writeup pointing at ADR-0003 Amendment #5.
+
+**Lockstep-edit gap (acknowledged, deferred)**: `SaveLoadSystem.CONSUMER_PATHS` does NOT yet include AudioRouter. The consumer-discovery body itself is STUB (Story 007 deferred to Sprint 12). Sprint 12+ Story 2 owns the lockstep edit when SaveLoadSystem-side discovery lands. The gap is documented inline in ADR-0003 Amendment #5 §Impact (item d) — explicit gap, not silent slippage.
+
+**Verification**:
+- New unit suite `tests/unit/audio_router/audio_router_skeleton_test.gd` — **23/23 PASS** (162ms total).
+  - Group A (4): autoload resolves at /root + project.godot lockstep + ordering after Orchestrator + 8 bus indices resolve.
+  - Group B (4): default volumes per §G (Master 0, Music -8, SFX -3, unmuted).
+  - Group C (3): set_*_volume_db round-trip writes to AudioServer.get_bus_volume_db.
+  - Group D (2): set_master_muted drives Master to -INF (≤-100 dB threshold); unmute restores cached volume.
+  - Group E (3): get_save_data canonical schema; load_save_data restores state; missing-fields fall back to defaults.
+  - Group F (4): signal subscriptions wired for all 6 sources (SceneManager + 4× Orchestrator + HeroRoster + Economy).
+  - Group G (3): manual cue API stubs callable without crash.
+- Hygiene-barrier pattern (S10-S4 lesson): `before_test` + `after_test` reset live AudioRouter state so the suite is order-independent within a shared session.
+- Full unit + integration sweep: **1138/1138 PASS, 0 errors / 0 failures** (was 1115 — +23 new tests, no regressions).
+
+**Sprint 11 progress after S11-S2**: 1/4 Must Haves done + 1/5 Should Haves done. Audio MVP groundwork laid for Sprint 12+ Stories 3-5 to land cue handlers without re-doing the connection plumbing.

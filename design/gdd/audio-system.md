@@ -461,8 +461,10 @@ Buttons fire BOTH `gui_input` (on press) AND `pressed` (on release). The chime i
 
 Per Sprint 10 risk-register guidance ("Treat as expected — surface ADR candidates IN the GDD; defer ADR authoring to Sprint 11 unless one is gating"), this section lists ADR candidates produced by the audio-system design pass. None are gating Production; all are Sprint 11+ implementation-stage decisions.
 
-**OQ-AS-1 — `AudioRouter` autoload registration order**
-AudioRouter must subscribe to signals from DungeonRunOrchestrator, HeroRoster, Economy, SceneManager. ADR-0003 rank table currently has no entry for AudioRouter. Sprint 11 candidate: append AudioRouter to ADR-0003 amendment, ranking AFTER DungeonRunOrchestrator (the latest gameplay autoload) so subscriptions land cleanly. Alternative: defer subscription via `call_deferred("_subscribe_to_signals")` from `_ready()` so rank order matters less. Decide during Sprint 11 implementation; both options are workable.
+**OQ-AS-1 — `AudioRouter` autoload registration order — RESOLVED 2026-05-05 (S11-S2)**
+~~AudioRouter must subscribe to signals from DungeonRunOrchestrator, HeroRoster, Economy, SceneManager. ADR-0003 rank table currently has no entry for AudioRouter. Sprint 11 candidate: append AudioRouter to ADR-0003 amendment, ranking AFTER DungeonRunOrchestrator (the latest gameplay autoload) so subscriptions land cleanly. Alternative: defer subscription via `call_deferred("_subscribe_to_signals")` from `_ready()` so rank order matters less. Decide during Sprint 11 implementation; both options are workable.~~
+
+**Resolution**: Option (a) selected — AudioRouter appended at rank 16 (after rank 15 OfflineProgressionEngine). See ADR-0003 Amendment #5 (2026-05-05). Rank choice keeps the signal-source autoloads strictly visible in `/root/` at AudioRouter's `_ready()` time so the defensive `has_node("/root/SourceAutoload")` guards always succeed in production. Sprint 12+ Story 2 owns the `SaveLoadSystem.CONSUMER_PATHS` lockstep edit when consumer-discovery body is implemented (currently STUB per Story 007 deferral).
 
 **OQ-AS-2 — Stinger overlap policy: drop vs. queue vs. crossfade**
 C.3 specifies drop-on-overlap. Alternative is queue (play next when current finishes) or fast-crossfade (cut current at -3 dB and bring in new). MVP gameplay rarely produces back-to-back Stingers so drop is sufficient. If post-launch live-ops content (e.g., milestone events with chained reward stingers) reveals overlap as a real case, revisit. Sprint 11 ships drop-on-overlap; Sprint 12+ may revisit.

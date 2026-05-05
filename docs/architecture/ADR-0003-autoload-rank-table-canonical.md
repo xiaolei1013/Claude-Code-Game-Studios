@@ -6,11 +6,11 @@ Accepted
 
 ## Date
 
-2026-04-22 (amended 2026-04-22 #1: rank invariant phrasing; amended 2026-04-22 #2: ranks 8 and 9 removed — see §Amendments)
+2026-04-22 (amended 2026-04-22 #1: rank invariant phrasing; amended 2026-04-22 #2: ranks 8 and 9 removed; amended 2026-04-22 #3: `_init(args)` superseded; amended 2026-04-26 #4: rank 8 = SceneManager; amended 2026-05-05 #5: rank 16 = AudioRouter — see §Amendments)
 
 ## Last Verified
 
-2026-04-26
+2026-05-05
 
 ## Decision Makers
 
@@ -443,3 +443,23 @@ Story S5-M4 (SceneManager autoload skeleton + four-state machine + DataRegistry 
 - Amendment #2's "non-autoload modules occupy these slots" rationale is superseded for rank 8 only; rank 9 retains the Amendment #2 vacant designation.
 - `SceneManager` is NOT a Save/Load consumer — no `CONSUMER_PATHS` change needed.
 - Lockstep edit is complete: (a) this ADR amended, (b) `architecture.md` updated, (c) `project.godot` updated.
+
+### Amendment #5 — 2026-05-05: AudioRouter assigned rank 16 — OQ-AS-1 closure
+
+Story S11-S2 (AudioRouter autoload skeleton + bus layout + ADR-0003 amendment) required assigning a concrete rank for the new `AudioRouter` autoload introduced by `design/gdd/audio-system.md`. OQ-AS-1 in the audio-system GDD identified two viable patterns: (a) append AudioRouter to the rank table with a rank that places it after all gameplay-signal sources, OR (b) defer signal subscription via `call_deferred("_subscribe_to_signals")` from `_ready()` so rank order doesn't matter. Both options are workable; the GDD asked Sprint 11 implementation to decide.
+
+**Decision**: Option (a). Append AudioRouter at rank 16 (after rank 15 OfflineProgressionEngine).
+
+**Analysis at implementation time (2026-05-05)**:
+- AudioRouter subscribes to gameplay signals from SceneManager (rank 8), DungeonRunOrchestrator (rank 14), HeroRoster (rank 7), Economy (rank 3). Per ADR-0003 §"Signal SUBSCRIPTION across any rank pair at `_ready()` time is safe" (Amendment #1, [VERIFIED]), the rank choice is technically irrelevant to subscription correctness — any rank works. **However**: ranking AudioRouter LAST keeps the signal-source autoloads strictly visible in `/root/` at AudioRouter's `_ready()` time, so the defensive `has_node("/root/SourceAutoload")` guards in `audio_router.gd._ready()` always succeed in production (failing-safe in test envs that boot a partial autoload set).
+- Appending at the end avoids any rank renumbering — matches Amendment #4's "claim a vacant or end slot, do not reorder" pattern.
+- AudioRouter IS a Save/Load consumer (per audio-system.md §C.7 — namespaced under top-level key `"audio"`), so SaveLoadSystem's `CONSUMER_PATHS` table needs an `AudioRouter` entry. **Sprint 12+ Story 2 owns this lockstep edit** when the SaveLoadSystem-side consumer-discovery body is implemented (currently STUB per Story 007 deferral). The gap is acknowledged: AudioRouter's `get_save_data` / `load_save_data` surface is real and tested in S11-S2; the SaveLoadSystem-side hook-up is the deferred half.
+
+**Decision**: AudioRouter is assigned rank 16 (Core / Audio layer per architecture.md categorization). This closes OQ-AS-1.
+
+**Impact**:
+- Rank table in `architecture.md` §Autoload Rank Table updated: new row appended for rank 16 = AudioRouter (Core / Audio).
+- `project.godot [autoload]` — `AudioRouter` entry added after `DungeonRunOrchestrator` (last entry pre-amendment), satisfying rank-16 position. New `[audio]` section added with `buses/default_bus_layout="res://assets/audio/audio_bus_layout.tres"` pointing at the 8-bus hierarchy authored in S11-S2.
+- `SaveLoadSystem.CONSUMER_PATHS` — entry NOT added in this amendment (deferred to Sprint 12+ Story 2 alongside SaveLoadSystem-side consumer discovery). The deferral is documented as an explicit gap that Sprint 12+ implementation must close.
+- audio-system.md §I.1 (OQ-AS-1) marked RESOLVED with this amendment as the resolution path.
+- Lockstep edit status: (a) this ADR amended ✓, (b) `architecture.md` updated ✓, (c) `project.godot` updated ✓, (d) `SaveLoadSystem.CONSUMER_PATHS` deferred (Sprint 12+ — explicit gap, not silent).

@@ -32,6 +32,11 @@ BiomeDungeonDatabase="*res://src/core/biome_dungeon_database/biome_dungeon_datab
 HeroRoster="*res://src/core/hero_roster/hero_roster.gd"
 SceneManager="*res://src/core/scene_manager/scene_manager.gd"
 DungeonRunOrchestrator="*res://src/core/dungeon_run_orchestrator/dungeon_run_orchestrator.gd"
+AudioRouter="*res://src/core/audio_router/audio_router.gd"
+
+[audio]
+
+buses/default_bus_layout="res://assets/audio/audio_bus_layout.tres"
 
 [display]
 
