@@ -114,6 +114,18 @@ signal flag_suspicious_timestamp_emitted(previous_ts: int, current_ts: int)
 ## The _notification handler MUST NOT touch this value on BG entry.
 var _tick_accumulator_seconds: float = 0.0
 
+## Heartbeat-second accumulator (separate from the tick accumulator). Advances
+## even when the UI is paused (TR-time-034); only gates on backgrounded state.
+## When it reaches [member heartbeat_interval_seconds], a heartbeat persist is
+## fired via [code]SaveLoadSystem.request_heartbeat_persist[/code] and the
+## accumulator is decremented by the interval (preserving any sub-interval
+## residual for the next firing).
+##
+## Sprint 11 S11-M2a — Story 011. Companion SaveLoadSystem.request_heartbeat_persist
+## body is deferred to Story 011 SaveLoadSystem-side (S11-M2b) alongside Story 007
+## (request_full_persist body); both share underlying envelope I/O machinery.
+var _heartbeat_accumulator_seconds: float = 0.0
+
 ## Monotonic sim-clock tick counter. Starts at 0 on every cold launch.
 ## Incremented before each tick_fired emission — first emission carries tick 1.
 ## Never decreases while the app is alive (TR-time-007).
@@ -193,11 +205,22 @@ func _notification(what: int) -> void:
 ## Example:
 ##   tick_system._process(0.1)  # emits tick_fired(1) then tick_fired(2)
 func _process(delta: float) -> void:
-	# TODO(heartbeat): under UI pause, the heartbeat accumulator must still
-	# advance (TR-time-034); only tick emission is suppressed. When heartbeat
-	# lands, split this early-return so UI pause bypasses only the emission
-	# branch, not the whole function.
-	if _app_state != AppState.FOREGROUND or _ui_paused:
+	# Background gate: in BG, neither tick nor heartbeat advances.
+	if _app_state != AppState.FOREGROUND:
+		return
+
+	# Heartbeat advances even under UI pause (TR-time-034 + Story 011 S11-M2a).
+	# Closes the prior TODO that called for splitting the UI-pause early-return.
+	# Heartbeat continues so save persistence does not stall while a modal is open.
+	_heartbeat_accumulator_seconds += delta
+	if _heartbeat_accumulator_seconds >= float(heartbeat_interval_seconds):
+		# Decrement (don't reset to 0) — preserves sub-interval residual so the
+		# average firing rate matches heartbeat_interval_seconds exactly.
+		_heartbeat_accumulator_seconds -= float(heartbeat_interval_seconds)
+		_fire_heartbeat()
+
+	# Tick emission suppressed by UI pause (TR-time-034 — original contract).
+	if _ui_paused:
 		return
 	_tick_accumulator_seconds += delta
 	while _tick_accumulator_seconds >= _TICK_INTERVAL_SECONDS:
@@ -283,6 +306,50 @@ func set_last_persist_ts(ts: int) -> void:
 ##   tick_system.set_session_high_water(max(prev_hwm, current_ts))
 func set_session_high_water(ts: int) -> void:
 	_session_high_water = ts
+
+## Fires a heartbeat persist request via [code]SaveLoadSystem.request_heartbeat_persist[/code].
+##
+## Called by [method _process] when the heartbeat accumulator reaches
+## [member heartbeat_interval_seconds]. Resolves the SaveLoadSystem autoload
+## defensively (test envs may not register it; cold-launch ordering is rank-2
+## so it's normally present by the time _process runs).
+##
+## Reads the wall clock once before packaging the time_fields payload, per the
+## ADR-0005 single-call-site invariant for [method _read_wall_clock_unix_time].
+##
+## Payload schema per Save/Load GDD §Heartbeat contract:
+##   - [code]last_ts_ms[/code]: current wall clock as milliseconds since epoch
+##   - [code]session_high_water[/code]: monotonically non-decreasing high-water
+##     mark used by the rewind-detection path
+##
+## Sprint 11 S11-M2a — Story 011 (TickSystem-side). The companion
+## [code]SaveLoadSystem.request_heartbeat_persist[/code] body is deferred to
+## Story 011 SaveLoadSystem-side (S11-M2b) alongside Story 007. In the
+## meantime, the call returns immediately (stub body=pass); heartbeat firing
+## is exercised structurally without persisting to disk.
+func _fire_heartbeat() -> void:
+	# Refresh wall clock cache before packaging the payload — single-call-site
+	# invariant per ADR-0005.
+	_read_wall_clock_unix_time()
+	var save_system: Node = (
+		get_node_or_null("/root/SaveLoadSystem") if get_tree() != null else null
+	)
+	if save_system == null:
+		# Test-env path: SaveLoadSystem autoload absent. The accumulator still
+		# advances + decrements correctly; persistence is a no-op until the
+		# autoload is wired (Story 011 SaveLoadSystem-side / S11-M2b).
+		return
+	if not save_system.has_method("request_heartbeat_persist"):
+		push_warning(
+			"[TickSystem] /root/SaveLoadSystem has no request_heartbeat_persist " +
+			"method; heartbeat fire skipped. Sprint 11 S11-M2b implements the body."
+		)
+		return
+	save_system.request_heartbeat_persist({
+		"last_ts_ms": now_ms(),
+		"session_high_water": get_session_high_water(),
+	})
+
 
 ## Suppresses tick emission while keeping [member _app_state] as FOREGROUND.
 ##

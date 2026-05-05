@@ -147,3 +147,29 @@ Pre-emptive Sprint 11 work begun after Sprint 10 close (S10-S3 recovery merged, 
 Full scene_manager suite post-S11-M1: **172/172 PASS, 0 errors / 0 failures** (was 165 before adding 7 new tests).
 
 **Sprint 11 progress**: 1/4 Must Haves done. Next per sprint-11.md sequencing: **S11-M2 (Story 011: TickSystem heartbeat accumulator + heartbeat partial envelope path)** — 1.5d nominal, depends on S11-M1.
+
+### S11-M2a — Story 011 (TickSystem-side): heartbeat accumulator — DONE 2026-05-05
+
+Investigation against actual code state revealed S11-M2 should split into two halves:
+- **S11-M2a (TickSystem-side)**: heartbeat accumulator + fire mechanism. ~30-45 min realistic. Self-contained.
+- **S11-M2b (SaveLoadSystem-side)**: `request_heartbeat_persist` body. **Blocks on Story 007** (`request_full_persist` body, also stub) — both sides need the same envelope I/O machinery (atomic write, FLAGS bit, HMAC, .tmp→rename, .bak rotation per Save/Load GDD §Rule 7). Realistic combined scope is 2-3d, NOT the 1.0d allocated. Deferred to **Sprint 12** alongside Story 007.
+
+This split honors the Sprint 10 deferral discipline lesson: S11-M2a is a tractable autonomous unit; S11-M2b would require a focused multi-story sprint and is over-eager to bundle here.
+
+**What shipped (S11-M2a)**:
+- `src/core/tick_system/tick_system.gd`:
+  - New `_heartbeat_accumulator_seconds: float` field (separate from tick accumulator).
+  - Restructured `_process(delta)`: BG gate first (neither path advances in BG), then heartbeat accumulator advances regardless of UI pause, then fires `_fire_heartbeat` on interval crossing (decrement-not-reset preserves sub-interval residual for exact-average rate), then existing UI-pause gate for tick emission. Closes the prior TODO at line 196.
+  - New `_fire_heartbeat()` method: calls `SaveLoadSystem.request_heartbeat_persist({last_ts_ms, session_high_water})` defensively (test-env-safe via `get_node_or_null` + `has_method` guards). Refreshes wall clock before reading per ADR-0005 single-call-site invariant.
+- `tests/unit/tick_system/heartbeat_accumulator_test.gd` — NEW 12-test suite, 5 groups:
+  - Group A: accumulator starts at zero + advances per delta.
+  - Group B: fires at interval; decrement preserves residual; does not fire below interval.
+  - Group C (critical): advances under UI pause (TR-time-034 contract); does NOT advance when backgrounded; resumes advancement after foreground.
+  - Group D: `_fire_heartbeat` no-op-safe when SaveLoadSystem autoload absent; heartbeat firing does not interact with tick counter.
+  - Group E: heartbeat_interval_seconds default = 60 (Save/Load GDD §Tuning Knobs); writeable for testing.
+
+**Verification**:
+- New suite: 12/12 PASS, 0 errors / 0 failures (159ms).
+- Full unit + integration sweep: **1115/1115 PASS, 0 errors / 0 failures** (was 1103 — +12 new tests, no regressions). The cumulative test surface continues to grow with implementation.
+
+**Sprint 11 progress after S11-M2a**: 1.5/4 Must Haves done (S11-M1 + S11-M2a; S11-M2b deferred to Sprint 12).
