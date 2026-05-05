@@ -535,5 +535,35 @@ Closes the OfflineProgressionEngine GDD §F + OQ-OE-6 prereq for the Economy hal
 **Sprint 11 progress after S11-X6**: 17 commits this session. Sprint 11: 3.5/4 Must Haves + 1/5 Should Haves + 9 bonus stories (007a + M3b + M3c + X1 + X2 + X3 + X4 + X5 + X6).
 
 **Remaining autonomous prereqs**:
-- DungeonRunOrchestrator.flush_offline_signals (~0.25d) — symmetric to S11-X6 but for orchestrator-side first-clear accumulation. Smaller scope.
+- ✓ DungeonRunOrchestrator.flush_offline_signals (S11-X7 — done)
 - ADR-X04 authoring (Recruitment determinism) (~0.5d) — picks OQ-RC-1/2/3 candidates.
+
+### S11-X7 — DungeonRunOrchestrator.flush_offline_signals — DONE 2026-05-05
+
+Closes the OfflineProgressionEngine GDD §F + OQ-OE-6 prereq for the orchestrator half. Symmetric to S11-X6 (Economy.flush_offline_signals) but smaller scope — only one emit site (`floor_cleared_first_time` at line 625 of `_process_kill_events`) needed the dispatch wrapper.
+
+**What shipped — code**:
+- `src/core/dungeon_run_orchestrator/dungeon_run_orchestrator.gd`:
+  - New `_is_offline_replay: bool = false` flag — externally set by OfflineProgressionEngine (rank 15) before the chunk loop. Foreground gameplay code MUST NOT touch this flag.
+  - New `_offline_pending_first_clears: Array[Dictionary] = []` accumulator — each entry is `{floor_index: int, biome_id: String, losing_run: bool}` matching the `floor_cleared_first_time` payload arity.
+  - The single `floor_cleared_first_time.emit()` site (line 625, inside `_process_kill_events` first-clear gate) now dispatches: when `_is_offline_replay == true`, append the payload as a Dictionary to the accumulator; else emit per-call as before. **Foreground path UNCHANGED** — every existing test against foreground emit semantics passes unchanged.
+  - New `flush_offline_signals() -> void` method: emits `floor_cleared_first_time(floor_index, biome_id, losing_run)` for each accumulated entry in insertion order; clears the accumulator + clears the `_is_offline_replay` flag. Idempotent on empty accumulator.
+
+**Cross-system contract closure**: with both Economy.flush_offline_signals (S11-X6) and Orchestrator.flush_offline_signals (S11-X7) implemented, OfflineProgressionEngine GDD §F's two cross-system contract additions are CLOSED. Sprint 12+ OfflineProgressionEngine implementation can bind against the locked APIs without further upstream contract work.
+
+**Verification**:
+- New unit suite `tests/unit/dungeon_run_orchestrator/flush_offline_signals_test.gd` — **9/9 PASS** (117ms total), 5 groups:
+  - Group A (2): accumulator state defaults — `_is_offline_replay = false`; `_offline_pending_first_clears = []`.
+  - Group B (1): public API method existence lock.
+  - Group C (3): flush emits per accumulated entry in insertion order (3 floors with mixed WIN/LOSING per ADR-0002); flush clears `_is_offline_replay`; flush clears accumulator.
+  - Group D (2): idempotent on empty accumulator; double-flush is safe (second call is no-op).
+  - Group E (1): dispatch-site routes to accumulator when flag is true (no per-call emit).
+- Full unit + integration sweep: **1228 / 1228 PASS, 0 errors / 0 failures** (was 1219 + 9 new tests).
+- **No regressions** in existing orchestrator tests (autoload skeleton + DI + kill attribution + state-changed signal + run-snapshot + save consumer surface + stub-XP-grant suites all green) — additive flag-driven dispatch preserves foreground-path behavior exactly.
+
+**Sprint 11 progress after S11-X7**: 18 commits this session. Sprint 11: 3.5/4 Must Haves + 1/5 Should Haves + **10 bonus stories** (007a + M3b + M3c + X1 + X2 + X3 + X4 + X5 + X6 + X7).
+
+**Remaining autonomous prereq**:
+- ADR-X04 authoring (Recruitment determinism) (~0.5d) — picks OQ-RC-1/2/3 candidates per Recruitment GDD §I. After this, the consumer-ecosystem prereq stack closes completely; Sprint 12+ implementation can begin against fully-locked contracts.
+
+The autonomous-execution session has now produced design + implementation work that effectively bridges Sprint 11 → Sprint 12 — all that remains is implementation of the 4 newly-designed systems (FormationAssignment + Recruitment + OfflineProgressionEngine + Audio MVP) against their locked GDDs.

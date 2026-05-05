@@ -204,6 +204,37 @@ var _dispatched_biome_id: String = ""
 
 
 # ---------------------------------------------------------------------------
+# Offline replay infrastructure — Sprint 11 S11-X7 / OfflineProgressionEngine
+# GDD §F + OQ-OE-6 lockstep. Mirrors the Economy shape from S11-X6 / ADR-0013
+# Amendment #1. NOT persisted — transient per-replay-cycle state only.
+# ---------------------------------------------------------------------------
+
+## When [code]true[/code], [signal floor_cleared_first_time] emit sites
+## accumulate into [member _offline_pending_first_clears] instead of emitting
+## per-call. Cleared by [method flush_offline_signals] after the aggregate
+## post-replay emission.
+##
+## Set externally by OfflineProgressionEngine (rank 15) at the start of the
+## chunk loop. Foreground gameplay code MUST NOT touch this flag —
+## compute_offline_batch (Sprint 12+ Story 010) is the only legitimate
+## production caller of the offline-replay path.
+##
+## ADR-0014 §signal emission policy + per_chunk_domain_signal_emission_during_offline_replay
+## forbidden pattern.
+var _is_offline_replay: bool = false
+
+## Floor-clear payloads pending aggregate emission after offline replay
+## completes. Each entry is a Dictionary
+## [code]{floor_index: int, biome_id: String, losing_run: bool}[/code]
+## matching the [signal floor_cleared_first_time] payload arity.
+##
+## Insertion order is preserved on flush per OfflineProgressionEngine GDD
+## §C.3 ("first_clear_awarded fires POST-replay for each first-cleared
+## floor in the offline window" — equivalent semantic for floor_cleared_first_time).
+var _offline_pending_first_clears: Array[Dictionary] = []
+
+
+# ---------------------------------------------------------------------------
 # Dispatch debounce + validation state — Story 003 (TR-026, TR-027, TR-032)
 # ---------------------------------------------------------------------------
 
@@ -622,7 +653,19 @@ func _process_kill_events(events: Variant) -> void:
 			# ADR-0002 (losing-first-clear reclaimable on win) so the fanfare
 			# stays a meaningful "first time you've EVER done this" moment.
 			if awarded:
-				floor_cleared_first_time.emit(floor_idx, _dispatched_biome_id, losing_run)
+				# Sprint 11 S11-X7 / ADR-0014 §signal emission policy: during
+				# offline replay (set externally by OfflineProgressionEngine
+				# rank 15), accumulate the floor-clear payload for post-replay
+				# aggregate emission instead of firing the player-facing
+				# fanfare per-chunk. Foreground path emits as before.
+				if _is_offline_replay:
+					_offline_pending_first_clears.append({
+						"floor_index": floor_idx,
+						"biome_id": _dispatched_biome_id,
+						"losing_run": losing_run,
+					})
+				else:
+					floor_cleared_first_time.emit(floor_idx, _dispatched_biome_id, losing_run)
 		# Floor cleared — transition ACTIVE_FOREGROUND → RUN_ENDED.
 		var next_state: int = DungeonRunStateScript.validate_transition(
 			state, DungeonRunStateScript.TRIGGER_RUN_ENDED
@@ -651,6 +694,41 @@ func attribute_kill_gold(tier: int, advantaged: bool, losing_run: bool) -> int:
 	var matchup_mult: float = MATCHUP_MULT_ADV if advantaged else MATCHUP_MULT_DIS
 	var loot_factor: float = LOSING_RUN_LOOT_FACTOR if losing_run else 1.0
 	return floori(float(base) * matchup_mult * loot_factor)
+
+
+## Drains per-chunk-suppressed offline-replay signals into aggregate
+## emissions, then clears [member _is_offline_replay].
+##
+## Sprint 11 S11-X7 / OfflineProgressionEngine GDD §F (Story 0a). Symmetric
+## to [code]Economy.flush_offline_signals[/code] (S11-X6 / ADR-0013 Amendment #1)
+## but for the orchestrator-side [signal floor_cleared_first_time].
+##
+## Per OfflineProgressionEngine GDD §C.3 signal-suppression policy:
+##   - [signal floor_cleared_first_time] fires ONCE per accumulated floor in
+##     the order they were appended (matches insertion order of the foreground
+##     replay sequence).
+##   - [member _is_offline_replay] is cleared to [code]false[/code] AFTER
+##     the aggregate emissions (subscribers re-entering during the emission
+##     see the post-replay flag state).
+##
+## Idempotent: calling on an empty / already-flushed accumulator is a no-op
+## (no signals fire, flag clears safely).
+##
+## Sprint 12+ OfflineProgressionEngine implementation owns the call site;
+## this method is the API surface the engine binds against.
+##
+## OfflineProgressionEngine GDD §F (Story 0a), §C.2 batch-loop integration.
+func flush_offline_signals() -> void:
+	# Aggregate floor_cleared_first_time emits in insertion order.
+	for entry: Dictionary in _offline_pending_first_clears:
+		floor_cleared_first_time.emit(
+			int(entry.floor_index),
+			String(entry.biome_id),
+			bool(entry.losing_run)
+		)
+	# Clear accumulator + replay flag.
+	_offline_pending_first_clears.clear()
+	_is_offline_replay = false
 
 
 ## Sprint 10 S10-M4 — stub XP grant.
