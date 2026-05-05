@@ -115,7 +115,35 @@
 ## Notes
 
 - This skeleton was authored 2026-05-05 by Sprint 10 S10-S5 groundwork story. Re-validate via `/sprint-plan` if anything material changes between now and Sprint 11 kickoff (2026-05-16).
+- **2026-05-05 (post-Sprint-10-close session): pre-emptive Sprint 11 work began** — see Closure Notes below.
 - The Sprint 11 nominal date range (2026-05-16 → 2026-05-25) follows the same 9-working-day cadence as Sprint 10 (2026-05-06 → 2026-05-15).
 - The save-persist workstream's 4-Must-Have decomposition matches the Sprint 11 reservation note authored in `sprint-10.md` §"Sprint 11 reservation (added 2026-05-05)". Story estimates carried forward from that reservation.
 - Audio implementation scope is minimum-viable per `audio-system.md` §K alternative scope (Stories 1–3 + asset placeholders). Stories 4–7 push to Sprint 12 if save-persist consumes most of Sprint 11.
 - `production/qa/qa-plan-sprint-11-XXXX.md` should be authored once Sprint 11 starts (Day 1 of Sprint 11 — not now). The QA plan should classify each Must Have by required test evidence per `production/qa/qa-plan-sprint-10-2026-05-05.md` precedent.
+
+## Closure Notes (pre-Sprint-11 autonomous progress)
+
+### S11-M1 — Story 008: scene_boundary_persist signal emission — DONE 2026-05-05
+
+Pre-emptive Sprint 11 work begun after Sprint 10 close (S10-S3 recovery merged, full suite 1096/1096 PASS clean baseline). "Honest dependency status check" pre-flight confirmed:
+
+- ✅ Signal `scene_boundary_persist(reason: String)` declared at `src/core/scene_manager/scene_manager.gd:148`
+- ✅ Listener wired in `SaveLoadSystem._ready` at line 252 (`scene_manager.scene_boundary_persist.connect(_on_scene_boundary_persist)`)
+- ✅ Handler method `_on_scene_boundary_persist(reason: String)` exists at line 925 (Story 012 STUB, body=`pass`)
+- ❌ **Signal NEVER emits anywhere** — Story 008 was 0% implemented; the deferred `# Story 008 implements emission` comment at the signal declaration matched reality.
+
+**What shipped**:
+- Two emit sites added in `scene_manager.gd._execute_transition`:
+  - `if screen_id == "dungeon_run_view": scene_boundary_persist.emit("pre_dungeon_entry")` — fires BEFORE old screen's on_exit (so SaveLoadSystem can persist current state before the dungeon transition starts).
+  - `if old_id == "victory_moment": scene_boundary_persist.emit("post_victory_exit")` — fires AFTER old screen's on_exit (so the just-finalized victory state persists).
+- Both emissions are synchronous in this story. Story 012 (S11-M3) extends the pre_dungeon_entry emission with `await SaveLoadSystem.save_completed` to gate the transition on persist completion per Save/Load GDD Rule 5 row 5 async-signal pattern. The await lands when SaveLoadSystem._on_scene_boundary_persist body is implemented (currently STUB).
+
+**Verification** — new test suite `tests/integration/scene_manager/scene_boundary_persist_emission_test.gd`, **7/7 PASS** (1.7s total):
+- Group A: signal declared (locks contract).
+- Group B: 3 emission timing tests — pre_dungeon_entry on entry to dungeon_run_view (count=1); post_victory_exit on exit from victory_moment (count=1); both fire on victory_moment → dungeon_run_view transition (size=2).
+- Group C: 2 negative-path tests — guild_hall → main_menu emits 0 (size=0); main_menu → formation_assignment emits 0 (size=0). Locks the GDD's "only these two transitions" constraint.
+- Group D: payload contract — `assert_array(_emitted_reasons).contains_exactly(["pre_dungeon_entry"])` locks the literal string. Future refactors can't silently rename and break SaveLoadSystem's reason-based branching when Story 012 implements it.
+
+Full scene_manager suite post-S11-M1: **172/172 PASS, 0 errors / 0 failures** (was 165 before adding 7 new tests).
+
+**Sprint 11 progress**: 1/4 Must Haves done. Next per sprint-11.md sequencing: **S11-M2 (Story 011: TickSystem heartbeat accumulator + heartbeat partial envelope path)** — 1.5d nominal, depends on S11-M1.

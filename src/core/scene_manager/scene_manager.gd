@@ -524,11 +524,29 @@ func _execute_transition(screen_id: String, transition: int) -> void:
 	var old_screen: Control = current_screen
 	var old_id: String = current_screen_id
 
+	# Story 008 (S11-M1): scene_boundary_persist emission. The signal fires only
+	# on the two specific transitions called out in the signal's contract
+	# (declaration above): "before entering dungeon_run_view AND after exiting
+	# victory_moment". Other transitions DO NOT fire it.
+	#
+	# Sprint 11 timing: synchronous emission. Story 012 (S11-M3) extends the
+	# emission with `await SaveLoadSystem.save_completed` to gate the transition
+	# on persist completion per Save/Load GDD Rule 5 row 5 async-signal pattern.
+	# That `await` lands when SaveLoadSystem._on_scene_boundary_persist body is
+	# implemented (currently STUB body=pass).
+	if screen_id == "dungeon_run_view":
+		scene_boundary_persist.emit("pre_dungeon_entry")
+
 	# AC H-02: on_exit fires BEFORE tween start — synchronous, never deferred.
 	# Per Story 004: direct call is safe (all screens extend Screen base class).
 	if old_screen != null:
 		old_screen.on_exit()
 		old_screen.queue_free()
+
+	# Story 008 emission for "post_victory_exit" — fires AFTER victory_moment's
+	# on_exit hook so SaveLoadSystem can persist the just-finalized victory state.
+	if old_id == "victory_moment":
+		scene_boundary_persist.emit("post_victory_exit")
 
 	# Instantiate incoming screen.
 	var packed: PackedScene = _screen_registry.get(screen_id) as PackedScene
