@@ -93,6 +93,7 @@ const CONSUMER_PATHS: PackedStringArray = [
 	"/root/FormationAssignment",
 	"/root/Recruitment",
 	"/root/DungeonRunOrchestrator",
+	"/root/AudioRouter",  # S11-S3: registered post-Story-007a for AC-AS-09 round-trip
 ]
 
 # ---------------------------------------------------------------------------

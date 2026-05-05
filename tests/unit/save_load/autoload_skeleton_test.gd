@@ -18,16 +18,17 @@ const LoadResultScript = preload("res://src/core/save_load_system/load_result.gd
 # ---------------------------------------------------------------------------
 # Test Group 1 — TR-save-load-031 / TR-save-load-034: CONSUMER_PATHS list
 #
-# Verifies the exact 6-entry ordered PackedStringArray declared as a constant.
+# Verifies the exact 7-entry ordered PackedStringArray declared as a constant.
 # Fails if any path is reordered, added, or removed without a lockstep ADR edit.
+# AudioRouter (rank 16) registered post-S11-S3 for AC-AS-09 round-trip.
 # ---------------------------------------------------------------------------
 
-func test_save_load_system_consumer_paths_has_exactly_6_entries() -> void:
+func test_save_load_system_consumer_paths_has_exactly_7_entries() -> void:
 	# Arrange / Act — constant; no instance needed
 	var paths: PackedStringArray = SaveLoadScript.CONSUMER_PATHS
 
 	# Assert
-	assert_int(paths.size()).is_equal(6)
+	assert_int(paths.size()).is_equal(7)
 
 
 func test_save_load_system_consumer_paths_first_entry_is_economy() -> void:
@@ -35,7 +36,7 @@ func test_save_load_system_consumer_paths_first_entry_is_economy() -> void:
 
 
 func test_save_load_system_consumer_paths_order_matches_canonical_spec() -> void:
-	# Assert — full canonical order per ADR-0003 Amendment #2 + ADR-0004
+	# Assert — full canonical order per ADR-0003 Amendment #2 + #5 + ADR-0004
 	var expected: PackedStringArray = PackedStringArray([
 		"/root/Economy",
 		"/root/HeroRoster",
@@ -43,6 +44,7 @@ func test_save_load_system_consumer_paths_order_matches_canonical_spec() -> void
 		"/root/FormationAssignment",
 		"/root/Recruitment",
 		"/root/DungeonRunOrchestrator",
+		"/root/AudioRouter",
 	])
 	var actual: PackedStringArray = SaveLoadScript.CONSUMER_PATHS
 

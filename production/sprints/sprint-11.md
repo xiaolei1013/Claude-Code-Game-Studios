@@ -600,3 +600,41 @@ The autonomous-execution session has produced design + implementation work that 
 - ✓ Cross-system contract dependencies fulfilled (HeroRoster.get_copies_owned, Economy.flush_offline_signals, Orchestrator.flush_offline_signals)
 
 Sprint 12+ implementation can begin without further upstream design or contract work.
+
+### S11-S3 — AudioRouter CONSUMER_PATHS registration + AC-AS-09 round-trip — DONE 2026-05-05
+
+Closes the first Sprint 11 Should Have post-bonus-work. Per audio-system.md §K Story 2: "Volume API + Settings persistence round-trip (AC-AS-09)." Pre-flight investigation (per the S10-S3 lesson on deferral discipline + the Honest Dependency Status Check) revealed that the **AudioRouter's get_save_data / load_save_data + _apply_to_audio_server were already wired in S11-S2** (the skeleton implementation was more complete than the deferral note implied). The actual missing piece was a 2-line lockstep edit: registering `/root/AudioRouter` in `SaveLoadSystem.CONSUMER_PATHS`.
+
+Per the audio-system.md §K Resolution note line 467: "Sprint 12+ Story 2 owns the `SaveLoadSystem.CONSUMER_PATHS` lockstep edit when consumer-discovery body is implemented (currently STUB per Story 007 deferral)." Story 007 / 007a is now DONE — the consumer-discovery body is real — so the lockstep edit is unblocked.
+
+**What shipped — code**:
+- `src/core/save_load_system/save_load_system.gd` line 89: `/root/AudioRouter` appended to `CONSUMER_PATHS` (now 7 entries, was 6). Position last per ADR-0003 Amendment #5 rank-16 convention. Position-last preserves the existing happy-path-deferral test's index-3 crash semantics (FormationAssignment crash precedes AudioRouter at index 6, so adding AudioRouter at the end is index-neutral for current crash-point analysis).
+
+**What shipped — tests**:
+- `tests/unit/audio_router/volume_persistence_round_trip_test.gd` — NEW 9-test suite, 3 groups:
+  - Group A (5): round-trip behavior — master, music, sfx, mute, all-four-fields. Verifies AudioRouter A → get_save_data → fresh AudioRouter B → load_save_data → AudioServer reflects loaded value (the AC-AS-09 contract).
+  - Group B (2): defaults on missing/corrupt fields — empty dict applies all defaults; partial dict (only master_volume_db) uses defaults for music/sfx/mute (per audio-system.md §E.2 corrupt-save policy).
+  - Group C (2): CONSUMER_PATHS membership lock — AudioRouter is registered; AudioRouter is last in order (locks the rank-16 convention).
+- `tests/unit/save_load/autoload_skeleton_test.gd` — sentinel size assertion bumped 6→7 + canonical-order spec extended with `/root/AudioRouter` (ADR-0003 Amendment #2 + #5 reference).
+- `tests/unit/save_load/request_full_persist_test.gd` — sentinel size assertion bumped 6→7; happy-path autoload-presence count bumped 4→5 (post-AudioRouter, 5 of 7 autoloads have get_save_data; the 2 unimplemented FormationAssignment + Recruitment remain as deferral signal).
+
+**What shipped — docs**:
+- `design/gdd/audio-system.md` §K OQ-AS-1 Resolution note (line 467) — strikethrough on the "Sprint 12+ Story 2 owns the lockstep edit" deferral; appended a "CONSUMER_PATHS lockstep edit completed Sprint 11 S11-S3 (2026-05-05) post-Story-007a" closure note. AC-AS-09 round-trip is now wired end-to-end.
+
+**Verification**:
+- New round-trip suite: **9/9 PASS** (103ms).
+- Updated request_full_persist sentinel: **9/9 PASS** (62ms; 2 changed tests, 7 unchanged still pass).
+- Updated autoload_skeleton consumer-paths spec: passes inline.
+- Full unit + integration sweep: **1237 / 1237 PASS, 0 errors / 0 failures** (was 1228 + 9 new tests).
+- **No regressions**.
+
+**Why this was a 0.25d job, not a 0.5d job**: the original Sprint 11 estimate (S11-S3 = 0.5d "Volume API + Settings persistence round-trip") assumed the volume API + persistence wiring needed implementation. S11-S2 had already shipped both. The lockstep + tests + GDD note close was ~30 min of actual work. **This is a positive deferral lesson**: the Sprint 11 estimate was conservative, and the pre-flight investigation (per S10-S3 discipline) correctly identified the small actual scope.
+
+**Sprint 11 progress after S11-S3**: 20 commits this session. Sprint 11: 3.5/4 Must Haves + **2/5 Should Haves** (S11-S2 ✓ + S11-S3 ✓) + 11 bonus stories (007a + M3b + M3c + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8).
+
+**Remaining Sprint 11 Should Haves**:
+- S11-S1 (offline modal) — depends on S11-M3 + S11-M4 (Story 016 / save-persist end-to-end was the deferred Must Have); not yet tractable.
+- S11-S4 (audio signal subscriptions) — handlers are wired (`_on_*` stubs); Sprint 12+ Story 3 owns actual cue-play implementation per audio-system.md §K. Currently deferred.
+- S11-S5 (re-playtest with persisted save) — requires Story 016 done; deferred.
+
+So S11-S3 is the last Sprint 11 Should Have closeable in autonomous-execution mode — the remaining 3 all depend on the Story-016 surface that was deferred this sprint.
