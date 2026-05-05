@@ -31,6 +31,7 @@ EnemyDatabase="*res://src/core/enemy_database/enemy_database.gd"
 BiomeDungeonDatabase="*res://src/core/biome_dungeon_database/biome_dungeon_database.gd"
 HeroRoster="*res://src/core/hero_roster/hero_roster.gd"
 SceneManager="*res://src/core/scene_manager/scene_manager.gd"
+FloorUnlock="*res://src/core/floor_unlock_system/floor_unlock_system.gd"
 DungeonRunOrchestrator="*res://src/core/dungeon_run_orchestrator/dungeon_run_orchestrator.gd"
 AudioRouter="*res://src/core/audio_router/audio_router.gd"
 

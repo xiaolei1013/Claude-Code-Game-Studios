@@ -6,7 +6,7 @@ Accepted
 
 ## Date
 
-2026-04-22 (amended 2026-04-22 #1: rank invariant phrasing; amended 2026-04-22 #2: ranks 8 and 9 removed; amended 2026-04-22 #3: `_init(args)` superseded; amended 2026-04-26 #4: rank 8 = SceneManager; amended 2026-05-05 #5: rank 16 = AudioRouter — see §Amendments)
+2026-04-22 (amended 2026-04-22 #1: rank invariant phrasing; amended 2026-04-22 #2: ranks 8 and 9 removed; amended 2026-04-22 #3: `_init(args)` superseded; amended 2026-04-26 #4: rank 8 = SceneManager; amended 2026-05-05 #5: rank 16 = AudioRouter; amended 2026-05-05 #6: rank 10 = FloorUnlockSystem registered under autoload name `FloorUnlock` — see §Amendments)
 
 ## Last Verified
 
@@ -463,3 +463,23 @@ Story S11-S2 (AudioRouter autoload skeleton + bus layout + ADR-0003 amendment) r
 - `SaveLoadSystem.CONSUMER_PATHS` — entry NOT added in this amendment (deferred to Sprint 12+ Story 2 alongside SaveLoadSystem-side consumer discovery). The deferral is documented as an explicit gap that Sprint 12+ implementation must close.
 - audio-system.md §I.1 (OQ-AS-1) marked RESOLVED with this amendment as the resolution path.
 - Lockstep edit status: (a) this ADR amended ✓, (b) `architecture.md` updated ✓, (c) `project.godot` updated ✓, (d) `SaveLoadSystem.CONSUMER_PATHS` deferred (Sprint 12+ — explicit gap, not silent).
+
+### Amendment #6 — 2026-05-05: FloorUnlockSystem implementation lands at rank 10
+
+Story S11-X1 (FloorUnlockSystem implementation) per the Sprint 11 unblock cascade after Story 007a (`request_full_persist` body) showed that the deferred consumer ecosystem was the actual blocker for happy-path Story 007 testing. FloorUnlockSystem was the only one of the 3 missing CONSUMER_PATHS autoloads (FloorUnlock, FormationAssignment, Recruitment) with a complete + APPROVED-for-MVP-runtime GDD (Pass-9 + Pass-PROBE-EXECUTED, 2026-04-21). The other two need GDD authoring before implementation.
+
+**Analysis at implementation time (2026-05-05)**:
+- The architecture.md rank table had `FloorUnlockSystem` listed at rank 10 since the original architecture authoring (Sprint 4-era documentation work).
+- `project.godot` did NOT yet have a `FloorUnlock` entry in the `[autoload]` section — the rank table-as-canonical-source was authored before the autoload was implemented.
+- `SaveLoadSystem.CONSUMER_PATHS` ALREADY listed `/root/FloorUnlock` (since Sprint 4); it was a forward-reference to the unimplemented autoload that this story closes.
+- Class declaration is `class_name FloorUnlockSystem extends Node`; autoload registration name is `FloorUnlock` (the shorter form used at call sites per GDD §C.3 D2 decision — class_name and autoload name are intentionally orthogonal).
+
+**Decision**: FloorUnlockSystem is implemented at autoload name `FloorUnlock`, rank 10 (Feature layer per architecture.md). Closes the architecture.md rank-table forward-reference.
+
+**Impact**:
+- `project.godot [autoload]` — `FloorUnlock` entry added between `SceneManager` (rank 8) and `DungeonRunOrchestrator` (rank 14), satisfying rank-10 position. The intervening rank 9 remains VACANT per Amendment #2.
+- `architecture.md` §Autoload Rank Table — no edit needed (rank 10 row was already present and referenced FloorUnlockSystem). The `Status: Not Started` notation in `design/gdd/systems-index.md` row 16 should be promoted to "Implemented (Sprint 11 S11-X1)" in a follow-up systems-index update.
+- `SaveLoadSystem.CONSUMER_PATHS` — `/root/FloorUnlock` was already in the list (index 2). No edit needed. The autoload now resolves where the consumer-discovery code expected it.
+- FloorUnlockSystem subscribes to `DungeonRunOrchestrator.floor_cleared_first_time` at `_ready()` per the GDD §C.3 ordering. Per ADR-0003 §Signal SUBSCRIPTION rule, rank 10 → rank 14 forward subscription is safe at `_ready()` time (signal objects exist on Node instantiation, before any `_ready()` fires; [VERIFIED]).
+- Pass-PROBE-EXECUTED designer-UI integration deferred per the GDD's I.11 update — runtime fallback (`ProjectSettings.get_setting(key, default)`) is what the implementation uses. V1.0 multi-biome work owns the proper @tool/EditorPlugin integration.
+- Lockstep edit status: (a) this ADR amended ✓, (b) `architecture.md` already had the rank — no edit needed, (c) `project.godot` updated ✓, (d) `SaveLoadSystem.CONSUMER_PATHS` already listed it — no edit needed.

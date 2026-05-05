@@ -316,3 +316,49 @@ New unit suite `tests/unit/dungeon_run_orchestrator/save_load_consumer_surface_t
 Full unit + integration sweep: **1166 / 1166 PASS, 0 errors / 0 failures** (was 1156 + 10 new tests).
 
 **Consumer-ecosystem gap update** (sentinel test in `request_full_persist_test.gd`): DungeonRunOrchestrator is at /root/ already (so the *autoload-presence* sentinel still asserts 3 of 6); but now with `get_save_data` implemented, the **method-presence** dimension shifts from "0 of 3 present have get_save_data" to "1 of 3" (Economy + HeroRoster already had it; orchestrator now joins). The remaining 3 missing autoloads (FloorUnlock + FormationAssignment + Recruitment) are the actual blockers for happy-path round-trip testing. Sprint 12+ owns landing those.
+
+### S11-X1 — FloorUnlockSystem implementation — DONE 2026-05-05
+
+Closes 1 of the 3 missing consumer autoloads. FloorUnlockSystem's GDD is the only one of the 3 with a complete + APPROVED-for-MVP-runtime design pass (Pass-9 + Pass-PROBE-EXECUTED 2026-04-21); FormationAssignment + Recruitment GDDs do not exist yet.
+
+**What shipped — code**:
+- `src/core/floor_unlock_system/floor_unlock_system.gd` — full implementation per GDD R1-R10 + §C.2 + Save/Load Rule 10:
+  - Public API: `is_unlocked(floor_index)`, `is_biome_available(biome_id)`, `is_biome_completed(biome_id)`, `get_available_biomes()`, `get_highest_cleared(biome_id)`, `get_floor_state(biome_id, floor_index)` per R1.
+  - Save/Load consumer surface: `get_save_data()` returns `{"highest_cleared": {biome_id: int}}`; `load_save_data(d)` with full per-value processing (type guard → lossy-cast warning → cast → under-range clamp → over-range clamp → write) per GDD §E.
+  - Signal handler: `_on_floor_cleared_first_time(floor_index, biome_id, losing_run)` with R9 idempotent advance (max() form), R5 LOSING-identical (losing_run accepted but not read), Pass-9 3-step validation (biome_available → BIOME_FLOOR_COUNT presence → floor_index range).
+  - `FloorState` enum (UNAVAILABLE / LOCKED / ACCESSIBLE / CLEARED) per §C.2.
+  - DI loggers (`_warning_logger` / `_error_logger`) per R1-DI-pattern for testability.
+  - Debug API (`debug_set_highest_cleared` + `debug_reset`) guarded by `OS.is_debug_build()`.
+  - `_ready()` reads `active_biome_mvp` from ProjectSettings runtime fallback (designer-UI integration deferred per Pass-PROBE-EXECUTED I.11 — runtime fallback is what works), validates against DataRegistry's active biomes, populates `BIOME_FLOOR_COUNT` from biome.dungeons[0].floors, seeds R2 fresh-save default, subscribes to Orchestrator.
+
+**What shipped — config + docs**:
+- `project.godot [autoload]` — `FloorUnlock` entry added between `SceneManager` (rank 8) and `DungeonRunOrchestrator` (rank 14), satisfying rank-10 position.
+- `docs/architecture/ADR-0003-autoload-rank-table-canonical.md` — Amendment #6 (2026-05-05) documenting the FloorUnlockSystem implementation lockstep edits + class_name/autoload-name orthogonality + Pass-PROBE-EXECUTED designer-UI deferral.
+- Header date + Last Verified updated.
+
+**Implementation note** (caught + fixed mid-session, worth memory entry): the GDD example code referenced `DataRegistry.get_all_ids("biomes")` but the actual DataRegistry public API is `get_all_by_type(content_type) -> Array[Resource]`. The semantics are equivalent (iterate biomes, filter by status="active") but the call shape differs — biome IDs come off the resolved Resource via `biome.get("id")` rather than from a separate ID-list call. GDD example code is a forward-reference, not a guarantee about DataRegistry's API.
+
+**Implementation note 2** (test-fixture typed-dict): the production field `BIOME_FLOOR_COUNT: Dictionary[String, int]` rejects untyped `{"forest_reach": 5}` literal assignment from tests — runtime type error. Test fixtures must use explicit typed local variables (`var bfc: Dictionary[String, int] = {...}; fu.BIOME_FLOOR_COUNT = bfc`). Saved as a memory note for future test-fixture authors.
+
+**Verification — new unit suite** `tests/unit/floor_unlock_system/floor_unlock_system_test.gd` — 30/30 PASS:
+- Group A (3): autoload presence + project.godot lockstep + rank-10 ordering between SceneManager and DungeonRunOrchestrator.
+- Group B (1): R1 public API method existence (10 methods).
+- Group C (2): R2 fresh-save default ({"forest_reach": 0}) + planned_v1 biomes not seeded.
+- Group D (6): §C.2 FloorState derivation — UNAVAILABLE / LOCKED-on-zero / LOCKED-out-of-range / ACCESSIBLE-on-fresh / LOCKED-beyond-accessible / CLEARED-at-or-below-highest.
+- Group E (4): is_unlocked semantics — accessible-true / locked-false / R10-sentinel-zero / cleared-true.
+- Group F (6): signal handler — first-clear advance / idempotent / no-decrement-on-lower-replay / LOSING-identical-to-WIN / unavailable-biome-error / invalid-floor-index-error.
+- Group G (8): get/load_save_data — canonical schema / mutation isolation / round-trip / missing-key fresh-default / under-range clamp / over-range clamp / non-numeric warn-and-zero / lossy-float-cast warning.
+
+**Sentinel test update**: `request_full_persist_test.gd` Group D sentinel was tripping by design (asserted `present == 3`; now 4 with FloorUnlock added). Updated to assert `present == 4` with new docstring listing the remaining 2 unimplemented (FormationAssignment + Recruitment).
+
+**Full unit + integration sweep**: **1196 / 1196 PASS, 0 errors / 0 failures** (was 1166 + 30 new tests).
+
+**Sprint 11 progress after S11-X1**: Sprint 11 has now produced an unprecedented amount of pre-emptive work for autonomous mode. Counting since 2026-05-05 session start: 12 commits, 3.5/4 Sprint 11 Must Haves + 1/5 Should Haves + Story 007a + S11-M3b + S11-M3c + S11-X1 + various Sprint 10 closures. The investigation-before-execution discipline keeps paying off — Story 007 was originally "2-3d defer", became 90 min; the consumer ecosystem was originally "Sprint 12+ multi-story", became 2 closures (M3c + X1) in the same session.
+
+**Remaining Sprint 11 / 12 work** (genuinely needs design or asset sourcing):
+- **FormationAssignment + Recruitment autoloads** — GDDs don't exist; Sprint 12+ design pass needed.
+- **Audio asset sourcing** + DataRegistry sfx/music category amendment for S11-S3/S4/N1-N3 unblock.
+- **OfflineProgressionEngine (rank 15)** for S11-M3c full resume path + S11-S5 re-playtest meaningful.
+- **S11-M4 end-to-end story 016 integration test** — depends on the two autoload gaps + OfflineProgressionEngine.
+
+The first three are Sprint 12+ design / asset / implementation work; S11-M4 follows.
