@@ -54,24 +54,25 @@ const _TRANSITION_TIMEOUT_MS: int = 2000
 # Sets sm.state = IDLE so it's ready for direct request_screen calls.
 # ---------------------------------------------------------------------------
 func _make_wired_scene_manager() -> Array:
-	# Instantiate a fresh SceneManager (not added to tree yet)
+	# Sprint 11 S10-S3 fix: order matters. add_child(sm) FIRST while MainRoot is
+	# absent from /root, so sm._ready() → _on_registry_ready() hits the test-env
+	# guard at scene_manager.gd:959 and skips the boot auto-route to guild_hall.
+	# Adding MainRoot AFTER avoids the boot transition racing with the test's
+	# explicit request_screen calls. Boot auto-route was the root cause of
+	# `_execute_transition requires IDLE state` assertion failures.
 	var sm: Node = SceneManagerScript.new()
 	sm.state = SceneManagerScript.State.IDLE
+	add_child(sm)
+	await get_tree().process_frame
 
-	# Instantiate MainRoot from the committed scene file
 	var packed_main_root: PackedScene = load(MAIN_ROOT_SCENE_PATH) as PackedScene
 	assert_object(packed_main_root).is_not_null()
 	var main_root: Control = packed_main_root.instantiate() as Control
 	assert_object(main_root).is_not_null()
-
-	# Add MainRoot to tree under root so _get_screen_container() can resolve it
 	get_tree().root.add_child(main_root)
 	await get_tree().process_frame
 
-	# Add SceneManager to tree so tween/call_deferred works correctly
-	add_child(sm)
-	await get_tree().process_frame
-
+	sm.state = SceneManagerScript.State.IDLE
 	return [sm, main_root]
 
 

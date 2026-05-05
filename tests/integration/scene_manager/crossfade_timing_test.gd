@@ -36,19 +36,21 @@ const MAIN_ROOT_SCENE_PATH: String = "res://src/core/scene_manager/MainRoot.tscn
 # Returns [sm_instance, main_root_instance].
 # ---------------------------------------------------------------------------
 func _make_wired_scene_manager() -> Array:
+	# Sprint 11 S10-S3 fix: see modal_overlay_counter_test.gd _make_wired_sm
+	# header comment for full rationale. Order matters — sm BEFORE MainRoot.
 	var sm: Node = SceneManagerScript.new()
 	sm.state = SceneManagerScript.State.IDLE
+	add_child(sm)
+	await get_tree().process_frame
 
 	var packed_main_root: PackedScene = load(MAIN_ROOT_SCENE_PATH) as PackedScene
 	assert_object(packed_main_root).is_not_null()
 	var main_root: Control = packed_main_root.instantiate() as Control
 	assert_object(main_root).is_not_null()
-
 	get_tree().root.add_child(main_root)
 	await get_tree().process_frame
-	add_child(sm)
-	await get_tree().process_frame
 
+	sm.state = SceneManagerScript.State.IDLE
 	return [sm, main_root]
 
 

@@ -95,11 +95,11 @@ stories:
     name: "scene_manager test env flakes cleanup (S9-N1 carry, promoted) — clean test signal helps Sprint 11 save-persist work"
     file: "production/sprints/sprint-10.md"
     priority: should-have
-    status: deferred-to-sprint-11
+    status: done
     owner: ""
     estimate_days: 0.5
-    blocker: "Root cause is scene_manager.gd line 617 _get_screen_container call assuming MainRoot parent; failures are not theme/UIFramework caused. Test-level defensive fixture would mask root cause; production code refactor exceeds 0.5d. Carry-forward to Sprint 11 Day 1 as save-persist pre-flight."
-    completed: ""
+    blocker: ""
+    completed: "2026-05-05 (Sprint 11 Day 1 pre-flight executed at end of Sprint 10 session — root cause was test-fixture order-of-operations, not scene_manager.gd refactor)"
 
   - id: "S10-S4"
     name: "Cross-test live-autoload contamination cleanup (S9-N2 carry, promoted) — Sprint 11 hygiene"

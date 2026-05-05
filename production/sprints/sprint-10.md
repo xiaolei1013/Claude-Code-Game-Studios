@@ -342,14 +342,32 @@ Verified via 181-test cross-suite run: 0 errors / 0 failures across ui_framework
 
 ## Sprint 10 close-out summary
 
-**Done (8 items)**: All 4 Must Haves (S10-M1, S10-M2, S10-M3, S10-M4) + 3 Should Haves (S10-S2, S10-S4, S10-S5) + 1 Nice to Have (S10-N1). Total realized: ~5.0d worth of scope completed in a single autonomous session before Day 1 of the nominal sprint.
+**Done (9 items)**: All 4 Must Haves (S10-M1, S10-M2, S10-M3, S10-M4) + 4 Should Haves (S10-S2, S10-S3, S10-S4, S10-S5) + 1 Nice to Have (S10-N1). Total realized: ~5.5d worth of scope completed in a single autonomous session before Day 1 of the nominal sprint.
 
-**Deferred (3 items)**:
+**Deferred (2 items)**:
 - **S10-S1 (Story 014 orchestrator state advancement, 1.0d)** → carry-forward to Sprint 11 backlog. Investigation revealed the architectural fix touches both orchestrator state machine + Screen base class — risk of overrun beyond the 1.25d time-box flagged in the risk register, and Sprint 11's save-persist workstream has higher leverage. The S8-M4 hotfix at the screen level remains good-enough.
-- **S10-S3 (scene_manager test env flakes, 0.5d)** → carry-forward to Sprint 11 Day 1 pre-flight. Root cause is `scene_manager.gd:617 _get_screen_container` assuming MainRoot is its parent in test envs (it isn't — test wrapper is `Node (_TestCase)`). Test-level defensive fixture would mask the root cause; production-code refactor exceeds 0.5d budget. Sprint 11 sees this as a clean-test-signal pre-flight item.
 - **S10-N2 (Re-dispatch shortcut on main_menu, 0.25d nominal)** → defer to Sprint 12 backlog. Investigation showed scope is feature work (track last formation + new bypass button + show/hide logic per dispatched-state) closer to 0.5–0.75d realistic. Sprint 11 reserves Must Have capacity for save-persist; this deferral preserves that.
 
-**Remaining capacity**: ~2.2d of the 7.2d Sprint 10 budget unspent; carry-forwards above absorb the surplus naturally into Sprint 11. The Sprint 11 save-persist workstream's 4.5–5.0d Must Have scope already accommodates these in its sequencing.
+**Remaining capacity**: ~1.7d of the 7.2d Sprint 10 budget unspent; carry-forwards above absorb the surplus naturally into Sprint 11. The Sprint 11 save-persist workstream's 4.5–5.0d Must Have scope already accommodates this in its sequencing.
+
+### S10-S3 — scene_manager test env flakes cleanup — DONE 2026-05-05 (originally deferred, then closed end-of-session)
+
+After authoring the Sprint 10 retrospective and committing the close-out (676a1bb), root-cause investigation revealed the failure mode was simpler than the retrospective claimed — and faster to fix than the deferred budget assumed. Documented here for the audit trail.
+
+**Initial diagnosis** (from retrospective, now superseded): "Root cause is `scene_manager.gd:617 _get_screen_container` assuming MainRoot is its parent in test envs; production-code refactor exceeds 0.5d budget."
+
+**Actual root cause**: test-fixture order-of-operations bug in 5 test files (`tests/unit/scene_manager/modal_overlay_counter_test.gd`, `tests/integration/scene_manager/{modal_pause_tick_coupling, request_screen_and_node_swap, crossfade_timing, formation_assignment_screen}_test.gd`). The shared `_make_wired_sm` / `_make_wired_scene_manager` helper added MainRoot to `/root` BEFORE adding the test SceneManager. The SM's `_ready()` then triggers `_on_registry_ready()`, which sees MainRoot present and **auto-routes to guild_hall by default** (per the production-code first-launch routing path at `scene_manager.gd:974+`). This boot transition then races with the test's explicit `request_screen` calls — the assertion failure `_execute_transition requires IDLE state` fires when the drain logic re-enters `_execute_transition` mid-transition.
+
+**Fix**: Reorder the helper to add SM BEFORE MainRoot. SM's `_ready` then hits the test-env early-return guard at `scene_manager.gd:959` (which fires when `/root/MainRoot` is null) and skips auto-routing entirely. MainRoot is added afterward, leaving SM in IDLE state ready for the test's explicit `request_screen` calls. No production-code changes; pure test-fixture fix in 5 files.
+
+**Verification**:
+- Per-suite isolation runs: 18/18 modal_overlay_counter ✓ (was 18 fail + 6 errors); 5/5 modal_pause_tick_coupling ✓; 13/13 crossfade_timing ✓; 24/24 request_screen_and_node_swap ✓; 16/16 formation_assignment_screen ✓.
+- Full scene_manager suite (165 tests): **165 / 165 PASS, 0 errors / 0 failures** (was 56 failures + 15 errors).
+- Full unit + integration sweep (1096 tests): **1096 / 1096 PASS, 0 errors / 0 failures**.
+
+**Lesson** (for retro update): the retro's Sprint 11 risk note ("S10-S3 in particular: save-persist integration tests will trigger the `scene_manager.gd:617` test-env coupling failure mode unless cleaned up first") was correct that the failure was a Sprint 11 risk, but wrong about the root cause. Sprint 11 save-persist tests would have hit the SAME boot-route race because they'd use the same `_make_wired_sm` helper. Closing this now removes a real risk; the retro's "production-code refactor exceeds 0.5d budget" diagnosis was over-pessimistic — the test-fixture fix took ~30 minutes including verification.
+
+**Sprint 10 progress after S10-S3**: **9 / 11 items closed (4 Must Have + 4 Should Have + 1 Nice to Have)**. Two deferred (S10-S1 to Sprint 11 backlog, S10-N2 to Sprint 12 backlog).
 
 ## Backlog (post-Sprint-11)
 

@@ -24,16 +24,26 @@ const MAIN_ROOT_SCENE_PATH: String = "res://src/core/scene_manager/MainRoot.tscn
 # State is set to IDLE so push_overlay/pop_overlay take the real path.
 # ---------------------------------------------------------------------------
 func _make_wired_sm() -> Array:
+	# Sprint 11 S10-S3 fix: order matters. add_child(sm) FIRST, while MainRoot is
+	# absent from /root, so sm._ready() → _on_registry_ready() hits the test-env
+	# guard at scene_manager.gd:959 and skips the boot auto-route to guild_hall.
+	# Adding MainRoot AFTER avoids the boot transition racing with the test's
+	# explicit request_screen calls. The boot auto-route was the root cause of
+	# `_execute_transition requires IDLE state` assertion failures: drain queue
+	# would re-enter _execute_transition while state was still TRANSITIONING.
 	var sm: Node = SceneManagerScript.new()
 	sm.state = SceneManagerScript.State.IDLE
+	add_child(sm)
+	await get_tree().process_frame
 
 	var packed: PackedScene = load(MAIN_ROOT_SCENE_PATH) as PackedScene
 	var main_root: Control = packed.instantiate() as Control
 	get_tree().root.add_child(main_root)
 	await get_tree().process_frame
 
-	add_child(sm)
-	await get_tree().process_frame
+	# State should be IDLE post-_ready due to test-env guard early-return at
+	# scene_manager.gd:959. Set defensively in case the guard moves.
+	sm.state = SceneManagerScript.State.IDLE
 
 	return [sm, main_root]
 

@@ -85,7 +85,7 @@
 
 ## Dependencies on External Factors
 
-- **Sprint 10 S10-S3 + S10-S4 done** — clean test baseline for save-persist work. Both are Should Have on Sprint 10; if not closed by Sprint 10 end, this becomes a Sprint 11 pre-flight blocker (resolve in Day 1 buffer).
+- **Sprint 10 S10-S3 + S10-S4 done** ✓ (both closed at end of Sprint 10 session — see sprint-10.md §Closure Notes for S10-S3 root-cause analysis). Sprint 11 inherits a clean test baseline; no Day 1 pre-flight needed for these. Full unit + integration suite passing 1096/1096 with 0 errors / 0 failures as of 2026-05-05 session close.
 - **Sprint 10 S10-M3 audio-system.md GDD** ✓ DONE 2026-05-05 — Sprint 11 audio implementation reads this directly.
 - **No external API/SDK dependencies**.
 
