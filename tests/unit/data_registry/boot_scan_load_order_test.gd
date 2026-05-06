@@ -157,7 +157,7 @@ func test_boot_scan_load_order_matches_ordered_categories() -> void:
 	dr._ready()
 
 	# Assert — recorded order is exactly ORDERED_CATEGORIES
-	assert_int(dr.recorded_order.size()).is_equal(8)
+	assert_int(dr.recorded_order.size()).is_equal(10)
 	assert_str(dr.recorded_order[0]).is_equal("classes")
 	assert_str(dr.recorded_order[1]).is_equal("enemies")
 	assert_str(dr.recorded_order[2]).is_equal("biomes")
@@ -166,6 +166,8 @@ func test_boot_scan_load_order_matches_ordered_categories() -> void:
 	assert_str(dr.recorded_order[5]).is_equal("matchup")
 	assert_str(dr.recorded_order[6]).is_equal("config")
 	assert_str(dr.recorded_order[7]).is_equal("name_pools")
+	assert_str(dr.recorded_order[8]).is_equal("sfx")
+	assert_str(dr.recorded_order[9]).is_equal("music")
 
 	# Cleanup
 	dr.free()
@@ -248,11 +250,11 @@ func test_boot_scan_does_not_enumerate_unknown_category_directories() -> void:
 	# Act
 	dr._ready()
 
-	# Assert — _categories contains only the eight ORDERED_CATEGORIES keys
+	# Assert — _categories contains only the ten ORDERED_CATEGORIES keys
 	# (six original + "config" added in Sprint 2 / S2-M2 + "name_pools" added
-	# in Sprint 8 / S8-N9); "bonus_category" is absent (auto-discovery is
-	# forbidden per ADR-0006).
-	assert_int(dr._categories.keys().size()).is_equal(8)
+	# in Sprint 8 / S8-N9 + "sfx" / "music" added in Sprint 12 / S12-S5);
+	# "bonus_category" is absent (auto-discovery is forbidden per ADR-0006).
+	assert_int(dr._categories.keys().size()).is_equal(10)
 	assert_bool(dr._categories.has("bonus_category")).is_false()
 	for cat: String in DataRegistry.ORDERED_CATEGORIES:
 		assert_bool(dr._categories.has(cat)).is_true()

@@ -35,6 +35,7 @@ extends Node
 ## load-time invariant, not a dependency declaration.
 const ORDERED_CATEGORIES: Array[String] = [
 	"classes", "enemies", "biomes", "dungeons", "items", "matchup", "config", "name_pools",
+	"sfx", "music",
 ]
 
 # Snake_case id regex per ADR-0011 §Load-Time Validation Semantics.

@@ -190,7 +190,7 @@ Two handlers, one signal. Neither knows about the other. The system stays loosel
 | **Music duration** | Beds: 60–180 s loops; Stingers: ≤ 5 s | Loop length avoids obvious repetition without bloating asset size. |
 | **Loop point** | Music beds: zero-crossing seamless loops authored at source (no Godot loop-fade hack) | Loop pop is the most common cozy-game audio fail. |
 | **Headroom** | -6 dB peak; -16 dB integrated LUFS for music beds; -10 dB integrated LUFS for SFX | Prevents clipping when multiple cues stack; matches mobile-target loudness norms. |
-| **Asset path** | `assets/audio/sfx/<id_without_prefix>.wav`, `assets/audio/music/<id_without_prefix>.ogg` | DataRegistry category scan pattern (ADR-0006) — `DataRegistry.resolve("sfx", "ui_tap")` returns the `.wav` resource. |
+| **Asset path** | `assets/data/sfx/<id_without_prefix>.tres` (wrapping the `.wav` stream), `assets/data/music/<id_without_prefix>.tres` (wrapping the `.ogg` stream) | DataRegistry category scan pattern (ADR-0006) — `DataRegistry.resolve("sfx", "ui_tap")` returns the `AudioStream` resource. The `.tres` carries the `id` field DataRegistry indexes by; the wrapped `.wav` / `.ogg` lives anywhere under `assets/audio/` (binary asset storage, not the indexed-content path). Pattern matches biomes / classes / dungeons category convention. |
 | **Audio bus layout** | `assets/audio/audio_bus_layout.tres` — single canonical resource | Mirrors the parchment_theme.tres pattern: one source of truth for mix. Tuned by audio-director, version-controlled, diff-friendly. |
 | **Mobile size budget** | Combined audio ≤ 8 MB at MVP (1 Guild Hall bed + 1 Forest Reach bed + ~10 SFX) | Matches mobile-port readiness target — small audio footprint keeps APK / IPA size manageable. |
 
