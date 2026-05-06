@@ -5,20 +5,22 @@
 #   /root/FormationAssignment, /root/Recruitment, /root/DungeonRunOrchestrator,
 #   /root/AudioRouter
 #
-# Live as of 2026-05-05 (after S11-X9 FormationAssignment skeleton):
+# Live as of 2026-05-05 (after S11-X10 Recruitment skeleton — consumer
+# ecosystem is now COMPLETE):
 #   - Economy (rank 3) ✓ has get_save_data
 #   - HeroRoster (rank 7) ✓ has get_save_data
 #   - FloorUnlock (rank 10) ✓ has get_save_data (S11-X1)
 #   - FormationAssignment (rank 11) ✓ has get_save_data (S11-X9, returns {})
+#   - Recruitment (rank 12) ✓ has get_save_data (S11-X10 — ADR-0015 schema:
+#     save_pool_seed + refresh_counter + current_pool)
 #   - DungeonRunOrchestrator (rank 14) ✓ has get_save_data (S11-M3c)
 #   - AudioRouter (rank 16) ✓ has get_save_data (S11-S2 + S11-S3 registration)
-#   - Recruitment ✗ unimplemented
 #
-# 6/7 autoloads present + with get_save_data. _resolve_consumer calls
-# get_tree().quit(1) on missing consumers per ADR-0004 §Consumer Contract;
-# happy-path testing against the live autoload would crash the test process
-# at Recruitment lookup (consumer index 4 — moved from index 3 because
-# FormationAssignment at index 3 now succeeds).
+# 7/7 autoloads present + with get_save_data. The original deferral sentinel
+# (Group D below) flips from "6 of 7 present" to "7 of 7 present" + an
+# updated docstring marking that the next blocker for happy-path coverage is
+# integration-test authoring (Sprint 11 S11-M4 / Story 016), not autoload
+# presence.
 #
 # Tests below cover:
 #   - State-transition guards (UNLOADED rejects with save_failed emit).
@@ -195,32 +197,31 @@ func test_save_load_system_save_failed_signal_declared() -> void:
 # that lands the happy-path coverage.
 # ===========================================================================
 
-func test_happy_path_persist_coverage_intentionally_deferred_until_consumer_ecosystem_completes() -> void:
+func test_happy_path_persist_coverage_intentionally_deferred_until_integration_test_authoring() -> void:
 	# CONSUMER_PATHS expects 7 autoloads at /root/{Economy, HeroRoster,
 	# FloorUnlock, FormationAssignment, Recruitment, DungeonRunOrchestrator,
 	# AudioRouter}.
 	#
-	# As of 2026-05-05 (post-S11-X9 FormationAssignment skeleton), 6 of 7 exist
-	# as live autoloads with get_save_data: Economy + HeroRoster + FloorUnlock
-	# (S11-X1) + FormationAssignment (S11-X9) + DungeonRunOrchestrator (S11-M3c)
-	# + AudioRouter (S11-S2/S11-S3). The remaining 1 (Recruitment) is
-	# unimplemented. Calling request_full_persist from READY state would crash
-	# via _resolve_consumer's get_tree().quit(1) at Recruitment lookup
-	# (consumer index 4 — moved from index 3 since FormationAssignment now
-	# succeeds).
+	# As of 2026-05-05 (post-S11-X10 Recruitment skeleton), 7 of 7 exist as
+	# live autoloads with get_save_data — the consumer-ecosystem gap that
+	# motivated this sentinel is now CLOSED.
 	#
-	# This sentinel test documents the remaining gap in CI output. It will
-	# be deleted in the same Sprint 12+ commit that lands the Recruitment
-	# autoload and adds happy-path round-trip coverage (envelope round-trip,
-	# atomic write semantics, TickSystem.set_last_persist_ts call,
-	# save_completed emit).
+	# The remaining gap is integration-test authoring: the happy-path round
+	# trip (envelope round-trip, atomic write semantics, TickSystem
+	# .set_last_persist_ts call, save_completed emit) needs a real test
+	# fixture that exercises request_full_persist end-to-end. That work is
+	# Sprint 11 S11-M4 (Story 016 — save-persist pipeline end-to-end). When
+	# S11-M4 lands, this sentinel should be DELETED + replaced with the
+	# real round-trip integration test.
+	#
+	# Until then, this test holds the line on "all 7 autoloads present + with
+	# get_save_data" so any regression (e.g., accidentally removing one) is
+	# loudly surfaced in CI.
 	var sl: Node = get_tree().root.get_node_or_null("SaveLoadSystem")
 	assert_int(sl.CONSUMER_PATHS.size()).is_equal(7)
-	# Verify the autoload-presence gap explicitly: 6 of 7 present today.
+	# Verify all 7 present.
 	var present: int = 0
 	for path: String in sl.CONSUMER_PATHS:
 		if get_tree().root.get_node_or_null(path) != null:
 			present += 1
-	# Hard equality so this fails if the situation changes (signal to delete
-	# this sentinel + add happy-path coverage).
-	assert_int(present).is_equal(6)
+	assert_int(present).is_equal(7)

@@ -483,3 +483,25 @@ Story S11-X1 (FloorUnlockSystem implementation) per the Sprint 11 unblock cascad
 - FloorUnlockSystem subscribes to `DungeonRunOrchestrator.floor_cleared_first_time` at `_ready()` per the GDD §C.3 ordering. Per ADR-0003 §Signal SUBSCRIPTION rule, rank 10 → rank 14 forward subscription is safe at `_ready()` time (signal objects exist on Node instantiation, before any `_ready()` fires; [VERIFIED]).
 - Pass-PROBE-EXECUTED designer-UI integration deferred per the GDD's I.11 update — runtime fallback (`ProjectSettings.get_setting(key, default)`) is what the implementation uses. V1.0 multi-biome work owns the proper @tool/EditorPlugin integration.
 - Lockstep edit status: (a) this ADR amended ✓, (b) `architecture.md` already had the rank — no edit needed, (c) `project.godot` updated ✓, (d) `SaveLoadSystem.CONSUMER_PATHS` already listed it — no edit needed.
+
+### Amendment #7 — 2026-05-05: Recruitment autoload skeleton lands at rank 12
+
+Story S11-X10 (Recruitment autoload skeleton) closes the LAST of the missing CONSUMER_PATHS autoloads. Combined with Amendment #6 (FloorUnlock, S11-X1) and S11-X9 (FormationAssignment skeleton), the consumer ecosystem is now COMPLETE — all 7 entries in `SaveLoadSystem.CONSUMER_PATHS` have live autoloads with `get_save_data` / `load_save_data` methods, unblocking the Sprint 11 S11-M4 (Story 016) end-to-end round-trip integration test.
+
+**Analysis at implementation time (2026-05-05)**:
+- The architecture.md rank table had `Recruitment` listed at rank 12 since the original architecture authoring (Sprint 4-era documentation work).
+- `project.godot` did NOT yet have a `Recruitment` entry in the `[autoload]` section — the rank table-as-canonical-source was authored before the autoload was implemented.
+- `SaveLoadSystem.CONSUMER_PATHS` ALREADY listed `/root/Recruitment` (since Sprint 4 — index 4); it was a forward-reference to the unimplemented autoload that this story closes.
+- Class declaration is `class_name Recruitment extends Node`; autoload registration name is `Recruitment` (the same — no orthogonality split for this system).
+- Recruitment subscribes to `DungeonRunOrchestrator.floor_cleared_first_time` at `_ready()` per ADR-0015 §OQ-RC-2 (free on-clear refresh trigger). Per ADR-0003 §Signal SUBSCRIPTION rule, rank 12 → rank 14 forward subscription is safe at `_ready()` time (signal objects exist on Node instantiation, before any `_ready()` fires; [VERIFIED]).
+
+**Decision**: Recruitment is implemented at autoload name `Recruitment`, rank 12 (Feature layer per architecture.md). Closes the architecture.md rank-table forward-reference + the final consumer-ecosystem gap.
+
+**Impact**:
+- `project.godot [autoload]` — `Recruitment` entry added between `FormationAssignment` (rank 11) and `DungeonRunOrchestrator` (rank 14), satisfying rank-12 position. The intervening rank 13 (Hero Leveling System per architecture.md) remains VACANT.
+- `architecture.md` §Autoload Rank Table — no edit needed (rank 12 row was already present and referenced Recruitment). The `Status: Authored` notation in `design/gdd/systems-index.md` row 14 should be promoted to "Implemented (Sprint 11 S11-X10)" in a follow-up systems-index update.
+- `SaveLoadSystem.CONSUMER_PATHS` — `/root/Recruitment` was already in the list (index 4). No edit needed. The autoload now resolves where the consumer-discovery code expected it.
+- Save namespace expands by 3 fields per ADR-0015 §Decision schema (`save_pool_seed`, `refresh_counter`, `current_pool`). Pre-Recruitment-shipped saves load with empty payload + first-launch seed init per ADR-0015 Migration Plan + Save/Load §C MVP-default-on-missing-key contract. Schema version bump per Save/Load GDD Rule 14 — Sprint 12+ Recruitment Story 6 (per recruitment-system.md §J) owns the explicit schema migration documentation.
+- Lockstep edit status: (a) this ADR amended ✓, (b) `architecture.md` already had the rank — no edit needed, (c) `project.godot` updated ✓, (d) `SaveLoadSystem.CONSUMER_PATHS` already listed it — no edit needed.
+
+**Consumer ecosystem status (post-Amendment #7)**: 7 of 7 CONSUMER_PATHS autoloads live with `get_save_data` — Economy (rank 3), HeroRoster (rank 7), FloorUnlock (rank 10), FormationAssignment (rank 11), Recruitment (rank 12), DungeonRunOrchestrator (rank 14), AudioRouter (rank 16). The Sprint 11 S11-M4 / Story 016 (save-persist end-to-end) is now unblocked.

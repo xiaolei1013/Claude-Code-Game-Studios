@@ -679,3 +679,58 @@ Per `design/gdd/formation-assignment-system.md` §C.1: a thin controller that tr
 - 6 of 7 CONSUMER_PATHS autoloads are now live (only Recruitment remains).
 - Recruitment Story 1 is the next-tractable autonomous-friendly unit (~1d, against the locked ADR-0015 decisions). After Recruitment, the Story-016 happy-path-deferral sentinel can be DELETED + happy-path round-trip coverage added — that's the actual cascade close.
 - Or: Sprint 12 sprint-plan authoring is the alternative natural stopping point (a single artifact summarizing the now-locked design + sequencing for Sprint 12+).
+
+### S11-X10 — Recruitment autoload skeleton (Sprint 12 Story 1 pre-emptive) — DONE 2026-05-05
+
+Closes the LAST CONSUMER_PATHS autoload gap. **All 7 of 7 CONSUMER_PATHS autoloads are now live** with `get_save_data` / `load_save_data`. The original Story-016 happy-path-deferral sentinel (`request_full_persist_test.gd` Group D) is no longer blocked on autoload presence — only on integration-test authoring. **S11-M4 is unblocked**.
+
+Per `design/gdd/recruitment-system.md` §C.1 + ADR-0015 (Pool Determinism + Refresh + Cost-Curve): Recruitment is a thin coordinator chaining Economy.try_spend → HeroRoster.add_hero atomically; owns the deterministic, save-seeded recruit pool generated via `RandomNumberGenerator` with seed = `_save_pool_seed XOR _refresh_counter`. Hybrid refresh cadence (free on `floor_cleared_first_time` + paid on-demand via `refresh_pool_paid()`); cost-curve interaction is global per-class (reads `HeroRoster.get_copies_owned`).
+
+**What shipped — code**:
+- `src/core/recruitment/recruitment.gd` — NEW autoload (~330 lines), full implementation per GDD §C.3 + ADR-0015:
+  - `RecruitOutcome` enum (5 values per §C.1) — SUCCESS / INSUFFICIENT_GOLD / ROSTER_FULL / INVALID_POOL_INDEX / UNRESOLVABLE_CLASS_ID.
+  - Public API: `try_recruit(pool_index) -> RecruitOutcome`, `get_recruit_pool() -> Array[String]`, `get_recruit_cost(pool_index) -> int`, `refresh_pool() -> void`, `refresh_pool_paid() -> bool`, `refresh_cost(refreshes_today) -> int`, `get_save_data() -> Dictionary`, `load_save_data(d) -> void`.
+  - Signals: `hero_recruited(hero_instance_id, class_id, cost_paid)` (3-arg, distinct from HeroRoster.hero_recruited 1-arg) + `pool_refreshed(new_pool)` (1-arg).
+  - 5-step transaction flow per §C.3 with refund path on add_hero contract violation (§C.4 atomic discipline).
+  - Persisted state per ADR-0015 Decision schema: `_save_pool_seed` (randi at first launch), `_refresh_counter`, `_current_pool: Array[String]`. Session-only `_refreshes_today` (resets on app boot per OQ-0015-1 MVP).
+  - `_first_launch_seed_init` defensive non-zero loop; `_regenerate_pool` deterministic via XOR seed; `_get_active_class_ids` via DataRegistry.get_all_by_type filtering by status="active".
+  - On-clear free refresh subscription to `DungeonRunOrchestrator.floor_cleared_first_time` at `_ready` (rank-12 → rank-14 forward-subscribe is safe per ADR-0003 §Signal SUBSCRIPTION rule).
+  - DI loggers (`_warning_logger` / `_error_logger`) per FloorUnlock S11-X1 testability pattern.
+  - `class_name` omitted to avoid the "class_name hides an autoload singleton" parse error (matches FormationAssignment + AudioRouter pattern; the GDD §C.1 example's literal `class_name Recruitment` is a design-spec stub).
+
+**What shipped — config + lockstep**:
+- `project.godot [autoload]` — `Recruitment` entry added between `FormationAssignment` (rank 11) and `DungeonRunOrchestrator` (rank 14), satisfying rank-12 position. The intervening rank 13 (Hero Leveling System) remains VACANT.
+- `docs/architecture/ADR-0003-autoload-rank-table-canonical.md` — Amendment #7 (2026-05-05) documenting the Recruitment implementation lockstep edits + class_name/autoload-name orthogonality + consumer-ecosystem closure status.
+- `SaveLoadSystem.CONSUMER_PATHS` — already listed `/root/Recruitment` at index 4 (no edit needed).
+
+**What shipped — tests**:
+- `tests/unit/recruitment/recruitment_skeleton_test.gd` — NEW 23-test suite, 6 groups:
+  - Group A (8): public API surface lock — 7 method-existence tests + RecruitOutcome enum has exactly 5 values.
+  - Group B (2): signal arity — hero_recruited + pool_refreshed declarations.
+  - Group C (3): refresh_cost curve (n=0 → 100; n=1 → 300; n=5 → 1100 per ADR-0015 examples).
+  - Group D (2): _regenerate_pool determinism — same (seed, counter) pair produces identical pools (ADR-0015 §Validation Criteria); pool size matches POOL_SIZE when classes available.
+  - Group G (6): Save/Load consumer surface — 3-field schema; pool-copy mutation isolation; round-trip preserves seed/counter/pool; empty-dict first-launch init; non-int seed warns + re-inits; non-string pool entries filtered.
+  - Group H (2): autoload presence at `/root/Recruitment` + CONSUMER_PATHS index 4 cross-check.
+
+**What shifted — sentinel test update**:
+- `tests/unit/save_load/request_full_persist_test.gd` Group D — sentinel renamed from `..._until_consumer_ecosystem_completes` to `..._until_integration_test_authoring`; `present == 6` bumped to `present == 7`; docstring updated to reflect that the next blocker is S11-M4 (Story 016 integration test authoring), not autoload presence. Signal to delete this sentinel + replace with real round-trip integration test when S11-M4 lands.
+
+**Implementation note** (caught + fixed mid-session): `class_name Recruitment` from the GDD §C.1 example collides with the autoload singleton named `Recruitment` (Godot 4.6 parse error: "Class hides an autoload singleton"). Two viable patterns in this codebase:
+- FloorUnlockSystem (S11-X1): `class_name FloorUnlockSystem` distinct from autoload `FloorUnlock`.
+- FormationAssignment / AudioRouter: no `class_name` declaration at all.
+The Recruitment GDD has no naming-orthogonality split, so the FormationAssignment pattern (drop class_name) was chosen. Saved as a memory note for future autoload authors.
+
+**Implementation note 2** (test-fixture typed-Array): Like FloorUnlock's `BIOME_FLOOR_COUNT: Dictionary[String, int]` typed-dict gotcha, Recruitment's `_current_pool: Array[String]` rejects untyped `[]` literal assignment from tests at runtime. Test fixtures must use explicit typed locals (`var pool: Array[String] = ["warrior"]; r._current_pool = pool`). Six test errors caught + fixed mid-session.
+
+**Verification**:
+- New skeleton suite: **23/23 PASS** (293ms).
+- Sentinel + adjacent suites (save_load + formation_assignment + floor_unlock_system + audio_router): **179/179 PASS** (2.3s).
+- Full unit + integration sweep: **1271 / 1271 PASS, 0 errors / 0 failures** (was 1248 + 23 new tests).
+- **No regressions** despite a new autoload entering `/root/` + the schema-bearing save consumer joining the discovery iteration.
+
+**Cross-system contract closure**:
+- Consumer ecosystem: 7/7 CONSUMER_PATHS autoloads live (was 6/7).
+- Sprint 12+ Recruitment Stories 0a (ADR-X04) ✓ already done as ADR-0015 (S11-X8). Story 0b (get_copies_owned) ✓ already done (S11-X5). Story 1 (skeleton) ✓ done as S11-X10. **Stories 2-8 remain Sprint 12+ scope** — full try_recruit happy-path tests, refund-path test, pool-generation choice (OQ-0015-2 dedup policy), cost-stability invariant test, RecruitScreen wire-up, AC-RC-14 CI grep.
+- Sprint 11 S11-M4 (Story 016 end-to-end) is now genuinely unblocked. The sentinel test signals the remaining work: integration-test authoring against the live consumer chain.
+
+**Sprint 11 progress after S11-X10**: 22 commits this session. Sprint 11: 3.5/4 Must Haves + 2/5 Should Haves + **13 bonus stories** (007a + M3b + M3c + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10). The autonomous-execution session has effectively bridged Sprint 11 → Sprint 12 — every consumer-ecosystem prereq for Story 016 happy-path round-trip is now fulfilled; the remaining work is genuinely integration-test authoring (the original S11-M4 scope).
