@@ -341,24 +341,65 @@ func test_run_pacing_idempotency_holds_during_dwell_window() -> void:
 # ===========================================================================
 
 func test_run_pacing_fast_path_dwell_holds_when_run_ended_at_on_enter() -> void:
-	# Arrange — orchestrator is ALREADY in RUN_ENDED before the screen mounts.
-	# This mirrors the production fast path: combat resolved during the
-	# FADE_TO_BLACK transition into dungeon_run_view, so by the time on_enter
-	# fires, state is RUN_ENDED and no state_changed signal will be incoming.
+	# Arrange — production fast-path scenario: combat resolves DURING the
+	# FADE_TO_BLACK transition into dungeon_run_view. Story 013 (Sprint 13
+	# S13-S1) replaced the prior screen-level on_enter early-detection
+	# hotfix with an orchestrator-level buffered-replay pattern. The
+	# orchestrator now buffers state_changed emissions while
+	# SceneManager.state == TRANSITIONING and replays them when
+	# SceneManager fires transition_complete; the slow-path _on_state_changed
+	# handler then runs (with its built-in 1500 ms dwell) just as it does
+	# for the normal mid-run path.
+	#
+	# This test models the production pathway:
+	#   1. Orchestrator at ACTIVE_FOREGROUND (real mid-run state).
+	#   2. SceneManager enters TRANSITIONING (FADE_TO_BLACK starts).
+	#   3. Combat resolves → orchestrator._set_state(RUN_ENDED) → buffered.
+	#   4. dungeon_run_view mounts (on_enter wires state_changed listener).
+	#   5. SceneManager.transition_complete fires → buffered replay runs →
+	#      slow-path _on_state_changed handler triggers dwell + route.
 	var snap: RunSnapshot = _seed_run_snapshot(45, 9)
-	DungeonRunOrchestrator.state = DungeonRunStateScript.State.RUN_ENDED
+	DungeonRunOrchestrator.state = DungeonRunStateScript.State.ACTIVE_FOREGROUND
 	DungeonRunOrchestrator.run_snapshot = snap
 
+	# Step 2: SceneManager is in the middle of FADE_TO_BLACK.
 	SceneManager.state = SceneManager.State.TRANSITIONING
 	SceneManager._queued_request = {}
 
-	# Act — mount the screen (on_enter detects RUN_ENDED via the defensive
-	# branch on dungeon_run_view.gd line 179 and call_deferred()s the route).
+	# Step 3: Combat resolves DURING the transition. Use _set_state so the
+	# Story 013 buffered-replay path runs (state_changed is captured but
+	# not emitted because SM.state == TRANSITIONING).
 	var t_start_ms: int = Time.get_ticks_msec()
+	DungeonRunOrchestrator._set_state(DungeonRunStateScript.State.RUN_ENDED)
+
+	# Buffer should now be populated — the emit was suppressed.
+	assert_bool(DungeonRunOrchestrator._buffered_state_change.is_empty()).is_false()
+
+	# Step 4: dungeon_run_view mounts. on_enter wires the state_changed
+	# listener but does NOT see the emit yet (it's still buffered).
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
 	assert_object(screen).is_not_null()
 
-	# Assert — fast path detected the already-RUN_ENDED state and showed overlay.
+	# Pre-replay: overlay not yet shown, no route queued.
+	assert_bool(screen._overlay_shown).is_false()
+	assert_bool(screen._routed).is_false()
+
+	# Step 5: trigger the buffered replay directly. In production this is
+	# wired via SceneManager.transition_complete; for the test we keep
+	# SM.state = TRANSITIONING throughout so the slow-path handler's
+	# downstream request_screen("main_menu") call queues into
+	# SM._queued_request rather than executing a real transition (which
+	# would crash without MainRoot — see other tests in this file).
+	DungeonRunOrchestrator._replay_buffered_state_change(
+		"dungeon_run_view", SceneManager.TransitionType.FADE_TO_BLACK
+	)
+
+	# Wait one frame for the replayed state_changed to propagate to the
+	# screen handler.
+	await get_tree().process_frame
+
+	# Assert — overlay is now visible (slow-path _on_state_changed showed it)
+	# and the route guard is set.
 	assert_bool(screen._overlay_shown).is_true()
 	assert_bool(screen._routed).is_true()
 
@@ -371,11 +412,11 @@ func test_run_pacing_fast_path_dwell_holds_when_run_ended_at_on_enter() -> void:
 	var t_end_ms: int = Time.get_ticks_msec()
 	var elapsed_ms: int = t_end_ms - t_start_ms
 
-	# Assert — elapsed must be at least the dwell minimum. WITHOUT the hotfix
-	# this asserts in the ~10-50 ms range (the call_deferred fires next frame).
-	# WITH the hotfix this asserts in the ~1500 ms range (await timer.timeout).
-	# 50 ms slack for create_timer scheduling jitter (matches Test 2).
-	assert_int(elapsed_ms).is_greater_equal(S9M2_MINIMUM_DWELL_MS - 50)
+	# Assert — elapsed must be at least the dwell minimum. The slow-path
+	# _on_state_changed handler awaits RUN_END_DWELL_MS (1500 ms) before
+	# routing, so the buffered-replay path inherits the dwell automatically.
+	# 100 ms slack matches the S13-S2 widening for full-sweep CPU contention.
+	assert_int(elapsed_ms).is_greater_equal(S9M2_MINIMUM_DWELL_MS - 100)
 
 	# Assert — the queue contains "main_menu" (route fired after the dwell).
 	assert_bool(SceneManager._queued_request.is_empty()).is_false()

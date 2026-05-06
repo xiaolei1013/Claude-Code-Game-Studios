@@ -182,42 +182,20 @@ func on_enter() -> void:
 	# Single-focus-mode strategy: suppress keyboard/gamepad focus on all Controls.
 	UIFrameworkScript.suppress_keyboard_focus(self)
 
-	# If the run is already in RUN_ENDED when we enter, show the overlay AND
-	# trigger the auto-route to main_menu.
+	# Story 013 (Sprint 13 S13-S1) replaces the prior on_enter early-detection
+	# hotfix with an orchestrator-level buffered-replay pattern. The Sprint 8
+	# S8-M4 + Sprint 9 S9-M2 hotfixes were screen-level workarounds for the
+	# during-transition race; the orchestrator now buffers state_changed
+	# emissions while SceneManager.state == TRANSITIONING and replays them
+	# at SceneManager.transition_complete time, so the slow-path
+	# _on_state_changed handler (below) handles BOTH the during-transition
+	# fast path AND the normal mid-run path identically.
 	#
-	# Sprint 8 S8-M4 hotfix: this defensive path fires when the run completes
-	# DURING the FADE_TO_BLACK transition into dungeon_run_view (formation_assignment
-	# already disconnected; dungeon_run_view's state_changed subscription wasn't
-	# yet wired). Without this, the screen sits on the run-end overlay forever
-	# because state_changed never fires again (state stays RUN_ENDED).
-	if DungeonRunOrchestrator.state == DungeonRunStateScript.State.RUN_ENDED:
-		var final_kills: int = 0
-		if DungeonRunOrchestrator.run_snapshot != null:
-			final_kills = DungeonRunOrchestrator.run_snapshot.kill_count
-		_show_run_end_overlay(final_kills)
-		_routed = true  # Story 013 idempotency; prevent duplicate request_screen.
-		# Defer the route by one frame so the overlay paints before the cross-fade.
-		# call_deferred ensures we don't call request_screen WHILE SceneManager
-		# is still settling its current transition (we just landed mid-FADE_TO_BLACK).
-		# request_screen will queue into SM._queued_request and drain when SM IDLE.
-		call_deferred("_deferred_run_end_route")
-
-
-## Deferred call wrapper that fires SceneManager.request_screen("main_menu")
-## one frame after on_enter detected an already-RUN_ENDED state. Defers ensure
-## the SceneManager has settled its current TRANSITIONING→IDLE before we kick
-## off the next transition. Sprint 8 S8-M4 hotfix.
-##
-## Sprint 9 S9-M2 hotfix (2026-05-05): the fast path was bypassing
-## RUN_END_DWELL_MS — when combat resolves during FADE_TO_BLACK into this
-## screen, on_enter detects RUN_ENDED and routed straight to main_menu the next
-## frame, leaving the player no time to see the overlay or kill_count. Awaiting
-## the dwell here makes the fast path match the slow-path behavior in
-## _on_state_changed (line 299).
-func _deferred_run_end_route() -> void:
-	if RUN_END_DWELL_MS > 0:
-		await get_tree().create_timer(RUN_END_DWELL_MS / 1000.0).timeout
-	SceneManager.request_screen("main_menu", SceneManager.TransitionType.CROSS_FADE)
+	# Removed:
+	#   - on_enter early-detection block (`if state == RUN_ENDED: ...`)
+	#   - _deferred_run_end_route() helper
+	# Both became redundant once the orchestrator owns the deferral.
+	# See production/epics/dungeon-run-orchestrator/story-013-...md for spec.
 
 
 ## Called by SceneManager BEFORE queue_free. Disconnects ALL signals connected

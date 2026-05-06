@@ -249,6 +249,26 @@ const DISPATCH_DEBOUNCE_MS: int = 250
 ## entry. Compared against [code]Time.get_ticks_msec()[/code] on each call.
 var _last_dispatch_ms: int = 0
 
+## Story 013 — buffered state_changed emit for the SceneManager-TRANSITIONING
+## window.
+##
+## Empty Dictionary when no buffered emit is pending. When _set_state fires
+## while SceneManager.state == TRANSITIONING, the (new_state, old_state) pair
+## is captured here instead of emitted directly. SceneManager.transition_complete
+## triggers a one-shot replay via [method _replay_buffered_state_change].
+##
+## Coalesce semantic: if multiple state changes occur during one TRANSITIONING
+## window, only the most recent (terminal) state is replayed. The "old_state"
+## stored is the state at the time of the FIRST buffered transition (so the
+## emit reflects the cross-transition transition, not the most recent
+## intermediate hop).
+##
+## Intentionally a Dictionary rather than typed fields so the empty-vs-
+## populated check is a single is_empty() call.
+##
+## TR-orchestrator-014-001 / TR-orchestrator-014-004 — Story 013.
+var _buffered_state_change: Dictionary = {}
+
 
 # ---------------------------------------------------------------------------
 # Built-in virtual methods
@@ -456,8 +476,73 @@ func _set_state(new_state: int) -> void:
 	if state == DungeonRunStateScript.State.ACTIVE_FOREGROUND:
 		_enter_active_foreground()
 	# Emit state_changed AFTER state is written and hooks are run so listeners
-	# observe the fully-settled new state (Story 012 AC-6).
-	state_changed.emit(new_state, old_state)
+	# observe the fully-settled new state (Story 012 AC-6). Routed through
+	# _emit_state_changed_or_buffer per Story 013 TR-014-001: when SceneManager
+	# is mid-transition, the emit is buffered and replayed post-transition so
+	# late-mounting screens (whose on_enter has not yet wired the
+	# state_changed listener) still get the emission.
+	_emit_state_changed_or_buffer(new_state, old_state)
+
+
+## Story 013 — emit `state_changed` synchronously when SceneManager is IDLE,
+## OR buffer the emit when SceneManager is mid-transition. The deferred emit
+## is replayed by [method _replay_buffered_state_change] when the SceneManager
+## fires `transition_complete`.
+##
+## Coalesce: if multiple state changes occur during one TRANSITIONING window,
+## only the latest is held in [member _buffered_state_change] (the previous
+## buffered entry is overwritten). The "old_state" stored is the original
+## pre-transition state, NOT the most recent intermediate state — this makes
+## the post-transition emit reflect the cross-transition transition. Listeners
+## that observe intermediate states should subscribe BEFORE the transition
+## starts (the standard ADR-0007 lifecycle).
+##
+## TR-orchestrator-014-001 / TR-orchestrator-014-002 / TR-orchestrator-014-004.
+func _emit_state_changed_or_buffer(new_state: int, old_state: int) -> void:
+	var sm: Node = get_node_or_null("/root/SceneManager")
+	# Defensive: if SceneManager is absent (early-boot or test envs), emit
+	# synchronously. The IDLE-time case is the canonical fast path.
+	if sm == null or not ("state" in sm) or sm.state != sm.State.TRANSITIONING:
+		state_changed.emit(new_state, old_state)
+		return
+
+	# Buffer the emit. Coalesce: if a buffered entry already exists, preserve
+	# the original old_state but overwrite the new_state with the latest.
+	# This makes the post-transition emit reflect "where we ended up" with
+	# "where we came from" being the pre-transition state.
+	var preserved_old_state: int = old_state
+	if not _buffered_state_change.is_empty():
+		preserved_old_state = int(_buffered_state_change.get("old_state", old_state))
+	_buffered_state_change = {
+		"new_state": new_state,
+		"old_state": preserved_old_state,
+	}
+
+	# Connect a one-shot replay handler if not already connected. CONNECT_ONE_SHOT
+	# auto-disconnects after firing; if multiple state changes accumulate during
+	# the same transition window, the existing connection covers them all.
+	if sm.has_signal("transition_complete"):
+		var sig: Signal = sm.get("transition_complete")
+		if not sig.is_connected(_replay_buffered_state_change):
+			sig.connect(_replay_buffered_state_change, CONNECT_ONE_SHOT)
+
+
+## Story 013 — replays a buffered state_changed emit when SceneManager fires
+## `transition_complete`. Connected via CONNECT_ONE_SHOT so it auto-disconnects
+## after firing. If [member _buffered_state_change] is empty (no buffered emit
+## pending), the replay is a no-op — defensive in case the transition finishes
+## without a state-change buffer ever being populated.
+##
+## TR-orchestrator-014-001 / TR-orchestrator-014-004.
+func _replay_buffered_state_change(_screen_id: String, _transition_type: int) -> void:
+	if _buffered_state_change.is_empty():
+		return
+	var buffered: Dictionary = _buffered_state_change.duplicate()
+	_buffered_state_change.clear()
+	state_changed.emit(
+		int(buffered["new_state"]),
+		int(buffered["old_state"]),
+	)
 
 
 ## Connects the [signal TickSystem.tick_fired] subscription. Called by
