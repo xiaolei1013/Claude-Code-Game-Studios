@@ -143,6 +143,34 @@ If any of the above is unexpectedly already implemented (not impossible — pre-
 - **Daily-reset signal** for refresh_cost(refreshes_today) — currently resets on app boot per ADR-0015 OQ-0015-1 MVP scope
 - **Tamper modal UX** (Save/Load Story 013) — currently emits `tamper_detected_on_load` signal but no UI surface
 
+## Closure Notes
+
+### S12-M5 — OfflineProgressionEngine batch chunking + signal suppression + cap (✓ DONE 2026-05-06)
+
+Verdict: **COMPLETE**.
+
+Replaces the S12-M4 stub body in `run_offline_replay` with the production chunked replay loop per ADR-0014 §C.2 + GDD §C.2 (`src/core/offline_progression_engine/offline_progression_engine.gd` lines 207–300). Per-chunk loop calls `Orchestrator.compute_offline_batch` then `Economy.compute_offline_batch`, accumulates into `OfflineSummary`, yields one process_frame, and adapts chunk size per ADR-0014 §D.3 (deadband [9,15] ms, ratio 0.6, clamp [500, 50000] ticks). Signal suppression flags set TRUE before the loop, FALSE after, then `flush_offline_signals` is called on each domain in canonical order. `_replay_in_flight` cleared BEFORE emit per GDD §E.6 (listener exception must not leave the engine stuck mid-flight).
+
+**Commits**:
+- `fa6dfd9` — S12-M5: implementation + 3 test suites (851 +/6 -)
+- `bba0965` — fix: add missing `_data_registry_can_resolve_test_class` helper to `tests/integration/hero_roster/save_load_round_trip_test.gd` (unblocks running unit + integration in one gdunit invocation; was a parse-error blocker surfaced during S12-M5 verification)
+
+**Tests**:
+- `tests/integration/offline_progression_engine/offline_batch_chunking_test.gd` (NEW, 570 lines, 20 tests, Groups A–I).
+- `tests/unit/offline_progression_engine/offline_forbidden_patterns_ci_grep_test.gd` (NEW, 178 lines, 10 tests). Group E grep recognizes both `if not _is_offline_replay: emit` and `if _is_offline_replay: ... else: emit` as valid guards.
+- `tests/unit/offline_progression_engine/offline_progression_engine_skeleton_test.gd` (modified) — three pre-S12-M5 tests now `await` the rewards signal since the loop body is async.
+
+**Verification (2026-05-06)**: 1068 unit + 300 integration = **1368 tests, 0 failures, 0 errors**. The 3 OE suites alone are 46/46 PASS.
+
+**Process notes captured**:
+1. Initial test file authored against fictional gdunit4 API (`watch_signals`, `was_emitted_once`, `get_signal_emissions`, `clear_signal_emissions`, `raise_error` — none exist in this project's gdunit4). Lesson: validate the test framework's actual API surface BEFORE authoring 25 tests against it. Project pattern is `assert_signal(instance).wait_until(ms).is_emitted("name")` plus the canonical Array-spy lambda capture (see `tests/integration/scene_manager/request_screen_and_node_swap_test.gd`).
+2. S12-M5 introduced an async-emit regression in 3 pre-existing skeleton tests (they expected synchronous emit against the S12-M4 stub). Fixed by adding `await` on those tests. Lesson: when changing a synchronous API to async (`await get_tree().process_frame` per chunk), audit ALL existing tests that call the API.
+3. Manual verification (load saved game with >30m elapsed → Return-to-App modal → OfflineSummary populated) **DEFERRED** to S12-S1 re-playtest scope.
+
+### Carry-forward
+
+S12-M6 (Audio cue-play Stories 3–5) is the only remaining Must Have for Sprint 12. S12-S1 (re-playtest with persisted save) is unblocked once S12-M6 lands.
+
 ## Notes
 
 - Authored 2026-05-05 by post-Sprint-11 close-out work (autonomous-execution session). Re-validate via `/sprint-plan` if anything material changes between now and Sprint 12 kickoff (2026-05-26).
