@@ -193,13 +193,44 @@ Filled in 7 signal-handler stubs + play_sfx/play_music/stop_music + Stinger hand
 
 **6/6 Must Haves DONE** (M1, M2, M3, M4, M5, M6). The MVP gameplay loop is end-to-end live: recruit → assign → dispatch → clear floor → award gold + level + offline replay → audio feedback throughout.
 
-**Remaining (Should Have / Nice to Have / carry-forward)**:
-- S12-S1 — re-playtest with persisted save (manual, unblocked)
-- S12-S2 — Story 009 reduce_motion + offline-replay modal (UI work)
-- S12-S3 — OfflineProgressionEngine Stories 7-8 (replay screen + acknowledge)
-- S12-S5 — Audio asset placeholders + DataRegistry sfx/music category registration (unblocks AudioRouter cues to actually play)
-- AC-AS-14/15 (UI tap chime UIFramework hook) — deferred from S12-M6
-- Pre-existing test bug: `tests/integration/hero_roster/save_load_round_trip_test.gd:407` `test_load_save_data_pads_undersize_formation_slots_with_zero` — orphan-slot boot validation clears the populated slot to 0; predates Sprint 8 S8-S4. Out of S12 scope.
+### S12-S2 Story 009 — reduce_motion + show_modal (✓ DONE 2026-05-06)
+
+Verdict: **COMPLETE WITH NOTES** (CEREMONY instant-cut path documented but not implemented; the real CEREMONY dispatcher is Story 006 scope and not yet shipped — current code falls back to `_transition_cross_fade` which picks up the reduce_motion clamp via the shared crossfade getter).
+
+`src/core/scene_manager/scene_manager.gd` (+182 lines) adds `reduce_motion` field + `REDUCE_MOTION_CLAMP_MS=50`, `_load_interim_settings()` at boot, `set_reduce_motion()` setter with ConfigFile persist (`user://settings.cfg`), per-getter clamp at the end of all 4 duration getters, `show_modal(modal: Control)` / `hide_modal(modal: Control)` API distinct from push_overlay/pop_overlay, and `_active_freestanding_modals: Array[Control]` member. `_settings_cfg_path` is overridable so tests can isolate from the real per-user settings file. Tests: 2 new integration suites — `tests/integration/scene_manager/reduce_motion_clamp_test.gd` (8 tests) + `tests/integration/scene_manager/offline_replay_modal_coordination_test.gd` (8 tests). **Commit**: `1174dc9`.
+
+Cleared a leaked `user://settings.cfg` from prior dev-machine state during verification (the agent had written `reduce_motion=true` before the path-override mechanism existed).
+
+### AC-AS-14/15 — UI tap chime via UIFramework hook (✓ DONE 2026-05-06)
+
+Verdict: **COMPLETE**. `UIFramework._on_touch_feedback_input` (static helper) now fires `sfx_ui_tap` via `AudioRouter.play_sfx` alongside the existing visual touch pulse. AudioRouter lookup via `Engine.get_main_loop().root.get_node_or_null("AudioRouter")` (UIFramework is static so no Node context for relative lookup). 4 new tests in `tests/unit/ui_framework/ui_framework_helpers_test.gd` Group D — mouse press, touch press, release-only (no chime), full press+release (1 chime, AC-AS-15). **Commit**: `e83f138`.
+
+### S12-S5 — sfx/music DataRegistry category registration + path alignment (✓ DONE 2026-05-06)
+
+Verdict: **PARTIALLY DONE — architectural piece COMPLETE, binary asset authoring deferred**. Adds `sfx` + `music` to `DataRegistry.ORDERED_CATEGORIES`. Creates `assets/data/sfx/` + `assets/data/music/` placeholder dirs (gitkeep). Updates audio-system.md §C.6 path convention to `assets/data/<category>/<id>.tres` to align with DataRegistry's category-scan pattern (the original GDD draft said `assets/audio/sfx/` which doesn't match DataRegistry's single-root scan). 2 pre-existing tests in `boot_scan_load_order_test.gd` updated from hardcoded count 8 → 10. AudioRouter still degrades to no-op when DataRegistry returns null on missing assets — silent audio in production until the actual binary `.wav` / `.ogg` stubs are authored. **Commit**: `2dac586`.
+
+### S12-S3 — OfflineProgressionEngine Stories 7-8 (✓ DONE — landed during S12-M5)
+
+Verdict: **COMPLETE WITH NOTE on sprint-plan-vs-GDD numbering mismatch**.
+
+Per `design/gdd/offline-progression-engine.md` §J the Stories 7-8 scope is:
+- **Story 7**: `_replay_in_flight` re-entry guard + tests for AC-OE-09 / AC-OE-10
+- **Story 8**: CI grep for the 5 ADR-0014 forbidden patterns + add to ADR-0003 forbidden-patterns registry
+
+Both landed during S12-M5:
+- `_replay_in_flight` guard implemented in `src/core/offline_progression_engine/offline_progression_engine.gd:185-190` + `:297` (cleared before emit). AC-OE-09 covered by `test_replay_in_flight_flag_transitions_false_post_emit` (chunking suite line 521); AC-OE-10 covered by `test_re_entrant_run_offline_replay_is_dropped_with_warning` (skeleton suite line 197) + `test_replay_in_flight_guard_reentrant_call_rejected` (chunking suite line 497).
+- CI grep for forbidden patterns lives in `tests/unit/offline_progression_engine/offline_forbidden_patterns_ci_grep_test.gd` (10 tests covering all 5 ADR-0014 forbidden patterns: unguarded `gold_changed.emit`, unguarded `first_clear_awarded.emit`, unguarded `_process_kill_events.emit`, flush_offline_signals exceptions, engine flag management).
+
+**Sprint-plan-vs-GDD mismatch flagged**: this sprint-12.md row originally described S12-S3 as "replay screen + acknowledge" but that scope matches GDD Story 9 (Return-to-App Screen wire-up — currently DEFERRED) + Story 10 (E2E integration test — currently DEFERRED), not Stories 7-8. The honest reading is that the row's description was imprecise; the GDD-numbered scope (Stories 7-8) is genuinely closed.
+
+**Deferred to Sprint 13+**: GDD Story 9 (Return-to-App Screen UI wire-up — subscribes to `offline_rewards_collected` + `cap_reached` and renders cozy summary) + GDD Story 10 (E2E integration test verifying AC-OE-12 5s ADVISORY budget + AC-OE-13 16ms BLOCKING per-chunk budget on min-spec mobile).
+
+### Remaining (Should Have / Nice to Have / carry-forward)
+
+- **S12-S1** — re-playtest with persisted save (manual, unblocked, needs human)
+- **GDD Stories 9-10** (deferred from S12-S3 per the sprint-plan-vs-GDD numbering reconciliation above) — Return-to-App Screen UI wire-up + E2E integration test, ~1.0d UI scope, needs design/UX pass for the cozy summary layout
+- **Audio binary asset authoring** (deferred from S12-S5) — needs a sound-design pass; AudioRouter cue dispatch is wired but plays silence until `.wav` / `.ogg` stubs land at `assets/audio/sfx/<id>.wav` (binary) wrapped in `assets/data/sfx/<id>.tres` (DataRegistry resource)
+- **Pre-existing test logic bug** (✓ FIXED 2026-05-06 by `1ec7f56`): `tests/integration/hero_roster/save_load_round_trip_test.gd:397` `test_load_save_data_pads_undersize_formation_slots_with_zero` — populated heroes so slot[0]=1 resolves cleanly; orphan-clear pass no longer masks the pad-pass assertion target.
 
 
 
