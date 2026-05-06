@@ -397,9 +397,24 @@ func test_load_save_data_truncates_oversize_formation_slots_with_warning() -> vo
 func test_load_save_data_pads_undersize_formation_slots_with_zero() -> void:
 	# Edge case: a save with fewer slots than current formation_size pads
 	# missing slots with 0 (empty), not garbage / out-of-bounds.
+	#
+	# Sprint 8 S8-S4: post-load boot validation clears orphan slot ids
+	# (slots referencing hero ids that don't exist in `heroes`). The
+	# padding-with-zero contract is independent of the orphan-clear
+	# pass; this test populates `heroes` with id=1 so slot[0]=1 resolves
+	# and isn't cleared by orphan-clear, leaving the padding behavior
+	# (slots[1]/[2] stay 0) as the assertion target. Without this
+	# population, slot[0] would also clear to 0, masking whether the
+	# padding zeroes came from the pad-pass or the orphan-clear pass.
+	if not _data_registry_can_resolve_test_class():
+		push_warning("Skipped: DataRegistry cannot resolve test class")
+		return
 	var hr: Node = _make_fresh_roster()
 	hr.load_save_data({
-		"heroes": [],
+		"heroes": [
+			{"instance_id": 1, "class_id": "warrior", "display_name": "A",
+				"current_level": 1, "xp": 0},
+		],
 		"formation_slots": [1],  # only 1 entry; current size is 3
 		"next_instance_id": 2,
 	})
