@@ -273,6 +273,45 @@ var _overlay_registry: Dictionary = {}
 var _queued_modal: Dictionary = {}
 
 # ---------------------------------------------------------------------------
+# Freestanding modal state — Story 009 / ADR-0014
+# ---------------------------------------------------------------------------
+
+## Caller-owned modal instances currently shown via show_modal().
+##
+## Distinct from _active_overlays (registry-based push_overlay). The caller
+## passes the Control instance directly; SceneManager hosts it in OverlayLayer
+## but does NOT free or manage its data lifecycle.
+##
+## ADR-0014 §State container — OfflineProgressionEngine owns _progress_modal
+var _active_freestanding_modals: Array[Control] = []
+
+# ---------------------------------------------------------------------------
+# Accessibility — reduce_motion — Story 009 / ADR-0007
+# ---------------------------------------------------------------------------
+
+## When true, all standard transition durations are clamped to REDUCE_MOTION_CLAMP_MS.
+##
+## Default is false. Persisted to user://settings.cfg via ConfigFile (interim path;
+## migrates to Save/Load envelope when Settings GDD #30 lands — see OQ-7 comment in
+## _load_interim_settings() and set_reduce_motion()).
+##
+## TR-scene-manager-027 — ADR-0007
+var reduce_motion: bool = false
+
+## Duration all standard transitions are clamped to when reduce_motion is true.
+## CEREMONY instant-cut is handled separately (Story 006 scope, documented below).
+## TR-scene-manager-027 — ADR-0007
+const REDUCE_MOTION_CLAMP_MS: int = 50
+
+## ConfigFile path for the reduce_motion interim persistence. Defaults to
+## the production user-data path; tests override to an isolated path so a
+## leaked file from a prior test run doesn't contaminate a fresh _ready().
+##
+## When Settings/Accessibility GDD #30 lands, this whole interim path
+## migrates to the Save/Load envelope (OQ-7 in story-009).
+var _settings_cfg_path: String = "user://settings.cfg"
+
+# ---------------------------------------------------------------------------
 # Built-in virtual methods
 # ---------------------------------------------------------------------------
 
@@ -310,6 +349,11 @@ func _ready() -> void:
 		push_warning(
 			"[SceneManager] scene_manager_config.tres not found at '%s'. Transition tuning knobs unavailable until Stories 005/009 create it." % _CONFIG_PATH
 		)
+
+	# Load accessibility settings (reduce_motion) before DataRegistry ready so the
+	# flag is available for the very first transition. Synchronous; never crashes.
+	# TR-scene-manager-027 — ADR-0007
+	_load_interim_settings()
 
 	# Populate overlay registry from preload constants.
 	# Adding a new overlay requires a new preload constant AND an entry here.
@@ -477,6 +521,89 @@ func pop_overlay(overlay_id: String) -> void:
 	# If overlays remain, state stays PAUSED; on_resume defers until last pop.
 
 
+## Shows a caller-owned modal Control on OverlayLayer.
+##
+## Distinct from push_overlay: the caller instantiates and owns the modal
+## (per ADR-0014 §State container). SceneManager hosts it in OverlayLayer and
+## tracks it in _active_freestanding_modals but does NOT own its data lifecycle.
+##
+## Does NOT increment _modal_pause_count and does NOT call get_tree().paused = true.
+## The offline replay tick loop must remain running (ADR-0014: replay path bypasses
+## tick_fired but the modal's UI animations must render).
+##
+## Example:
+##   SceneManager.show_modal(_progress_modal)  # OfflineProgressionEngine call site
+##
+## ADR-0014 §Time-gated UX — TR-scene-manager-009
+func show_modal(modal: Control) -> void:
+	assert(modal != null, "[SceneManager] show_modal received null modal")
+	var overlay_layer: CanvasLayer = _get_overlay_layer()
+	if overlay_layer == null:
+		push_error("[SceneManager] show_modal: OverlayLayer not found; aborting")
+		return
+	overlay_layer.add_child(modal)
+	_active_freestanding_modals.append(modal)
+	# Notify current screen it is pausing (visual indication; not a tree pause).
+	if current_screen != null:
+		current_screen.on_pause()
+	state = State.PAUSED
+	# Do NOT increment _modal_pause_count — offline replay does not pause the tree.
+	# (replay path bypasses tick_fired per ADR-0005; UI animations on the modal
+	# must continue rendering while replay batches process.)
+
+
+## Hides and frees a caller-owned modal that was previously shown via show_modal.
+##
+## No-ops with push_warning if the modal was never tracked (prevents double-free).
+## Transitions state back to IDLE and calls on_resume() only when BOTH
+## _active_freestanding_modals AND _active_overlays are empty — i.e., if
+## push_overlay has stacked overlays on top, state stays PAUSED.
+##
+## Example:
+##   SceneManager.hide_modal(_progress_modal)  # called on offline_rewards_collected
+##
+## ADR-0014 §Time-gated UX — TR-scene-manager-009
+func hide_modal(modal: Control) -> void:
+	if not _active_freestanding_modals.has(modal):
+		push_warning("[SceneManager] hide_modal: modal not tracked; no-op")
+		return
+	_active_freestanding_modals.erase(modal)
+	modal.queue_free()
+	if _active_freestanding_modals.is_empty() and _active_overlays.is_empty():
+		state = State.IDLE
+		if current_screen != null:
+			current_screen.on_resume()
+	# If push_overlay overlays remain, state stays PAUSED; on_resume defers until last close.
+
+
+## Sets the reduce_motion accessibility flag and persists it to user://settings.cfg.
+##
+## Idempotent on no-change. If the ConfigFile save fails, push_warning with error code
+## but the in-memory value is still updated (runtime takes effect immediately).
+##
+## OQ-7 migration note: when Settings/Accessibility GDD #30 lands, migrate
+## reduce_motion read/write from user://settings.cfg to the Save/Load envelope under
+## a "settings" namespace. On first boot after migration: read both paths; write only
+## to envelope; delete ConfigFile entry after first successful envelope save with the
+## field present.
+##
+## Example:
+##   SceneManager.set_reduce_motion(true)   # called from Settings overlay (GDD #30)
+##
+## TR-scene-manager-027 — ADR-0007
+func set_reduce_motion(value: bool) -> void:
+	if reduce_motion == value:
+		return
+	reduce_motion = value
+	var cfg := ConfigFile.new()
+	# Load existing file to preserve unrelated keys; ignore error (file may not exist yet).
+	cfg.load(_settings_cfg_path)
+	cfg.set_value("accessibility", "reduce_motion", value)
+	var save_err: Error = cfg.save(_settings_cfg_path)
+	if save_err != OK:
+		push_warning("[SceneManager] Failed to persist reduce_motion to user://settings.cfg (err=%d)" % save_err)
+
+
 ## Returns the total authored duration of the last cross-fade tween in milliseconds.
 ##
 ## This is a structural AC H-01 probe: it reflects the authored segment durations
@@ -494,6 +621,31 @@ func _get_last_crossfade_total_duration_ms() -> int:
 # ---------------------------------------------------------------------------
 # Private methods
 # ---------------------------------------------------------------------------
+
+## Loads accessibility settings from user://settings.cfg at boot time.
+##
+## Reads the [accessibility] section reduce_motion key. Defaults to false on missing
+## or malformed file — emits push_warning on load errors other than missing file so
+## that malformed files are surfaced without crashing boot.
+##
+## Called once from _ready() BEFORE DataRegistry.registry_ready connects so the flag
+## is available for the very first transition.
+##
+## OQ-7 migration note: when Settings/Accessibility GDD #30 lands, migrate this read
+## to the Save/Load envelope. Until then, user://settings.cfg is the mandated interim
+## path (ADR-0007 §OQ-7 — never write to the Save/Load envelope in MVP).
+##
+## TR-scene-manager-027 — ADR-0007
+func _load_interim_settings() -> void:
+	var cfg := ConfigFile.new()
+	var err: Error = cfg.load(_settings_cfg_path)
+	if err == OK:
+		reduce_motion = bool(cfg.get_value("accessibility", "reduce_motion", false))
+	elif err != ERR_FILE_NOT_FOUND:
+		# Malformed file — warn but do not crash. Defaults (reduce_motion = false) stand.
+		push_warning("[SceneManager] _load_interim_settings: could not parse user://settings.cfg (err=%d); defaults applied" % err)
+	# ERR_FILE_NOT_FOUND is the expected first-launch path — silent, no warning.
+
 
 ## Executes a screen transition by dispatching to the appropriate tween-based
 ## transition handler.
@@ -579,6 +731,14 @@ func _execute_transition(screen_id: String, transition: int) -> void:
 			_transition_push_modal(old_screen, old_id, new_screen, screen_id)
 		TransitionType.CEREMONY:
 			# Story 006 owns CEREMONY via AnimationPlayer — out of scope for this story.
+			# When Story 006's real CEREMONY dispatcher ships, it must branch here:
+			#   if reduce_motion:
+			#       _instant_ceremony_cut(new_screen_callable)
+			#       return
+			# Until then there is nothing to cut to, so the fallback to CROSS_FADE is
+			# correct. The reduce_motion instant-cut branch is DECLARED in Story 009
+			# (ADR-0007 §CEREMONY reduce_motion) but not wired until Story 006 ships.
+			# TR-scene-manager-036 — ADR-0007
 			push_warning("[SceneManager] CEREMONY transition not yet implemented (Story 006); falling back to CROSS_FADE")
 			_transition_cross_fade(old_screen, old_id, new_screen, screen_id)
 		_:
@@ -1056,11 +1216,17 @@ func _get_screen_container() -> Node:
 
 ## Returns the cross-fade duration for the given incoming screen (milliseconds).
 ##
-## Priority: per-screen transition_override_ms > config default > hardcoded constant.
+## Priority: reduce_motion clamp > per-screen transition_override_ms > config default > hardcoded constant.
+## When reduce_motion is true the clamp short-circuits all other logic — the 50ms value
+## is returned regardless of per-screen overrides or config knobs (ADR-0007 §reduce_motion).
 ## Negative values are clamped to 0 with push_warning.
 ##
 ## [param incoming_screen] the incoming screen node; may be null.
+##
+## TR-scene-manager-027 — ADR-0007
 func _get_crossfade_duration_ms(incoming_screen: Control) -> int:
+	if reduce_motion:
+		return REDUCE_MOTION_CLAMP_MS
 	if incoming_screen != null and "transition_override_ms" in incoming_screen:
 		var override_ms: int = incoming_screen.transition_override_ms
 		if override_ms < 0:
@@ -1074,7 +1240,12 @@ func _get_crossfade_duration_ms(incoming_screen: Control) -> int:
 
 
 ## Returns the slide duration for the given incoming screen (milliseconds).
+##
+## When reduce_motion is true, returns REDUCE_MOTION_CLAMP_MS regardless of other knobs.
+## TR-scene-manager-027 — ADR-0007
 func _get_slide_duration_ms(incoming_screen: Control) -> int:
+	if reduce_motion:
+		return REDUCE_MOTION_CLAMP_MS
 	if incoming_screen != null and "transition_override_ms" in incoming_screen:
 		var override_ms: int = incoming_screen.transition_override_ms
 		if override_ms > 0:
@@ -1085,7 +1256,12 @@ func _get_slide_duration_ms(incoming_screen: Control) -> int:
 
 
 ## Returns the fade-to-black duration for the given incoming screen (milliseconds).
+##
+## When reduce_motion is true, returns REDUCE_MOTION_CLAMP_MS regardless of other knobs.
+## TR-scene-manager-027 — ADR-0007
 func _get_fade_to_black_duration_ms(incoming_screen: Control) -> int:
+	if reduce_motion:
+		return REDUCE_MOTION_CLAMP_MS
 	if incoming_screen != null and "transition_override_ms" in incoming_screen:
 		var override_ms: int = incoming_screen.transition_override_ms
 		if override_ms > 0:
@@ -1096,7 +1272,12 @@ func _get_fade_to_black_duration_ms(incoming_screen: Control) -> int:
 
 
 ## Returns the push-modal duration for the given incoming screen (milliseconds).
+##
+## When reduce_motion is true, returns REDUCE_MOTION_CLAMP_MS regardless of other knobs.
+## TR-scene-manager-027 — ADR-0007
 func _get_push_modal_duration_ms(incoming_screen: Control) -> int:
+	if reduce_motion:
+		return REDUCE_MOTION_CLAMP_MS
 	if incoming_screen != null and "transition_override_ms" in incoming_screen:
 		var override_ms: int = incoming_screen.transition_override_ms
 		if override_ms > 0:
