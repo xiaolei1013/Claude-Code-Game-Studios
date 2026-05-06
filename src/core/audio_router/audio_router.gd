@@ -1,38 +1,34 @@
-## AudioRouter — centralized audio routing autoload (Sprint 11 S11-S2 skeleton).
+## AudioRouter — centralized audio routing autoload (Sprint 11 S11-S2 skeleton,
+## Sprint 12 S12-M6 Stories 3-5 implementation).
 ##
 ## Owns the gameplay-signal → bus playback translation per
 ## `design/gdd/audio-system.md`. Gameplay code never calls
 ## [code]AudioStreamPlayer.play()[/code] directly; routing happens here.
 ##
-## Sprint 11 S11-S2 scope: SKELETON only.
-##   - Public API surface declared (volume control, mute control, manual cue
-##     trigger escape hatches).
-##   - Signal subscription wiring to existing gameplay signals (SceneManager,
-##     DungeonRunOrchestrator, HeroRoster, Economy) at [method _ready].
-##   - Bus-volume-control method bodies are real (small, safe, no I/O).
-##   - SFX / Music play-cue bodies are STUBS (no AudioStream resources sourced
-##     yet; play_sfx / play_music return cleanly without effect).
-##   - Save consumer surface (get_save_data / load_save_data) implemented with
-##     defaults; volume restoration works once SaveLoadSystem load lands.
+## Sprint 11 S11-S2 scope: SKELETON only (volume API, signal wiring, save
+## consumer surface).
 ##
-## Sprint 12+ extensions:
-##   - Story 2: full volume API + SaveLoadSystem consumer registration round-trip.
-##   - Story 3: signal handlers fire actual cue plays (UI tap chime, level-up
-##     chime, etc.) once cue resources land in DataRegistry.
-##   - Story 4: Music/Ambient crossfade implementation + biome-bed swap.
-##   - Story 5: Music/Stinger duck envelope + reward fanfare wiring.
-##   - Story 6: hydration suppression hook (audio-system.md §I.5).
+## Sprint 12 S12-M6 scope (Stories 3-5):
+##   - Story 3: play_sfx implementation with DataRegistry resolve + transient
+##     AudioStreamPlayer lifecycle. All 7 signal handler bodies filled in.
+##   - Story 4: Music/Ambient crossfade implementation + biome-bed swap on
+##     DungeonRunOrchestrator.state_changed.
+##   - Story 5: Music/Stinger duck envelope (F.3) + reward fanfare wiring.
+##
+## class_name omitted: "class_name AudioRouter" collides with the autoload
+## singleton per project_godot_autoload_class_name_collision memory note
+## (same pattern as FormationAssignment, OfflineProgressionEngine, Recruitment).
 ##
 ## Governing GDD: design/gdd/audio-system.md
 ## Autoload rank: 16 (per ADR-0003 Amendment #5; appended after rank 15
 ## OfflineProgressionEngine so all gameplay-signal sources exist at our
 ## [method _ready] for connection).
-## Story: S11-S2 (audio-system.md §K Sprint 11 minimum-viable scope)
+## Story: S11-S2 skeleton + S12-M6 Stories 3-5
 extends Node
 
 
 # ---------------------------------------------------------------------------
-# Constants — bus names + cue payload schema keys
+# Constants — bus names
 # ---------------------------------------------------------------------------
 
 ## Bus names matching the audio_bus_layout.tres hierarchy. Resolved via
@@ -52,6 +48,51 @@ const _DEFAULT_MUSIC_DB: float = -8.0
 const _DEFAULT_SFX_DB: float = -3.0
 const _DEFAULT_MASTER_MUTED: bool = false
 
+## Gold-chime throttle window per audio-system.md §F.2 + §G.
+## Designer-tunable via @export if needed; const for now per MVP scope.
+const _GOLD_CHIME_THROTTLE_MS: int = 250
+
+## Stinger duck constants per audio-system.md §F.3 + §G.
+const _AMBIENT_DUCK_DB: float = -3.0
+const _AMBIENT_DUCK_ATTACK_MS: int = 100
+const _AMBIENT_DUCK_RELEASE_MS: int = 250
+
+## Music crossfade default per audio-system.md §F.4 + §G.
+const _MUSIC_DEFAULT_FADE_MS: int = 800
+
+## Maps every SFX cue id from §C.2 to its target AudioServer sub-bus.
+## Drives bus= assignment in play_sfx without per-cue conditionals.
+## Keys are StringNames matching the §C.2 id column.
+const _CUE_BUS_MAP: Dictionary = {
+	&"sfx_ui_tap":                    &"SFX/UI",
+	&"sfx_ui_panel_open":             &"SFX/UI",
+	&"sfx_ui_panel_close":            &"SFX/UI",
+	&"sfx_combat_enemy_kill":         &"SFX/Combat",
+	&"sfx_combat_boss_kill":          &"SFX/Combat",
+	&"sfx_combat_hero_damaged":       &"SFX/Combat",
+	&"sfx_combat_advantage_chime":    &"SFX/Combat",
+	&"sfx_reward_gold_collected":     &"SFX/Reward",
+	&"sfx_reward_level_up_chime":     &"SFX/Reward",
+	&"sfx_reward_floor_clear_fanfare":&"SFX/Reward",
+	&"sfx_reward_class_unlock_fanfare":&"SFX/Reward",
+}
+
+## Default volume multipliers per §C.2. Keys match _CUE_BUS_MAP.
+## play_sfx applies volume_mult via linear_to_db before AudioServer.
+const _CUE_VOLUME_MULT_MAP: Dictionary = {
+	&"sfx_ui_tap":                    1.0,
+	&"sfx_ui_panel_open":             0.9,
+	&"sfx_ui_panel_close":            0.9,
+	&"sfx_combat_enemy_kill":         1.0,
+	&"sfx_combat_boss_kill":          1.4,
+	&"sfx_combat_hero_damaged":       0.7,
+	&"sfx_combat_advantage_chime":    0.8,
+	&"sfx_reward_gold_collected":     1.0,
+	&"sfx_reward_level_up_chime":     1.2,
+	&"sfx_reward_floor_clear_fanfare":1.4,
+	&"sfx_reward_class_unlock_fanfare":1.5,
+}
+
 
 # ---------------------------------------------------------------------------
 # Private state
@@ -64,28 +105,68 @@ var _music_volume_db: float = _DEFAULT_MUSIC_DB
 var _sfx_volume_db: float = _DEFAULT_SFX_DB
 var _master_muted: bool = _DEFAULT_MASTER_MUTED
 
+## Throttle clock for gold-chime anti-slot-machine filter (F.2).
+## Stores Time.get_ticks_msec() at the last played gold chime.
+var _gold_chime_last_played_ms: int = 0
+
+## Currently-playing Ambient bed and its id. null = no bed playing.
+## Tracked across crossfades so play_music can guard same-id no-ops.
+var _current_ambient_player: AudioStreamPlayer = null
+var _current_ambient_id: StringName = &""
+
+## Currently-playing Stinger player. null = no stinger playing.
+## Guards the non-overlap rule per §C.3.
+var _current_stinger_player: AudioStreamPlayer = null
+
+## The signed dB offset applied to the Ambient bus during a Stinger duck
+## envelope (F.3). Tween targets this variable, NOT the absolute bus volume,
+## so player Settings volume changes during a Stinger don't fight the duck.
+var _ambient_duck_offset_db: float = 0.0
+
+## Active duck tween (held to cancel on early Stinger end if needed).
+var _duck_tween: Tween = null
+
+## Debug / test-observable play log. Populated only in debug builds
+## (OS.is_debug_build() guard). Tests assert on this array; production
+## overhead is zero in release builds.
+## Schema per entry: { "sfx_id": StringName, "pitch_scale": float, "volume_mult": float }
+var _test_play_sfx_log: Array = []
+
+## Headless-mode guard: set true in _ready if no audio device found.
+## All play_sfx / play_music / stop_music calls short-circuit when true.
+var _headless_mode: bool = false
+
 
 # ---------------------------------------------------------------------------
 # Built-in lifecycle
 # ---------------------------------------------------------------------------
 
-## Sprint 11 S11-S2: subscribes to signal sources required by audio-system.md §F.
-## Audio cue bodies are STUBs; this just wires the connections so Sprint 12+
-## stories can land cue handlers without re-doing the connection plumbing.
+## Subscribes to signal sources required by audio-system.md §F.
+## Headless / no-device mode (E.1): short-circuits subscriptions.
 ##
 ## Defensive autoload-resolution per ADR-0003 §Signal SUBSCRIPTION rule —
 ## subscription across any rank pair is safe at _ready() time (signal objects
 ## exist on Node instantiation, before any _ready fires). [VERIFIED]
-##
-## Each connection is idempotent-guarded so re-binding (e.g., test-env) does
-## not double-fire handlers.
 func _ready() -> void:
-	# Apply default volumes to AudioServer immediately. Settings overlay (Sprint
-	# 12+) writes through set_*_volume_db, which both updates AudioServer and
-	# triggers a save persist.
+	# E.1: detect headless / no-device audio.
+	# AudioServer.get_output_device_list() returns PackedStringArray of available
+	# output device names. On the Dummy audio driver (headless CI, no physical
+	# device), this returns an empty array.
+	if AudioServer.get_output_device_list().is_empty():
+		_headless_mode = true
+		push_warning("[AudioRouter] No audio device found — operating in headless mode. Signal subscriptions skipped. Audio routing is a no-op.")
+		# Still apply defaults (volume API still returns sane values per AC-AS-11).
+		_apply_to_audio_server()
+		return
+
+	# E.10: verify bus layout loaded correctly.
+	if AudioServer.get_bus_count() < 6:
+		push_error("[AudioRouter] audio_bus_layout.tres is missing or malformed; expected ≥6 buses, got %d. Audio routing degrades to Master-only." % AudioServer.get_bus_count())
+
+	# Apply default volumes to AudioServer immediately.
 	_apply_to_audio_server()
 
-	# Signal subscriptions — SceneManager (rank 8). Existing signal contract.
+	# SceneManager (rank 8) — UI panel SFX + Music/Ambient crossfade.
 	if has_node("/root/SceneManager"):
 		var sm: Node = get_node("/root/SceneManager")
 		if sm.has_signal("screen_changed") and not sm.screen_changed.is_connected(_on_screen_changed):
@@ -109,7 +190,7 @@ func _ready() -> void:
 		if roster.has_signal("hero_leveled") and not roster.hero_leveled.is_connected(_on_hero_leveled):
 			roster.hero_leveled.connect(_on_hero_leveled)
 
-	# Economy (rank 3) — gold chime trigger (with throttle, per audio-system.md §F.2).
+	# Economy (rank 3) — gold chime trigger (throttled per F.2).
 	if has_node("/root/Economy"):
 		var econ: Node = get_node("/root/Economy")
 		if econ.has_signal("gold_changed") and not econ.gold_changed.is_connected(_on_gold_changed):
@@ -166,21 +247,131 @@ func is_master_muted() -> bool:
 # Public API — manual cue trigger (escape hatches; gameplay code uses signals)
 # ---------------------------------------------------------------------------
 
-## Sprint 11 S11-S2: STUB. Sprint 12+ Story 3 implements actual cue play via
-## DataRegistry.resolve("sfx", id) → AudioStreamPlayer routed to the cue's bus.
-func play_sfx(_sfx_id: StringName) -> void:
-	pass  # Sprint 12+ Story 3
+## Resolves [param sfx_id] via DataRegistry and plays a transient
+## AudioStreamPlayer routed to the cue's target bus per §C.2.
+##
+## [param sfx_id]: StringName key from §C.2 table. Unknown ids play nothing
+##   (DataRegistry returns null → silent skip per OQ-AS-6 / E.1).
+## [param pitch_scale]: AudioStreamPlayer.pitch_scale multiplier. Default 1.0.
+## [param volume_mult]: linear multiplier applied as linear_to_db offset to
+##   the player's volume_db. Default 1.0. Values from §C.2 are in the
+##   [constant _CUE_VOLUME_MULT_MAP].
+##
+## Returns [code]null[/code] in headless mode; otherwise returns the transient
+## [AudioStreamPlayer] child (alive only during playback, then queue_freed).
+func play_sfx(sfx_id: StringName, pitch_scale: float = 1.0, volume_mult: float = 1.0) -> AudioStreamPlayer:
+	if _headless_mode:
+		return null
+
+	# Debug-build play log for test observability (zero overhead in release).
+	if OS.is_debug_build():
+		_test_play_sfx_log.append({
+			"sfx_id": sfx_id,
+			"pitch_scale": pitch_scale,
+			"volume_mult": volume_mult,
+		})
+
+	# DataRegistry resolve — null means asset not yet sourced (OQ-AS-6 scope).
+	var stream: AudioStream = null
+	if has_node("/root/DataRegistry"):
+		var registry: Node = get_node("/root/DataRegistry")
+		# DataRegistry.resolve takes content_type (String) + id (String).
+		# Strip the "sfx_" prefix from the StringName to match asset file naming.
+		var raw_id: String = str(sfx_id)
+		if raw_id.begins_with("sfx_"):
+			raw_id = raw_id.substr(4)
+		if registry.has_method("resolve"):
+			stream = registry.resolve("sfx", raw_id) as AudioStream
+
+	if stream == null:
+		# No asset yet (E.1 / OQ-AS-6) — skip play silently.
+		return null
+
+	# Determine target bus from cue map; fall back to SFX root if unknown.
+	var target_bus: StringName = _CUE_BUS_MAP.get(sfx_id, _BUS_SFX)
+
+	var player: AudioStreamPlayer = AudioStreamPlayer.new()
+	player.stream = stream
+	player.bus = target_bus
+	player.pitch_scale = pitch_scale
+	# Convert linear multiplier to dB offset. volume_mult=1.0 → 0 dB offset.
+	player.volume_db = linear_to_db(maxf(volume_mult, 0.0001))
+	add_child(player)
+	player.play()
+	# Queue-free when playback finishes to avoid AudioStreamPlayer leaks.
+	player.finished.connect(player.queue_free)
+	return player
 
 
-## Sprint 11 S11-S2: STUB. Sprint 12+ Story 4 implements actual cue play +
-## crossfade with the currently-playing Ambient (if any).
-func play_music(_music_id: StringName, _fade_in_ms: int = 800) -> void:
-	pass  # Sprint 12+ Story 4
+## Crossfades to a new Music/Ambient bed per §F.4.
+##
+## If [param music_id] matches the currently-playing bed, this is a no-op.
+## If no bed is currently playing, starts the new bed directly at full volume.
+## Otherwise, fades old out and new in over [param fade_in_ms].
+func play_music(music_id: StringName, fade_in_ms: int = _MUSIC_DEFAULT_FADE_MS) -> void:
+	if _headless_mode:
+		return
+
+	# No-op guard per §F.4: same id already playing.
+	if music_id == _current_ambient_id and _current_ambient_player != null:
+		return
+
+	# Resolve the music stream via DataRegistry.
+	var stream: AudioStream = null
+	if has_node("/root/DataRegistry"):
+		var registry: Node = get_node("/root/DataRegistry")
+		var raw_id: String = str(music_id)
+		if raw_id.begins_with("music_"):
+			raw_id = raw_id.substr(6)
+		# Strip trailing "_bed" or "_stinger" suffix per ADR-0006 asset-path schema:
+		# asset is at assets/audio/music/<id_without_prefix>.ogg
+		if registry.has_method("resolve"):
+			stream = registry.resolve("music", raw_id) as AudioStream
+
+	# Spawn new player at -80 dB baseline (near-silence per §F.4 -∞ intent;
+	# -80 avoids INF arithmetic edge cases in the Tween).
+	var new_player: AudioStreamPlayer = AudioStreamPlayer.new()
+	new_player.stream = stream  # null-safe: stream=null means silence
+	new_player.bus = _BUS_MUSIC_AMBIENT
+	new_player.volume_db = -80.0
+	new_player.autoplay = false
+	add_child(new_player)
+	new_player.play()
+
+	if _current_ambient_player == null:
+		# No existing bed — jump straight to full volume without fade.
+		new_player.volume_db = 0.0
+	else:
+		# Crossfade: fade out old, fade in new simultaneously.
+		var old_player: AudioStreamPlayer = _current_ambient_player
+		var tween: Tween = create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(old_player, "volume_db", -80.0, fade_in_ms / 1000.0)
+		tween.tween_property(new_player, "volume_db", 0.0, fade_in_ms / 1000.0)
+		# E.4: if play_music fires again mid-fade, old_player will have been
+		# queue_freed by the next crossfade's finished callback; no double-free
+		# because queue_free is idempotent (Godot defers to end-of-frame).
+		tween.tween_callback(old_player.queue_free).set_delay(fade_in_ms / 1000.0)
+
+	_current_ambient_player = new_player
+	_current_ambient_id = music_id
 
 
-## Sprint 11 S11-S2: STUB. Sprint 12+ Story 4 implements fade-out + queue_free.
-func stop_music(_fade_out_ms: int = 800) -> void:
-	pass  # Sprint 12+ Story 4
+## Fades out and queue_frees the current Music/Ambient bed.
+## No-op if no bed is currently playing.
+func stop_music(fade_out_ms: int = _MUSIC_DEFAULT_FADE_MS) -> void:
+	if _headless_mode:
+		return
+	if _current_ambient_player == null:
+		return
+
+	var player_to_fade: AudioStreamPlayer = _current_ambient_player
+	_current_ambient_player = null
+	_current_ambient_id = &""
+
+	var tween: Tween = create_tween()
+	tween.tween_property(player_to_fade, "volume_db", -80.0, fade_out_ms / 1000.0)
+	tween.tween_callback(player_to_fade.queue_free)
 
 
 # ---------------------------------------------------------------------------
@@ -213,37 +404,177 @@ func load_save_data(d: Dictionary) -> void:
 
 
 # ---------------------------------------------------------------------------
-# Signal handlers — STUBS in Sprint 11 S11-S2; Sprint 12+ Story 3 implements
-# actual cue play. Connections are wired so Story 3 lands without
-# re-plumbing.
+# Signal handlers — S12-M6 Stories 3-5 implementations
 # ---------------------------------------------------------------------------
 
-func _on_screen_changed(_new_screen_id: String, _old_screen_id: String) -> void:
-	pass  # Sprint 12+ Story 3 / Story 4 (UI panel SFX + Music/Ambient crossfade)
+## §C.2 / §K Story 3: UI panel SFX on screen entry.
+## MVP note: panel-open SFX deferred (§C.2 trigger is non-blocking UI path;
+## asset sourcing OQ-AS-6 applies). Skeleton retained for Sprint 12+ wiring.
+## AC-AS-14, AC-AS-15 are in UIFramework scope, not here.
+func _on_screen_changed(new_screen_id: String, _old_screen_id: String) -> void:
+	# Panel open SFX is DEFERRED for MVP (non-critical per task spec item 5).
+	# Document the skip: sfx_ui_panel_open would fire here; dropping in MVP
+	# because UIFramework.wire_touch_feedback owns the tap-chime surface and
+	# the panel-open asset isn't sourced yet (OQ-AS-6).
+	# Music transition for non-dungeon screens handled here — return to
+	# guild_hall bed whenever a non-dungeon screen appears AND we're not
+	# currently in an active dungeon run. In Sprint 12+, SceneManager.screen_id
+	# constants will allow a tighter screen-type guard; for now, use presence
+	# of DungeonRunOrchestrator state as the guard.
+	var orch: Node = get_node_or_null("/root/DungeonRunOrchestrator")
+	var in_dungeon: bool = false
+	if orch != null and "state" in orch:
+		# ACTIVE_FOREGROUND = 2 per DungeonRunState.State enum.
+		in_dungeon = (orch.state == 2)
+
+	if not in_dungeon and new_screen_id != "":
+		# Non-dungeon screen entered: fade to guild hall bed.
+		play_music(&"music_guild_hall_bed")
 
 
-func _on_run_state_changed(_new_state: int, _old_state: int) -> void:
-	pass  # Sprint 12+ Story 4 (biome-bed swap on dungeon entry)
+## §C.3 / §K Story 4: biome-bed swap when run state transitions.
+## Per §C.3: entering ACTIVE_FOREGROUND → play biome bed; returning from
+## dungeon (RUN_ENDED) → play guild hall bed.
+func _on_run_state_changed(new_state: int, _old_state: int) -> void:
+	# ACTIVE_FOREGROUND = 2, RUN_ENDED = 4 per DungeonRunState.State enum.
+	if new_state == 2:
+		# Entering ACTIVE_FOREGROUND: swap to biome bed.
+		var orch: Node = get_node_or_null("/root/DungeonRunOrchestrator")
+		var biome_id: String = ""
+		if orch != null and "_dispatched_biome_id" in orch:
+			biome_id = str(orch.get("_dispatched_biome_id"))
+		if biome_id != "":
+			play_music(StringName("music_" + biome_id + "_bed"))
+		else:
+			# Unknown/empty biome: fall back to guild hall bed per spec.
+			play_music(&"music_guild_hall_bed")
+	elif new_state == 4:
+		# RUN_ENDED: return to guild hall bed.
+		play_music(&"music_guild_hall_bed")
 
 
-func _on_enemy_killed(_tier: int, _archetype: String, _advantaged: bool) -> void:
-	pass  # Sprint 12+ Story 3 (tier-modulated kill chime per Formula F.1)
+## §F.1 / §C.2 / §K Story 3: tier-modulated kill chime per Formula F.1.
+## pitch_scale(tier) = 1.0 + (3 - tier) * 0.10
+## No throttle on kill chime — E.6: 5 kills in a frame produces 5 overlapping
+## chimes; that is intended behavior.
+func _on_enemy_killed(tier: int, _archetype: String, _advantaged: bool) -> void:
+	var pitch: float = 1.0 + (3 - tier) * 0.10
+	play_sfx(&"sfx_combat_enemy_kill", pitch, 1.0)
 
 
+## §C.2 / §K Story 3: boss kill chime — distinct sample, volume_mult 1.4.
 func _on_boss_killed(_enemy_id: String) -> void:
-	pass  # Sprint 12+ Story 3 (boss kill chime — distinct sample)
+	play_sfx(&"sfx_combat_boss_kill", 1.0, 1.4)
 
 
+## §C.2 + §C.3 / §K Story 5: floor clear fanfare (SFX/Reward) + Stinger
+## (Music/Stinger with Ambient duck).
 func _on_floor_cleared_first_time(_floor_index: int, _biome_id: String, _losing_run: bool) -> void:
-	pass  # Sprint 12+ Story 5 (floor clear fanfare + Music/Stinger with Ambient duck)
+	play_sfx(&"sfx_reward_floor_clear_fanfare", 1.0, 1.4)
+	_play_stinger(&"music_floor_clear_stinger")
 
 
+## §E.8 / §K Story 3: level-up chime. Guards hydration suppression flag on
+## HeroRoster so chime does not fire during save-load hydration (OQ-AS-5).
+## [param instance_id]: hero instance id (matches hero_leveled signal param).
 func _on_hero_leveled(_instance_id: int, _old_level: int, _new_level: int) -> void:
-	pass  # Sprint 12+ Story 3 (level-up chime, paired with S10-M4 toast)
+	# E.8 hydration guard: check HeroRoster._suppress_signals.
+	var roster: Node = get_node_or_null("/root/HeroRoster")
+	if roster != null and "_suppress_signals" in roster and roster._suppress_signals:
+		return
+	play_sfx(&"sfx_reward_level_up_chime", 1.0, 1.2)
 
 
-func _on_gold_changed(_new_balance: int, _delta: int, _reason: String) -> void:
-	pass  # Sprint 12+ Story 3 (gold-collected chime with anti-slot-machine throttle F.2)
+## §F.2 / §E.7 / §K Story 3: gold chime with anti-slot-machine throttle.
+## E.7: delta ≤ 0 is skipped (refunds, zero-delta routing events).
+## F.2: throttle to ≤1 play per _GOLD_CHIME_THROTTLE_MS window.
+func _on_gold_changed(_new_balance: int, delta: int, _reason: String) -> void:
+	# E.7: skip refunds and zero-delta events.
+	if delta <= 0:
+		return
+	# F.2 throttle — compare against last-played timestamp.
+	var now: int = Time.get_ticks_msec()
+	if now - _gold_chime_last_played_ms < _GOLD_CHIME_THROTTLE_MS:
+		return
+	_gold_chime_last_played_ms = now
+	play_sfx(&"sfx_reward_gold_collected", 1.0, 1.0)
+
+
+# ---------------------------------------------------------------------------
+# Private — Stinger playback with duck envelope (§F.3 / Story 5)
+# ---------------------------------------------------------------------------
+
+## Plays a Music/Stinger cue with the F.3 Ambient duck envelope.
+##
+## Non-overlap rule (§C.3): if a stinger is already playing, the new one is
+## dropped with push_warning. The duck envelope is applied around the stinger
+## duration: attack ramp (100 ms) + hold (stinger duration) + release (250 ms).
+##
+## [param stinger_id]: StringName key for the Music/Stinger cue (e.g.
+##   [code]&"music_floor_clear_stinger"[/code]).
+func _play_stinger(stinger_id: StringName) -> void:
+	if _headless_mode:
+		return
+
+	# §C.3 non-overlap rule.
+	if _current_stinger_player != null:
+		push_warning("[AudioRouter] Stinger overlap dropped: %s while %s playing" % [stinger_id, _current_stinger_player.name])
+		return
+
+	# Resolve stream via DataRegistry.
+	var stream: AudioStream = null
+	if has_node("/root/DataRegistry"):
+		var registry: Node = get_node("/root/DataRegistry")
+		var raw_id: String = str(stinger_id)
+		if raw_id.begins_with("music_"):
+			raw_id = raw_id.substr(6)
+		if registry.has_method("resolve"):
+			stream = registry.resolve("music", raw_id) as AudioStream
+
+	var player: AudioStreamPlayer = AudioStreamPlayer.new()
+	player.stream = stream  # null-safe: silence if asset missing
+	player.bus = _BUS_MUSIC_STINGER
+	player.name = stinger_id  # for overlap warning message above
+	add_child(player)
+	_current_stinger_player = player
+
+	# F.3 attack: ramp Ambient duck offset from 0 to -3 dB over 100 ms.
+	_apply_ambient_duck_envelope(_AMBIENT_DUCK_DB, _AMBIENT_DUCK_ATTACK_MS / 1000.0)
+	player.play()
+
+	# On stinger finished: release duck, queue_free player, clear tracking.
+	player.finished.connect(_on_stinger_finished.bind(player))
+
+
+## Called when the Stinger cue finishes. Releases the F.3 Ambient duck
+## envelope over 250 ms, then queue_frees the player node.
+func _on_stinger_finished(player: AudioStreamPlayer) -> void:
+	_current_stinger_player = null
+	# F.3 release: ramp ambient duck offset back to 0 dB over 250 ms.
+	_apply_ambient_duck_envelope(0.0, _AMBIENT_DUCK_RELEASE_MS / 1000.0)
+	player.queue_free()
+
+
+## Tweens the Ambient bus volume offset (_ambient_duck_offset_db) to
+## [param target_db] over [param duration_secs].
+## Applies absolute volume as base + offset so player Settings changes
+## don't fight the duck (§F.3 last paragraph).
+func _apply_ambient_duck_envelope(target_db: float, duration_secs: float) -> void:
+	if _duck_tween != null and _duck_tween.is_running():
+		_duck_tween.kill()
+	_duck_tween = create_tween()
+	_duck_tween.tween_method(_set_ambient_duck_offset, _ambient_duck_offset_db, target_db, duration_secs)
+
+
+## Setter called by the duck envelope Tween. Writes the combined
+## (base music volume + duck offset) to the Music/Ambient bus.
+func _set_ambient_duck_offset(offset_db: float) -> void:
+	_ambient_duck_offset_db = offset_db
+	var ambient_idx: int = AudioServer.get_bus_index(_BUS_MUSIC_AMBIENT)
+	if ambient_idx >= 0:
+		# base_volume is the Music bus volume (relative child inherits); ambient
+		# sub-bus is authored at 0 dB relative. Apply duck as absolute offset.
+		AudioServer.set_bus_volume_db(ambient_idx, _ambient_duck_offset_db)
 
 
 # ---------------------------------------------------------------------------
