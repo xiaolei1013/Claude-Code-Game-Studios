@@ -404,3 +404,68 @@ func test_refresh_pool_paid_with_sufficient_gold_charges_and_refreshes() -> void
 	assert_int(_pool_refreshed_calls.size()).is_equal(1)
 
 	_disconnect_spies(recruitment)
+
+
+# ===========================================================================
+# AC-RC-11 cost-stability invariant — Sprint 13 S13-S3 closure.
+#
+# Locks the literal invariant: for each entry i in the pool,
+#   get_recruit_cost(i) == Economy.recruit_cost(pool[i],
+#                          HeroRoster.get_copies_owned(pool[i]))
+# This ensures the cost shown to the player matches the cost charged at
+# try_recruit time. The adjacent test
+# `test_try_recruit_subsequent_warrior_costs_270_per_geometric_curve`
+# covers the post-recruit increment; this test covers the pre-recruit
+# parity for arbitrary pool contents.
+# ===========================================================================
+
+func test_get_recruit_cost_matches_economy_recruit_cost_contract_for_all_pool_entries() -> void:
+	# Wipe roster so copies_owned starts at 0 for all classes.
+	var roster: Node = get_tree().root.get_node_or_null("HeroRoster")
+	for h_v: Variant in roster.call("get_all_heroes"):
+		var h: RefCounted = h_v as RefCounted
+		if h != null:
+			roster.call("remove_hero", int(h.get("instance_id")))
+
+	var recruitment: Node = get_tree().root.get_node_or_null("Recruitment")
+	var economy: Node = get_tree().root.get_node_or_null("Economy")
+	assert_object(recruitment).is_not_null()
+	assert_object(economy).is_not_null()
+
+	# Seed a 3-entry pool with mixed classes (relies on warrior + mage being
+	# in DataRegistry; if mage is unresolvable, the orphan path returns -1
+	# from get_recruit_cost AND from Economy.recruit_cost, so the invariant
+	# still holds at -1).
+	_set_pool(recruitment, ["warrior", "warrior", "mage"] as Array[String])
+
+	# Assert the literal invariant for every pool entry.
+	for i: int in range(recruitment.get_recruit_pool().size()):
+		var class_id: String = recruitment.get_recruit_pool()[i]
+		var copies_owned: int = int(roster.call("get_copies_owned", class_id))
+		var displayed_cost: int = recruitment.get_recruit_cost(i)
+		var canonical_cost: int = int(economy.call("recruit_cost", class_id, copies_owned))
+		assert_int(displayed_cost).override_failure_message(
+			"AC-RC-11 invariant broken at pool index %d (class_id=%s, copies_owned=%d): "
+			% [i, class_id, copies_owned]
+			+ "get_recruit_cost=%d, Economy.recruit_cost=%d"
+			% [displayed_cost, canonical_cost]
+		).is_equal(canonical_cost)
+
+	# Recruit one warrior so copies_owned for "warrior" advances; assert the
+	# invariant STILL holds for the remaining warrior pool entry (index 1)
+	# AND for the mage entry (which should be unaffected by warrior copies).
+	_set_gold(1000)
+	var outcome: int = recruitment.try_recruit(0)
+	assert_int(outcome).is_equal(RecruitmentScript.RecruitOutcome.SUCCESS)
+
+	for i: int in range(recruitment.get_recruit_pool().size()):
+		var class_id: String = recruitment.get_recruit_pool()[i]
+		var copies_owned: int = int(roster.call("get_copies_owned", class_id))
+		var displayed_cost: int = recruitment.get_recruit_cost(i)
+		var canonical_cost: int = int(economy.call("recruit_cost", class_id, copies_owned))
+		assert_int(displayed_cost).override_failure_message(
+			"AC-RC-11 invariant broken AFTER recruit at pool index %d (class_id=%s, copies_owned=%d): "
+			% [i, class_id, copies_owned]
+			+ "get_recruit_cost=%d, Economy.recruit_cost=%d"
+			% [displayed_cost, canonical_cost]
+		).is_equal(canonical_cost)

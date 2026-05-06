@@ -431,8 +431,20 @@ For each entry in pool, get_recruit_cost(i) == Economy.recruit_cost(pool[i], Her
 **AC-RC-12 — pool_refreshed signal fires on refresh_pool() call**
 Connect a spy. Call refresh_pool. Asserts: signal fired exactly once; payload equals the new pool.
 
-**AC-RC-13 — Save/Load consumer surface (MVP empty payload)**
-get_save_data() returns `{}` (empty Dictionary). load_save_data({}) is a no-op. load_save_data(arbitrary_dict) is a no-op (forward-compat: ignore unknown keys). Sprint 13+ ADR-X04 may extend this.
+**AC-RC-13 — Save/Load consumer surface**
+
+> **SUPERSEDED 2026-05-06 (Sprint 13 S13-S3 reconciliation)** by ADR-0015 (Sprint 11 S11-X8 — Recruitment Pool Determinism + Refresh + Cost-Curve). The original "MVP empty payload" wording reflected the Pass-1 draft hypothesis (OQ-RC-1 deferred determinism to ADR-X04). ADR-0015 RESOLVED OQ-RC-1 by selecting deterministic save-seeded pool generation (Option B), which requires persisting 3 fields. The implementation in `src/core/recruitment/recruitment.gd:372-411` reflects ADR-0015, NOT this AC's pre-resolution wording.
+
+Canonical AC text (post-supersession):
+
+get_save_data() returns a 3-field Dictionary:
+- `save_pool_seed: int` — RNG seed for deterministic pool generation across save-load
+- `refresh_counter: int` — increments per refresh; mixed with save_pool_seed via XOR for the per-pool RNG seed
+- `current_pool: Array[String]` — the most recent pool snapshot (so reload-after-close shows the same pool until next refresh trigger)
+
+load_save_data(d) restores all 3 fields if present; non-int / non-string entries are filtered with `push_warning` (per skeleton tests `test_load_save_data_ignores_non_int_seed_and_re_inits` + `test_load_save_data_filters_non_string_pool_entries`). Empty Dict triggers a fresh save_pool_seed init via `randi()` (first-launch path). Forward-compat: unknown keys are ignored silently.
+
+Test coverage already lands per the skeleton suite at `tests/unit/recruitment/recruitment_skeleton_test.gd:204-305`.
 
 **AC-RC-14 — CI grep: HeroRoster.add_hero has exactly one production caller (Recruitment)**
 Repository-level grep finds at most one `HeroRoster.add_hero(` call site in `src/` outside of HeroRoster's own `seed_first_launch_state()` and `add_hero` itself. The site is in `src/core/recruitment/recruitment.gd`. Forbidden-pattern entry: `add_hero_outside_recruitment`.
