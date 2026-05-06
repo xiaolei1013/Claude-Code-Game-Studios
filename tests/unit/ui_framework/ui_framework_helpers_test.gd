@@ -199,3 +199,110 @@ func test_ui_framework_format_localized_substitutes_multiple_args_in_order() -> 
 	# "hero_level_up_toast_format Theron 3" (headless fallback).
 	assert_str(out).contains("Theron")
 	assert_str(out).contains("3")
+
+
+# ===========================================================================
+# Group D — AC-AS-14 / AC-AS-15: UI tap chime via wire_touch_feedback
+# ===========================================================================
+# Tests the audio-system.md hook that fires sfx_ui_tap on the same gui_input
+# event that drives the visual touch pulse. Reads back the AudioRouter's
+# debug-build _test_play_sfx_log spy populated by play_sfx.
+
+func _ar() -> Node:
+	return get_tree().root.get_node_or_null("AudioRouter")
+
+
+func _clear_play_log() -> void:
+	var ar: Node = _ar()
+	if ar != null and "_test_play_sfx_log" in ar:
+		ar._test_play_sfx_log.clear()
+
+
+func _count_ui_tap_plays() -> int:
+	var ar: Node = _ar()
+	if ar == null or "_test_play_sfx_log" not in ar:
+		return 0
+	var count: int = 0
+	for entry: Dictionary in ar._test_play_sfx_log:
+		if entry.get("sfx_id") == &"sfx_ui_tap":
+			count += 1
+	return count
+
+
+func test_ui_framework_wire_touch_feedback_fires_ui_tap_chime_on_mouse_press() -> void:
+	# AC-AS-14: a wired Control receiving a mouse-button-down event produces
+	# exactly one sfx_ui_tap play.
+	# Arrange
+	_clear_play_log()
+	var btn: Button = auto_free(Button.new())
+	add_child(btn)
+	UIFrameworkScript.wire_touch_feedback(btn)
+
+	# Act — synthesize a mouse-button-down event via the gui_input signal.
+	var press: InputEventMouseButton = InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	btn.gui_input.emit(press)
+
+	# Assert
+	assert_int(_count_ui_tap_plays()).is_equal(1)
+
+
+func test_ui_framework_wire_touch_feedback_fires_ui_tap_chime_on_touch_press() -> void:
+	# AC-AS-14 (touch parity): a screen-touch-down event also produces one chime.
+	# Arrange
+	_clear_play_log()
+	var btn: Button = auto_free(Button.new())
+	add_child(btn)
+	UIFrameworkScript.wire_touch_feedback(btn)
+
+	# Act
+	var touch: InputEventScreenTouch = InputEventScreenTouch.new()
+	touch.pressed = true
+	btn.gui_input.emit(touch)
+
+	# Assert
+	assert_int(_count_ui_tap_plays()).is_equal(1)
+
+
+func test_ui_framework_wire_touch_feedback_does_not_fire_chime_on_release() -> void:
+	# AC-AS-15: the chime is wired to gui_input (press) only — release does
+	# NOT produce a chime. A complete tap (press + release) yields exactly one
+	# chime, not two.
+	# Arrange
+	_clear_play_log()
+	var btn: Button = auto_free(Button.new())
+	add_child(btn)
+	UIFrameworkScript.wire_touch_feedback(btn)
+
+	# Act — fire a release event (pressed = false).
+	var release: InputEventMouseButton = InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.pressed = false
+	btn.gui_input.emit(release)
+
+	# Assert — no chime on release.
+	assert_int(_count_ui_tap_plays()).is_equal(0)
+
+
+func test_ui_framework_wire_touch_feedback_full_tap_produces_exactly_one_chime() -> void:
+	# AC-AS-15: combined press + release produces 1 chime, not 2.
+	# Arrange
+	_clear_play_log()
+	var btn: Button = auto_free(Button.new())
+	add_child(btn)
+	UIFrameworkScript.wire_touch_feedback(btn)
+
+	# Act — full tap = press then release.
+	var press: InputEventMouseButton = InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	btn.gui_input.emit(press)
+
+	var release: InputEventMouseButton = InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.pressed = false
+	btn.gui_input.emit(release)
+
+	# Assert
+	assert_int(_count_ui_tap_plays()).is_equal(1)

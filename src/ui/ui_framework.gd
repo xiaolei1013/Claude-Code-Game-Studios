@@ -218,13 +218,37 @@ static func wire_touch_feedback(control: Control) -> void:
 ## Internal — handles a [code]gui_input[/code] event and dispatches a touch
 ## pulse on mouse-button-down or screen-touch-down. Bound to the wired Control
 ## via [code]Callable.bind(control)[/code] in [method wire_touch_feedback].
+##
+## Audio: each press also fires [code]sfx_ui_tap[/code] via AudioRouter per
+## audio-system.md AC-AS-14 / AC-AS-15. Wiring on [code]gui_input[/code]
+## (press) rather than Button.pressed (release) ensures exactly one chime
+## per tap, not two.
 static func _on_touch_feedback_input(event: InputEvent, control: Control) -> void:
 	if event is InputEventMouseButton:
 		if (event as InputEventMouseButton).pressed:
 			_play_touch_pulse(control)
+			_fire_ui_tap_chime()
 	elif event is InputEventScreenTouch:
 		if (event as InputEventScreenTouch).pressed:
 			_play_touch_pulse(control)
+			_fire_ui_tap_chime()
+
+
+## Internal — fires [code]sfx_ui_tap[/code] via the AudioRouter autoload.
+## Defensive: silently no-ops if AudioRouter is absent (test fixtures that
+## don't load the autoload, headless runs without audio device, etc.).
+##
+## Looking up the autoload via [code]Engine.get_main_loop()[/code] rather
+## than [code]get_node()[/code] because this static method has no Node
+## context to anchor a relative lookup.
+static func _fire_ui_tap_chime() -> void:
+	var loop: SceneTree = Engine.get_main_loop() as SceneTree
+	if loop == null:
+		return
+	var router: Node = loop.root.get_node_or_null("AudioRouter")
+	if router == null or not router.has_method("play_sfx"):
+		return
+	router.play_sfx(&"sfx_ui_tap")
 
 
 ## Safe-format wrapper around [code]tr()[/code] localization keys with format
