@@ -259,21 +259,26 @@ func test_seed_first_launch_state_refuses_on_non_empty_roster() -> void:
 	if not _data_registry_can_resolve_warrior():
 		push_warning("Skipped")
 		return
-	# Arrange — pre-populate with one hero via add_hero.
+	# Arrange — pre-populate with one hero via add_hero. add_hero uses
+	# randi() to pick from the warrior name pool, which CAN include
+	# "Theron" — leading to a flaky `is_not_equal("Theron")` assertion
+	# below. Force the display_name to a known-distinct sentinel so the
+	# test asserts the seed-didn't-overwrite behavior deterministically.
 	var hr: Node = _make_fresh_roster()
 	var pre_existing: RefCounted = hr.add_hero(SEED_CLASS_ID)
 	assert_object(pre_existing).is_not_null()
+	const _SENTINEL_NAME: String = "PreExistingNotTheron"
+	pre_existing.display_name = _SENTINEL_NAME
 
 	# Act — should refuse and log a push_warning; no mutation.
 	hr.seed_first_launch_state()
 
 	# Assert — roster size unchanged.
 	assert_int(hr._heroes.size()).is_equal(1)
-	# The pre-existing hero's instance_id is 1 (add_hero assigns from
-	# _next_instance_id starting at 1); so we cannot assert the seed didn't
-	# overwrite by checking absence of instance_id 1. Instead, assert the
-	# display_name is NOT "Theron" — i.e. the seed name didn't leak.
-	assert_str(hr._heroes[1].display_name).is_not_equal(SEED_NAME)
+	# The pre-existing hero's display_name is the sentinel — verifies the
+	# seed didn't overwrite the pre-existing hero (which would have set
+	# display_name to SEED_NAME = "Theron").
+	assert_str(hr._heroes[1].display_name).is_equal(_SENTINEL_NAME)
 
 
 func test_seed_first_launch_state_refuses_on_already_seeded_roster() -> void:
