@@ -385,13 +385,16 @@ func get_save_data() -> Dictionary:
 ## and use the default (anti-save-tamper resilience).
 func load_save_data(d: Dictionary) -> void:
 	# save_pool_seed — int. Missing → first-launch init at end of method.
+	# JSON.parse_string returns numeric values as TYPE_FLOAT; accept both
+	# TYPE_INT and TYPE_FLOAT and cast through int() per the FloorUnlock
+	# S11-X1 canonical pattern.
 	if d.has("save_pool_seed"):
 		var raw_seed: Variant = d["save_pool_seed"]
-		if raw_seed is int:
-			_save_pool_seed = raw_seed
+		if typeof(raw_seed) in [TYPE_INT, TYPE_FLOAT]:
+			_save_pool_seed = int(raw_seed)
 		else:
 			_warning_logger.call(
-				"Recruitment.load_save_data: save_pool_seed not int (got %s) — re-initializing"
+				"Recruitment.load_save_data: save_pool_seed not numeric (type=%d) — re-initializing"
 				% typeof(raw_seed)
 			)
 			_save_pool_seed = 0  # re-init below
@@ -399,11 +402,11 @@ func load_save_data(d: Dictionary) -> void:
 	# refresh_counter — int.
 	if d.has("refresh_counter"):
 		var raw_counter: Variant = d["refresh_counter"]
-		if raw_counter is int:
-			_refresh_counter = raw_counter
+		if typeof(raw_counter) in [TYPE_INT, TYPE_FLOAT]:
+			_refresh_counter = int(raw_counter)
 		else:
 			_warning_logger.call(
-				"Recruitment.load_save_data: refresh_counter not int (got %s) — defaulting to 0"
+				"Recruitment.load_save_data: refresh_counter not numeric (type=%d) — defaulting to 0"
 				% typeof(raw_counter)
 			)
 			_refresh_counter = 0

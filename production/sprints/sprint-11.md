@@ -734,3 +734,49 @@ The Recruitment GDD has no naming-orthogonality split, so the FormationAssignmen
 - Sprint 11 S11-M4 (Story 016 end-to-end) is now genuinely unblocked. The sentinel test signals the remaining work: integration-test authoring against the live consumer chain.
 
 **Sprint 11 progress after S11-X10**: 22 commits this session. Sprint 11: 3.5/4 Must Haves + 2/5 Should Haves + **13 bonus stories** (007a + M3b + M3c + X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10). The autonomous-execution session has effectively bridged Sprint 11 → Sprint 12 — every consumer-ecosystem prereq for Story 016 happy-path round-trip is now fulfilled; the remaining work is genuinely integration-test authoring (the original S11-M4 scope).
+
+### S11-M4 (Story 016 partial) — load body + round-trip integration test — DONE 2026-05-05
+
+The original Sprint 11 Must Have. Pre-flight investigation found that **`SaveLoadSystem` had no `request_full_load` method at all** — the load side of Story 007 was deferred when 007a shipped only the persist body. Closing S11-M4 required Story 007b (load body) FIRST, then the integration test. Both shipped this session.
+
+**Story 007b — `request_full_load` body**:
+- New method on SaveLoadSystem (~150 lines): file presence check (cold-start emits `first_launch` + `load_completed` advances UNLOADED → READY), MAGIC validation (rejects non-LGLD), VERSION cross-check (rejects mismatch — Sprint 12+ Story 010 owns migration), PAYLOAD_LENGTH cross-check (DoS defense per ADR-0004 Rule 2), HMAC validation against N=2 keys (current + prior; prior-key match sets `_needs_rekey_persist`), un-XOR + UTF-8 JSON parse, per-consumer hydration via `load_save_data`.
+- New signals: `load_completed(reason: String)` + `load_failed(reason: String, error_code: int)` — symmetric with the existing `save_completed` / `save_failed` pair.
+- Validation order (MAGIC → VERSION → PAYLOAD_LENGTH → HMAC) is FIXED per ADR-0004 §Validation order; reordering is FORBIDDEN (HMAC-first creates a save-destruction DoS on N-1 fallback).
+- State transitions: UNLOADED → LOADING → READY (success) | LOADING → CORRUPT (any validation failure). Cold-start path bypasses LOADING for clean signal semantics (no transient state observable to subscribers).
+
+**S11-M4 — `tests/integration/save_load/save_persist_roundtrip_test.gd`**:
+- NEW 10-test integration suite, 6 groups:
+  - Group A (1): full-envelope round-trip preserves all 7 consumer states. Snapshot-comparison via `JSON.stringify(get_save_data())` before/after; key-equality across the round trip is the canonical AC-1 contract.
+  - Group B (2): atomic-write file shape — `.tmp` absent post-success; `.dat` size equals `44 + payload_length`; MAGIC bytes "LGLD" at offset 0; VERSION u16 LE at offset 4 equals CURRENT_SAVE_VERSION (=1).
+  - Group C (1): cold-start (no save file) emits `first_launch` + `load_completed` and advances UNLOADED → READY without entering CORRUPT.
+  - Group D (2): tamper detection — byte-flip in payload region triggers CORRUPT state + `tamper_detected_on_load` + `load_failed`. MAGIC corruption (garbage file) triggers CORRUPT + `load_failed` WITHOUT `tamper_detected_on_load` (MAGIC failure is a "wrong file" signal, not tamper).
+  - Group E (3): load signal declarations + `request_full_load` method existence.
+  - Group F (1): state-guard — `request_full_load` from READY rejects with `load_failed(ERR_UNAVAILABLE)` (manual reload is Sprint 12+ scope).
+- Hygiene barrier per S10-S4 lesson: `before_test`/`after_test` reset `_state` to UNLOADED, restore canonical `save_file_path`, delete fixture file at `user://test_fixture_s11_m4_roundtrip.dat`.
+
+**Implementation note** (caught + fixed mid-session): JSON.parse_string returns numeric values as `TYPE_FLOAT`, so the original `if raw_seed is int` type guard in `Recruitment.load_save_data` rejected the round-tripped seed (and re-initialized via `_first_launch_seed_init()`, producing a fresh seed). Fixed to use the FloorUnlock S11-X1 canonical pattern: `if typeof(raw_value) in [TYPE_INT, TYPE_FLOAT]: int(raw_value)`. This is a project-wide gotcha for any consumer that persists ints. Saved as a memory note.
+
+**Sentinel test cleanup**: the `request_full_persist_test.gd` Group D sentinel was originally going to be deleted in this commit per the docstring TODO ("delete this sentinel + add happy-path round-trip coverage"). Decision: **keep the sentinel** as a strong CI signal that all 7 autoloads remain present + with `get_save_data`. The new round-trip integration test in `tests/integration/save_load/` is the canonical happy-path coverage; the sentinel now serves as a unit-level "consumer ecosystem still complete" tripwire. Both tests serve different purposes; deleting the sentinel would lose a fast-failing tripwire if a future change accidentally drops a consumer.
+
+**Verification**:
+- New round-trip integration suite: **10/10 PASS**.
+- Recruitment skeleton suite (post-load_save_data fix): **23/23 PASS** (no regressions from the typeof change).
+- save_load suite: **106/106 PASS** (load_completed/load_failed signals + request_full_load method don't break the existing signal-spy or state-guard tests).
+- **Full unit + integration sweep: 1281 / 1281 PASS, 0 errors / 0 failures** (was 1271 + 10 new tests).
+- **No regressions**.
+
+**Original Story 016 ACs status**:
+- ✅ AC-1 (full-state envelope round-trip) — Group A integration test.
+- ✅ AC-3 (scene_boundary_persist receiver) — already covered by S11-M1 + S11-M3 tests.
+- ✅ AC-5 (atomic write file shape) — Group B integration test (`.tmp` absent + `.dat` shape).
+- ✅ AC-6 (no cached consumer refs) — code-review-verified; `_resolve_consumer` is the only access pattern (per-call `get_node_or_null`).
+- ✅ Tamper signal contract — Group D integration test.
+- ⚠️ AC-2 (heartbeat envelope ≤512 bytes) — SUPERSEDED by S11-M2b decision: heartbeat = full persist sharing the same envelope schema (no separate partial envelope). The "≤512 byte heartbeat" constraint is obsolete; documented in S11-M2b closure note.
+- ⚠️ AC-4 (save_failed → transition abort) — Sprint 12+ scope; SceneManager-side await pattern is the forward-looking optimization per S11-M3b doc clarification.
+- ⚠️ AC-7/8 (persist + load p95 latency benchmarks) — Sprint 12+ Story 015 scope (perf verification); not in this commit.
+- ⚠️ AC-9 (manual close-reload smoke) — Sprint 11 S11-S5 scope (re-playtest); requires real Godot build session.
+
+**Sprint 11 progress after S11-M4**: 23 commits this session (this commit). Sprint 11: **4/4 Must Haves DONE** + 2/5 Should Haves + 13 bonus stories. Story 016 status flips from BLOCKED → COMPLETE-WITH-NOTES (AC-1/3/5/6 + tamper covered; AC-2 superseded; AC-4/7/8/9 deferred to Sprint 11 S11-S5 + Sprint 12+ Story 015 per scope handoff above).
+
+**The original Sprint 11 sprint goal is met**: a player can dispatch → clear floor 1 → close the game → reopen and resume with the same hero levels + gold + run state. The integration test exercises exactly this round-trip via the JSON.stringify(get_save_data()) byte-equality check across all 7 consumers. Manual-build verification (S11-S5 re-playtest) remains as the last live-confirm step.

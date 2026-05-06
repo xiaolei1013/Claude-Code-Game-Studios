@@ -149,6 +149,37 @@ signal save_completed(reason: String)
 ## ADR-0004 §Signals — TR-save-load-031
 signal save_failed(reason: String, error_code: int)
 
+## Emitted when a load operation completes successfully — i.e., consumers have
+## been hydrated and [member _state] has reached READY (either via the cold-
+## start [signal first_launch] path or via a successful envelope hydrate).
+##
+## [param reason]: Human-readable label for the load trigger
+## ("boot", "manual", "post_corrupt_acknowledge", etc.). Symmetric with
+## [signal save_completed].
+##
+## Sprint 11 Story 007b — load body. Declared alongside the existing
+## save_completed for symmetry; integration tests use this to await load
+## completion in round-trip fixtures.
+##
+## ADR-0004 §Signals — TR-save-load-031
+signal load_completed(reason: String)
+
+## Emitted when a load operation fails fatally (CORRUPT state reached, or the
+## envelope is unrecoverable after [signal tamper_detected_on_load] +
+## [signal corrupt_both_acknowledged] handling).
+##
+## [param reason]: Human-readable description of the failure.
+## [param error_code]: [enum Error] value from the failing I/O or validation
+##   call. ERR_FILE_CORRUPT on MAGIC/VERSION/HMAC failure; ERR_FILE_CANT_OPEN
+##   on file I/O error.
+##
+## Symmetric with [signal save_failed]. Note: cold-start (no save file) is
+## NOT a load failure — it emits [signal first_launch] + [signal load_completed]
+## with reason="first_launch_cold_start" and the state advances to READY.
+##
+## ADR-0004 §Signals — TR-save-load-031
+signal load_failed(reason: String, error_code: int)
+
 ## Emitted when the load pipeline detects a suspicious timestamp on the save
 ## envelope (forwarded from [signal TickSystem.flag_suspicious_timestamp_emitted]).
 ##
@@ -497,6 +528,185 @@ func request_heartbeat_persist(time_fields: Dictionary) -> void:
 	# discarded; no allocation concern.
 	var _unused: Dictionary = time_fields
 	request_full_persist("heartbeat")
+
+
+## Requests a full-envelope load — reads [member save_file_path], validates
+## the envelope, and hydrates all consumers via [code]load_save_data[/code].
+##
+## Sprint 11 Story 007b — load body. Mirror of [method request_full_persist].
+## Validation order is FIXED per ADR-0004 §Validation order: MAGIC → VERSION
+## → PAYLOAD_LENGTH match → HMAC. Reordering is FORBIDDEN.
+##
+## State transitions:
+## - UNLOADED → LOADING → READY (success)
+## - UNLOADED → LOADING → CORRUPT (envelope unrecoverable)
+## - First-launch (no save file): UNLOADED → READY directly + emits
+##   [signal first_launch] + [signal load_completed] with
+##   reason="first_launch_cold_start".
+##
+## On HMAC tag-1 (prior key) match (N=2 rotation per ADR-0004 §HMAC Key
+## History): sets [member _needs_rekey_persist] so the next
+## [method request_full_persist] resigns under the current-build tag.
+##
+## [param reason]: Human-readable label for the load trigger ("boot",
+##   "manual", "post_corrupt_acknowledge"). Propagated verbatim to
+##   [signal load_completed] / [signal load_failed].
+##
+## Example:
+##   SaveLoadSystem.request_full_load("boot")
+##
+## ADR-0004 §Load pipeline, TR-save-load-045
+func request_full_load(reason: String) -> void:
+	# Guard: load is only valid from UNLOADED. Re-loading from READY is a
+	# Sprint 12+ feature (manual reload after settings change); MVP rejects.
+	if _state != State.UNLOADED:
+		push_warning(
+			"SaveLoadSystem.request_full_load: state=%d not UNLOADED — " % _state +
+			"load trigger ignored (reason='%s'). Only the initial cold-boot " % reason +
+			"load is supported in MVP."
+		)
+		load_failed.emit(reason, ERR_UNAVAILABLE)
+		return
+
+	_transition_to(State.LOADING)
+
+	# 1. File presence check. No file = first launch (cold start).
+	if not FileAccess.file_exists(save_file_path):
+		_transition_to(State.READY)
+		first_launch.emit()
+		load_completed.emit("first_launch_cold_start" if reason.is_empty() else reason)
+		return
+
+	# 2. Read envelope bytes.
+	var file: FileAccess = FileAccess.open(save_file_path, FileAccess.READ)
+	if file == null:
+		var open_err: int = FileAccess.get_open_error()
+		push_error(
+			"SaveLoadSystem.request_full_load: FileAccess.open(%s, READ) failed — " % save_file_path +
+			"error=%d (reason='%s')" % [open_err, reason]
+		)
+		_transition_to(State.CORRUPT)
+		load_failed.emit(reason, open_err)
+		return
+	var envelope: PackedByteArray = file.get_buffer(file.get_length())
+	file.close()
+
+	# 3. Parse header — MAGIC + VERSION + PAYLOAD_LENGTH (validation order
+	#    locked by ADR-0004; do NOT reorder to HMAC-first).
+	var parsed: Dictionary = _parse_header(envelope)
+	if not parsed.magic_ok:
+		push_error(
+			"SaveLoadSystem.request_full_load: MAGIC mismatch — " +
+			"envelope is not a Lantern Guild save (reason='%s')" % reason
+		)
+		_transition_to(State.CORRUPT)
+		load_failed.emit(reason, ERR_FILE_CORRUPT)
+		return
+	var version: int = int(parsed.version)
+	if version != CURRENT_SAVE_VERSION:
+		# Sprint 12+ owns schema migration (Story 010). MVP rejects the
+		# version-mismatched envelope as CORRUPT — the migration path lands
+		# alongside the next save-schema bump.
+		push_error(
+			"SaveLoadSystem.request_full_load: VERSION %d != CURRENT_SAVE_VERSION %d — " % [version, CURRENT_SAVE_VERSION] +
+			"schema migration is Sprint 12+ scope (Story 010); rejecting (reason='%s')" % reason
+		)
+		_transition_to(State.CORRUPT)
+		load_failed.emit(reason, ERR_FILE_CORRUPT)
+		return
+
+	# 4. Split + payload-length cross-check (ADR-0004 §DoS defense Rule 2).
+	var parts: Dictionary = _split_envelope(envelope)
+	if not _validate_payload_length_match(parts):
+		push_error(
+			"SaveLoadSystem.request_full_load: PAYLOAD_LENGTH header field (%d) " % parsed.payload_length +
+			"does not match (file_length - %d) (%d) — truncated or padded envelope " % [_ENVELOPE_OVERHEAD, parts.file_length - _ENVELOPE_OVERHEAD] +
+			"(reason='%s')" % reason
+		)
+		_transition_to(State.CORRUPT)
+		load_failed.emit(reason, ERR_FILE_CORRUPT)
+		return
+
+	# 5. HMAC validation against N=2 keys (current + prior). Per ADR-0004
+	#    §HMAC Key History: prior-key match sets _needs_rekey_persist so the
+	#    next persist re-signs under the current-build tag.
+	var tags: Array[PackedByteArray] = _derive_integrity_tags()
+	var hmac_input: PackedByteArray = envelope.slice(0, envelope.size() - _HMAC_SIZE)
+	var expected_current: PackedByteArray = _integrity_wrap(tags[0], hmac_input)
+	var matches_current: bool = (parts.footer_tag == expected_current)
+	var matches_prior: bool = false
+	if not matches_current and tags.size() >= 2:
+		var expected_prior: PackedByteArray = _integrity_wrap(tags[1], hmac_input)
+		matches_prior = (parts.footer_tag == expected_prior)
+	if not (matches_current or matches_prior):
+		push_error(
+			"SaveLoadSystem.request_full_load: HMAC verification failed against " +
+			"both current + prior tags — envelope tampered or key rotation breach " +
+			"(reason='%s')" % reason
+		)
+		_transition_to(State.CORRUPT)
+		# Tamper signal per ADR-0004 + Save/Load GDD AC-SL-03 (declared
+		# signal already exists). Story 013 wires the modal UX; here we
+		# emit the signal so listeners can react.
+		tamper_detected_on_load.emit()
+		load_failed.emit(reason, ERR_FILE_CORRUPT)
+		return
+	if matches_prior and not matches_current:
+		# N=2 rotation — re-persist under current-build tag on next persist.
+		_needs_rekey_persist = true
+
+	# 6. Un-XOR payload + UTF-8 JSON parse.
+	var mask_seed: PackedByteArray = _derive_mask_seed(version)
+	var mask: PackedByteArray = _generate_mask(mask_seed, (parts.masked_payload as PackedByteArray).size())
+	var plaintext: PackedByteArray = _apply_xor_mask(parts.masked_payload, mask)
+	var json_string: String = plaintext.get_string_from_utf8()
+	var parse_result: Variant = JSON.parse_string(json_string)
+	if parse_result == null or not (parse_result is Dictionary):
+		push_error(
+			"SaveLoadSystem.request_full_load: JSON parse failed (got %s) — " % typeof(parse_result) +
+			"envelope HMAC was valid but payload is not a Dictionary (reason='%s')" % reason
+		)
+		_transition_to(State.CORRUPT)
+		load_failed.emit(reason, ERR_PARSE_ERROR)
+		return
+	var root_dict: Dictionary = parse_result as Dictionary
+
+	# 7. Iterate CONSUMER_PATHS, hydrate each via load_save_data. Per Save/Load
+	#    GDD §C: missing per-consumer keys are tolerated — load_save_data is
+	#    contractually responsible for handling absent fields with first-
+	#    launch defaults (per consumer's own spec). This path mirrors the
+	#    persist body's iteration shape.
+	for path: String in CONSUMER_PATHS:
+		var node: Node = _resolve_consumer(path)
+		if node == null:
+			# _resolve_consumer already called push_error + get_tree().quit(1).
+			# Surface as load_failed for any subscriber that needs to react.
+			_transition_to(State.CORRUPT)
+			load_failed.emit(reason, ERR_DOES_NOT_EXIST)
+			return
+		if not node.has_method("load_save_data"):
+			push_error(
+				"SaveLoadSystem.request_full_load: %s has no load_save_data — " % path +
+				"fatal architecture violation per ADR-0004 §Consumer Contract."
+			)
+			_transition_to(State.CORRUPT)
+			load_failed.emit(reason, ERR_METHOD_NOT_FOUND)
+			return
+		var consumer_data: Variant = root_dict.get(node.name, {})
+		# Per Save/Load Rule 11 type-guard: pass empty dict on non-Dictionary
+		# value rather than letting the consumer's load_save_data type-error.
+		if not (consumer_data is Dictionary):
+			push_warning(
+				"SaveLoadSystem.request_full_load: %s payload is %s (not Dictionary) — " % [path, typeof(consumer_data)] +
+				"passing empty dict to load_save_data (Rule 11)"
+			)
+			consumer_data = {}
+		node.call("load_save_data", consumer_data)
+
+	# 8. Success: transition READY + emit load_completed.
+	_transition_to(State.READY)
+	load_completed.emit(reason)
+
 
 # ---------------------------------------------------------------------------
 # Private methods

@@ -1,13 +1,28 @@
 # Story 016: Save-persist pipeline end-to-end — full envelope + heartbeat + scene-boundary trigger
 
 > **Epic**: save-load-system
-> **Status**: BLOCKED (2026-05-05) — see "Block Reason" below
+> **Status**: COMPLETE-WITH-NOTES (2026-05-05) — see "Closure Note" below
 > **Layer**: Foundation
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26
-> **Sprint Mapping**: S9-S1 (sprint-9.md) → S10-M1 (sprint-10.md initial draft) → **deferred to Sprint 11** (revised 2026-05-05 after `/dev-story` Phase 2 discovery)
+> **Sprint Mapping**: S9-S1 (sprint-9.md) → S10-M1 (sprint-10.md initial draft) → deferred to Sprint 11 (revised 2026-05-05 after `/dev-story` Phase 2 discovery) → **closed Sprint 11 S11-M4 / Story 007b (2026-05-05) — AC-1/3/5/6 + tamper covered; AC-2 superseded; AC-4/7/8/9 deferred to S11-S5 + Sprint 12+ Story 015**
 
-## Block Reason — added 2026-05-05 by /dev-story
+## Closure Note — 2026-05-05 (Sprint 11 S11-M4 + Story 007b)
+
+Closure log lives in `production/sprints/sprint-11.md` under "S11-M4 (Story 016 partial)". Summary:
+- ✅ AC-1 — full-envelope round-trip integration test (`tests/integration/save_load/save_persist_roundtrip_test.gd` Group A) — 7-consumer state preserved across persist→reset→load via JSON.stringify byte-equality.
+- ✅ AC-3 — scene_boundary_persist receiver wiring — covered by Sprint 11 S11-M1 (signal emission, 7 dedicated tests) + S11-M3 (`_on_scene_boundary_persist` body forwards to request_full_persist).
+- ✅ AC-5 — atomic write file shape (Group B integration tests) — `.tmp` absent post-success; `.dat` size = 44 + payload_length; MAGIC bytes verified at offset 0.
+- ✅ AC-6 — no cached consumer refs — code-review-verified; `_resolve_consumer` is the only access pattern (per-call `get_node_or_null` per ADR-0003).
+- ✅ Tamper detection — Group D integration test (byte-flip triggers CORRUPT + `tamper_detected_on_load` + `load_failed`; MAGIC failure triggers CORRUPT + `load_failed` WITHOUT tamper signal).
+- ⚠️ AC-2 — heartbeat envelope ≤512 bytes — SUPERSEDED. Per S11-M2b decision, heartbeat = full persist sharing one envelope schema (no separate partial envelope path). The 512-byte constraint is obsolete; documented in sprint-11.md S11-M2b closure note.
+- ⚠️ AC-4 — save_failed → transition abort — Sprint 12+ scope. SceneManager-side `await` pattern is the forward-looking optimization per S11-M3b doc clarification (current synchronous-I/O architecture lets `scene_boundary_persist.emit()` return only after `save_completed`/`save_failed` has fired).
+- ⚠️ AC-7 / AC-8 — persist + load p95 latency benchmarks — Sprint 12+ Story 015 scope (perf verification suite); not in this commit.
+- ⚠️ AC-9 — manual close-reload smoke — Sprint 11 S11-S5 scope (re-playtest with persisted save); requires real Godot build session, not headless test.
+
+**The original Sprint 11 sprint goal is met**: a player can dispatch → clear floor 1 → close the game → reopen and resume with the same hero levels + gold + run state. The integration test exercises exactly this round-trip via the JSON.stringify(get_save_data()) byte-equality check across all 7 consumers (Economy, HeroRoster, FloorUnlock, FormationAssignment, Recruitment, DungeonRunOrchestrator, AudioRouter). Manual-build verification (S11-S5 re-playtest) remains as the last live-confirm step.
+
+## Original Block Reason — added 2026-05-05 by /dev-story (RESOLVED 2026-05-05 by S11-M4)
 
 The "Dependencies" section below claims Stories 007/008/011/012 are Complete. **Code state contradicts this**:
 
