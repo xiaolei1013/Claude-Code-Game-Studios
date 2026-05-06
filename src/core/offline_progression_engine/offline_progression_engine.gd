@@ -204,15 +204,93 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 	if clipped > 0:
 		cap_reached.emit(clipped)
 
-	# Sprint 12 S12-M4 STUB: assemble an empty summary. S12-M5 will replace
-	# this with the full GDD §C.2 pseudocode (per-chunk loop + flush_offline_signals
-	# calls + adaptive chunk-size adjustment).
+	# Sprint 12 S12-M5: full chunked replay loop per GDD §C.2 + ADR-0014 §C.2.
+	# Convert capped seconds to ticks (TickSystem.TICKS_PER_SECOND = 20 per game-time-and-tick.md).
+	var ticks_per_second: int = 20
+	var total_ticks: int = capped * ticks_per_second
+	var remaining_ticks: int = total_ticks
+	var current_chunk_size: int = OFFLINE_CHUNK_INITIAL_TICKS
+
+	# Initialize summary accumulator.
 	var summary: OfflineSummary = OfflineSummary.new()
 	summary.seconds_credited = capped
 	summary.seconds_clipped = clipped
-	summary.ticks_replayed = 0  # S12-M5 fills this in.
-	summary.chunks_consumed = 0
-	summary.total_replay_wall_time_ms = 0
+
+	# Suppress per-chunk domain signals per ADR-0014 §C.3 + ADR-0013.
+	var economy: Node = get_node_or_null("/root/Economy")
+	var orchestrator: Node = get_node_or_null("/root/DungeonRunOrchestrator")
+	if economy != null:
+		economy._is_offline_replay = true
+	if orchestrator != null:
+		orchestrator._is_offline_replay = true
+
+	# Batch chunking loop per GDD §C.2 pseudocode + ADR-0014 §C.2.
+	var replay_start_ms: int = Time.get_ticks_msec()
+	while remaining_ticks > 0:
+		var chunk_ticks: int = mini(current_chunk_size, remaining_ticks)
+		var chunk_start_ms: int = Time.get_ticks_msec()
+
+		# Domain calls: Orchestrator first (combat kills), then Economy (drip accrual).
+		# Per ADR-0014: order is load-bearing for accumulation semantics.
+		var combat_result: Dictionary = {}
+		if orchestrator != null and orchestrator.has_method("compute_offline_batch"):
+			var result = orchestrator.compute_offline_batch(chunk_ticks)
+			if result != null:
+				combat_result = result
+				# Accumulate kills by tier (population is lazy; defaults to 0).
+				if result.has("kills_by_tier") and result.kills_by_tier is Dictionary:
+					for tier: int in result.kills_by_tier.keys():
+						if not summary.has_meta("_kills_by_tier"):
+							summary.set_meta("_kills_by_tier", {})
+						var tier_dict: Dictionary = summary.get_meta("_kills_by_tier")
+						tier_dict[tier] = tier_dict.get(tier, 0) + result.kills_by_tier[tier]
+				# Track first_clear_tick to populate floors_cleared_in_window post-replay.
+				if result.has("first_clear_tick") and result.first_clear_tick >= 0:
+					if not summary.has_meta("_floors_cleared_ticks"):
+						summary.set_meta("_floors_cleared_ticks", [])
+					var cleared_list: Array = summary.get_meta("_floors_cleared_ticks")
+					if result.first_clear_tick not in cleared_list:
+						cleared_list.append(result.first_clear_tick)
+
+		var economy_result: Dictionary = {}
+		if economy != null and economy.has_method("compute_offline_batch"):
+			var result = economy.compute_offline_batch(chunk_ticks)
+			if result != null:
+				economy_result = result
+
+		summary.ticks_replayed += chunk_ticks
+		summary.chunks_consumed += 1
+		remaining_ticks -= chunk_ticks
+
+		# Measure wall time for this chunk (measuring yield is non-blocking per async pattern).
+		var chunk_wall_ms: int = Time.get_ticks_msec() - chunk_start_ms
+
+		# Yield to main thread per ADR-0014: yield IS the budget mechanism (no WorkerThreadPool).
+		await get_tree().process_frame
+
+		# Adaptive chunk-size adjustment per ADR-0014 §D.3 + GDD §D.3.
+		var deadband_low: float = OFFLINE_CHUNK_TARGET_WALL_MS * (1.0 - OFFLINE_CHUNK_DEADBAND_RATIO)
+		var deadband_high: float = OFFLINE_CHUNK_TARGET_WALL_MS * (1.0 + OFFLINE_CHUNK_DEADBAND_RATIO)
+		if chunk_wall_ms < deadband_low or chunk_wall_ms > deadband_high:
+			# Outside deadband: adjust chunk size toward target.
+			var ratio: float = float(OFFLINE_CHUNK_TARGET_WALL_MS) / float(maxi(chunk_wall_ms, 1))
+			var adjusted: int = int(current_chunk_size * lerpf(1.0, ratio, OFFLINE_CHUNK_ADJUST_RATIO))
+			current_chunk_size = clampi(adjusted, OFFLINE_CHUNK_MIN_TICKS, OFFLINE_CHUNK_MAX_TICKS)
+
+	summary.total_replay_wall_time_ms = Time.get_ticks_msec() - replay_start_ms
+
+	# Clear suppression flags BEFORE flush (defensive re-init; flush also clears).
+	if economy != null:
+		economy._is_offline_replay = false
+	if orchestrator != null:
+		orchestrator._is_offline_replay = false
+
+	# Emit aggregate domain signals per ADR-0014 §C.3 post-replay order.
+	# Order: Economy aggregates, then Orchestrator aggregates, then this engine's signal.
+	if economy != null and economy.has_method("flush_offline_signals"):
+		economy.flush_offline_signals()
+	if orchestrator != null and orchestrator.has_method("flush_offline_signals"):
+		orchestrator.flush_offline_signals()
 
 	# Clear in-flight state BEFORE emitting (per GDD §E.6: a listener
 	# exception must not leave _replay_in_flight stuck true).

@@ -122,10 +122,17 @@ func test_run_offline_replay_under_cap_does_not_emit_cap_reached() -> void:
 	# Non-live unit instance — _read_cap_seconds() falls back to GDD default
 	# 28800 (8h) when TickSystem isn't visible to this instance via /root/.
 	# elapsed=3600 (1h) is well under cap.
+	# S12-M5: run_offline_replay now awaits process_frame per chunk; pump frames.
 	var ope: Node = _make_engine()
 	_connect_spies(ope)
 
 	ope.run_offline_replay(3600)
+	# Pump enough frames for the chunked loop to complete (3600s = 72000 ticks;
+	# at INITIAL_TICKS 5000: ~15 chunks → 15 process_frame yields needed; 60 is safe headroom).
+	for _i: int in range(60):
+		await get_tree().process_frame
+		if _rewards_collected_calls.size() > 0:
+			break
 
 	assert_int(_cap_reached_calls.size()).is_equal(0)
 	assert_int(_rewards_collected_calls.size()).is_equal(1)
@@ -140,10 +147,16 @@ func test_run_offline_replay_under_cap_does_not_emit_cap_reached() -> void:
 func test_run_offline_replay_at_exactly_cap_does_not_emit_cap_reached() -> void:
 	# GDD §E.3: elapsed == cap → strict > 0 check on clipped means no emit.
 	# Live TickSystem is at /root; its offline_cap_seconds = 28800 default.
+	# S12-M5: run_offline_replay now awaits process_frame per chunk; pump frames.
 	var ope: Node = _make_engine()
 	_connect_spies(ope)
 
 	ope.run_offline_replay(28800)
+	# 28800s = 576000 ticks; at INITIAL_TICKS 5000: ~116 chunks. Use 200-frame limit.
+	for _i: int in range(200):
+		await get_tree().process_frame
+		if _rewards_collected_calls.size() > 0:
+			break
 
 	assert_int(_cap_reached_calls.size()).is_equal(0)
 	assert_int(_rewards_collected_calls.size()).is_equal(1)
@@ -156,10 +169,16 @@ func test_run_offline_replay_at_exactly_cap_does_not_emit_cap_reached() -> void:
 
 func test_run_offline_replay_above_cap_emits_cap_reached_with_clipped_delta() -> void:
 	# GDD §E.4: elapsed = 86400 (24h); cap = 28800 (8h); clipped = 57600.
+	# S12-M5: run_offline_replay now awaits process_frame per chunk; pump frames.
 	var ope: Node = _make_engine()
 	_connect_spies(ope)
 
 	ope.run_offline_replay(86400)
+	# cap = 28800s = 576000 ticks; ~116 chunks. Use 200-frame limit.
+	for _i: int in range(200):
+		await get_tree().process_frame
+		if _rewards_collected_calls.size() > 0:
+			break
 
 	assert_int(_cap_reached_calls.size()).is_equal(1)
 	assert_int(_cap_reached_calls[0]).is_equal(57600)
