@@ -577,20 +577,69 @@ func recruit_cost(class_id: String, copies_owned: int) -> int:
 	return int(floor(float(base) * pow(ratio, float(copies_owned))))
 
 
-## Returns the gold cost to level [param class_tier] hero from [param current_level].
+## Returns the gold cost to level a [param class_tier] hero from
+## [param current_level] to [param current_level] + 1.
 ##
-## Formula: floori(BASE_LEVEL[class_tier] × LEVEL_RATIO^(current_level - 1))
-## (from EconomyConfig — resolved from DataRegistry in Story 002).
+## Formula: [code]floori(BASE_LEVEL[class_tier] × LEVEL_RATIO^(current_level - 1))[/code]
+## where BASE_LEVEL + LEVEL_RATIO + LEVEL_CAP come from [member _config]
+## (EconomyConfig.tres).
 ##
-## Returns -1 (sentinel) if [param current_level] >= LEVEL_CAP (past cap).
-## STUB — returns [code]0[/code]. Real formula + sentinel logic lands in Story 008.
+## Returns [code]-1[/code] (sentinel) on:
+## - [param current_level] >= LEVEL_CAP (past cap — no further leveling)
+## - [param current_level] < 1 (authoring bug — heroes start at level 1)
+## - [member _config] null (boot failed OR test fixture without seed)
+## - [param class_tier] not in BASE_LEVEL keys (unknown tier)
 ##
-## [param class_tier]: Hero class tier (1..2).
-## [param current_level]: Hero's current level (1..LEVEL_CAP).
+## Pure function — no state mutation. Per ADR-0013 §level_cost: called on
+## UI render + button-tap (user-driven cadence, not a hot path).
+##
+## [param class_tier]: Hero class tier (1..2). Maps to BASE_LEVEL key.
+## [param current_level]: Hero's current level (1..LEVEL_CAP). Returns -1
+##   if at or past cap (caller checks for -1 to disable Level-Up button).
 ##
 ## Example:
 ##   var cost: int = Economy.level_cost(1, 5)
+##   # tier 1 hero at level 5 → floori(40 × 1.6^4) = floori(262.144) = 262
 ##
-## ADR-0013 §Requirements — GDD §D.4, §H-08
+## Sprint 12 S12-N5 — closes the Story 008 stub (sibling to S12-M1
+## recruit_cost). ADR-0013 §Requirements + §D.4 + AC H-08; GDD §D.4.
 func level_cost(class_tier: int, current_level: int) -> int:
-	return 0  # Story 008
+	# Step 1: config presence guard.
+	if _config == null:
+		push_error(
+			"Economy.level_cost: _config null — DataRegistry.resolve('config', 'economy_config') failed at boot OR test fixture did not seed _config (class_tier=%d, current_level=%d)"
+			% [class_tier, current_level]
+		)
+		return -1
+
+	# Step 2: current_level lower-bound guard. Heroes start at level 1 per
+	# HeroRoster.add_hero contract. Negative or zero values are an
+	# authoring bug.
+	if current_level < 1:
+		push_error(
+			"Economy.level_cost: current_level=%d < 1 (heroes start at level 1) — class_tier=%d"
+			% [current_level, class_tier]
+		)
+		return -1
+
+	# Step 3: cap guard. At-or-past-cap returns -1 sentinel; caller (Level-
+	# Up UI) interprets this as "Level-Up button disabled."
+	if current_level >= _config.LEVEL_CAP:
+		return -1
+
+	# Step 4: tier lookup. BASE_LEVEL is Dictionary[int, int] keyed by
+	# class.tier (currently {1: 40, 2: 600} per economy_config.tres).
+	if not _config.BASE_LEVEL.has(class_tier):
+		push_error(
+			"Economy.level_cost: class_tier %d not in BASE_LEVEL keys %s (current_level=%d)"
+			% [class_tier, _config.BASE_LEVEL.keys(), current_level]
+		)
+		return -1
+
+	# Step 5: geometric escalation per ADR-0013 §D.4 + GDD §D.4. floori
+	# matches the canonical curve convention (recruit_cost + refresh_cost).
+	# Note: exponent is (current_level - 1) so level 1 → ratio^0 = 1 → cost
+	# == BASE_LEVEL (the FIRST level-up costs the base value).
+	var base: int = int(_config.BASE_LEVEL[class_tier])
+	var ratio: float = _config.LEVEL_RATIO
+	return int(floor(float(base) * pow(ratio, float(current_level - 1))))

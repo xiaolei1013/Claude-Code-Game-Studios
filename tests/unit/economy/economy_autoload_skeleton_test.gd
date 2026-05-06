@@ -331,15 +331,17 @@ func test_economy_recruit_cost_method_exists_with_correct_arity() -> void:
 	economy.free()
 
 
-func test_economy_level_cost_returns_zero_stub() -> void:
-	# Arrange
+func test_economy_level_cost_method_exists_with_correct_arity() -> void:
+	# Sprint 12 S12-N5: level_cost STUB → formula implementation. Skeleton
+	# test downgraded from "returns 0 stub" to "method exists with correct
+	# arity"; the formula behavior is covered by economy_level_cost_test.gd.
+	# Calling on a fresh Economy.new() (no _config seed) returns -1 sentinel
+	# per the new formula's null-config guard.
 	var economy: Node = EconomyScript.new()
 
-	# Act
-	var result: int = economy.level_cost(1, 1)
+	assert_bool(economy.has_method("level_cost")).is_true()
+	# Sentinel-only call (config null on a never-add_child'd instance)
+	# returns -1 per the formula's _config guard.
+	assert_int(economy.level_cost(1, 1)).is_equal(-1)
 
-	# Assert — stub returns 0
-	assert_int(result).is_equal(0)
-
-	# Cleanup
 	economy.free()
