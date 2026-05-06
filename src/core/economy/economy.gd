@@ -503,21 +503,78 @@ func get_config() -> EconomyConfig:
 ## Returns the gold cost to recruit one more copy of [param class_id] given
 ## that [param copies_owned] copies are already owned.
 ##
-## Formula: floori(BASE_RECRUIT[tier] × RECRUIT_RATIO^copies_owned)
-## (from EconomyConfig — resolved from DataRegistry in Story 002).
+## Formula: [code]floori(BASE_RECRUIT[tier] × RECRUIT_RATIO^copies_owned)[/code]
+## where tier is read from the [HeroClass] resource resolved via
+## [code]DataRegistry.resolve("classes", class_id)[/code].
 ##
-## Returns -1 if [param class_id] cannot be resolved (push_error on miss).
-## STUB — returns [code]0[/code]. Real formula lands in Story 007.
+## Returns [code]-1[/code] (sentinel) on:
+## - [param copies_owned] < 0 (authoring bug — push_error + return -1)
+## - [member _config] null (boot failed OR test fixture did not seed)
+## - DataRegistry.resolve returns null (orphan class_id — content patch
+##   removed it OR save corruption)
+## - tier not in BASE_RECRUIT keys (unknown tier — push_error + return -1)
 ##
-## [param class_id]: Snake-case class identifier (e.g. "warrior_t1").
-## [param copies_owned]: Number of copies already in the roster.
+## Pure function — no state mutation. Per ADR-0013 §recruit_cost: called on
+## UI render + button-tap (user-driven cadence, not a hot path). Performance
+## budget: <50 µs per call (DataRegistry.resolve + pow + floor).
+##
+## [param class_id]: Snake-case class identifier (e.g. "warrior").
+## [param copies_owned]: Copies already in the roster, from
+##   [code]HeroRoster.get_copies_owned(class_id)[/code]. Must be >= 0.
 ##
 ## Example:
-##   var cost: int = Economy.recruit_cost("warrior_t1", 2)
+##   var cost: int = Economy.recruit_cost("warrior", 2)
+##   # tier 1 warrior, 2 copies owned: floori(150 × 1.8^2) = floori(486.0) = 486
 ##
-## ADR-0013 §Requirements — GDD §D.3
+## Sprint 12 S12-M1 — closes the Story 007 stub.
+## ADR-0013 §Requirements + §recruit_cost semantics; GDD §D.3.
 func recruit_cost(class_id: String, copies_owned: int) -> int:
-	return 0  # Story 007
+	# Step 1: copies_owned non-negative guard. Negative values would invert
+	# the geometric escalation (RECRUIT_RATIO^|−n| < 1.0) and produce a
+	# fractional cost smaller than BASE_RECRUIT — soft authoring bug.
+	if copies_owned < 0:
+		push_error(
+			"Economy.recruit_cost: copies_owned=%d negative (authoring bug) — class_id='%s'"
+			% [copies_owned, class_id]
+		)
+		return -1
+
+	# Step 2: config presence guard. _config is populated in _ready() from
+	# DataRegistry; absence means a test fixture instantiated Economy.new()
+	# without seeding _config, OR DataRegistry boot failed (production would
+	# already have crashed via the _ready() push_error path).
+	if _config == null:
+		push_error(
+			"Economy.recruit_cost: _config null — DataRegistry.resolve('config', 'economy_config') failed at boot OR test fixture did not seed _config (class_id='%s')"
+			% class_id
+		)
+		return -1
+
+	# Step 3: class_id resolution. Orphan class_ids return null per Save/Load
+	# corruption-resilience contract; production push_error + sentinel.
+	var class_data: Resource = DataRegistry.resolve("classes", class_id) as Resource
+	if class_data == null:
+		push_error(
+			"Economy.recruit_cost: DataRegistry.resolve('classes', '%s') returned null — orphan class_id"
+			% class_id
+		)
+		return -1
+
+	# Step 4: tier lookup. BASE_RECRUIT is Dictionary[int, int] keyed by
+	# HeroClass.tier (currently {1: 150, 2: 8000} per economy_config.tres).
+	var tier: int = int(class_data.get("tier"))
+	if not _config.BASE_RECRUIT.has(tier):
+		push_error(
+			"Economy.recruit_cost: tier %d not in BASE_RECRUIT keys %s (class_id='%s')"
+			% [tier, _config.BASE_RECRUIT.keys(), class_id]
+		)
+		return -1
+
+	# Step 5: geometric escalation. floori per the canonical curve convention
+	# (matches level_cost shape + Recruitment.refresh_cost).
+	var base: int = int(_config.BASE_RECRUIT[tier])
+	var ratio: float = _config.RECRUIT_RATIO
+	return int(floor(float(base) * pow(ratio, float(copies_owned))))
 
 
 ## Returns the gold cost to level [param class_tier] hero from [param current_level].
