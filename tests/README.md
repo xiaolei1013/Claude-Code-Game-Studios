@@ -5,6 +5,8 @@
 **CI**: `.github/workflows/tests.yml`
 **Setup date**: 2026-04-24
 
+> **Authoring tests?** Read [`tests/PATTERNS.md`](PATTERNS.md) FIRST — it covers the gdunit4 signal API surface, Array-spy idiom, hygiene barriers, ConfigFile test isolation, async-API-change auditing, and other patterns whose rediscovery has cost real time.
+
 ## Directory Layout
 
 ```
