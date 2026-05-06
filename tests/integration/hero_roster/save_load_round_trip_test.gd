@@ -20,6 +20,13 @@ func _make_fresh_roster() -> Node:
 	return hr
 
 
+# Detect if DataRegistry can resolve a real class. Used to skip boot-validation
+# tests that need DataRegistry-backed class lookup (FOLLOWUP-002 / S6-M12).
+# Mirror of helper in tests/unit/hero_roster/add_hero_and_signals_test.gd.
+func _data_registry_can_resolve_test_class() -> bool:
+	return DataRegistry.resolve("classes", "warrior") != null
+
+
 # Inject a synthetic HeroInstance directly into _heroes (bypasses DataRegistry).
 func _inject_hero(hr: Node, id: int, class_id: String = "warrior",
 		display_name: String = "", level: int = 1, xp: int = 0) -> RefCounted:
