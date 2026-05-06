@@ -14,3 +14,11 @@ tick_label_prefix,Tick:
 kill_count_label_prefix,Kills:
 run_complete_kill_count_format,Run Complete — %d kills
 hero_level_up_toast_format,%s reached level %d!
+return_to_app_title,Welcome back!
+return_to_app_seconds_credited_format,You were away for %d minutes.
+return_to_app_gold_earned_format,+%d gold earned
+return_to_app_kills_format,%d enemies defeated
+return_to_app_floors_format,%d floors cleared
+return_to_app_cap_reached_notice_format,(Capped at %d hours offline.)
+return_to_app_acknowledge_button,Continue
+return_to_app_no_summary_fallback,No recent rewards to summarize.

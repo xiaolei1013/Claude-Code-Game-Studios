@@ -1,3 +1,7 @@
+; Minimal engineering-wired layout for the Return-to-App summary screen.
+; UX/cozy aesthetic pass (animated reveal, parchment ornaments, coin icon,
+; floor-by-floor carousel, celebration particles) deferred to Sprint 14+.
+; See return_to_app.gd doc comment for the full deferred-UX list.
 [gd_scene load_steps=2 format=3 uid="uid://screen_return_to_app"]
 
 [ext_resource type="Script" path="res://assets/screens/return_to_app/return_to_app.gd" id="1_return_to_app"]
@@ -11,18 +15,64 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_return_to_app")
 
-[node name="Label" type="Label" parent="."]
+[node name="SummaryPanel" type="PanelContainer" parent="."]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -100.0
-offset_top = -16.0
-offset_right = 100.0
-offset_bottom = 16.0
+offset_left = -240.0
+offset_top = -200.0
+offset_right = 240.0
+offset_bottom = 200.0
 grow_horizontal = 2
 grow_vertical = 2
-text = "Return to App (placeholder)"
+
+[node name="VBoxContainer" type="VBoxContainer" parent="SummaryPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="HeaderLabel" type="Label" parent="SummaryPanel/VBoxContainer"]
+layout_mode = 2
+text = "Welcome back!"
 horizontal_alignment = 1
+theme_override_font_sizes/font_size = 24
+
+[node name="ElapsedSubhead" type="Label" parent="SummaryPanel/VBoxContainer"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+
+[node name="GoldRow" type="Label" parent="SummaryPanel/VBoxContainer"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+
+[node name="KillsRow" type="Label" parent="SummaryPanel/VBoxContainer"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+
+[node name="FloorsRow" type="Label" parent="SummaryPanel/VBoxContainer"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+
+[node name="CapNotice" type="Label" parent="SummaryPanel/VBoxContainer"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+visible = false
+
+[node name="NoSummaryLabel" type="Label" parent="SummaryPanel/VBoxContainer"]
+layout_mode = 2
+text = "No recent rewards to summarize."
+horizontal_alignment = 1
+visible = false
+
+[node name="AcknowledgeButton" type="Button" parent="SummaryPanel/VBoxContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(160, 44)
+text = "Continue"
+size_flags_horizontal = 4

@@ -129,6 +129,18 @@ var _replay_in_flight: bool = false
 ## before the replay loop begins). Cleared post-replay. STABLE-FOR-TEST-ACCESS.
 var _pending_elapsed_seconds: int = 0
 
+## Cached summary from the most recent completed replay. Written BEFORE
+## offline_rewards_collected is emitted so late subscribers (e.g., the
+## Return-to-App Screen, which is instantiated AFTER the signal fires) can
+## read the summary via [method last_summary] in their on_enter() without
+## needing to have been connected at emit time.
+##
+## Pattern: screen connects in on_enter, reads _last_summary immediately (late-
+## subscriber path), AND stays connected for re-render if the signal fires while
+## the screen is already alive (live-subscriber path). Both paths call the same
+## _render_summary helper.
+var _last_summary: OfflineSummary = null
+
 ## Test-injection DI for warning logs per FloorUnlock S11-X1's pattern.
 var _warning_logger: Callable = func(msg: String) -> void: push_warning(msg)
 
@@ -292,12 +304,32 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 	if orchestrator != null and orchestrator.has_method("flush_offline_signals"):
 		orchestrator.flush_offline_signals()
 
+	# Cache summary BEFORE emitting so late subscribers (Return-to-App Screen)
+	# can read it via last_summary() in on_enter() even if the signal already
+	# fired before the screen was instantiated. See _last_summary doc comment.
+	_last_summary = summary
+
 	# Clear in-flight state BEFORE emitting (per GDD §E.6: a listener
 	# exception must not leave _replay_in_flight stuck true).
 	_replay_in_flight = false
 	_pending_elapsed_seconds = 0
 
 	offline_rewards_collected.emit(summary)
+
+	# Route to Return-to-App Screen if real seconds were credited (Story 9 autoload
+	# hook — closes the loop: replay complete → summary cached → screen routed →
+	# on_enter reads cached summary). Guard with has_node + has_method for test-env
+	# safety. The MainRoot guard is load-bearing: SceneManager.request_screen
+	# transitively asserts on /root/MainRoot existing (per scene_manager.gd:1212).
+	# Test envs that drive run_offline_replay without authoring a MainRoot would
+	# crash here without this guard.
+	if summary.seconds_credited > 0:
+		var scene_manager: Node = get_node_or_null("/root/SceneManager")
+		var main_root: Node = get_node_or_null("/root/MainRoot")
+		if scene_manager != null and main_root != null and scene_manager.has_method("request_screen"):
+			scene_manager.request_screen(
+				"return_to_app", SceneManager.TransitionType.SLIDE_DOWN
+			)
 
 
 ## Returns true if a replay is currently in flight. The Return-to-App Screen
@@ -306,6 +338,22 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 ## blocked by SceneManager via this flag.
 func is_replay_in_flight() -> bool:
 	return _replay_in_flight
+
+
+## Returns the most recently completed [OfflineSummary], or null if no replay
+## has ever completed in this session.
+##
+## Intended for the **late-subscriber pattern**: the Return-to-App Screen may
+## be instantiated AFTER [signal offline_rewards_collected] has already emitted
+## (e.g., when SceneManager finishes a SLIDE_DOWN transition into the screen
+## after the replay completes). The screen calls this getter in [method on_enter]
+## to render the cached summary immediately, without needing to have been
+## connected at emit time.
+##
+## Null handling: callers MUST check for null. Return null = no replay has run
+## this session (cold launch, or screen shown via debug navigation).
+func last_summary() -> OfflineSummary:
+	return _last_summary
 
 
 # ---------------------------------------------------------------------------
