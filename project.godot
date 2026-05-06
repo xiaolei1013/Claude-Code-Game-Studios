@@ -35,6 +35,7 @@ FloorUnlock="*res://src/core/floor_unlock_system/floor_unlock_system.gd"
 FormationAssignment="*res://src/core/formation_assignment/formation_assignment.gd"
 Recruitment="*res://src/core/recruitment/recruitment.gd"
 DungeonRunOrchestrator="*res://src/core/dungeon_run_orchestrator/dungeon_run_orchestrator.gd"
+OfflineProgressionEngine="*res://src/core/offline_progression_engine/offline_progression_engine.gd"
 AudioRouter="*res://src/core/audio_router/audio_router.gd"
 
 [audio]

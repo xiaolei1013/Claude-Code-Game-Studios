@@ -505,3 +505,28 @@ Story S11-X10 (Recruitment autoload skeleton) closes the LAST of the missing CON
 - Lockstep edit status: (a) this ADR amended ✓, (b) `architecture.md` already had the rank — no edit needed, (c) `project.godot` updated ✓, (d) `SaveLoadSystem.CONSUMER_PATHS` already listed it — no edit needed.
 
 **Consumer ecosystem status (post-Amendment #7)**: 7 of 7 CONSUMER_PATHS autoloads live with `get_save_data` — Economy (rank 3), HeroRoster (rank 7), FloorUnlock (rank 10), FormationAssignment (rank 11), Recruitment (rank 12), DungeonRunOrchestrator (rank 14), AudioRouter (rank 16). The Sprint 11 S11-M4 / Story 016 (save-persist end-to-end) is now unblocked.
+
+### Amendment #8 — 2026-05-05: OfflineProgressionEngine skeleton lands at rank 15
+
+Story S12-M4 (OfflineProgressionEngine Stories 1-3 — autoload skeleton + boot orchestration + OfflineSummary class) per `design/gdd/offline-progression-engine.md` §C.1 + ADR-0014 (Offline Replay Batch Chunking + RunSnapshot Schema). Sprint 12 Must Have shipped pre-emptively in the autonomous-execution session post-Sprint-11 close-out.
+
+**Analysis at implementation time (2026-05-05)**:
+- `architecture.md` rank table had `OfflineProgressionEngine` listed at rank 15 since the original architecture authoring (Sprint 4-era documentation work).
+- `project.godot` did NOT yet have an `OfflineProgressionEngine` entry in the `[autoload]` section — the rank table-as-canonical-source was authored before the autoload was implemented.
+- **NOT in CONSUMER_PATHS** per `offline-progression-engine.md` §C.7 — the engine has no persisted state of its own (its inputs come from other systems' save namespaces). This is the FIRST autoload at rank ≥3 that is intentionally absent from CONSUMER_PATHS.
+- `class_name` omitted to avoid the "Class hides an autoload singleton" parse error per the project_godot_autoload_class_name_collision memory note (matches FormationAssignment + AudioRouter + Recruitment pattern).
+- Engine subscribes to `TickSystem.offline_elapsed_seconds` at `_ready()` per GDD §F. Per ADR-0003 §Signal SUBSCRIPTION rule + Amendment #1 [VERIFIED] empirical probe, rank 15 → rank 0 forward subscription is safe (signal objects exist on Node instantiation, before any `_ready()` fires).
+
+**Decision**: OfflineProgressionEngine is implemented at autoload name `OfflineProgressionEngine`, rank 15 (Feature layer per architecture.md). Closes the architecture.md rank-table forward-reference. The Sprint 12 S12-M4 scope ships Stories 1-3 (skeleton + boot subscription + OfflineSummary class); the chunked replay loop body is **STUBBED** and lands in S12-M5 (Stories 4-6) per `offline-progression-engine.md` §J.
+
+**Impact**:
+- `project.godot [autoload]` — `OfflineProgressionEngine` entry added between `DungeonRunOrchestrator` (rank 14) and `AudioRouter` (rank 16), satisfying rank-15 position.
+- `architecture.md` §Autoload Rank Table — no edit needed (rank 15 row was already present and referenced OfflineProgressionEngine). The `Status: Authored` notation in `design/gdd/systems-index.md` row 12 should be promoted to "Implemented (Sprint 12 S12-M4 — skeleton + boot subscription)" in a follow-up systems-index update.
+- `SaveLoadSystem.CONSUMER_PATHS` — **no edit needed** (intentionally absent per GDD §C.7). The 7-entry list remains canonical.
+- OfflineProgressionEngine subscribes to `TickSystem.offline_elapsed_seconds` at `_ready()` per the GDD §F. Per ADR-0003 §Signal SUBSCRIPTION rule, rank 15 → rank 0 forward subscription is safe at `_ready()` time (signal objects exist on Node instantiation; [VERIFIED]).
+- The chunked replay loop body remains STUBBED per S12-M4 scope; S12-M5 lands the real implementation per ADR-0014's adaptive time-budgeted chunking algorithm.
+- Lockstep edit status: (a) this ADR amended ✓, (b) `architecture.md` already had the rank — no edit needed, (c) `project.godot` updated ✓, (d) `SaveLoadSystem.CONSUMER_PATHS` intentionally absent — no edit needed.
+
+**Rank slot inventory (post-Amendment #8)**:
+- Ranks with live autoloads: 0 (TickSystem), 1 (DataRegistry), 2 (SaveLoadSystem), 3 (Economy), 4 (HeroClassDatabase), 5 (EnemyDatabase), 6 (BiomeDungeonDatabase), 7 (HeroRoster), 8 (SceneManager), 10 (FloorUnlock), 11 (FormationAssignment), 12 (Recruitment), 14 (DungeonRunOrchestrator), 15 (OfflineProgressionEngine), 16 (AudioRouter).
+- VACANT ranks: 9 (per Amendment #2 footnote), 13 (HeroLeveling — Sprint 13+ implementation candidate per `architecture.md` System Layer Map).
