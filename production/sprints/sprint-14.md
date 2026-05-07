@@ -91,7 +91,7 @@
 - [x] **S14-M4** Hero Leveling GDD #15 status flips from "Not Started" to DRAFT (commit `66f937d` GDD groundwork + `e1c5584`/`ae719f5`/`0ed11ae` implementation 2026-05-07; AC-15-14 verified by stub_xp_grant_test.gd Group F)
 - [x] **S14-M5** HD-2D shader pass — **DONE-via-deferral**: ADR-0017 (commit `5f3cbab` 2026-05-07) defers the shader pass to Vertical Slice tier per `game-concept.md` §Risks fallback. Status: Accepted 2026-05-07 (autonomous-session creative-direction authorization). Pivot triggers documented for successor ADR.
 - [x] Full unit + integration sweep ≥1500 tests, 0 failures, 0 errors (1503/1503 at 2026-05-07 close — exceeds the 1500 bar)
-- [ ] Sprint 14 retrospective committed at `production/retrospectives/sprint-14-retrospective-<date>.md` — **PENDING** (will land alongside this Definition of Done update; per Sprint 13 retro recommendation, Sprint-N retros author at Sprint-N close + capture the pre-emption ratio)
+- [x] Sprint 14 retrospective committed at `production/retrospectives/sprint-14-retrospective-2026-05-07.md` — captures the binding-decision-needs-user-input resolution mid-session + 5-consecutive-sprints >95% pre-emption ratio + cumulative 9 first-pass GDDs closing all MVP UI screen "Not Started" gaps
 
 ## Sprint 15+ candidates (post-Sprint-14)
 
