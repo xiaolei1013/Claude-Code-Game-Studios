@@ -693,6 +693,14 @@ func _process_kill_events(events: Variant) -> void:
 	var roster_for_xp: Node = (
 		get_node_or_null("/root/HeroRoster") if get_tree() != null else null
 	)
+	# Engine-code-rule extension (Sprint 14 S14-M4 Story 3 follow-up): pre-cache
+	# xp_per_kill(tier) for every tier seen in this kills_array so the per-kill
+	# loop avoids the Economy.get_config tree query that lives inside
+	# xp_per_kill. For a 60-kill combat tick that would be 60 tree queries
+	# inside the hot path; pre-caching reduces it to ≤5 queries (one per
+	# unique tier, MVP tiers 1-5). Cache is a local Dictionary[int, int]
+	# keyed by tier, populated lazily on first per-tier sighting.
+	var xp_by_tier_cache: Dictionary = {}
 
 	for ke: Variant in kills_array:
 		# KillEvent fields — duck-typed reads against the value-type contract:
@@ -716,7 +724,13 @@ func _process_kill_events(events: Variant) -> void:
 		# dispatched-formation hero. Foreground-only (this loop only runs in
 		# ACTIVE_FOREGROUND state per _on_tick_fired guard); offline replay
 		# uses the Story 4 batch path via flush_offline_signals.
-		_grant_xp_to_formation(roster_for_xp, xp_per_kill(tier))
+		# Per-tier XP cache (engine-code-rule: hoist Economy tree query out
+		# of the per-kill loop; resolve at most once per unique tier).
+		var xp_amount: int = int(xp_by_tier_cache.get(tier, -1))
+		if xp_amount < 0:
+			xp_amount = xp_per_kill(tier)
+			xp_by_tier_cache[tier] = xp_amount
+		_grant_xp_to_formation(roster_for_xp, xp_amount)
 
 	if bool(events.get("first_clear_in_range")):
 		# Sprint 8 S8-N5 (Story 007) — 3-layer idempotency:

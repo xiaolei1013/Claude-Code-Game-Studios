@@ -334,7 +334,44 @@ When a test adds multiple nodes to `/root` or to a parent tree, the order matter
 
 ---
 
-## 10. CONNECT_ONE_SHOT for spies that should fire exactly once
+## 10. Typed-collection literal assignment in test fixtures
+
+Fields declared with strong typed-collection types — `Array[Dictionary]`, `Array[int]`, `Dictionary[int, int]`, etc. — runtime-reject untyped literal assignment at the property-set site. Tests that try to seed such a field with an inline `[...]` or `{...}` literal fail with:
+
+```
+Invalid assignment of property or key 'X' with value of type 'Array' on a base object of type 'Y'
+```
+
+**Wrong** — direct literal assignment to a `Array[Dictionary]` field:
+
+```gdscript
+orch._offline_pending_first_clears = [
+    {"floor_index": 1, "biome_id": "x", "losing_run": false},
+]
+# SCRIPT ERROR — the literal is untyped Array, not Array[Dictionary]
+```
+
+**Right** — assign through a typed local:
+
+```gdscript
+var clears: Array[Dictionary] = [
+    {"floor_index": 1, "biome_id": "x", "losing_run": false},
+]
+orch._offline_pending_first_clears = clears
+```
+
+Same gotcha applies to:
+- `Array[int]` / `Array[String]` / `Array[Resource]` fields
+- `Dictionary[K, V]` fields (Godot 4.4+)
+- Any custom-typed Array (`Array[HeroInstance]`)
+
+The runtime check is intentional — it prevents silent type drift on later mutations. The fix is mechanical (one typed-local var); apply consistently across test seeding code.
+
+**Detection**: gdunit4 reports the failure as a SCRIPT ERROR mid-test, not a test-assertion failure. Look for "Invalid assignment of property" in the test log when a fixture-setup test fails inexplicably.
+
+---
+
+## 11. CONNECT_ONE_SHOT for spies that should fire exactly once
 
 When the spy is set up to verify a single emission, prefer `CONNECT_ONE_SHOT` so the lambda auto-disconnects after firing:
 
@@ -370,3 +407,4 @@ For continuous-emission spies (counters), omit the flag and ensure cleanup expli
 | gdunit4 API correction | Sprint 12 S12-M5 | ~0.5d (25 tests against fictional API rewritten) |
 | CI grep forbidden-pattern | Sprint 12 S12-M5 | New pattern from ADR-0014 enforcement need |
 | Wired-vs-autoload + order-of-operations | Sprint 10 S10-S3 | 71-test failure cascade until reordered |
+| Typed-collection literal-rejection | Sprint 11 S11-X10 (Recruitment) — re-surfaced Sprint 14 S14-M4 Story 4 | Fix is mechanical; the gotcha resurfaces every time net-new test code seeds a typed-collection field |
