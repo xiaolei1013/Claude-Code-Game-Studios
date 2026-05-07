@@ -11,18 +11,80 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_victory_moment")
 
-[node name="Label" type="Label" parent="."]
+[node name="DimBackdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.4)
+mouse_filter = 0
+
+[node name="CenterPanel" type="PanelContainer" parent="."]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -100.0
-offset_top = -16.0
-offset_right = 100.0
-offset_bottom = 16.0
+offset_left = -240.0
+offset_top = -200.0
+offset_right = 240.0
+offset_bottom = 200.0
 grow_horizontal = 2
 grow_vertical = 2
-text = "Victory Moment (placeholder)"
+custom_minimum_size = Vector2(480, 400)
+
+[node name="CenterVBox" type="VBoxContainer" parent="CenterPanel"]
+layout_mode = 2
+
+[node name="HeadlineLabel" type="Label" parent="CenterPanel/CenterVBox"]
+layout_mode = 2
+text = "Forest Reach — Floor 1 cleared"
 horizontal_alignment = 1
+theme_type_variation = &"IdentityHeader"
+
+[node name="UnlockNoticeLabel" type="Label" parent="CenterPanel/CenterVBox"]
+layout_mode = 2
+text = "Floor 2 now available."
+horizontal_alignment = 1
+
+[node name="StatsBlock" type="VBoxContainer" parent="CenterPanel/CenterVBox"]
+layout_mode = 2
+
+[node name="KillCountRow" type="HBoxContainer" parent="CenterPanel/CenterVBox/StatsBlock"]
+layout_mode = 2
+
+[node name="KillCountLabel" type="Label" parent="CenterPanel/CenterVBox/StatsBlock/KillCountRow"]
+layout_mode = 2
+text = "Kills"
+
+[node name="KillCountValue" type="Label" parent="CenterPanel/CenterVBox/StatsBlock/KillCountRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "0"
+horizontal_alignment = 2
+
+[node name="GoldGainedRow" type="HBoxContainer" parent="CenterPanel/CenterVBox/StatsBlock"]
+layout_mode = 2
+
+[node name="GoldGainedLabel" type="Label" parent="CenterPanel/CenterVBox/StatsBlock/GoldGainedRow"]
+layout_mode = 2
+text = "Gold gained"
+
+[node name="GoldGainedValue" type="Label" parent="CenterPanel/CenterVBox/StatsBlock/GoldGainedRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "+0 gold"
+horizontal_alignment = 2
+
+[node name="LevelUpsBlock" type="VBoxContainer" parent="CenterPanel/CenterVBox/StatsBlock"]
+layout_mode = 2
+visible = false
+
+[node name="ContinuationPromptLabel" type="Label" parent="CenterPanel/CenterVBox"]
+layout_mode = 2
+text = "Tap to continue"
+horizontal_alignment = 1
+visible = false
