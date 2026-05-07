@@ -167,12 +167,12 @@ Per `recruitment-system.md` §D.2 + ADR-0015:
 ```
 refresh_cost(refreshes_today) = BASE_REFRESH_COST × (1 + REFRESH_COST_MULT × refreshes_today)
 ```
-Where defaults: `BASE_REFRESH_COST = 250`, `REFRESH_COST_MULT = 2.0`.
+Where defaults: `BASE_REFRESH_COST = 100`, `REFRESH_COST_MULT = 2.0` (per `recruitment.gd:72-73` + Recruitment GDD §I OQ-RC-2 resolution; this corrects a 2026-05-07 first-pass drift where the GDD originally listed 250 — sweep-iteration drift fix).
 
 So:
-- 1st refresh today: 250g
-- 2nd refresh today: 750g
-- 3rd refresh today: 1250g
+- 1st refresh today: 100g
+- 2nd refresh today: 300g
+- 3rd refresh today: 500g
 - … etc.
 
 Player-controlled gate against spam-rerolling. The Recruit screen displays the CURRENT cost (next refresh's cost) in the Refresh button label.
