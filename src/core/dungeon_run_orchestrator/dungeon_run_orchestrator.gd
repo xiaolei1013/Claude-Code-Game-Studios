@@ -671,6 +671,13 @@ func _process_kill_events(events: Variant) -> void:
 	# it registered — null-guard the per-kill call below.
 	var economy: Node = get_node_or_null("/root/Economy") if get_tree() != null else null
 	var economy_can_add_gold: bool = economy != null and economy.has_method("add_gold")
+	# Resolve HeroRoster autoload once for per-kill XP grants per Hero Leveling
+	# GDD #15 §C.1 (Sprint 14 S14-M4 Story 3). Engine-code-rule: no per-kill
+	# tree query — hoist outside the loop. _grant_xp_to_formation null-guards
+	# the roster argument so test envs without HeroRoster are safe.
+	var roster_for_xp: Node = (
+		get_node_or_null("/root/HeroRoster") if get_tree() != null else null
+	)
 
 	for ke: Variant in kills_array:
 		# KillEvent fields — duck-typed reads against the value-type contract:
@@ -690,6 +697,11 @@ func _process_kill_events(events: Variant) -> void:
 		if "is_boss" in ke and bool(ke.is_boss):
 			var enemy_id_str: String = String(ke.enemy_id) if "enemy_id" in ke else ""
 			boss_killed.emit(enemy_id_str)
+		# Hero Leveling GDD #15 §C.1 / AC-15-01: per-kill XP grant to every
+		# dispatched-formation hero. Foreground-only (this loop only runs in
+		# ACTIVE_FOREGROUND state per _on_tick_fired guard); offline replay
+		# uses the Story 4 batch path via flush_offline_signals.
+		_grant_xp_to_formation(roster_for_xp, xp_per_kill(tier))
 
 	if bool(events.get("first_clear_in_range")):
 		# Sprint 8 S8-N5 (Story 007) — 3-layer idempotency:
@@ -720,24 +732,19 @@ func _process_kill_events(events: Variant) -> void:
 			# re-entry from re-calling Economy (whose monotonic gate would block
 			# anyway, but skipping the call is cheaper).
 			run_snapshot.floor_clear_emitted = true
-			# Sprint 10 S10-M4: stub XP grant — +1 level per dispatched-formation
-			# hero on floor clear. Gated by the same Layer 2 floor_clear_emitted
-			# flag so within-dispatch re-entry does not double-grant. The grant
-			# uses HeroRoster.set_hero_level which clamps to level_cap and emits
-			# hero_leveled (UI subscribers route that into a level-up toast).
-			# Stub formula; Sprint 11 replaces with proper XP-based curve.
-			# Roster is dependency-injected so unit tests can pass a fresh
-			# HeroRoster instance instead of mutating the live autoload.
-			var roster_for_grant: Node = (
-				get_node_or_null("/root/HeroRoster") if get_tree() != null else null
-			)
-			_grant_stub_levels_to_formation(roster_for_grant)
 			# Signal fires only on genuine first-ever-clear (Economy gated).
 			# Subsequent dispatches that re-clear the same floor see awarded=false
 			# and DO NOT fire the player-facing fanfare — a critical UX rule per
 			# ADR-0002 (losing-first-clear reclaimable on win) so the fanfare
 			# stays a meaningful "first time you've EVER done this" moment.
 			if awarded:
+				# Hero Leveling GDD #15 §C.2 / AC-15-02: per-floor-clear XP
+				# grant to every dispatched-formation hero. Tied to the
+				# floor_cleared_first_time signal (lifetime monotonic) per
+				# AC-15-02 — re-runs of an already-cleared floor get kill-XP
+				# only. Sprint 14 S14-M4 Story 3 replaces the Sprint 10 S10-M4
+				# stub +1-per-clear grant per AC-15-14.
+				_grant_xp_to_formation(roster_for_xp, xp_per_floor_clear(floor_idx))
 				# Sprint 11 S11-X7 / ADR-0014 §signal emission policy: during
 				# offline replay (set externally by OfflineProgressionEngine
 				# rank 15), accumulate the floor-clear payload for post-replay
@@ -816,24 +823,40 @@ func flush_offline_signals() -> void:
 	_is_offline_replay = false
 
 
-## Sprint 10 S10-M4 — stub XP grant.
+## Sprint 14 S14-M4 — real XP grant per Hero Leveling GDD #15.
 ##
-## Grants +1 level to every hero in the dispatched formation on a successful
-## floor clear. Resolves the live HeroRoster autoload (test-env safe via
-## get_node_or_null guard) and calls [code]set_hero_level(id, current_level + 1)[/code]
-## per hero. [member HeroRoster.set_hero_level] handles level_cap clamping and
-## emits [signal HeroRoster.hero_leveled] which the dungeon_run_view toast
-## subscribes to (S10-M4 UI half).
+## Grants [param xp_amount] XP to every dispatched-formation hero. Reads
+## [code]run_snapshot.formation_snapshot.instance_ids[/code] (the dispatch-time
+## formation, NOT the live HeroRoster formation per §C.6 formation-membership
+## determinism) and calls [code]roster.add_xp(id, xp_amount)[/code] per hero.
+## [code]HeroRoster.add_xp[/code] handles the multi-level cascade + LEVEL_CAP
+## overflow + hydration suppression per Hero Leveling GDD §C.4 / §C.5 / §C.7.
 ##
-## Caller must gate this with the Layer 2 [code]run_snapshot.floor_clear_emitted[/code]
-## flag so within-dispatch re-entry does not double-grant.
+## Caller is responsible for gating this:
+##   - Per-kill XP: kill loop in [method _process_kill_events] calls per kill
+##     event (after [signal enemy_killed] emit) — foreground-only; offline
+##     replay batches via Story 4 path.
+##   - Per-floor-clear XP: floor-clear branch calls inside the
+##     [code]if awarded:[/code] (Layer 3 / lifetime monotonic) sub-branch so
+##     XP-per-floor-clear ties to the [signal floor_cleared_first_time] signal
+##     per AC-15-02. Re-runs of an already-cleared floor get kill-XP only.
 ##
-## Scope (stub): flat +1 per clear regardless of run outcome. Sprint 11 replaces
-## this with a proper XP-based progression curve per the economy/progression GDD.
-## The S10-M4 risk-register entry explicitly authorizes this scope-reduction:
-## "If grant logic absent, scope-reduce to 'feedback only on a stub-grant' —
-## defer real grant formula to Sprint 11 alongside save-persist work."
-func _grant_stub_levels_to_formation(roster: Node) -> void:
+## Defensive guards (silent early-return):
+##   - [param xp_amount] <= 0 → no-op (matches add_xp's zero/negative semantics).
+##   - [member run_snapshot] null → no-op (NO_RUN state).
+##   - [code]formation_snapshot.instance_ids[/code] missing or empty → no-op.
+##   - [param roster] null → no-op (test-env path: get_node_or_null returned
+##     null before this call).
+##   - [param roster] missing [code]add_xp[/code] method → no-op (forward-compat
+##     against future roster API drift).
+##
+## Replaces Sprint 10 S10-M4 stub [code]_grant_stub_levels_to_formation[/code]
+## per Hero Leveling GDD #15 §J Story 3 + AC-15-14.
+##
+## Hero Leveling GDD #15 §C.1 / §C.2 / §C.6 — TR-15-01 / TR-15-02 / TR-15-06
+func _grant_xp_to_formation(roster: Node, xp_amount: int) -> void:
+	if xp_amount <= 0:
+		return
 	if run_snapshot == null:
 		return
 	var fs: Dictionary = run_snapshot.formation_snapshot
@@ -845,32 +868,86 @@ func _grant_stub_levels_to_formation(roster: Node) -> void:
 		return
 	if roster == null:
 		return
-	if not roster.has_method("set_hero_level") or not roster.has_method("get_all_heroes"):
+	if not roster.has_method("add_xp"):
 		return
-	# Build {id → current_level} once (avoid one tree-traversing get_all_heroes
-	# call per hero in the formation; engine-code rule: no repeated tree queries
-	# inside a loop).
-	var level_by_id: Dictionary = {}
-	for hero: Variant in roster.get_all_heroes():
-		if hero == null:
-			continue
-		if not ("instance_id" in hero) or not ("current_level" in hero):
-			continue
-		level_by_id[int(hero.get("instance_id"))] = int(hero.get("current_level"))
 	for hero_id_v: Variant in ids:
 		var hero_id: int = int(hero_id_v)
 		# instance_id 0 represents an empty slot — skip.
 		if hero_id == 0:
 			continue
-		if not level_by_id.has(hero_id):
-			# Hero may have been removed from the roster between dispatch and
-			# clear (no MVP UI path produces this, but defensive against future
-			# remove_hero-during-run use cases).
-			continue
-		var cur_lvl: int = int(level_by_id[hero_id])
-		# set_hero_level clamps to level_cap; +1 past cap is a no-op + warning
-		# at the HeroRoster layer, which is the desired behavior.
-		roster.set_hero_level(hero_id, cur_lvl + 1)
+		# add_xp itself handles unknown-id (push_warning + return false) per
+		# the §C.6 spec — a hero removed from the roster between dispatch and
+		# clear silently no-ops at the roster layer.
+		roster.add_xp(hero_id, xp_amount)
+
+
+## Returns the XP grant per kill for [param tier] per Hero Leveling GDD
+## #15 §C.1 / Formula D.1: [code]xp_per_kill(tier) = XP_PER_KILL[tier][/code].
+##
+## Reads [code]Economy.get_config().XP_PER_KILL[/code] (Dictionary[int, int]).
+## Fallback constants (when config null OR tier missing from dict) are the
+## §C.1 defaults: {1: 5, 2: 10, 3: 20, 4: 40, 5: 80}.
+##
+## Per AC-15-10 + §E.7, an unknown [param tier] (config drift — content patch
+## removed a tier OR a save references an out-of-range tier) defaults to
+## tier-1 XP and logs push_warning. Defensive fallback prevents content-drift
+## crashes; the invariant is "kill always grants SOME XP, never zero".
+##
+## Hero Leveling GDD #15 §C.1 / §D.1 — TR-15-01 / AC-15-10
+func xp_per_kill(tier: int) -> int:
+	const _FALLBACK_XP_PER_KILL: Dictionary = {1: 5, 2: 10, 3: 20, 4: 40, 5: 80}
+	var economy: Node = get_node_or_null("/root/Economy") if get_tree() != null else null
+	if economy != null and economy.has_method("get_config"):
+		var cfg: Resource = economy.get_config()
+		if cfg != null and "XP_PER_KILL" in cfg:
+			var dict_val: Variant = cfg.get("XP_PER_KILL")
+			if dict_val is Dictionary:
+				var d: Dictionary = dict_val as Dictionary
+				if d.has(tier):
+					return int(d[tier])
+				if d.has(1):
+					push_warning(
+						"[Orchestrator] xp_per_kill: unknown tier %d; defaulting to tier 1"
+						% tier
+					)
+					return int(d[1])
+	if _FALLBACK_XP_PER_KILL.has(tier):
+		return int(_FALLBACK_XP_PER_KILL[tier])
+	push_warning(
+		"[Orchestrator] xp_per_kill: unknown tier %d; defaulting to tier 1 (fallback)"
+		% tier
+	)
+	return int(_FALLBACK_XP_PER_KILL[1])
+
+
+## Returns the XP grant per floor clear for [param floor_index] per Hero
+## Leveling GDD #15 §C.2 / Formula D.2:
+##   [code]xp_per_floor_clear(f) = XP_PER_FLOOR_CLEAR_BASE + (f - 1) * XP_PER_FLOOR_CLEAR_STEP[/code]
+##
+## Reads [code]Economy.get_config().XP_PER_FLOOR_CLEAR_BASE[/code] +
+## [code]XP_PER_FLOOR_CLEAR_STEP[/code]. Fallback constants are §C.2 defaults
+## (50, 25): Floor 1 = 50, Floor 2 = 75, Floor 3 = 100, Floor 4 = 125,
+## Floor 5 = 150.
+##
+## [param floor_index] is expected in [1, 5] (validated by the caller's
+## existing floor-range guard at the kill-loop emit site); negative inputs
+## return 0 (silent no-op upstream of [method _grant_xp_to_formation]).
+##
+## Hero Leveling GDD #15 §C.2 / §D.2 — TR-15-02
+func xp_per_floor_clear(floor_index: int) -> int:
+	if floor_index < 1:
+		return 0
+	var base: int = 50
+	var step: int = 25
+	var economy: Node = get_node_or_null("/root/Economy") if get_tree() != null else null
+	if economy != null and economy.has_method("get_config"):
+		var cfg: Resource = economy.get_config()
+		if cfg != null:
+			if "XP_PER_FLOOR_CLEAR_BASE" in cfg:
+				base = int(cfg.get("XP_PER_FLOOR_CLEAR_BASE"))
+			if "XP_PER_FLOOR_CLEAR_STEP" in cfg:
+				step = int(cfg.get("XP_PER_FLOOR_CLEAR_STEP"))
+	return base + (floor_index - 1) * step
 
 
 # ---------------------------------------------------------------------------
