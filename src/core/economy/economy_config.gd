@@ -127,6 +127,61 @@ extends GameData
 @export_range(1, 20) var LEVEL_CAP: int = 15
 
 # ---------------------------------------------------------------------------
+# Section: Hero Leveling XP constants — Hero Leveling GDD #15 §C.1–§C.3 + §G.
+#
+# 5 constants drive the XP earn + level-up curve. NOT YET wired —
+# Hero Leveling GDD §J Story 2 (HeroRoster.add_xp) + Story 3 (orchestrator
+# XP grant subscriber) + Story 4 (offline replay XP batching) close the
+# implementation. Sprint 14 S14-M4 scope.
+# ---------------------------------------------------------------------------
+
+## XP granted per enemy kill, indexed by tier. Geometric ~2× scaling
+## matches gold scaling (BASE_KILL 1:3.5:8) but gentler — late-tier
+## kills are ~16× early-tier, keeps Floor 5 from trivializing earlier
+## leveling-up paths.
+##
+## Defaults per Hero Leveling GDD §C.1 / §G:
+##   Tier 1 = 5, Tier 2 = 10, Tier 3 = 20, Tier 4 = 40, Tier 5 = 80
+## Safe range per tier: 1–500.
+## GDD §G row: XP_PER_KILL.
+@export var XP_PER_KILL: Dictionary = {1: 5, 2: 10, 3: 20, 4: 40, 5: 80}
+
+## Base XP grant per floor clear (Floor 1 baseline).
+##
+## Combined with XP_PER_FLOOR_CLEAR_STEP via formula
+##   xp_per_floor_clear(floor) = BASE + (floor - 1) * STEP
+## Floor 1 = 50, Floor 5 = 150 by default.
+## Safe range: 0–500. 0 disables floor-clear bonus.
+## GDD §G row: XP_PER_FLOOR_CLEAR_BASE.
+@export_range(0, 500) var XP_PER_FLOOR_CLEAR_BASE: int = 50
+
+## Per-floor XP increment beyond Floor 1 (linear scaling).
+##
+## Floor N grants BASE + (N - 1) * STEP. Step=25 means Floor 5 = 150,
+## 3× Floor 1's 50 — non-trivial but not runaway.
+## Safe range: 0–100. 0 = flat across floors.
+## GDD §G row: XP_PER_FLOOR_CLEAR_STEP.
+@export_range(0, 100) var XP_PER_FLOOR_CLEAR_STEP: int = 25
+
+## Base XP threshold for level 1 → 2 transition.
+##
+## Combined with XP_THRESHOLD_STEP via formula
+##   xp_threshold(current_level) = BASE + STEP * current_level
+## Level 1 → 2 needs 100 + 50·1 = 150 XP by default.
+## Safe range: 50–500.
+## GDD §G row: XP_THRESHOLD_BASE.
+@export_range(50, 500) var XP_THRESHOLD_BASE: int = 100
+
+## Per-level XP threshold increment (linear scaling).
+##
+## Level N → N+1 needs BASE + N·STEP XP. Cumulative XP from level 1
+## to LEVEL_CAP = (CAP - 1) × (BASE + STEP × CAP / 2). Default
+## (BASE=100, STEP=50, CAP=15) = 14 × 475 = 6650 XP cumulative.
+## Safe range: 0–200. 0 = flat threshold across all levels.
+## GDD §G row: XP_THRESHOLD_STEP.
+@export_range(0, 200) var XP_THRESHOLD_STEP: int = 50
+
+# ---------------------------------------------------------------------------
 # Section: Floor-clear bonuses (TR-economy-010 / GDD §D.5 / §G rows FLOOR_CLEAR_BONUS[1..5])
 # ---------------------------------------------------------------------------
 
