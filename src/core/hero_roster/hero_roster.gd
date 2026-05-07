@@ -52,6 +52,11 @@ const _FALLBACK_MAX_ROSTER_SIZE: int = 30
 const _FALLBACK_FORMATION_SIZE: int = 3
 const _FALLBACK_LEVEL_CAP: int = 15
 
+# Fallback XP threshold curve constants per Hero Leveling GDD #15 §C.3 defaults.
+# Used when Economy.get_config() returns null (boot order / test fixture).
+const _FALLBACK_XP_THRESHOLD_BASE: int = 100
+const _FALLBACK_XP_THRESHOLD_STEP: int = 50
+
 const _CONFIG_CATEGORY: String = "config"
 const _CONFIG_ID: String = "roster_config"
 
@@ -441,6 +446,84 @@ func set_hero_level(id: int, new_level: int) -> bool:
 	instance.current_level = clamped
 	if not _suppress_signals:
 		hero_leveled.emit(id, old_level, clamped)
+	return true
+
+
+## Returns the XP required to advance a hero from [param current_level] to
+## [code]current_level + 1[/code]. Pure linear curve per Hero Leveling GDD
+## #15 §C.3 / §D.3:
+##   [code]xp_threshold(L) = XP_THRESHOLD_BASE + XP_THRESHOLD_STEP * L[/code]
+##
+## Constants resolve through [code]Economy.get_config()[/code]; if the config
+## is null (boot ordering edge case) the fallback constants
+## [code]_FALLBACK_XP_THRESHOLD_BASE[/code] / [code]_FALLBACK_XP_THRESHOLD_STEP[/code]
+## are used (defaults 100 / 50, matching GDD).
+##
+## Out-of-range [param current_level] is not validated here — callers
+## ([method add_xp]) only invoke this with [code]current_level in [1, level_cap()-1][/code].
+##
+## Hero Leveling GDD #15 §C.3 — TR-15-03
+func xp_threshold(current_level: int) -> int:
+	var base: int = _FALLBACK_XP_THRESHOLD_BASE
+	var step: int = _FALLBACK_XP_THRESHOLD_STEP
+	var cfg: Resource = Economy.get_config() if Economy != null else null
+	if cfg != null:
+		if "XP_THRESHOLD_BASE" in cfg:
+			base = int(cfg.get("XP_THRESHOLD_BASE"))
+		if "XP_THRESHOLD_STEP" in cfg:
+			step = int(cfg.get("XP_THRESHOLD_STEP"))
+	return base + step * current_level
+
+
+## Grants [param amount] XP to the hero with [param id], cascading through
+## any level-ups the gain crosses. Returns [code]true[/code] on success or
+## [code]false[/code] when [param id] is unknown OR [param amount] is negative.
+##
+## Semantics (Hero Leveling GDD #15 §C.4):
+##   - [param amount] == 0: silent no-op; returns [code]true[/code]; no signal.
+##   - [param amount] < 0: push_error + return [code]false[/code]; no mutation.
+##   - Unknown [param id]: push_warning + return [code]false[/code]; no mutation.
+##   - Already at [method level_cap]: silent no-op; returns [code]true[/code]
+##     (overflow discarded per cozy register §C.5; no negative feedback).
+##   - Cascade: while [code]instance.xp >= xp_threshold(current_level)[/code]
+##     and [code]current_level < level_cap()[/code], deduct threshold,
+##     increment level, emit [signal hero_leveled] once per crossed level.
+##   - On reaching the cap mid-cascade, [code]instance.xp = 0[/code]
+##     (overflow discarded per §C.5 + §E.6).
+##   - Signal suppression: when [member _suppress_signals] is true (post-load
+##     hydration per ADR-0004 + §C.7), state mutates but [signal hero_leveled]
+##     is NOT emitted. Audio chime / toast subscribers stay silent.
+##
+## Hero Leveling GDD #15 §C.4 / §C.5 / §C.7 — TR-15-04
+func add_xp(id: int, amount: int) -> bool:
+	if not _heroes.has(id):
+		push_warning("[HeroRoster] add_xp: unknown id %d" % id)
+		return false
+	if amount < 0:
+		push_error(
+			"[HeroRoster] add_xp: negative amount %d (id=%d)" % [amount, id]
+		)
+		return false
+	if amount == 0:
+		return true
+	var instance: RefCounted = _heroes[id]
+	var cap: int = level_cap()
+	# Already capped — overflow discarded silently per §C.5.
+	if instance.current_level >= cap:
+		return true
+	instance.xp += amount
+	while instance.current_level < cap:
+		var threshold: int = xp_threshold(instance.current_level)
+		if instance.xp < threshold:
+			break
+		instance.xp -= threshold
+		var old_level: int = instance.current_level
+		instance.current_level += 1
+		if not _suppress_signals:
+			hero_leveled.emit(id, old_level, instance.current_level)
+	# Cap reached mid-cascade — discard XP overflow per §C.5 / §E.6.
+	if instance.current_level >= cap:
+		instance.xp = 0
 	return true
 
 
