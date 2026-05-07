@@ -6,6 +6,7 @@
 script = ExtResource("1_econconf")
 id = "economy_config"
 display_name = "Economy Config"
+STARTING_GOLD = 100
 BASE_DRIP = Array[int]([2, 4, 7, 12, 8])
 MATCHUP_DRIP_BONUS = 1.0
 BASE_KILL = {1: 10, 2: 35, 3: 80}

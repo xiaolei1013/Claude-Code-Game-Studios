@@ -24,6 +24,23 @@ extends GameData
 # Section: Drip income (TR-economy-006 / GDD §D.1 / §G rows BASE_DRIP[1..5])
 # ---------------------------------------------------------------------------
 
+## First-launch starting gold per Onboarding GDD #29 §C.1 + §D.1.
+##
+## Set just below recruit_cost(warrior, 0) = 150 so the first-session player
+## MUST dispatch to earn the recruit gap (forces the cozy first-action loop).
+## Above 150 lets the player skip the first dispatch + recruit immediately,
+## which violates the Onboarding §B Player Fantasy.
+## Below 50 makes Recruit feel out of reach for too many runs.
+## Safe range: 50–200. Default 100 per Onboarding GDD §G.
+##
+## NOT YET wired into Economy.load_save_data (which is currently stubbed).
+## Sprint 14+ Onboarding implementation (S14-S3) closes the wiring AC-29-03:
+## first-launch with empty save dict initializes _gold_balance to STARTING_GOLD.
+## Returning-launch with persisted gold_balance restores the saved value.
+##
+## GDD §G rows: STARTING_GOLD (Onboarding GDD #29).
+@export_range(0, 1000) var STARTING_GOLD: int = 100
+
 ## Gold drip per tick indexed by floor (0-based; access as BASE_DRIP[floor_index - 1]).
 ##
 ## Size MUST be 5 (one entry per MVP floor, 1–5).
