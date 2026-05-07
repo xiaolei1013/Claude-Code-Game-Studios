@@ -284,6 +284,29 @@ var _last_dispatch_ms: int = 0
 ## TR-orchestrator-014-001 / TR-orchestrator-014-004 — Story 013.
 var _buffered_state_change: Dictionary = {}
 
+## Last successful dispatch intent — captured in [method dispatch] right
+## before the state transition to ACTIVE_FOREGROUND (i.e. all validations
+## passed). Empty Dictionary [code]{}[/code] when no successful dispatch
+## has occurred this session. Schema (when populated):
+##
+##   - [code]formation[/code]: Array (deep copy of [method dispatch]'s
+##     [param formation] argument).
+##   - [code]floor_index[/code]: int (1-5).
+##   - [code]biome_id[/code]: String.
+##
+## NOT persisted in the save namespace — session-only. After game close →
+## reopen the field resets to {}; the player must make a deliberate dispatch
+## via the formation_assignment screen first. This is intentional cozy-UX
+## scope: the re-dispatch shortcut surfaces only AFTER deliberate dispatch
+## in this session (avoids first-launch confusion with an unfamiliar
+## bypass button).
+##
+## Read by main_menu.gd to toggle the RedispatchButton visibility via
+## [method get_last_dispatch_intent].
+##
+## Sprint 14 S14-N2 (5-sprint carry-forward from S10-N2)
+var last_dispatch_intent: Dictionary = {}
+
 
 # ---------------------------------------------------------------------------
 # Built-in virtual methods
@@ -460,6 +483,16 @@ func dispatch(formation: Array, floor_index: int, biome_id: String) -> void:
 	# the floor-clear marker fires later in the run.
 	_dispatched_floor_index = floor_index
 	_dispatched_biome_id = biome_id
+	# Sprint 14 S14-N2: capture the dispatch intent for the main_menu
+	# re-dispatch shortcut. Captured AFTER all validations pass + BEFORE
+	# the state transition to ACTIVE_FOREGROUND so re-dispatch reads from
+	# a known-good intent. Deep-copy `formation` so subsequent caller-side
+	# mutations don't propagate into the cached intent.
+	last_dispatch_intent = {
+		"formation": formation.duplicate(true),
+		"floor_index": floor_index,
+		"biome_id": biome_id,
+	}
 	_set_state(DungeonRunStateScript.State.ACTIVE_FOREGROUND)
 
 
@@ -1029,6 +1062,21 @@ func xp_per_floor_clear(floor_index: int) -> int:
 			if "XP_PER_FLOOR_CLEAR_STEP" in cfg:
 				step = int(cfg.get("XP_PER_FLOOR_CLEAR_STEP"))
 	return base + (floor_index - 1) * step
+
+
+## Returns a deep copy of [member last_dispatch_intent] — the formation +
+## floor + biome triplet captured at the most recent successful dispatch.
+##
+## Returns an empty Dictionary [code]{}[/code] when no successful dispatch
+## has occurred this session. Callers should treat that as "no shortcut
+## available" (e.g. main_menu's RedispatchButton hides itself).
+##
+## Returns a deep copy so callers can mutate the result without
+## contaminating the cached intent.
+##
+## Sprint 14 S14-N2 — accessor for the main_menu re-dispatch shortcut.
+func get_last_dispatch_intent() -> Dictionary:
+	return last_dispatch_intent.duplicate(true)
 
 
 # ---------------------------------------------------------------------------
