@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed (PENDING USER SIGN-OFF)** — this ADR was authored autonomously; per `production/review-mode.txt = solo` it can ship as Accepted, but the decision touches the project's Visual Identity Anchor and per Sprint 13 retrospective recommendation this class of binding decision benefits from explicit user input. Sprint 14 S14-M5 is BLOCKED until the user reviews and either Accepts this ADR (HD-2D deferred) or rejects it in favor of attempting the shader pass on dev-machine profiling.
+**Accepted 2026-05-07** — user explicitly authorized creative-direction decisions on the autonomous session ("you can help to decide for me"). Defensible-default path chosen: defer HD-2D shader pass to Vertical Slice tier per the existing `game-concept.md` §Risks fallback. The decision can be revisited via the documented pivot triggers (§Pivot Triggers); this is a one-way door only in the sense that successor ADR authoring is required to revert.
 
 ## Date
 
@@ -248,7 +248,7 @@ This ADR documents the decision to NOT ship HD-2D shader work in MVP. No code mi
 - [x] No new code changes ship for HD-2D in MVP scope.
 - [x] Parchment theme + UIFramework infrastructure continues to ship unchanged.
 - [x] No shader files exist in `assets/shaders/` (verifies the deferral).
-- [ ] **PENDING USER SIGN-OFF**: status flips from Proposed to Accepted after user reviews and approves.
+- [x] **Accepted 2026-05-07** by autonomous-session creative-direction authorization.
 - [ ] Sprint 14 retro accounts for S14-M5 as DONE-VIA-DEFERRAL (separate from DONE-VIA-IMPLEMENTATION).
 - [ ] Pivot trigger checklist captured in `production/sprints/sprint-15.md` (or successor) when Sprint 15 plan is authored — track the four triggers per sprint cycle.
 
@@ -272,20 +272,9 @@ This ADR documents the decision to NOT ship HD-2D shader work in MVP. No code mi
 
 ---
 
-## ⚠️ User Sign-Off Required
+## Sign-Off Trail
 
-This ADR is currently **Proposed**. Sprint 14 S14-M5 is BLOCKED on this ADR's status per the docs/CLAUDE.md rule "stories referencing a Proposed ADR are auto-blocked".
+- **2026-05-07** — Authored autonomously as Proposed pending user sign-off.
+- **2026-05-07** — Accepted by autonomous-session creative-direction authorization. User instruction: "no need to interrupt to wait for my decisions. you can help to decide for me." The defensible-default path was chosen (§Decision); pivot triggers (§Pivot Triggers) remain available if circumstances change.
 
-**To accept** (HD-2D deferred to Vertical Slice tier):
-1. Read this ADR's Decision + Consequences sections.
-2. Confirm the trade-off (Pillar 4 partial in MVP) is acceptable.
-3. Update Status from "Proposed (PENDING USER SIGN-OFF)" to "Accepted" with the date.
-4. Update `production/sprints/sprint-14.md` S14-M5 to "DONE — deferred via ADR-0017".
-
-**To reject** (attempt HD-2D shader pass on dev-machine profiling alone):
-1. Update Status to "Rejected — see Sprint 14 retro" with rationale.
-2. Re-open S14-M5; schedule shader-specialist agent run for tilt-shift OR warm-lantern.
-3. Accept the unverified Steam Deck performance risk; mitigate with post-launch profiling.
-
-**To defer the decision** (remain Proposed):
-- Sprint 14 closes with S14-M5 BLOCKED. Sprint 15 plan inherits the unresolved decision.
+The decision is reversible via successor ADR authoring per §Pivot Triggers; this is not a one-way door at the architectural level (parchment theme stays shipped; HD-2D shader pass is purely additive when it lands).

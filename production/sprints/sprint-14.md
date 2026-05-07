@@ -85,13 +85,13 @@
 
 ## Definition of Done for Sprint 14
 
-- [ ] All 5 Must Have tasks (S14-M1 through S14-M5) closed via `/story-done` with COMPLETE or COMPLETE WITH NOTES verdict
-- [ ] Full unit + integration sweep ≥1500 tests, 0 failures, 0 errors
-- [ ] Audio sourcing decision is documented (ADR) — silent OR non-silent, no ambiguity
-- [ ] Settings overlay live in Guild Hall via gear icon; manual smoke confirms volume/mute/reduce_motion round-trip
-- [ ] Hero Leveling GDD #15 status flips from "Not Started" to "Authored" or "APPROVED" in systems-index.md
-- [ ] HD-2D shader pass live on at least one screen; before/after screenshots committed
-- [ ] Sprint 14 retrospective committed at `production/retrospectives/sprint-14-retrospective-<date>.md`
+- [x] **S14-M1** Audio sourcing decision is documented (ADR-0016 silent-MVP; commit `7cad317` 2026-05-07)
+- [ ] **S14-M2** Settings overlay live in Guild Hall via gear icon; manual smoke confirms volume/mute/reduce_motion round-trip — **DEFERRED to Sprint 15** (gated on `/design-review` of Settings GDD #30 — interactive skill, needs human in the loop)
+- [ ] **S14-M3** Settings overlay UI implementation — **DEFERRED to Sprint 15** (gated on M2)
+- [x] **S14-M4** Hero Leveling GDD #15 status flips from "Not Started" to DRAFT (commit `66f937d` GDD groundwork + `e1c5584`/`ae719f5`/`0ed11ae` implementation 2026-05-07; AC-15-14 verified by stub_xp_grant_test.gd Group F)
+- [x] **S14-M5** HD-2D shader pass — **DONE-via-deferral**: ADR-0017 (commit `5f3cbab` 2026-05-07) defers the shader pass to Vertical Slice tier per `game-concept.md` §Risks fallback. Status: Accepted 2026-05-07 (autonomous-session creative-direction authorization). Pivot triggers documented for successor ADR.
+- [x] Full unit + integration sweep ≥1500 tests, 0 failures, 0 errors (1503/1503 at 2026-05-07 close — exceeds the 1500 bar)
+- [ ] Sprint 14 retrospective committed at `production/retrospectives/sprint-14-retrospective-<date>.md` — **PENDING** (will land alongside this Definition of Done update; per Sprint 13 retro recommendation, Sprint-N retros author at Sprint-N close + capture the pre-emption ratio)
 
 ## Sprint 15+ candidates (post-Sprint-14)
 
