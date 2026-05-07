@@ -1,0 +1,109 @@
+[gd_scene load_steps=2 format=3 uid="uid://hero_detail_modal_scaffold"]
+
+[ext_resource type="Script" path="res://assets/screens/hero_detail/hero_detail_modal.gd" id="1_hd_modal"]
+
+[node name="HeroDetailModal" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_hd_modal")
+
+[node name="DimBackdrop" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.4)
+mouse_filter = 0
+
+[node name="DetailPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -160.0
+offset_right = 200.0
+offset_bottom = 160.0
+grow_horizontal = 2
+grow_vertical = 2
+custom_minimum_size = Vector2(400, 320)
+
+[node name="HeaderRow" type="HBoxContainer" parent="DetailPanel"]
+layout_mode = 2
+
+[node name="ClassPortrait" type="TextureRect" parent="DetailPanel/HeaderRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(96, 96)
+expand_mode = 1
+stretch_mode = 5
+
+[node name="HeaderLabels" type="VBoxContainer" parent="DetailPanel/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="DisplayNameLabel" type="Label" parent="DetailPanel/HeaderRow/HeaderLabels"]
+layout_mode = 2
+text = "Hero Name"
+theme_type_variation = &"IdentityHeader"
+
+[node name="ClassNameLabel" type="Label" parent="DetailPanel/HeaderRow/HeaderLabels"]
+layout_mode = 2
+text = "Class"
+
+[node name="OwnedCountLabel" type="Label" parent="DetailPanel/HeaderRow/HeaderLabels"]
+layout_mode = 2
+text = "(owned: 1 warrior)"
+
+[node name="StatsBlock" type="VBoxContainer" parent="DetailPanel"]
+layout_mode = 2
+
+[node name="LevelRow" type="HBoxContainer" parent="DetailPanel/StatsBlock"]
+layout_mode = 2
+
+[node name="LevelLabel" type="Label" parent="DetailPanel/StatsBlock/LevelRow"]
+layout_mode = 2
+text = "Level"
+
+[node name="LevelValueLabel" type="Label" parent="DetailPanel/StatsBlock/LevelRow"]
+layout_mode = 2
+text = "1"
+
+[node name="XPRow" type="VBoxContainer" parent="DetailPanel/StatsBlock"]
+layout_mode = 2
+
+[node name="XPLabel" type="Label" parent="DetailPanel/StatsBlock/XPRow"]
+layout_mode = 2
+text = "XP: 0 / 150"
+
+[node name="XPProgressBar" type="ProgressBar" parent="DetailPanel/StatsBlock/XPRow"]
+layout_mode = 2
+max_value = 1.0
+step = 0.01
+value = 0.0
+show_percentage = false
+
+[node name="ActionRow" type="HBoxContainer" parent="DetailPanel"]
+layout_mode = 2
+alignment = 1
+
+[node name="LevelUpButton" type="Button" parent="DetailPanel/ActionRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(180, 44)
+focus_mode = 0
+mouse_filter = 0
+text = "Level Up"
+
+[node name="CloseButton" type="Button" parent="DetailPanel/ActionRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 44)
+focus_mode = 0
+mouse_filter = 0
+text = "Close"
