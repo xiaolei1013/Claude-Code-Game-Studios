@@ -110,14 +110,15 @@ Re-rendered on every `pool_refreshed`, `hero_recruited`, `gold_changed`. Each re
 
 `_on_recruit_pressed(pool_index: int)`:
 1. Defensive check: `pool_index in [0, POOL_SIZE)` — push_warning + return on out-of-range (race condition during refresh)
-2. Call `Recruitment.try_recruit(pool_index) -> bool`
-3. On true: `Recruitment.try_recruit` already handled atomic try_spend + add_hero; signals fire (`hero_recruited` from HeroRoster, `gold_changed` from Economy with reason="recruit"). Screen subscribers re-render automatically.
-4. On false: failure reasons are toast-displayed via `_show_toast(reason)`:
-   - `"insufficient_gold"` — toast "Not enough gold."
-   - `"roster_full"` — toast "Roster full. Visit roster to dismiss heroes." (V1.0+ ; MVP shows "Roster full." without action hint since MVP has no dismiss UI)
-   - `"unresolvable_class"` — toast "This class is no longer available." (orphan class)
+2. Call `Recruitment.try_recruit(pool_index) -> RecruitOutcome` (per `recruitment.gd:198` — returns the enum at `recruitment.gd:47` with values `SUCCESS / INSUFFICIENT_GOLD / ROSTER_FULL / INVALID_POOL_INDEX / UNRESOLVABLE_CLASS_ID`)
+3. Match on the returned enum:
+   - `SUCCESS`: `Recruitment.try_recruit` already handled atomic try_spend + add_hero; signals fire (`HeroRoster.hero_recruited(instance)` 1-arg from HeroRoster — see §F dependency table — AND `Recruitment.hero_recruited(instance_id, class_id, cost_paid)` 3-arg from Recruitment with the cost-paid summary; `gold_changed` from Economy with reason="recruit"). Screen subscribers re-render automatically.
+   - `INSUFFICIENT_GOLD`: `_show_toast(tr("recruit_error_insufficient_gold"))` — "Not enough gold."
+   - `ROSTER_FULL`: `_show_toast(tr("recruit_error_roster_full"))` — "Roster full." (MVP — no dismiss UI yet; V1.0+ may extend with action hint when retire UI ships)
+   - `UNRESOLVABLE_CLASS_ID`: `_show_toast(tr("recruit_error_unresolvable_class"))` — "This class is no longer available." (orphan class — content drift defensive)
+   - `INVALID_POOL_INDEX`: defensive race condition (visibility check should prevent); push_warning + skip toast (player retap re-evaluates pool)
 
-The "atomic" semantic per Recruitment GDD §C.5 (single-writer + try_spend → add_hero) means partial failures cannot occur — either both happen or neither does. The screen does not need rollback handling; it just listens for failure signals.
+The "atomic" semantic per Recruitment GDD §C.5 (single-writer + try_spend → add_hero) means partial failures cannot occur — either both happen or neither does. The screen does not need rollback handling; it just listens for failure-outcome enum values.
 
 ### C.6 Pool refresh interaction
 
@@ -296,13 +297,13 @@ For each pool entry, the OwnedLabel reads `HeroRoster.get_copies_owned(class_id)
 For each pool entry, the RecruitButton.disabled = (gold_balance < cost). Affordable rows render with SelectedSlotButton theme variation (warm); unaffordable rows render dimmed but still interactive (showing the cost).
 
 **AC-21-05 — Recruit press atomic transaction**
-Tapping the RecruitButton at pool_index=N calls `Recruitment.try_recruit(N)`. On success, `hero_recruited` and `gold_changed` signals fire from Recruitment's atomic dispatch (per Recruitment AC-RC-09); screen re-renders gold counter + the affected entry's cost (which jumps per ADR-0013 cost curve) + owned-count.
+Tapping the RecruitButton at pool_index=N calls `Recruitment.try_recruit(N) -> RecruitOutcome`. On `RecruitOutcome.SUCCESS`, `HeroRoster.hero_recruited(instance)` (1-arg) + `Recruitment.hero_recruited(instance_id, class_id, cost_paid)` (3-arg) + `gold_changed` signals fire from Recruitment's atomic dispatch (per Recruitment AC-RC-09); screen re-renders gold counter + the affected entry's cost (which jumps per ADR-0013 cost curve) + owned-count.
 
 **AC-21-06 — Insufficient-gold try_recruit shows toast**
-If the player's gold drops between render and tap (race condition), `try_recruit` returns false with reason="insufficient_gold"; the screen displays the localized toast "Not enough gold." for 3.0s.
+If the player's gold drops between render and tap (race condition), `try_recruit` returns `RecruitOutcome.INSUFFICIENT_GOLD`; the screen displays the localized toast "Not enough gold." for 3.0s.
 
 **AC-21-07 — Roster-full try_recruit shows toast**
-If the player's roster is at max_roster_size at tap time, `try_recruit` returns false with reason="roster_full"; the screen displays "Roster full." toast for 3.0s.
+If the player's roster is at max_roster_size at tap time, `try_recruit` returns `RecruitOutcome.ROSTER_FULL`; the screen displays "Roster full." toast for 3.0s.
 
 **AC-21-08 — Refresh Pool button shows current cost**
 The RefreshPoolButton's text includes the localized cost from `Recruitment.refresh_cost(refreshes_today)`. The cost updates after each successful refresh (the curve advances per ADR-0015).

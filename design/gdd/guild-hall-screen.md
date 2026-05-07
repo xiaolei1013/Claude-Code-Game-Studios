@@ -241,7 +241,7 @@ Subscribe + emit `gold_changed(450, 50, "kill")`. `_gold_label.text` matches new
 With 3 heroes seeded: 3 HeroCard children spawned in RosterPanel. Each card displays the hero's display_name + class_id + current_level.
 
 **AC-19-04 — Roster panel updates on hero_recruited**
-Subscribe + emit `hero_recruited(4, "mage")`. A new HeroCard appears for hero id 4. Card count increases by 1.
+Subscribe to `HeroRoster.hero_recruited(instance: HeroInstance)` (1-arg per `hero_roster.gd:170`; NOT the 3-arg `Recruitment.hero_recruited` — see Cross-GDD Consistency Sweep 2026-05-07 for the dual-source disambiguation). Emit with a fresh `HeroInstance` (instance_id=4, class_id="mage"). A new HeroCard appears for hero id 4. Card count increases by 1.
 
 **AC-19-05 — Roster panel updates on hero_removed**
 Same pattern, removal.
