@@ -58,7 +58,9 @@ class TestSpyResolver extends RefCounted:
 		result.effectiveness_label = canned_label
 		return result
 
-	func resolve_floor_matchup(formation: Array, archetypes: Array[String]) -> RefCounted:
+	func resolve_floor_matchup(_formation: Array, _archetypes: Array[String]) -> RefCounted:
+		# Spy returns canned values regardless of inputs; parameters retained
+		# for interface conformance with MatchupResolver.
 		resolve_floor_matchup_call_count += 1
 		var result: MatchupResult = preload("res://src/core/matchup_resolver/matchup_result.gd").new()
 		result.is_advantaged = canned_advantaged

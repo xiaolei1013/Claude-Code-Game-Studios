@@ -763,7 +763,7 @@ func _execute_transition(screen_id: String, transition: int) -> void:
 ##
 ## TR-scene-manager-020, TR-scene-manager-023, TR-scene-manager-032 — ADR-0007
 func _transition_cross_fade(
-		old_screen: Control,
+		_old_screen: Control,
 		old_id: String,
 		new_screen: Control,
 		screen_id: String) -> void:

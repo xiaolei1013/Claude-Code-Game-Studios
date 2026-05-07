@@ -142,7 +142,8 @@ func test_flush_offline_signals_with_empty_accumulators_is_safe_noop() -> void:
 class RecordingOrchestrator extends OrchestratorScript:
 	var grant_calls: Array[Dictionary] = []
 
-	func _grant_xp_to_formation(roster: Node, xp_amount: int) -> void:
+	func _grant_xp_to_formation(_roster: Node, xp_amount: int) -> void:
+		# Recording variant only captures xp_amount; roster ignored.
 		grant_calls.append({"xp_amount": xp_amount})
 
 

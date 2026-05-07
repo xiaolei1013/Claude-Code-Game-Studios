@@ -24,7 +24,9 @@ class SpyMatchupResolver extends MatchupResolver:
 	var calls_by_archetype: Dictionary = {}
 	var canned_results: Dictionary = {}  # archetype: String → is_advantaged: bool
 
-	func resolve_formation_matchup(formation: Array, archetype: String) -> MatchupResult:
+	func resolve_formation_matchup(_formation: Array, archetype: String) -> MatchupResult:
+		# Spy intentionally ignores formation (canned-by-archetype semantics);
+		# parameter retained for interface conformance with MatchupResolver.
 		call_count += 1
 		var key: StringName = StringName(archetype)
 		calls_by_archetype[key] = int(calls_by_archetype.get(key, 0)) + 1

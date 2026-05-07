@@ -269,11 +269,13 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 
 		# Domain calls: Orchestrator first (combat kills), then Economy (drip accrual).
 		# Per ADR-0014: order is load-bearing for accumulation semantics.
-		var combat_result: Dictionary = {}
+		# Note: combat_result/economy_result locals removed (were assigned but
+		# never read — the if-branches consume `result` directly via has()/has_method()
+		# checks). If a future iteration needs to thread the per-chunk result into
+		# a cross-system summary, reintroduce the locals at that time.
 		if orchestrator != null and orchestrator.has_method("compute_offline_batch"):
 			var result = orchestrator.compute_offline_batch(chunk_ticks)
 			if result != null:
-				combat_result = result
 				# Accumulate kills by tier (population is lazy; defaults to 0).
 				if result.has("kills_by_tier") and result.kills_by_tier is Dictionary:
 					for tier: int in result.kills_by_tier.keys():
@@ -289,11 +291,11 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 					if result.first_clear_tick not in cleared_list:
 						cleared_list.append(result.first_clear_tick)
 
-		var economy_result: Dictionary = {}
 		if economy != null and economy.has_method("compute_offline_batch"):
-			var result = economy.compute_offline_batch(chunk_ticks)
-			if result != null:
-				economy_result = result
+			var _result = economy.compute_offline_batch(chunk_ticks)
+			# Stub for Story 010 — economy.compute_offline_batch returns null;
+			# when implemented, the result will populate gold drip accumulators
+			# on `summary` here (mirroring the orchestrator branch above).
 
 		summary.ticks_replayed += chunk_ticks
 		summary.chunks_consumed += 1

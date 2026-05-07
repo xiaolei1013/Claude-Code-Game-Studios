@@ -353,8 +353,8 @@ func try_award_floor_clear(floor_index: int, bonus_amount: int) -> bool:
 ##   var result: Economy.OfflineResult = Economy.compute_offline_batch(3600 * 20)
 ##
 ## ADR-0013 §Requirements — GDD §C.5, §C.6, §D.6 — ADR-X02
-func compute_offline_batch(tick_budget: int) -> OfflineResult:
-	return null  # Story 010
+func compute_offline_batch(_tick_budget: int) -> OfflineResult:
+	return null  # Story 010; rename _tick_budget on impl
 
 
 ## Drains per-chunk-suppressed offline-replay signals into single aggregate
@@ -429,8 +429,8 @@ func get_save_data() -> Dictionary:
 ##       "floor_clear_bonus_credited": {1: 500}})
 ##
 ## ADR-0013 §Requirements — ADR-0004 consumer contract
-func load_save_data(data: Dictionary) -> void:
-	pass  # Story 012
+func load_save_data(_data: Dictionary) -> void:
+	pass  # Story 012; rename _data on impl
 
 # ---------------------------------------------------------------------------
 # Public API — read methods (display surfaces)

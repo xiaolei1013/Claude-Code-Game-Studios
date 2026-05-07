@@ -1412,8 +1412,8 @@ func _derive_integrity_tags() -> Array[PackedByteArray]:
 ## [param current_ts]: The current suspicious wall-clock timestamp (Unix seconds).
 ##
 ## ADR-0007, TR-save-load-032, Story 013
-func _on_flag_suspicious_timestamp_emitted(previous_ts: int, current_ts: int) -> void:
-	pass  # Story 013 (tamper-detection)
+func _on_flag_suspicious_timestamp_emitted(_previous_ts: int, _current_ts: int) -> void:
+	pass  # Story 013 (tamper-detection); rename _-prefixed params on impl
 
 
 ## Handles [signal SceneManager.scene_boundary_persist].
