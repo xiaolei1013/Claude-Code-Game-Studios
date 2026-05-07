@@ -49,6 +49,10 @@ var _enter_time_msec: int = 0
 
 
 @onready var _dim_backdrop: ColorRect = $DimBackdrop
+## Reserved for Sprint 17 S17-S2 visual polish — staggered reveal
+## animation queries the center panel for size/position to drive
+## tween targets. Read deferred until that work lands.
+@warning_ignore("unused_private_class_variable")
 @onready var _center_panel: PanelContainer = $CenterPanel
 @onready var _headline_label: Label = $CenterPanel/CenterVBox/HeadlineLabel
 @onready var _unlock_notice_label: Label = $CenterPanel/CenterVBox/UnlockNoticeLabel

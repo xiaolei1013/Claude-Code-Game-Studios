@@ -167,6 +167,11 @@ var _last_summary: OfflineSummary = null
 var _warning_logger: Callable = func(msg: String) -> void: push_warning(msg)
 
 ## Test-injection DI for error logs per FloorUnlock S11-X1's pattern.
+## Currently unread — held for symmetry with `_warning_logger` so future
+## error-emitting paths in `compute_offline_summary` land on the established
+## DI shape rather than calling `push_error` directly. Tests can already
+## override this field if a future error path lands.
+@warning_ignore("unused_private_class_variable")
 var _error_logger: Callable = func(msg: String) -> void: push_error(msg)
 
 

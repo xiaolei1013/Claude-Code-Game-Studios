@@ -53,7 +53,15 @@ var _cached_level_up_cost: int = -1
 
 # Node references — assumed via @onready (.tscn defines the tree).
 @onready var _dim_backdrop: ColorRect = $DimBackdrop
+## Reserved for Sprint 17 S17-M2 visual polish — modal slide-in animation
+## queries the detail panel for size/position; read deferred until that
+## work lands.
+@warning_ignore("unused_private_class_variable")
 @onready var _detail_panel: PanelContainer = $DetailPanel
+## Reserved for class-portrait sourcing decision (carve-out per Sprint 17
+## S17-M1 known scope) — placeholder while ClassPortrait sourcing follows
+## the ADR-0016 silent-MVP precedent or an art-asset binding lands.
+@warning_ignore("unused_private_class_variable")
 @onready var _class_portrait: TextureRect = $DetailPanel/HeaderRow/ClassPortrait
 @onready var _display_name_label: Label = $DetailPanel/HeaderRow/HeaderLabels/DisplayNameLabel
 @onready var _class_name_label: Label = $DetailPanel/HeaderRow/HeaderLabels/ClassNameLabel

@@ -25,6 +25,10 @@ const RecruitmentScript = preload("res://src/core/recruitment/recruitment.gd")
 var POOL_SIZE: int = RecruitmentScript.POOL_SIZE
 
 
+## Reserved for Sprint 17 S17-M1 visual polish — RecruitButton theme
+## variation + gold-counter pulse animation queries this panel for
+## layout. Read deferred until that work lands.
+@warning_ignore("unused_private_class_variable")
 @onready var _pool_panel: PanelContainer = $PoolPanel
 @onready var _pool_entries: Array[Control] = [
 	$PoolPanel/PoolVBox/PoolEntry0,
@@ -38,6 +42,10 @@ var POOL_SIZE: int = RecruitmentScript.POOL_SIZE
 
 # Per-tier XP cache (engine-code-rule pattern — pre-cache instead of
 # resolving costs in render loop).
+## Reserved for re-render guard — visual-polish iteration may need to
+## debounce overlapping refresh calls during animation transitions.
+## Read deferred until S17-M1 polish work lands.
+@warning_ignore("unused_private_class_variable")
 var _is_rendering: bool = false
 
 
