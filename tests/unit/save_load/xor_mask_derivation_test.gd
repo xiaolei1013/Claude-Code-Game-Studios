@@ -34,8 +34,15 @@ static var _NAMESPACE_BYTES: PackedByteArray = PackedByteArray([
 # ---------------------------------------------------------------------------
 
 ## Returns a fresh SaveLoadSystem instance (not added to tree; _ready skipped).
+## auto_free registers the Node for gdunit4 to clean up at test end. Without
+## it, each test that calls _make_sls leaks a Node — which is what produced
+## the 15 pre-existing "orphans" warning across this 17-test suite (the 2
+## tests that don't use _make_sls were the non-orphans). Pattern reference:
+## tests/unit/floor_unlock_system/floor_unlock_system_test.gd:_make_floor_unlock_with_stubs.
 func _make_sls() -> Node:
-	return SaveLoadScript.new()
+	var sls: Node = SaveLoadScript.new()
+	auto_free(sls)
+	return sls
 
 
 ## Computes the reference seed for a given version using the canonical formula.
