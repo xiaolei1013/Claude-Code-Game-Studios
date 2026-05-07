@@ -282,6 +282,27 @@ func get_recruit_pool() -> Array[String]:
 	return _current_pool.duplicate()
 
 
+## Returns the number of paid pool refreshes performed this session.
+## Read-side convenience accessor for the Recruit Screen UI's
+## RefreshPoolButton cost label per Recruit Screen GDD #21 §C.6 step 1.
+##
+## Pairs with [method refresh_cost] — the screen reads this counter then
+## passes it to refresh_cost to compute the player-facing "next refresh
+## costs N gold" label without the screen needing to touch the private
+## [member _refreshes_today] field.
+##
+## Session-only — resets to 0 on cold launch (the in-day refresh tally
+## restarts each time the player relaunches the app). NOT persisted in
+## get_save_data per ADR-0015 §OQ-RC-2 (paid-refresh resets daily-ish via
+## the cold-launch boundary).
+##
+## Sprint 16 S16-N1 — closes Cross-GDD Consistency Sweep 2026-05-07
+## §Self-documented gap; matches the existing public-accessor pattern
+## ([method get_recruit_pool] / [method get_recruit_cost]).
+func get_refreshes_today() -> int:
+	return _refreshes_today
+
+
 ## Returns the cost (in gold) for the recruit at pool_index. Read-side
 ## convenience for screen UI per §C.1 + §D.1. Returns -1 for invalid
 ## pool_index OR if Economy/Roster autoloads are absent OR if the pool entry

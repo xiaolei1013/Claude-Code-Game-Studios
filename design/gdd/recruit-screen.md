@@ -123,7 +123,7 @@ The "atomic" semantic per Recruitment GDD §C.5 (single-writer + try_spend → a
 ### C.6 Pool refresh interaction
 
 `_on_refresh_pressed()`:
-1. Read current cost: `Recruitment.refresh_cost(Recruitment.get_refreshes_today())` — exposed via accessor (Sprint 14 S14-S4 may need this getter; if not present, the screen reads `_refreshes_today` or the cost directly via a wrapper method)
+1. Read current cost: `Recruitment.refresh_cost(Recruitment.get_refreshes_today())` — both accessors exist as of Sprint 16 S16-N1 (per Cross-GDD Consistency Sweep 2026-05-07 §Self-documented gap closure). The screen passes the session-paid-refresh count to the cost-curve formula without touching the private `_refreshes_today` field.
 2. Defensive check: `Economy.get_gold_balance() >= cost` — disable button if insufficient (mirrors C.4 affordability)
 3. Call `Recruitment.refresh_pool_paid() -> bool`
 4. On true: `pool_refreshed` signal fires → `_on_pool_refreshed` re-renders. Refresh button cost label updates via `_refresh_refresh_button_cost` (the refreshes_today counter incremented)
