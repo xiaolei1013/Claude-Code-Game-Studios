@@ -44,8 +44,9 @@
 |---|---|---|---|---|
 | S14-S1 | **Manual re-playtest with persisted save** (S12-S1 + S13 carry-forward) — needs human play session | producer + qa-tester | 0.5d | M3 done |
 | S14-S2 | **Sprint 13 retrospective** (continuing the Sprint 10/11/12 pattern) | producer + claude-code | 0.25d | sprint window closed |
-| S14-S3 | **Onboarding / First-Session Flow GDD #29** (currently "Not Started") — first-launch experience: Theron seed → first dispatch tutorial moment → cozy-register handoff to Guild Hall | game-designer + ux-designer | 1.0d | none |
+| S14-S3 | **Onboarding / First-Session Flow** — implementation per GDD #29 (drafted in this session by autonomous push; pending /design-review). Adds STARTING_GOLD constant + integration test simulating cold-launch + manual smoke checklist. ~1.0d. | gameplay-programmer + ux-designer | 1.0d | GDD #29 /design-review APPROVED |
 | S14-S4 | **Recruit Screen UI** (S13-N4 carry-forward; recruitment-system.md §J Story 7) | ui-programmer + ux-designer | 0.75d | UX pass for recruit-card layout |
+| S14-S5 | **Guild Hall Screen full implementation** per Guild Hall GDD #19 (drafted in this session — current Sprint 8 S8-M4 stub is just the DispatchNavButton). Header bar + roster panel + recruit nav button gating + settings gear icon integration. 6 stories totaling ~3.0d per GDD §J. | ui-programmer + ux-designer | 3.0d | Guild Hall GDD #19 /design-review APPROVED; Settings GDD #30 review APPROVED (gear opens Settings overlay); replay_in_flight_changed signal landed (commit `54cd394`) ✓ |
 
 ### Nice to Have
 
