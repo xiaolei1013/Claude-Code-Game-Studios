@@ -478,8 +478,10 @@ Future screens (e.g., Victory Moment) may want to override Music/Ambient tempora
 **OQ-AS-5 — Hydration suppression hook**
 E.8 requires AudioRouter to suppress the level-up chime during save-load hydration. HeroRoster's `_suppress_signals` flag is internal. Sprint 11 should either (a) add a public `HeroRoster.is_hydrating` getter, or (b) have AudioRouter subscribe to a `SaveLoadSystem.hydration_started` / `hydration_complete` signal and gate cues based on that. Option (b) is cleaner because it scales — Audio is one of many systems that may want to suppress side-effects during hydration. Sprint 11 ADR candidate.
 
-**OQ-AS-6 — Audio asset sourcing**
-This GDD specifies cue ids and standards but does not source the actual `.wav` / `.ogg` files. Audio asset sourcing (commission vs. license vs. AI-generated under license) is a Sprint 12+ pre-Polish art/audio sourcing pass. Until assets land, AudioRouter routes correctly but cues play silence (the resolve returns null → AudioStreamPlayer skips play). MVP still ships and runs.
+**OQ-AS-6 — Audio asset sourcing — RESOLVED 2026-05-07 (S14-M1)**
+~~This GDD specifies cue ids and standards but does not source the actual `.wav` / `.ogg` files. Audio asset sourcing (commission vs. license vs. AI-generated under license) is a Sprint 12+ pre-Polish art/audio sourcing pass. Until assets land, AudioRouter routes correctly but cues play silence (the resolve returns null → AudioStreamPlayer skips play). MVP still ships and runs.~~
+
+**Resolution**: `docs/architecture/ADR-0016-audio-asset-sourcing-silent-mvp.md` locks the **silent-MVP path** — no `.wav` / `.ogg` files ship in MVP; AudioRouter remains wired-but-silent. Four documented pivot triggers (post-launch playtest signal · ≥$200 budget approval · mobile port milestone · sprint capacity surplus enabling AI-generation) authorize a successor ADR when any one fires. The GDD's spec (C.2 / C.3 cue taxonomy + music plan) is preserved unchanged for future non-silent pivot — pivot is a content patch, not a code change. `game-concept.md` §Audio Needs row updated to reference ADR-0016.
 
 **OQ-AS-7 — Combat-music ramp on heavy ticks**
 Late-game playtest may reveal that pure-ambient music under heavy combat ticks (4–5 kills per second producing 4–5 chimes) feels under-mixed. A subtle "combat intensity" bus modulation (Music/Ambient tilts +1 dB during dispatched-state, neutral otherwise) is a Sprint 13+ polish candidate. NOT a real combat soundtrack — just a 1 dB warmth shift to anchor the mix. Out of MVP scope.
@@ -500,7 +502,7 @@ This GDD's signal subscriptions touch nine other systems. Cross-references for r
 - `save-load-system.md` — settings persistence schema (C.7). Reconciliation needed in Sprint 11.
 - `data-loading.md` — DataRegistry category-scan pattern for `sfx/` and `music/` directories. Sprint 11 must register these categories per ADR-0006.
 - `art-bible.md` §7 Animation Feel — the "stately with warm snappiness" directive applies to audio: SFX timings must match (UI ≤300 ms total, Reward ≤1500 ms total). This GDD's C.6 duration cells respect that.
-- `game-concept.md` §Audio Needs — "Moderate — ambient dungeon loops, UI tap feedback, low-key fanfare for unlocks". This GDD's scope matches the game-concept brief exactly.
+- `game-concept.md` §Audio Needs — "MVP: silent (per ADR-0016); V1.0+: ambient dungeon loops, UI tap feedback, low-key fanfare for unlocks". This GDD's scope matches the V1.0+ brief; MVP ships silent per the resolved sourcing decision (OQ-AS-6 above).
 
 ---
 

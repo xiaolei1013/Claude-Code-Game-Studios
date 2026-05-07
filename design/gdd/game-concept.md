@@ -207,7 +207,7 @@ Visual presentation (portraits, dungeon art, idle anims) carries the cozy fantas
 | **Key Technical Challenges** | Accurate offline progression math; save-file integrity and anti-tamper; balancing idle curves; pixel-perfect HD-2D rendering (tilt-shift DoF + warm lighting); **input-agnostic UI (mouse + touch-friendly from MVP to avoid a full UI rewrite for the mobile port)** |
 | **Art Style** | 2D pixel art, HD-2D inspired (tilt-shift DoF + warm lighting overlays) |
 | **Art Pipeline Complexity** | Medium — custom pixel art for heroes/enemies; asset packs feasible for MVP backgrounds |
-| **Audio Needs** | Moderate — ambient dungeon loops, UI tap feedback, low-key fanfare for unlocks |
+| **Audio Needs** | **MVP: silent** (AudioRouter wired but silent until a pivot trigger fires per `docs/architecture/ADR-0016-audio-asset-sourcing-silent-mvp.md`). **V1.0+ scope**: ambient dungeon loops, UI tap feedback, low-key fanfare for unlocks per `design/gdd/audio-system.md` §C. Pivot triggers: 3+ playtests flag missing audio · ≥$200 budget approval · mobile port milestone (silent-on-mobile is a hard gate) · sprint capacity surplus enabling AI-generation pathway. |
 | **Networking** | None |
 | **Content Volume** | MVP: 3 classes, 1 biome (5 floors), ~8 enemy types. V1.0: 15-20 classes, 5 biomes, prestige layer |
 | **Procedural Systems** | None in MVP. Possibly procedural run variance in V1.0 (randomized dungeon modifiers) |
