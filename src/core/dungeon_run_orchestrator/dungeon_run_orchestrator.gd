@@ -233,6 +233,21 @@ var _is_offline_replay: bool = false
 ## floor in the offline window" — equivalent semantic for floor_cleared_first_time).
 var _offline_pending_first_clears: Array[Dictionary] = []
 
+## Per-tier kill count accumulator for offline replay XP batching per Hero
+## Leveling GDD #15 §E.9 / AC-15-11. Populated by
+## [method compute_offline_batch] (Sprint 12+ Story 010 — currently
+## scaffold-only since the orchestrator's compute_offline_batch is not yet
+## implemented; the OfflineProgressionEngine's [code]has_method[/code] guard
+## makes the call a no-op until it lands). [method flush_offline_signals]
+## reads this accumulator + [member _offline_pending_first_clears] to compute
+## a single batched XP-grant per dispatched-formation hero (§E.9: cascade
+## fires post-replay rather than per-tick).
+##
+## Cleared on flush per the existing first_clears + flag-clear pattern.
+##
+## Hero Leveling GDD #15 §E.9 / AC-15-11
+var _offline_pending_kills_by_tier: Dictionary = {}
+
 
 # ---------------------------------------------------------------------------
 # Dispatch debounce + validation state — Story 003 (TR-026, TR-027, TR-032)
@@ -810,7 +825,19 @@ func attribute_kill_gold(tier: int, advantaged: bool, losing_run: bool) -> int:
 ## this method is the API surface the engine binds against.
 ##
 ## OfflineProgressionEngine GDD §F (Story 0a), §C.2 batch-loop integration.
+##
+## Sprint 14 S14-M4 Story 4 / Hero Leveling GDD #15 §E.9 / AC-15-11:
+## additionally batches XP grants — sums [code]xp_per_kill[/code] across
+## [member _offline_pending_kills_by_tier] plus [code]xp_per_floor_clear[/code]
+## across [member _offline_pending_first_clears], then dispatches a single
+## [code]roster.add_xp(id, total)[/code] per dispatched-formation hero. The
+## cascade (multi-level-up loop) runs at HeroRoster.add_xp time per §C.4 —
+## one call per hero, not per kill. Sequencing: floor_cleared_first_time
+## emits BEFORE the XP grant so the player-facing first-clear fanfare
+## precedes the level-up chimes (subscriber order is deterministic).
 func flush_offline_signals() -> void:
+	var total_xp: int = compute_offline_total_xp()
+
 	# Aggregate floor_cleared_first_time emits in insertion order.
 	for entry: Dictionary in _offline_pending_first_clears:
 		floor_cleared_first_time.emit(
@@ -818,9 +845,49 @@ func flush_offline_signals() -> void:
 			String(entry.biome_id),
 			bool(entry.losing_run)
 		)
-	# Clear accumulator + replay flag.
+
+	# Hero Leveling GDD #15 AC-15-11: single batched add_xp per formation
+	# hero. _grant_xp_to_formation null-guards the roster argument (test
+	# envs without /root/HeroRoster are safe).
+	if total_xp > 0:
+		var roster: Node = (
+			get_node_or_null("/root/HeroRoster") if get_tree() != null else null
+		)
+		_grant_xp_to_formation(roster, total_xp)
+
+	# Clear accumulators + replay flag.
 	_offline_pending_first_clears.clear()
+	_offline_pending_kills_by_tier.clear()
 	_is_offline_replay = false
+
+
+## Returns the total XP a single dispatched-formation hero would gain from
+## the current offline replay accumulators. Pure function — does NOT mutate
+## state, does NOT call add_xp, does NOT emit signals.
+##
+## Formula per Hero Leveling GDD #15 AC-15-11:
+##   [code]total = sum(xp_per_kill(tier) * count for tier, count in kills_by_tier)
+##                + sum(xp_per_floor_clear(f) for f in floors_cleared_in_window)[/code]
+##
+## Reads [member _offline_pending_kills_by_tier] +
+## [member _offline_pending_first_clears]. When both are empty, returns 0.
+##
+## Used by [method flush_offline_signals] to batch the XP grant; exposed
+## publicly so OfflineProgressionEngine summary-rendering paths (Return-to-App
+## Screen) can preview the per-hero XP gain pre-flush if needed.
+##
+## Hero Leveling GDD #15 §E.9 / AC-15-11
+func compute_offline_total_xp() -> int:
+	var total: int = 0
+	for tier_v: Variant in _offline_pending_kills_by_tier.keys():
+		var tier: int = int(tier_v)
+		var count: int = int(_offline_pending_kills_by_tier[tier_v])
+		if count > 0:
+			total += xp_per_kill(tier) * count
+	for entry: Dictionary in _offline_pending_first_clears:
+		var floor_idx: int = int(entry.get("floor_index", 0))
+		total += xp_per_floor_clear(floor_idx)
+	return total
 
 
 ## Sprint 14 S14-M4 — real XP grant per Hero Leveling GDD #15.
