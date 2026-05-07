@@ -388,6 +388,9 @@ func _mean_int(arr: Array[int]) -> int:
 	var sum: int = 0
 	for v: int in arr:
 		sum += v
+	# Integer mean — fine for stat-aggregation tests where fractional
+	# averages don't carry information.
+	@warning_ignore("integer_division")
 	return sum / arr.size() if arr.size() > 0 else 0
 
 

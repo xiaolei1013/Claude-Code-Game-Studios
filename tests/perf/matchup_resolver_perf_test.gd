@@ -59,6 +59,8 @@ func test_resolve_formation_matchup_10000_calls_under_perf_budget() -> void:
 	for _i: int in range(10000):
 		var _r: MatchupResult = resolver.resolve_formation_matchup(formation, "bruiser")
 	var elapsed_us: int = Time.get_ticks_usec() - t0
+	# μs→ms truncation; ms granularity is sufficient for budget checks.
+	@warning_ignore("integer_division")
 	var elapsed_ms: int = elapsed_us / 1000
 
 	# Soft-warn at 100ms (sets a tight regression alarm).
@@ -92,6 +94,8 @@ func test_resolve_floor_matchup_5_archetype_call_under_perf_budget() -> void:
 	for _i: int in range(1000):
 		var _r: MatchupResult = resolver.resolve_floor_matchup(formation, archetypes)
 	var elapsed_us: int = Time.get_ticks_usec() - t0
+	# μs→ms truncation; ms granularity is sufficient for budget checks.
+	@warning_ignore("integer_division")
 	var elapsed_ms: int = elapsed_us / 1000
 
 	# Hard ceiling at 500ms — gives plenty of room for CI variance.

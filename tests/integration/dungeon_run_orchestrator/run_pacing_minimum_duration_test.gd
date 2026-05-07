@@ -146,6 +146,9 @@ func test_run_pacing_dwell_overlay_remains_visible_for_minimum_duration() -> voi
 	# We wait half the dwell, then re-check. The overlay must still be visible.
 	# create_timer is the same mechanism the production code uses, so this
 	# accurately measures whether the dwell is actually being respected.
+	# Half-dwell in seconds — int/int truncation acceptable for the timer
+	# (S9M2_MINIMUM_DWELL_MS is even-valued in MVP).
+	@warning_ignore("integer_division")
 	await get_tree().create_timer((S9M2_MINIMUM_DWELL_MS / 2) / 1000.0).timeout
 	assert_bool(screen._run_end_overlay.visible).is_true()
 

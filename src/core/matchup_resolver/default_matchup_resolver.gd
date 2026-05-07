@@ -103,6 +103,7 @@ func resolve_formation_matchup(formation: Array, enemy_archetype: String) -> Mat
 	# For N_eligible=2 → threshold 1; counter_count must be ≥ 2.
 	# For N_eligible=1 → threshold 0; counter_count must be ≥ 1.
 	# For N_eligible=0 → threshold 0; counter_count==0 → false (correct).
+	@warning_ignore("integer_division")
 	result.is_advantaged = counter_count > (n_eligible / 2)
 
 	# TR-013 dedup + alphabetical sort (single-enemy case is already deduplicated;

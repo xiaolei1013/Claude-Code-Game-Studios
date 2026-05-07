@@ -85,10 +85,12 @@ signal tick_fired(tick_number: int)
 ## Emitted on session resume after the platform was backgrounded or the game
 ## was closed. [param seconds] is the wall-clock delta; [param cap_reached]
 ## is true when the delta exceeded offline_cap_seconds.
+@warning_ignore("unused_signal")
 signal offline_elapsed_seconds(seconds: float, cap_reached: bool)
 
 ## Emitted when the wall-clock timestamp rewinds beyond rewind_tolerance_seconds,
 ## indicating a suspicious system-clock adjustment.
+@warning_ignore("unused_signal")
 signal flag_suspicious_timestamp_emitted(previous_ts: int, current_ts: int)
 
 # ---------------------------------------------------------------------------

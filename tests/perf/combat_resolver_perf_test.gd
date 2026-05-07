@@ -70,6 +70,8 @@ func test_compute_offline_batch_576k_p95_under_perf_budget() -> void:
 	var p95_idx: int = 18
 	p95_us = times_us[p95_idx]
 	var max_us: int = times_us[19]
+	# μs→ms truncation; ms granularity is sufficient for soft-warn budget checks.
+	@warning_ignore("integer_division")
 	var p95_ms: int = p95_us / 1000
 
 	# Soft warn at 100ms — informative regression alarm, not gating.

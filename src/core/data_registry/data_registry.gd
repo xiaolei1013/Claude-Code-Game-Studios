@@ -108,6 +108,8 @@ signal registry_error(reason: String, details: Dictionary)
 
 ## Emitted after a successful hot-reload re-enumeration pass (debug builds only).
 ## [param content_type] names the content category that was refreshed.
+## Forward-looking — emit path lands when the hot-reload pass ships.
+@warning_ignore("unused_signal")
 signal hot_reload_complete(content_type: String)
 
 # ---------------------------------------------------------------------------

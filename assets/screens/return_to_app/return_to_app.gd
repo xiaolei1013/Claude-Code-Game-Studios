@@ -184,7 +184,8 @@ func _render_summary(summary: OfflineProgressionEngine.OfflineSummary) -> void:
 	# Header.
 	_header_label.text = tr("return_to_app_title")
 
-	# Elapsed subhead — convert seconds to whole minutes.
+	# Elapsed subhead — convert seconds to whole minutes (intentional truncation).
+	@warning_ignore("integer_division")
 	var minutes_away: int = int(summary.seconds_credited / 60)
 	_elapsed_subhead.text = UIFrameworkScript.format_localized(
 		"return_to_app_seconds_credited_format", [minutes_away]
@@ -213,6 +214,8 @@ func _render_summary(summary: OfflineProgressionEngine.OfflineSummary) -> void:
 	# Cap notice — show if any seconds were clipped (from summary or cached signal).
 	var clipped: int = maxi(summary.seconds_clipped, _pending_seconds_clipped)
 	if clipped > 0:
+		# Intentional s→h truncation (cap-reached notice shows whole hours).
+		@warning_ignore("integer_division")
 		var hours_capped: int = int(clipped / 3600)
 		_cap_notice.text = UIFrameworkScript.format_localized(
 			"return_to_app_cap_reached_notice_format", [hours_capped]

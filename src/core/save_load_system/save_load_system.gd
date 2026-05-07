@@ -204,6 +204,7 @@ signal first_launch()
 ## Body emitted in Story 007 corrupt-both recovery path. Declaration lives here.
 ##
 ## TR-save-load-032
+@warning_ignore("unused_signal")
 signal corrupt_both_acknowledged()
 
 # ---------------------------------------------------------------------------
@@ -495,6 +496,8 @@ func request_full_persist(reason: String) -> void:
 		# before any wall-clock read this session). A zero last_persist_ts
 		# would be misinterpreted by offline-progression as "never persisted".
 		if now_ms_int > 0:
+			# Intentional ms→s truncation (ts is whole seconds per Save/Load spec).
+			@warning_ignore("integer_division")
 			tick_system.set_last_persist_ts(now_ms_int / 1000)
 
 	# 9. Success: transition back to READY + emit save_completed.
