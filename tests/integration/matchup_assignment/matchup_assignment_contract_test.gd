@@ -201,3 +201,50 @@ func test_matchup_screen_select_floor_disables_button_for_locked_floor() -> void
 	else:
 		assert_bool(screen._select_button.disabled).is_true()
 	screen.on_exit()
+
+
+# ===========================================================================
+# Group G — FloorUnlock.floor_unlocked subscription (S17-N2 + AC-23-15)
+# ===========================================================================
+
+# Sprint 17 S17-N2 added the FloorUnlock.floor_unlocked signal; the matchup
+# screen subscribes in on_enter to satisfy AC-23-15 (locked → unlocked
+# transition during offline-replay flush re-renders FloorButtons).
+
+func test_matchup_screen_subscribes_to_floor_unlocked_signal_in_on_enter() -> void:
+	var screen: Node = _make_screen()
+	screen.set_initial_selection("forest_reach", 1)
+	screen.on_enter()
+	assert_bool(FloorUnlock.floor_unlocked.is_connected(screen._on_floor_unlocked)).is_true()
+	screen.on_exit()
+
+
+func test_matchup_screen_disconnects_floor_unlocked_signal_in_on_exit() -> void:
+	var screen: Node = _make_screen()
+	screen.set_initial_selection("forest_reach", 1)
+	screen.on_enter()
+	screen.on_exit()
+	# After on_exit, no subscription remains — prevents leak across screens.
+	assert_bool(FloorUnlock.floor_unlocked.is_connected(screen._on_floor_unlocked)).is_false()
+
+
+func test_matchup_screen_floor_unlocked_handler_idempotent_on_duplicate_call() -> void:
+	# AC-23-15 verification: programmatic call to the handler must not crash
+	# and must leave _selected_biome_id + _selected_floor_index intact (the
+	# re-apply logic preserves the current selection).
+	var screen: Node = _make_screen()
+	screen.set_initial_selection("forest_reach", 1)
+	screen.on_enter()
+	# Capture pre-call selection.
+	var pre_biome: String = screen._selected_biome_id
+	var pre_floor: int = screen._selected_floor_index
+	# Direct handler call simulates the signal firing during offline replay.
+	screen._on_floor_unlocked("forest_reach", 2)
+	# Selection preserved.
+	assert_str(screen._selected_biome_id).is_equal(pre_biome)
+	assert_int(screen._selected_floor_index).is_equal(pre_floor)
+	# Idempotent: second call also safe.
+	screen._on_floor_unlocked("forest_reach", 2)
+	assert_str(screen._selected_biome_id).is_equal(pre_biome)
+	assert_int(screen._selected_floor_index).is_equal(pre_floor)
+	screen.on_exit()
