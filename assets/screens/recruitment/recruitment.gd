@@ -112,9 +112,12 @@ func _refresh_all() -> void:
 func _refresh_gold_counter() -> void:
 	if _gold_counter == null:
 		return
-	# str() format until UIFramework.format_short_number lands (cross-GDD
-	# sweep additional gap noted in S16-M2 commit).
-	_gold_counter.text = "%d gold" % Economy.get_gold_balance()
+	# Sprint 17 S17-S5: UIFramework.format_short_number now ships; gold
+	# values >= 1000 render as "1.2K" / "4.5M" / etc. per cozy-display
+	# thresholds (Recruit Screen GDD #21 §C.3).
+	_gold_counter.text = "%s gold" % UIFrameworkScript.format_short_number(
+		Economy.get_gold_balance()
+	)
 
 
 func _refresh_pool_panel() -> void:
@@ -153,7 +156,7 @@ func _render_pool_entry(entry: Control, pool_index: int, class_id: String) -> vo
 
 	# CostLabel via Recruitment.get_recruit_cost(pool_index).
 	var cost: int = Recruitment.get_recruit_cost(pool_index)
-	cost_label.text = "%d gold" % cost  # str() until format_short_number lands
+	cost_label.text = "%s gold" % UIFrameworkScript.format_short_number(cost)
 
 	# OwnedLabel via HeroRoster.get_copies_owned.
 	var copies: int = HeroRoster.get_copies_owned(class_id)
@@ -170,7 +173,7 @@ func _refresh_refresh_button_cost() -> void:
 		return
 	var refreshes_today: int = Recruitment.get_refreshes_today()
 	var cost: int = Recruitment.refresh_cost(refreshes_today)
-	_refresh_pool_button.text = "Refresh Pool — %d gold" % cost
+	_refresh_pool_button.text = "Refresh Pool — %s gold" % UIFrameworkScript.format_short_number(cost)
 	_refresh_pool_button.disabled = Economy.get_gold_balance() < cost
 
 

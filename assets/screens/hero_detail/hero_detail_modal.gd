@@ -213,13 +213,7 @@ func _refresh_level_up_button() -> void:
 	var tier: int = int(_class_data.get("tier")) if "tier" in _class_data else 1
 	var cost: int = Economy.level_cost(tier, _hero.current_level)
 	_cached_level_up_cost = cost
-	# NOTE: Recruit Screen GDD #21 + Hero Detail GDD #22 reference
-	# UIFramework.format_short_number which does NOT exist as of 2026-05-07
-	# (additional cross-GDD gap not flagged in the original sweep). For
-	# the scaffold, format the cost as a plain int string. The formatter
-	# polish can land alongside Recruit Screen UI implementation in
-	# Sprint 16 — it's a shared dependency.
-	_level_up_button.text = tr("hero_detail_level_up_format") % str(cost)
+	_level_up_button.text = tr("hero_detail_level_up_format") % UIFrameworkScript.format_short_number(cost)
 	_level_up_button.disabled = (Economy.get_gold_balance() < cost)
 
 

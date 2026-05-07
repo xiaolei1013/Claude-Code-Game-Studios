@@ -105,14 +105,25 @@ func test_recruit_screen_on_exit_disconnects_all_signals() -> void:
 # ===========================================================================
 
 # After on_enter, the GoldCounter label reflects Economy.get_gold_balance.
+# Sprint 17 S17-S5: gold values >= 1000 render via UIFramework.format_short_number
+# as "1.2K" (Recruit Screen GDD #21 §C.3 cozy-display thresholds).
 func test_recruit_screen_renders_gold_counter_from_economy() -> void:
 	var screen: Node = _make_screen()
-	# Set a known gold balance.
+	# Set a known gold balance below K threshold to exercise raw-int format.
+	Economy._gold_balance = 555
+	screen.on_enter()
+	# Counter reflects the raw value (sub-K threshold).
+	assert_bool(screen._gold_counter.text.contains("555")).is_true()
+	screen.on_exit()
+
+
+# Above K threshold uses short-number format.
+func test_recruit_screen_gold_counter_uses_short_number_format_above_k() -> void:
+	var screen: Node = _make_screen()
 	Economy._gold_balance = 1234
 	screen.on_enter()
-	# Counter reflects the value (string format may vary; assert it
-	# contains the integer).
-	assert_bool(screen._gold_counter.text.contains("1234")).is_true()
+	# 1234 → "1.2K".
+	assert_bool(screen._gold_counter.text.contains("1.2K")).is_true()
 	screen.on_exit()
 
 

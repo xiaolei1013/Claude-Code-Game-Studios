@@ -173,6 +173,13 @@ func _render_unlock_notice() -> void:
 func _render_stats() -> void:
 	_kill_count_value.text = "%d" % _kill_count
 	if _gold_delta > 0:
+		# Sprint 17 S17-S5: short-number format for large gold deltas
+		# per cozy-display thresholds (e.g., +12.5K instead of +12500).
+		# The locale format string "victory_gold_gained_format" expects
+		# %d so we pass the raw int — short-number formatting kicks in
+		# at the locale-string layer in V1.0+ when locale strings are
+		# updated to %s. MVP keeps %d for backward compat with the
+		# preliminary locale seed (commit 1ad8416).
 		_gold_gained_value.text = tr("victory_gold_gained_format") % _gold_delta
 	else:
 		# Defensive — runs only credit gold in MVP; a 0-delta run is

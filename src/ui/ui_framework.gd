@@ -297,6 +297,72 @@ static func format_localized(key: String, args: Array) -> String:
 	return fmt + " " + " ".join(parts)
 
 
+## Formats a numeric value as a compact display string using K / M / B / T
+## thresholds per [EconomyConfig] (DISPLAY_K_THRESHOLD = 1000,
+## DISPLAY_M_THRESHOLD = 1_000_000, DISPLAY_B_THRESHOLD = 1_000_000_000,
+## DISPLAY_T_THRESHOLD = 1_000_000_000_000). Defaults to those values when
+## Economy is unavailable (test envs).
+##
+## Examples:
+##   [code]format_short_number(450)[/code] → [code]"450"[/code]
+##   [code]format_short_number(1234)[/code] → [code]"1.2K"[/code]
+##   [code]format_short_number(4_500_000)[/code] → [code]"4.5M"[/code]
+##   [code]format_short_number(7_200_000_000)[/code] → [code]"7.2B"[/code]
+##
+## Below DISPLAY_K_THRESHOLD: rendered as the integer with no suffix.
+## At/above each threshold: divided by the threshold's 10^N base, formatted
+## with one decimal place, and appended with the K/M/B/T suffix.
+##
+## Used by Recruit Screen (#21), Roster / Hero Detail Modal (#22), Victory
+## Moment Screen (#25), and any UI surface that displays gold or large
+## numeric values.
+##
+## Sprint 17 S17-S5 — closes the cross-GDD gap surfaced during Sprint 16
+## scaffold authoring (the helper was referenced in 3 GDDs but didn't
+## exist; landing it pre-emptively unblocks the visual-polish iteration
+## scheduled for Sprint 17 M1+M2+S1+S2).
+static func format_short_number(value: int) -> String:
+	# Negative numbers are not expected (gold is always positive in MVP);
+	# format the absolute value with a minus prefix as defensive output.
+	if value < 0:
+		return "-" + format_short_number(-value)
+
+	# Resolve thresholds from Economy if available; fall back to defaults.
+	var k_threshold: int = 1_000
+	var m_threshold: int = 1_000_000
+	var b_threshold: int = 1_000_000_000
+	var t_threshold: int = 1_000_000_000_000
+	# Use Engine.get_singleton or autoload-name lookup pattern that
+	# safely returns null if Economy is missing (test envs).
+	var economy: Object = null
+	var main_loop: MainLoop = Engine.get_main_loop()
+	if main_loop is SceneTree:
+		var root: Window = (main_loop as SceneTree).root
+		if root != null:
+			economy = root.get_node_or_null("/root/Economy")
+	if economy != null and economy.has_method("get_config"):
+		var cfg: Resource = economy.call("get_config")
+		if cfg != null:
+			if "DISPLAY_K_THRESHOLD" in cfg:
+				k_threshold = int(cfg.get("DISPLAY_K_THRESHOLD"))
+			if "DISPLAY_M_THRESHOLD" in cfg:
+				m_threshold = int(cfg.get("DISPLAY_M_THRESHOLD"))
+			if "DISPLAY_B_THRESHOLD" in cfg:
+				b_threshold = int(cfg.get("DISPLAY_B_THRESHOLD"))
+			if "DISPLAY_T_THRESHOLD" in cfg:
+				t_threshold = int(cfg.get("DISPLAY_T_THRESHOLD"))
+
+	if value < k_threshold:
+		return "%d" % value
+	if value < m_threshold:
+		return "%.1fK" % (float(value) / 1_000.0)
+	if value < b_threshold:
+		return "%.1fM" % (float(value) / 1_000_000.0)
+	if value < t_threshold:
+		return "%.1fB" % (float(value) / 1_000_000_000.0)
+	return "%.1fT" % (float(value) / 1_000_000_000_000.0)
+
+
 ## Internal — plays the 1.05× scale pulse via Tween. Centers
 ## [code]pivot_offset[/code] on the Control's current size so the pulse reads
 ## as a centered "warm bump" rather than a top-left zoom. Safe to call on a
