@@ -8,19 +8,18 @@
 ## sourcing + EnemyDistributionList per-row layout + matchup-hint locale
 ## strings) deferred to post-`/design-review` of GDD #23.
 ##
-## Drift notes from cross-GDD sweep iterations (THIRD iteration —
-## these surfaced during S16-M3 scaffold authoring):
+## Drift resolution log (Sprint 17 sweep #4 + S17-N2 + S17-N3 closure;
+## previously a SWEEP-#3 backlog at scaffold-authoring time):
 ## - DataRegistry uses `get_all_by_type(content_type)` not `list_category`
-##   — GDD §C.2 + §F mention list_category which doesn't exist; using
-##   the correct API.
-## - FloorUnlock.is_unlocked is SINGLE-ARG `is_unlocked(floor_index)`
-##   — GDD §C.3 + §C.4 + §D.1 + §F + AC-23-05/06/15 claim
-##   `is_unlocked(biome_id, floor_index)` (2-arg). The single-arg form
-##   uses an implicit active biome (single-biome MVP per GDD §C.8).
-##   Using single-arg form here; flag for sweep iteration to fix the GDD.
-## - FloorUnlock has NO `floor_unlocked` signal — GDD §C.2 + §E.3 +
-##   AC-23-15 claim subscription. The signal doesn't exist; the screen
-##   re-renders on next on_enter instead. Sweep iteration item.
+##   — GDD updated 2026-05-07 (S17-M5 sweep #4); scaffold already correct.
+## - FloorUnlock.is_unlocked_in_biome(biome_id, floor_index) added in
+##   Sprint 17 S17-N3 as the V1.0+ multi-biome variant; the 1-arg
+##   `is_unlocked(floor_index)` is preserved as the Orchestrator AC-ORC-13
+##   contract. GDD §C.3 + §C.4 + §D.1 + §F + AC-23-05 updated to cite
+##   the new method name. Scaffold uses `is_unlocked_in_biome` here.
+## - FloorUnlock.floor_unlocked(biome_id, floor_index) signal added in
+##   Sprint 17 S17-N2; scaffold subscribes per GDD §C.2 + §E.3 + AC-23-15.
+##   Re-renders biome tabs on advance (e.g., during offline-replay flush).
 ## - FormationAssignment.set_target / get_target shipped in S15-N1 (✓);
 ##   the screen pushes selection back via set_target on Select press.
 extends Screen
@@ -109,11 +108,11 @@ func on_enter() -> void:
 	# Step 3: apply initial selection (or fallback to first unlocked).
 	_apply_initial_selection()
 
-	# Step 4: signal subscriptions deferred — GDD §C.2 cites
-	# FloorUnlock.floor_unlocked which doesn't exist (sweep iteration #3
-	# drift). Mid-screen unlock-state updates require either polling OR
-	# the signal landing in Sprint 17+. For MVP single-biome scope,
-	# unlock-state is stable during a screen visit.
+	# Step 4: subscribe to FloorUnlock.floor_unlocked (R11 — S17-N2 landed
+	# the signal). Mid-screen advance (e.g., offline-replay flush) re-renders
+	# the affected FloorButton from locked → unlocked per AC-23-15.
+	if not FloorUnlock.floor_unlocked.is_connected(_on_floor_unlocked):
+		FloorUnlock.floor_unlocked.connect(_on_floor_unlocked)
 
 	# Step 5: button handlers.
 	if not _back_button.pressed.is_connected(_on_back_pressed):
@@ -123,6 +122,8 @@ func on_enter() -> void:
 
 
 func on_exit() -> void:
+	if FloorUnlock.floor_unlocked.is_connected(_on_floor_unlocked):
+		FloorUnlock.floor_unlocked.disconnect(_on_floor_unlocked)
 	if _back_button != null and _back_button.pressed.is_connected(_on_back_pressed):
 		_back_button.pressed.disconnect(_on_back_pressed)
 	if _select_button != null and _select_button.pressed.is_connected(_on_select_pressed):
@@ -177,12 +178,10 @@ func _render_biome_tabs() -> void:
 			floor_button.custom_minimum_size = Vector2(60, 60)
 			floor_button.focus_mode = Control.FOCUS_NONE
 			floor_button.mouse_filter = Control.MOUSE_FILTER_STOP
-			# Lock-state visual: disabled if not unlocked. Per drift note in
-			# header doc, FloorUnlock.is_unlocked is single-arg (implicit
-			# active biome — single-biome MVP per GDD §C.8). The biome_id
-			# arg is captured for the future 2-arg API when V1.0+ multi-
-			# biome lands.
-			floor_button.disabled = not FloorUnlock.is_unlocked(floor_index)
+			# Lock-state visual: disabled if not unlocked. Uses the V1.0+
+			# multi-biome predicate `is_unlocked_in_biome(biome_id, floor_index)`
+			# (S17-N3 — GDD §C.3 step 2).
+			floor_button.disabled = not FloorUnlock.is_unlocked_in_biome(biome_id, floor_index)
 			# Bind handler with biome_id + floor_index.
 			floor_button.pressed.connect(
 				_on_floor_button_pressed.bind(biome_id, floor_index)
@@ -213,8 +212,7 @@ func _apply_initial_selection() -> void:
 func _select_floor(biome_id: String, floor_index: int) -> void:
 	_selected_biome_id = biome_id
 	_selected_floor_index = floor_index
-	# Single-arg is_unlocked per drift note in header doc.
-	if FloorUnlock.is_unlocked(floor_index):
+	if FloorUnlock.is_unlocked_in_biome(biome_id, floor_index):
 		_select_button.disabled = false
 		_select_button.text = tr("matchup_select_format") % [floor_index, biome_id.capitalize()]
 	else:
@@ -227,8 +225,7 @@ func _select_floor(biome_id: String, floor_index: int) -> void:
 # ---------------------------------------------------------------------------
 
 func _on_floor_button_pressed(biome_id: String, floor_index: int) -> void:
-	# Single-arg is_unlocked per drift note in header doc.
-	if not FloorUnlock.is_unlocked(floor_index):
+	if not FloorUnlock.is_unlocked_in_biome(biome_id, floor_index):
 		# Toast: tr("matchup_floor_locked_format") with prior unlocked
 		# floor index (per §C.4 step 1). Scaffold uses push_warning.
 		push_warning(
@@ -255,8 +252,25 @@ func _on_back_pressed() -> void:
 	SceneManager.request_screen("formation_assignment", SceneManager.TransitionType.CROSS_FADE)
 
 
-# Signal handlers deferred — FloorUnlock.floor_unlocked signal doesn't
-# exist in the current codebase (drift note in header doc). When the
-# signal lands in Sprint 17+ multi-biome work, _on_floor_unlocked
-# handler can be added that re-renders biome tabs + re-applies
-# current selection.
+# ---------------------------------------------------------------------------
+# Signal handler — FloorUnlock.floor_unlocked (R11 — S17-N2)
+# ---------------------------------------------------------------------------
+
+## Re-renders biome tabs and re-applies current selection when an unlock
+## advance lands while the screen is open (rare; primarily during offline
+## replay flush). Per AC-23-15: the affected FloorButton transitions from
+## locked → unlocked visual.
+##
+## Implementation note: the cheap path is a full re-render rather than a
+## targeted button-state mutation, because the scaffold rebuilds floor rows
+## from scratch in `_render_biome_tabs` (queue_free + re-instantiate). This
+## is safe at MVP scale (5 buttons × 1 biome = 5 nodes) and avoids drift
+## between the locked/unlocked visual state and the underlying FloorUnlock
+## query. The unused params are namespaced via underscore-prefix per the
+## "all-floors-of-this-biome are now potentially advanced" simpler model.
+func _on_floor_unlocked(_biome_id: String, _floor_index: int) -> void:
+	_render_biome_tabs()
+	# Re-apply current selection so SelectButton state follows the new
+	# unlock predicate (e.g., a previously-locked target is now selectable).
+	if _selected_biome_id != "" and _selected_floor_index > 0:
+		_select_floor(_selected_biome_id, _selected_floor_index)

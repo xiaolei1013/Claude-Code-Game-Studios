@@ -215,6 +215,22 @@ func is_unlocked(floor_index: int) -> bool:
 	return state == FloorState.ACCESSIBLE or state == FloorState.CLEARED
 
 
+## V1.0+ multi-biome variant: identical predicate to is_unlocked but with
+## biome_id supplied explicitly rather than resolved via _active_biome_id().
+## Required by Matchup Assignment Screen #23 (the picker iterates available
+## biomes; it cannot rely on the MVP-fixed active biome). MVP behavior is
+## indistinguishable when biome_id == _active_biome_id().
+##
+## Cannot share a name with the 1-arg is_unlocked because GDScript has no
+## arity-based overloading and the matchup GDD spec is biome-first ordering
+## (which conflicts with making biome_id a trailing default param). Per
+## Sprint 17 S17-N3 design decision: separate explicit name; orchestrator
+## continues to use the 1-arg form (AC-ORC-13 contract preserved).
+func is_unlocked_in_biome(biome_id: String, floor_index: int) -> bool:
+	var state: FloorState = get_floor_state(biome_id, floor_index)
+	return state == FloorState.ACCESSIBLE or state == FloorState.CLEARED
+
+
 ## Per R7: returns true iff biome_id is in get_available_biomes() — i.e., the
 ## biome's status is "active" in DataRegistry.
 func is_biome_available(biome_id: String) -> bool:

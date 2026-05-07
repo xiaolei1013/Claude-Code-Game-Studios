@@ -79,9 +79,9 @@ SceneManager.request_screen("matchup_assignment", CROSS_FADE)
 ```
 
 **on_enter:**
-- Resolve all biomes via `DataRegistry.list_category("biomes")` — returns Array[String] of biome ids, ordered alphabetically (deterministic)
-- For each biome: resolve full Biome resource via `DataRegistry.resolve("biomes", id)` (gives dominant_archetypes + display_name + icon)
-- For each biome: list floors via `DataRegistry.list_category("dungeons")` filtered by `dungeon.biome_id == biome.id` (each Dungeon record per `biome-dungeon-database.md` §C is a single floor)
+- Resolve all biomes via `DataRegistry.get_all_by_type("biomes")` — returns `Array[Resource]` of Biome resources, ordered by DataRegistry's deterministic file-walk order (Pass-2 / S17-M5 sweep #4 edit 2026-05-07: corrected from `list_category("biomes")` which does not exist in DataRegistry's API per `src/core/data_registry/data_registry.gd:322`)
+- For each biome: read `display_name`, `icon`, `dominant_archetypes`, `id` directly off the Biome resource (no separate `resolve(...)` call needed — `get_all_by_type` returns the resource directly)
+- For each biome: read floors via `biome.dungeons[0].floors` per `biome-dungeon-database.md` §C (Pass-2 / S17-M5 sweep #4 edit 2026-05-07: corrected the prior "each Dungeon record is a single floor" claim, which contradicts the actual schema where `Biome.dungeons` is `Array[Dungeon]` and each Dungeon contains `Array[Floor]`. MVP single-dungeon-per-biome invariant means `dungeons[0]` is the only entry; floor count is `dungeons[0].floors.size()`)
 - Initial render: `_render_biome_tabs()` (one tab per biome), `_select_floor(_initial_biome_id, _initial_floor)`
 - Wire BackButton.pressed → `_on_back_pressed`
 - Wire SelectButton.pressed → `_on_select_pressed`
@@ -107,7 +107,7 @@ SceneManager.request_screen("matchup_assignment", CROSS_FADE)
       - Tooltip / aria-label: localized floor name (e.g., "Forest Reach — Floor 1")
       - Locked-state visual: padlock icon overlay + dimmed parchment per ADR-0008
 2. Lock-state per FloorButton:
-   - Read `FloorUnlock.is_unlocked(biome_id, floor_index)` (per `floor-unlock-system.md`)
+   - Read `FloorUnlock.is_unlocked_in_biome(biome_id, floor_index)` (per `floor-unlock-system.md` §C.1 R1 — Pass-2 / S17-M5 sweep #4 edit 2026-05-07: corrected from `is_unlocked(biome_id, ...)` 2-arg form which does not exist; GDScript has no arity-based overloading and the 1-arg `is_unlocked(floor_index)` is locked as the Orchestrator AC-ORC-13 contract. The new explicitly-named method was added in Sprint 17 S17-N3 specifically as the matchup screen's per-biome predicate.)
    - If unlocked: button enabled, parchment-themed normal
    - If locked: button shows padlock + dimmed; tap surfaces a toast "Clear Floor %d to unlock." per the floor-unlock GDD
 3. Selected-state: the currently-selected FloorButton renders with SelectedSlotButton theme variation (warm parchment glow per ADR-0008).
@@ -117,7 +117,7 @@ If `biome.dominant_archetypes` is empty (defensive), the matchup hint label rend
 ### C.4 Floor selection interaction
 
 `_on_floor_button_pressed(biome_id, floor_index)`:
-1. If `FloorUnlock.is_unlocked(biome_id, floor_index) == false`:
+1. If `FloorUnlock.is_unlocked_in_biome(biome_id, floor_index) == false`:
    - Toast: tr("matchup_floor_locked_format") formatted with floor_index of the prior floor (e.g., "Clear Floor 2 to unlock."). 3.0s linger.
    - Button-state highlight returns to non-selected.
    - Return without updating selection.
@@ -174,11 +174,11 @@ Per Settings GDD #30 §C + ADR-0008:
 
 ### D.1 Floor unlock check (cross-reference)
 
-Per `floor-unlock-system.md`:
+Per `floor-unlock-system.md` §C.1 R1:
 ```
-is_unlocked(biome_id, floor_index) = FloorUnlock.is_unlocked(biome_id, floor_index)
+is_unlocked(biome_id, floor_index) = FloorUnlock.is_unlocked_in_biome(biome_id, floor_index)
 ```
-Returns bool. The screen uses this to gate FloorButton interactivity per §C.3 step 2.
+Returns bool. The screen uses this to gate FloorButton interactivity per §C.3 step 2. (Pass-2 / S17-M5 sweep #4 edit 2026-05-07: previously cited `FloorUnlock.is_unlocked(biome_id, floor_index)` — that 2-arg form does not exist; the 1-arg `is_unlocked(floor_index)` is the Orchestrator's AC-ORC-13 contract and cannot be overloaded in GDScript. The matchup-screen-facing predicate is the new `is_unlocked_in_biome(biome_id, floor_index)` method introduced in Sprint 17 S17-N3.)
 
 ### D.2 Matchup hint per biome (cross-reference)
 
@@ -220,7 +220,7 @@ V1.0+ scenario; static labels re-render on next on_enter. MVP locks the locale a
 Per ADR-0004 hydration suppression, `FloorUnlock` doesn't fire spurious signals during hydration. Screen rebuilds on next on_enter; mid-screen is stable.
 
 ### E.7 Empty biomes category
-Defensive — if `DataRegistry.list_category("biomes")` returns empty (content patch removed all biomes; should not happen in production), screen shows placeholder "No biomes available. Update content." with BackButton enabled. push_warning logged.
+Defensive — if `DataRegistry.get_all_by_type("biomes")` returns empty (content patch removed all biomes; should not happen in production), screen shows placeholder "No biomes available. Update content." with BackButton enabled. push_warning logged.
 
 ### E.8 Biome with zero floors
 Defensive — if a biome has no associated dungeons, BiomeTab renders header but no FloorRow. Skipped from selection. push_warning logged.
@@ -242,10 +242,10 @@ Per ADR-0014 + Settings GDD #30 precedent, screens MAY gate certain interactions
 
 | System | Why | Surface used |
 |---|---|---|
-| `DataRegistry` (#2) | Biome + dungeon + enemy resolution | `list_category("biomes")`, `resolve("biomes", id)`, `list_category("dungeons")`, `resolve("dungeons", id)`, `resolve("enemies", id)` |
-| `BiomeDungeonDatabase` (#8) | Resource definitions | per-biome `dominant_archetypes` + `display_name`; per-dungeon `floor_index` + `biome_id` + `enemy_list` |
+| `DataRegistry` (#2) | Biome + dungeon + enemy resolution | `get_all_by_type("biomes")`, `resolve("enemies", id)` (Pass-2 / S17-M5 sweep #4 edit 2026-05-07: corrected from non-existent `list_category` and removed redundant explicit dungeon resolves — biome.dungeons is read directly off the resource per `biome-dungeon-database.md` §C) |
+| `BiomeDungeonDatabase` (#8) | Resource definitions | per-biome `dominant_archetypes` + `display_name` + `icon` + `dungeons` (Array[Dungeon]); per-dungeon `floors` (Array[Floor]); per-floor `floor_index` + `enemy_list` |
 | `EnemyDatabase` (#7) | Archetype lookup | per-enemy `archetype` + `display_name` |
-| `FloorUnlock` (#16) | Per-floor lock-state | `is_unlocked(biome_id, floor_index)`, `floor_unlocked` signal |
+| `FloorUnlock` (#16) | Per-floor lock-state | `is_unlocked_in_biome(biome_id, floor_index)` (Pass-2 / S17-N3 edit 2026-05-07: was `is_unlocked(biome_id, floor_index)` — corrected to the V1.0+ multi-biome variant), `floor_unlocked(biome_id, floor_index)` signal (R11) |
 | `FormationAssignment` (#17) | Selection sink | `set_target(biome_id, floor_index)` setter (NEW per §C.5) — the screen pushes selection here for formation_assignment.gd to consume |
 | `SceneManager` (#4) | Navigation | `request_screen("formation_assignment", CROSS_FADE)` |
 | `UIFramework` (#18) | Theme + touch feedback | `apply_parchment_panel`, `wire_touch_feedback`, `format_localized` |
@@ -281,14 +281,14 @@ Per ADR-0014 + Settings GDD #30 precedent, screens MAY gate certain interactions
 ADR-0009 may evolve counter-class mappings in V1.0+ (e.g., "specialist" archetype counters multiple classes). Tuning lives in the matchup-resolver GDD; the matchup screen passively reads.
 
 ### V1.0+ tuning knob: biome ordering
-MVP ordering is alphabetical per DataRegistry.list_category. V1.0+ may prefer "unlocked first, locked last" or a curated narrative order. Tuning knob: `BIOME_DISPLAY_ORDER: Array[String]` in BiomeDungeonDatabase config.
+MVP ordering follows DataRegistry's deterministic file-walk order (alphabetical by file name on every supported platform). V1.0+ may prefer "unlocked first, locked last" or a curated narrative order. Tuning knob: `BIOME_DISPLAY_ORDER: Array[String]` in BiomeDungeonDatabase config.
 
 ---
 
 ## H. Acceptance Criteria
 
 **AC-23-01 — Screen renders one BiomeTab per biome in DataRegistry**
-On enter, `DataRegistry.list_category("biomes")` returns the biome list; BiomeTab nodes render alphabetically. MVP: one tab (forest_reach).
+On enter, `DataRegistry.get_all_by_type("biomes")` returns the biome list (`Array[Resource]`); BiomeTab nodes render in deterministic file-walk order. MVP: one tab (forest_reach).
 
 **AC-23-02 — BiomeNameLabel + BiomeIcon match resolved Biome**
 Each BiomeTab's BiomeNameLabel reads from `biome.display_name_key` via tr(); BiomeIcon reads from `biome.icon` (placeholder when null).
@@ -300,7 +300,7 @@ The hint string is locale-formatted from `biome.dominant_archetypes` per ADR-000
 Each BiomeTab's FloorRow renders 5 FloorButtons (F1–F5) corresponding to the 5 Dungeons whose `biome_id` matches.
 
 **AC-23-05 — Locked floors render with padlock + dimmed**
-For each FloorButton, `FloorUnlock.is_unlocked(biome_id, floor_index) == false` → padlock icon + dimmed parchment.
+For each FloorButton, `FloorUnlock.is_unlocked_in_biome(biome_id, floor_index) == false` → padlock icon + dimmed parchment.
 
 **AC-23-06 — Tap on locked floor surfaces toast**
 Tapping a locked FloorButton triggers a toast ("Clear Floor %d to unlock.") for 3.0s; selection does NOT update.

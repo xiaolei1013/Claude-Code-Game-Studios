@@ -94,6 +94,7 @@ var active_biome_mvp: String = "forest_reach"
 var BIOME_FLOOR_COUNT: Dictionary[String, int] = {}
 
 func is_unlocked(floor_index: int) -> bool
+func is_unlocked_in_biome(biome_id: String, floor_index: int) -> bool  # Pass-10 / S17-N3: V1.0+ multi-biome variant; matchup screen #23 caller
 func is_biome_available(biome_id: String) -> bool
 func is_biome_completed(biome_id: String) -> bool
 func get_available_biomes() -> Array[String]

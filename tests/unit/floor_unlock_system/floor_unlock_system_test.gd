@@ -200,6 +200,38 @@ func test_is_unlocked_returns_true_for_cleared_floor() -> void:
 
 
 # ===========================================================================
+# Group E2 — is_unlocked_in_biome (V1.0+ multi-biome variant; S17-N3)
+# ===========================================================================
+
+func test_is_unlocked_in_biome_matches_one_arg_form_for_active_biome() -> void:
+	# When biome_id == _active_biome_id(), the 2-arg form is indistinguishable
+	# from the 1-arg form (MVP single-biome invariant).
+	var fu: Node = _make_floor_unlock_with_stubs()
+	fu._unlock_state["forest_reach"] = 2  # F1+F2 CLEARED, F3 ACCESSIBLE
+	assert_bool(fu.is_unlocked_in_biome("forest_reach", 1)).is_true()
+	assert_bool(fu.is_unlocked_in_biome("forest_reach", 2)).is_true()
+	assert_bool(fu.is_unlocked_in_biome("forest_reach", 3)).is_true()
+	assert_bool(fu.is_unlocked_in_biome("forest_reach", 4)).is_false()
+
+
+func test_is_unlocked_in_biome_returns_false_for_unavailable_biome() -> void:
+	# planned_v1 / unknown biome → state is UNAVAILABLE → false.
+	var fu: Node = _make_floor_unlock_with_stubs()
+	assert_bool(fu.is_unlocked_in_biome("planned_v1_biome", 1)).is_false()
+	assert_bool(fu.is_unlocked_in_biome("", 1)).is_false()
+
+
+func test_is_unlocked_in_biome_respects_r10_sentinel() -> void:
+	# R10: floor_index < 1 (sentinel + negatives) is never accessible.
+	var fu: Node = _make_floor_unlock_with_stubs()
+	fu._unlock_state["forest_reach"] = 5
+	assert_bool(fu.is_unlocked_in_biome("forest_reach", 0)).is_false()
+	assert_bool(fu.is_unlocked_in_biome("forest_reach", -1)).is_false()
+	# Over-range too: F6 doesn't exist.
+	assert_bool(fu.is_unlocked_in_biome("forest_reach", 6)).is_false()
+
+
+# ===========================================================================
 # Group F — Signal handler (R3 + R5 + R9 idempotent advance)
 # ===========================================================================
 
