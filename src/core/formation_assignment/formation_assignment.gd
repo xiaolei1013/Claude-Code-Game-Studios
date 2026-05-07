@@ -136,3 +136,83 @@ func get_save_data() -> Dictionary:
 ## formation-assignment-system.md §C.6 + §C.1 line 122.
 func load_save_data(_d: Dictionary) -> void:
 	pass
+
+
+# ---------------------------------------------------------------------------
+# Sprint 15 S15-N1 — Matchup Assignment Screen #23 set_target / get_target
+# accessor pair.
+#
+# The Matchup Assignment Screen (#23) is a sub-screen of formation_assignment
+# that lets the player browse biomes + select a floor. It pushes the
+# selection back via this autoload's set_target setter; formation_assignment
+# screen reads via get_target on its own on_enter to update the hard-coded
+# Sprint-8-VS biome+floor fields per Matchup Assignment GDD §C.5.
+#
+# The selection is session-only — NOT persisted via get_save_data. The
+# formation_assignment screen's hard-coded fields (forest_reach floor 1)
+# are the cold-launch fallback. Every successful matchup-assignment
+# selection writes a new target here; every dispatch that completes
+# resets the target to the "current default" (the hard-coded fallback)
+# on RUN_ENDED — but that reset is the screen's responsibility, not this
+# autoload's. This autoload simply stores whatever was last set.
+# ---------------------------------------------------------------------------
+
+## Last Matchup-Assignment-Screen target written via [method set_target].
+## Empty Dictionary [code]{}[/code] when no target has been written this
+## session. Schema (when populated):
+##   - [code]biome_id[/code]: String
+##   - [code]floor_index[/code]: int (1-5 in MVP)
+##
+## Read by [method get_target] (returns deep copy). Read by
+## formation_assignment screen on its on_enter to update its display.
+##
+## NOT persisted in [method get_save_data] — session-only. Cold-launch
+## reads {} → formation_assignment falls back to its hard-coded
+## (forest_reach, 1) defaults.
+##
+## Sprint 15 S15-N1 — Matchup Assignment Screen #23 OQ-23-4 dependency.
+var _matchup_target: Dictionary = {}
+
+
+## Sets the active matchup-assignment target — the (biome_id, floor_index)
+## pair the player just selected on the Matchup Assignment Screen (#23).
+## Subsequent calls overwrite the prior value; no validation is performed
+## here (the screen is responsible for ensuring the floor is unlocked +
+## the biome exists per `floor_unlock_system.md` + `biome_dungeon_database.md`).
+##
+## Empty / null biome_id is rejected with push_warning (defensive against
+## screen-side bugs); floor_index < 1 is rejected similarly.
+##
+## Matchup Assignment Screen GDD #23 §C.5 + §F (selection sink).
+##
+## Sprint 15 S15-N1.
+func set_target(biome_id: String, floor_index: int) -> void:
+	if biome_id == "":
+		push_warning(
+			"[FormationAssignment] set_target: empty biome_id rejected; target unchanged"
+		)
+		return
+	if floor_index < 1:
+		push_warning(
+			"[FormationAssignment] set_target: floor_index %d < 1 rejected; target unchanged"
+			% floor_index
+		)
+		return
+	_matchup_target = {
+		"biome_id": biome_id,
+		"floor_index": floor_index,
+	}
+
+
+## Returns a deep copy of the currently-set matchup-assignment target.
+## Returns an empty Dictionary [code]{}[/code] when no target has been
+## written this session — formation_assignment screen treats this as
+## "use hard-coded fallback (forest_reach, 1)" per Matchup Assignment
+## GDD #23 §C.5 step 3.
+##
+## Returns a deep copy so callers can mutate the result without
+## contaminating the cached target.
+##
+## Sprint 15 S15-N1.
+func get_target() -> Dictionary:
+	return _matchup_target.duplicate(true)

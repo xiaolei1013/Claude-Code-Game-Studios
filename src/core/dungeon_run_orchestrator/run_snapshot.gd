@@ -68,6 +68,19 @@ var loop_counter: int = 0
 ## Sprint 7 S7-M13 added this field as part of the VS harness data path.
 var kill_count: int = 0
 
+## Player gold balance captured at dispatch validation time (just before
+## state transition to ACTIVE_FOREGROUND). Captured by [code]Orchestrator.dispatch[/code]
+## via [code]Economy.get_gold_balance()[/code] read; never updated post-
+## capture. The Victory Moment screen (#25) reads this to compute the
+## post-run gold delta = [code]post_run_balance - pre_dispatch_gold[/code]
+## per Victory Moment GDD §D.2. NOT serialized in to_dict — session-only
+## context for the foreground victory celebration; offline replay uses
+## the OfflineProgressionEngine's flushed aggregate gold delta instead
+## (Return-to-App Screen #20 path).
+##
+## Sprint 15 S15-S4 (Victory Moment GDD #25 OQ-25-1 dependency).
+var pre_dispatch_gold: int = 0
+
 
 # ---------------------------------------------------------------------------
 # Idempotency / per-dispatch flags (TR-orchestrator-005)

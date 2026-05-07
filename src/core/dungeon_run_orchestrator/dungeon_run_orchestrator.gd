@@ -493,6 +493,17 @@ func dispatch(formation: Array, floor_index: int, biome_id: String) -> void:
 		"floor_index": floor_index,
 		"biome_id": biome_id,
 	}
+	# Sprint 15 S15-S4: capture pre-dispatch gold for the Victory Moment
+	# screen's post-run gold-delta render per Victory Moment GDD #25 §D.2 +
+	# OQ-25-1 dependency. Reads /root/Economy.get_gold_balance() with
+	# null-guard for test environments without Economy autoload registered.
+	# Captured AFTER all validations pass + BEFORE the state transition so
+	# the value reflects the player's pre-run balance unchanged.
+	var economy_for_gold: Node = (
+		get_node_or_null("/root/Economy") if get_tree() != null else null
+	)
+	if economy_for_gold != null and economy_for_gold.has_method("get_gold_balance"):
+		run_snapshot.pre_dispatch_gold = int(economy_for_gold.get_gold_balance())
 	_set_state(DungeonRunStateScript.State.ACTIVE_FOREGROUND)
 
 
