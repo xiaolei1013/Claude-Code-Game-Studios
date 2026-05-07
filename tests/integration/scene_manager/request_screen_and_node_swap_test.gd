@@ -39,6 +39,7 @@ const CANONICAL_SCREEN_IDS: Array[String] = [
 	"dungeon_run_view",
 	"victory_moment",
 	"return_to_app",
+	"matchup_assignment",  # Sprint 16 S16-M3 (pre-emptive scaffold) registered 2026-05-07
 ]
 
 # Default timeout for awaiting transition_complete in wired tests (ms).
@@ -467,15 +468,16 @@ func test_same_screen_request_does_not_free_current_screen() -> void:
 
 
 # ===========================================================================
-# Group E: TR-scene-manager-022 — 7 MVP screens preloaded
+# Group E: TR-scene-manager-022 — MVP screens preloaded (count expanded
+# 2026-05-07 from 7 → 8 with Sprint 16 S16-M3 matchup_assignment scaffold)
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
-# E-01: _screen_registry has exactly 7 entries
+# E-01: _screen_registry has exactly 8 entries
 # ---------------------------------------------------------------------------
-func test_screen_registry_has_seven_entries() -> void:
+func test_screen_registry_has_eight_entries() -> void:
 	var sm: Node = SceneManagerScript.new()
-	assert_int(sm._screen_registry.size()).is_equal(7)
+	assert_int(sm._screen_registry.size()).is_equal(8)
 	sm.free()
 
 
