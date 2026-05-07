@@ -37,6 +37,25 @@ enum FloorState { UNAVAILABLE, LOCKED, ACCESSIBLE, CLEARED }
 
 
 # ---------------------------------------------------------------------------
+# Public signals (R11 — UI live-update on frontier advance)
+# ---------------------------------------------------------------------------
+
+## Fired when an unlock advance moves the frontier forward — i.e., a previously
+## LOCKED floor transitions to ACCESSIBLE. Payload identifies the newly-
+## ACCESSIBLE floor (highest_cleared + 1 after the advance), bounded by the
+## biome's floor count. Not emitted on idempotent re-clears (R9 no-op path),
+## on the final-floor clear (no further floor exists), or during load_save_data
+## (hydration is silent).
+##
+## Consumers: Matchup Assignment Screen #23 (AC-23-15 re-renders the affected
+## FloorButton from locked → unlocked); Guild Hall Screen #19, Formation
+## Assignment #17 may also subscribe for cozy live-update fanfare during
+## offline-replay flush. Per ADR-0003 signal subscription rule: connect at
+## _ready() with no CONNECT_DEFERRED.
+signal floor_unlocked(biome_id: String, floor_index: int)
+
+
+# ---------------------------------------------------------------------------
 # Internal state (R1 §C.1)
 # ---------------------------------------------------------------------------
 
@@ -391,6 +410,13 @@ func _on_floor_cleared_first_time(floor_index: int, biome_id: String, _losing_ru
 	var h_new: int = max(current, floor_index)
 	if h_new > current:
 		_unlock_state[biome_id] = h_new
+		# R11: emit floor_unlocked for the newly-ACCESSIBLE next-frontier floor,
+		# if one exists within biome range. Final-floor clear (h_new == count)
+		# emits nothing — no further floor to unlock.
+		var floor_count: int = BIOME_FLOOR_COUNT[biome_id]
+		var next_frontier: int = h_new + 1
+		if next_frontier <= floor_count:
+			floor_unlocked.emit(biome_id, next_frontier)
 	# else: silent idempotent no-op
 
 

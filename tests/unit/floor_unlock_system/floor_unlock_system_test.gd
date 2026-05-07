@@ -260,6 +260,125 @@ func test_signal_handler_rejects_invalid_floor_index_with_error_log() -> void:
 
 
 # ===========================================================================
+# Group F2 — floor_unlocked signal (R11 — UI live-update on frontier advance)
+# ===========================================================================
+
+# Array-spy pattern per project_gdunit4_signal_api.md: lambdas capture by value,
+# so the spy must be a reference type (Array) to be mutated from inside the
+# capture closure. Each test wires a fresh spy to the freshly-instantiated
+# FloorUnlockSystem so emissions across tests don't bleed.
+
+func test_floor_unlocked_signal_emits_on_frontier_advance() -> void:
+	# Arrange — fresh save (highest_cleared=0); F1 ACCESSIBLE, F2 LOCKED.
+	var fu: Node = _make_floor_unlock_with_stubs()
+	var captured: Array = []
+	fu.floor_unlocked.connect(
+		func(biome_id: String, floor_index: int) -> void:
+			captured.append({"biome_id": biome_id, "floor_index": floor_index})
+	)
+
+	# Act — clear F1; frontier advances 0 → 1 ⇒ F2 transitions LOCKED → ACCESSIBLE.
+	fu._on_floor_cleared_first_time(1, "forest_reach", false)
+
+	# Assert — exactly one emission for F2.
+	assert_int(captured.size()).is_equal(1)
+	assert_str(captured[0]["biome_id"]).is_equal("forest_reach")
+	assert_int(captured[0]["floor_index"]).is_equal(2)
+
+
+func test_floor_unlocked_signal_does_not_emit_on_idempotent_replay() -> void:
+	# R9 idempotent path: re-clear of an already-cleared floor must NOT
+	# re-fire floor_unlocked (the frontier did not move).
+	var fu: Node = _make_floor_unlock_with_stubs()
+	fu._unlock_state["forest_reach"] = 2  # F1 + F2 already cleared
+	var captured: Array = []
+	fu.floor_unlocked.connect(
+		func(_b: String, _f: int) -> void: captured.append(true)
+	)
+
+	# Act — replay F1 (already cleared; no advance).
+	fu._on_floor_cleared_first_time(1, "forest_reach", false)
+	# Act — replay F2 (still no advance).
+	fu._on_floor_cleared_first_time(2, "forest_reach", false)
+
+	# Assert — zero emissions; frontier never moved.
+	assert_int(captured.size()).is_equal(0)
+
+
+func test_floor_unlocked_signal_does_not_emit_on_final_floor_clear() -> void:
+	# Final-floor clear (F5 in MVP) advances highest_cleared to count; no
+	# further floor exists to unlock — the signal must not fire.
+	var fu: Node = _make_floor_unlock_with_stubs()
+	fu._unlock_state["forest_reach"] = 4  # frontier at F5 (ACCESSIBLE)
+	var captured: Array = []
+	fu.floor_unlocked.connect(
+		func(_b: String, _f: int) -> void: captured.append(true)
+	)
+
+	# Act — clear F5; frontier advances 4 → 5; biome is now CLEARED.
+	fu._on_floor_cleared_first_time(5, "forest_reach", false)
+
+	# Assert — zero emissions (no F6 to unlock).
+	assert_int(captured.size()).is_equal(0)
+	assert_int(fu.get_highest_cleared("forest_reach")).is_equal(5)
+
+
+func test_floor_unlocked_signal_emits_on_losing_first_clear() -> void:
+	# R5 + R11 interaction: LOSING run advances unlock identically to WIN, so
+	# floor_unlocked fires identically too — Pillar 1 fanfare equality.
+	var fu: Node = _make_floor_unlock_with_stubs()
+	var captured: Array = []
+	fu.floor_unlocked.connect(
+		func(b: String, f: int) -> void:
+			captured.append({"biome_id": b, "floor_index": f})
+	)
+
+	# Act — LOSING first-clear of F1.
+	fu._on_floor_cleared_first_time(1, "forest_reach", true)
+
+	# Assert — emission identical to WIN path.
+	assert_int(captured.size()).is_equal(1)
+	assert_int(captured[0]["floor_index"]).is_equal(2)
+
+
+func test_floor_unlocked_signal_does_not_emit_on_invalid_floor_or_biome() -> void:
+	# Validation rejection paths (out-of-range index, unavailable biome) must
+	# not emit floor_unlocked — the early-return guards run before any state
+	# mutation.
+	var fu: Node = _make_floor_unlock_with_stubs()
+	var captured: Array = []
+	fu.floor_unlocked.connect(
+		func(_b: String, _f: int) -> void: captured.append(true)
+	)
+
+	# Act — invalid: index 0 (sentinel), index 6 (out-of-range), unavailable biome.
+	fu._on_floor_cleared_first_time(0, "forest_reach", false)
+	fu._on_floor_cleared_first_time(6, "forest_reach", false)
+	fu._on_floor_cleared_first_time(1, "planned_v1_biome", false)
+
+	# Assert — no emissions; rejected at error-log path.
+	assert_int(captured.size()).is_equal(0)
+
+
+func test_floor_unlocked_signal_does_not_emit_during_load_save_data() -> void:
+	# Hydration must be silent (R3 + R11): load_save_data writes _unlock_state
+	# directly, bypassing the signal handler — no UI live-update fanfare on
+	# session restore.
+	var fu: Node = _make_floor_unlock_with_stubs()
+	var captured: Array = []
+	fu.floor_unlocked.connect(
+		func(_b: String, _f: int) -> void: captured.append(true)
+	)
+
+	# Act — load a save with F3 already cleared.
+	fu.load_save_data({"highest_cleared": {"forest_reach": 3}})
+
+	# Assert — state hydrated, no signal emission.
+	assert_int(fu.get_highest_cleared("forest_reach")).is_equal(3)
+	assert_int(captured.size()).is_equal(0)
+
+
+# ===========================================================================
 # Group G — get_save_data / load_save_data (Save/Load Rule 10 contract)
 # ===========================================================================
 

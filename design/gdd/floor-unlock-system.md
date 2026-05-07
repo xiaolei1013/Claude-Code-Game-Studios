@@ -99,6 +99,8 @@ func is_biome_completed(biome_id: String) -> bool
 func get_available_biomes() -> Array[String]
 func get_highest_cleared(biome_id: String) -> int
 func get_floor_state(biome_id: String, floor_index: int) -> FloorState
+# Public signal (R11 — UI live-update on frontier advance):
+signal floor_unlocked(biome_id: String, floor_index: int)
 ## Standard Save/Load consumer contract per Save/Load GDD #3 Rule 10.
 ## `data` is the **unwrapped interior dict** — Save/Load strips the "floor_unlock" namespace
 ## key before calling. Payload shape: `{"highest_cleared": {biome_id: int}}`. Missing key on
@@ -307,6 +309,8 @@ func _on_floor_cleared_first_time(floor_index: int, biome_id: String, losing_run
 Duplicate signals, out-of-order save/load replay, and re-dispatch of an already-cleared floor are all safe no-ops. The `max()` form is written identically in §D.4 so the invariant "`_unlock_state[biome_id]` is monotone non-decreasing" is visible in both places.
 
 **R10 — 1-based indexing convention**. `floor_index` is 1-based throughout, consistent with `FLOOR_CLEAR_BONUS[1..5]` (Pass 4A lock) and Economy's `try_award_floor_clear(floor_index)` range guard. `floor_index == 0` is the **sentinel for "no floors cleared yet"** in the stored counter only — it is never a valid query argument. `is_unlocked(0)` returns `false`. `_on_floor_cleared_first_time(0, ...)` logs `push_error` and returns.
+
+**R11 — `floor_unlocked` signal (UI live-update on frontier advance)** _(Pass-10 edit 2026-05-07 — Sprint 17 S17-N2; closes Sprint 16 S16-M3 Matchup Assignment cross-GDD sweep iteration #3 drift item; Matchup Assignment Screen GDD #23 §C.2 + §E.3 + AC-23-15 reference this signal)._ The system emits `floor_unlocked(biome_id: String, floor_index: int)` exactly once per successful frontier advance in `_on_floor_cleared_first_time`, identifying the newly-ACCESSIBLE floor (`highest_cleared + 1` after the advance). The emission is bounded by biome floor count — final-floor clears (where `h_new == BIOME_FLOOR_COUNT[biome_id]`) emit nothing because no further floor exists to unlock. The signal is **NOT emitted** on: idempotent re-clears (R9 no-op path; the frontier did not move); validation rejections (out-of-range `floor_index`, unavailable `biome_id`; the early-return guards run before any state mutation); or `load_save_data` hydration (the loader writes `_unlock_state` directly, bypassing the signal handler — session restore must be silent so UI consumers don't fanfare on every save reload). Per R5, LOSING and WIN first-clears emit identically — the param is ignored by the firing predicate. **Subscriber compatibility**: per Pass-7 BLOCKING-2 lesson, signal arity is load-bearing; consumers MUST accept the 2-arg payload exactly. **Connect timing**: subscribers connect at `_ready()` per ADR-0003, no `CONNECT_DEFERRED` (mirroring R3's orchestrator-side rule).
 
 ---
 
@@ -615,7 +619,7 @@ advance_unlock(f, b):
 | **Dungeon Run Orchestrator (#13)** (query consumer; note the bidirectional relationship — signal source AND query caller) | Hard | `FloorUnlock.is_unlocked(floor_index: int) -> bool` at DISPATCHING (AC-ORC-13 contract) |
 | **Guild Hall Screen (#19)** (undesigned) | Hard | `get_floor_state(biome_id, floor_index)`, `get_highest_cleared(biome_id)`, `get_available_biomes()`, `is_biome_completed(biome_id)` |
 | **Formation Assignment (#17)** (undesigned) | Hard | `is_unlocked(floor_index)`, `get_available_biomes()`, `get_floor_state(...)` for picker UI filtering |
-| **Matchup Assignment Screen (#23)** (undesigned) | Hard | `is_unlocked(floor_index)`, `get_available_biomes()` |
+| **Matchup Assignment Screen (#23)** (undesigned) | Hard | `is_unlocked(floor_index)`, `get_available_biomes()`; subscribes to `FloorUnlock.floor_unlocked(biome_id, floor_index)` (R11) for live-update re-render of the affected FloorButton during offline-replay flush (AC-23-15) |
 | **Unlock/Victory Moment UI (#25)** (undesigned) | Hard | Subscribes to `DungeonRunOrchestrator.floor_cleared_first_time` **independently**; reads `FloorUnlock.get_highest_cleared(biome_id)` to classify new-high vs replay |
 | **Save/Load System (#3)** | Hard | Calls `get_save_data` / `load_save_data`; manages `"floor_unlock"` namespace persistence |
 
@@ -1021,6 +1025,7 @@ Pass-7 edit 2026-04-21 — closes BLOCKING-6: Pass-6 cited `DataRegistry.stub_bi
 | AC-FU-14 | Signal subscription live at Orchestrator emission | Integration | BLOCKING | `tests/integration/floor_unlock/` | ✅ WRITEABLE (Pass-7: reclassified to Mode-2 real autoload tree — sibling-node construction from Pass-3/4/5/6 could not pass because `_ready()` connects to autoload singleton via class_name, not to a manually-constructed sibling; Mode-2 uses production execution path) |
 | Sub-AC 14-autoload-order | `[autoload]` section ordering | Manual smoke-check | **ADVISORY** | `production/qa/smoke-checks/autoload-order.md` (template TBD) | **PROSE-READY** (Pass-8 edit — closes qa-lead BLOCKING P8-B-5: NOT "writeable today"; AC prose is usable as manual checklist, but the template file + smoke-check directory are TBD until I.10 ships both a CI parse script and the template authored by qa-lead) |
 | AC-FU-15 | Stale biome_id in save preserved with warning + re-activation forward-compat | Logic | BLOCKING | `tests/unit/floor_unlock/` (primary) + `tests/integration/floor_unlock/` (re-activation step — `data_root_path` redirect requires real autoload tree) | ✅ Pass-7 re-activation mechanism corrected to use existing Data Loading `data_root_path` tuning knob (GDD #2 line 183) — Pass-6 cited non-existent `DataRegistry.stub_biome()`; Pass-4 NEW + Pass-6 continuation step added |
+| AC-FU-16 | `floor_unlocked` signal emits exactly once per frontier advance — and only on advance (not on idempotent replay, final-floor clear, validation rejection, or `load_save_data` hydration); LOSING/WIN parity per R5 | Logic | BLOCKING | `tests/unit/floor_unlock_system/floor_unlock_system_test.gd` (Group F2) | ✅ Pass-10 NEW 2026-05-07 — closes Sprint 16 S16-M3 sweep #3 drift (Matchup Assignment GDD #23 §C.2 + §E.3 + AC-23-15 reference signal); 6 Sub-ACs cover advance / replay / final-floor / LOSING / validation-reject / hydration paths |
 
 ### Intentionally Deferred (Out of MVP Scope)
 
