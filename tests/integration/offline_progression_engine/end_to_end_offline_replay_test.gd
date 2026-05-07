@@ -316,3 +316,96 @@ func test_e2e_replay_in_flight_blocks_concurrent_pipeline_invocation() -> void:
 	# Cleanup — disconnect non-one-shot listener manually.
 	for c: Dictionary in OfflineProgressionEngine.offline_rewards_collected.get_connections():
 		OfflineProgressionEngine.offline_rewards_collected.disconnect(c["callable"])
+
+
+# ===========================================================================
+# Group G: replay_in_flight_changed signal (Guild Hall GDD #19 OQ-19-1)
+# ===========================================================================
+
+func test_e2e_replay_in_flight_changed_emits_true_then_false_in_pair() -> void:
+	## The replay_in_flight_changed signal emits exactly twice per replay:
+	## (true) at the start, (false) at the end (before offline_rewards_collected).
+	## Subscribers (Guild Hall settings gear, Settings overlay gating) use this
+	## to enable/disable interactive surfaces reactively.
+	# Arrange
+	var transitions: Array[bool] = []
+	OfflineProgressionEngine.replay_in_flight_changed.connect(
+		func(in_flight: bool): transitions.append(in_flight)
+	)
+	var rewards_captured: Array = [null]
+	OfflineProgressionEngine.offline_rewards_collected.connect(
+		func(s): rewards_captured[0] = s, CONNECT_ONE_SHOT
+	)
+
+	# Act — drive a normal replay.
+	OfflineProgressionEngine.run_offline_replay(600)
+	var fired: bool = await _pump_until_summary(rewards_captured, _PIPELINE_TIMEOUT_FRAMES)
+	assert_bool(fired).is_true()
+
+	# Assert — exactly 2 transitions: true then false.
+	assert_int(transitions.size()).is_equal(2)
+	assert_bool(transitions[0]).is_true()
+	assert_bool(transitions[1]).is_false()
+
+	# Cleanup
+	for c: Dictionary in OfflineProgressionEngine.replay_in_flight_changed.get_connections():
+		OfflineProgressionEngine.replay_in_flight_changed.disconnect(c["callable"])
+
+
+func test_e2e_replay_in_flight_changed_does_not_emit_on_zero_elapsed() -> void:
+	## elapsed=0 returns silently per GDD §E.1 — no replay starts, no signal
+	## emit. The signal contract is "emits when _replay_in_flight changes",
+	## and zero-elapsed never sets the flag true.
+	# Arrange
+	var emit_count: Array[int] = [0]
+	OfflineProgressionEngine.replay_in_flight_changed.connect(
+		func(_in_flight: bool): emit_count[0] += 1
+	)
+
+	# Act
+	OfflineProgressionEngine.run_offline_replay(0)
+
+	# Pump to verify nothing arrives async.
+	for _i: int in range(_SHORT_TIMEOUT_FRAMES):
+		await get_tree().process_frame
+
+	# Assert — no transitions fired.
+	assert_int(emit_count[0]).is_equal(0)
+
+	# Cleanup
+	for c: Dictionary in OfflineProgressionEngine.replay_in_flight_changed.get_connections():
+		OfflineProgressionEngine.replay_in_flight_changed.disconnect(c["callable"])
+
+
+func test_e2e_replay_in_flight_changed_re_entrant_call_does_not_emit_extra_true() -> void:
+	## When run_offline_replay is called while a replay is in flight, the call
+	## is dropped via the in-flight guard. The dropped call MUST NOT emit a
+	## second 'true' transition — only the first replay's pair of (true, false)
+	## should be observed.
+	# Arrange
+	var transitions: Array[bool] = []
+	OfflineProgressionEngine.replay_in_flight_changed.connect(
+		func(in_flight: bool): transitions.append(in_flight)
+	)
+	var rewards_captured: Array = [null]
+	OfflineProgressionEngine.offline_rewards_collected.connect(
+		func(s): rewards_captured[0] = s, CONNECT_ONE_SHOT
+	)
+
+	# Act — first call kicks off replay.
+	OfflineProgressionEngine.run_offline_replay(600)
+	# Second call during in-flight — dropped via the guard.
+	OfflineProgressionEngine.run_offline_replay(600)
+
+	var fired: bool = await _pump_until_summary(rewards_captured, _PIPELINE_TIMEOUT_FRAMES)
+	assert_bool(fired).is_true()
+
+	# Assert — still exactly 2 transitions (the dropped second call did NOT
+	# emit a third 'true').
+	assert_int(transitions.size()).is_equal(2)
+	assert_bool(transitions[0]).is_true()
+	assert_bool(transitions[1]).is_false()
+
+	# Cleanup
+	for c: Dictionary in OfflineProgressionEngine.replay_in_flight_changed.get_connections():
+		OfflineProgressionEngine.replay_in_flight_changed.disconnect(c["callable"])

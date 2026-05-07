@@ -116,6 +116,28 @@ signal offline_rewards_collected(summary: OfflineSummary)
 signal cap_reached(seconds_clipped: int)
 
 
+## Fires whenever [member _replay_in_flight] changes value. Payload is the
+## new state. Subscribers (Guild Hall settings gear gating per Guild Hall
+## GDD #19 §C.5, Settings overlay open-gating per Settings GDD #30 §E.6)
+## use this to enable/disable interactive surfaces that should be unavailable
+## while a replay is in progress.
+##
+## Emit pairs are exactly-once-per-replay:
+##   - emits [code]true[/code] right after [member _replay_in_flight] is set
+##     to true at the start of [method run_offline_replay]
+##   - emits [code]false[/code] right after [member _replay_in_flight] is set
+##     back to false (BEFORE the [signal offline_rewards_collected] emit, so
+##     listeners that re-enable UI on replay-complete see the false state
+##     before any rewards-handling logic that depends on UI state).
+##
+## Re-entrant calls to [method run_offline_replay] (rejected by the in-flight
+## guard) do NOT emit a [code]true[/code] — only the FIRST replay invocation
+## triggers the state-change signal.
+##
+## Surfaced by Sprint 13 Guild Hall GDD #19 OQ-19-1.
+signal replay_in_flight_changed(in_flight: bool)
+
+
 # ---------------------------------------------------------------------------
 # Private state (visibility-sensitive; tests assert via stable field names)
 # ---------------------------------------------------------------------------
@@ -208,6 +230,9 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 
 	_replay_in_flight = true
 	_pending_elapsed_seconds = elapsed_seconds
+	# Notify state-change subscribers (Guild Hall + Settings overlay gating)
+	# per Guild Hall GDD #19 OQ-19-1.
+	replay_in_flight_changed.emit(true)
 
 	# Cap clipping per GDD §D.2.
 	var cap_seconds: int = _read_cap_seconds()
@@ -313,6 +338,11 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 	# exception must not leave _replay_in_flight stuck true).
 	_replay_in_flight = false
 	_pending_elapsed_seconds = 0
+	# Notify state-change subscribers BEFORE the rewards emit so listeners
+	# that re-enable UI on replay-complete (Guild Hall settings gear,
+	# Settings overlay open-gating) see the false state before any
+	# rewards-handling logic fires per Guild Hall GDD #19 OQ-19-1.
+	replay_in_flight_changed.emit(false)
 
 	offline_rewards_collected.emit(summary)
 
