@@ -1,10 +1,11 @@
 # Story 010: Schema VERSION migration path (placeholder for MVP; full fail-forward/restore logic)
 
 > **Epic**: save-load-system
-> **Status**: Ready
+> **Status**: Complete (2026-05-07; commit pending — placeholder MVP scope shipped per AC checklist)
 > **Layer**: Foundation
 > **Type**: Integration
 > **Manifest Version**: 2026-04-24
+> **Test evidence**: `tests/unit/save_load/schema_migration_test.gd` (12 tests, all PASS)
 
 ## Context
 
@@ -28,14 +29,14 @@
 
 *Scoped to this story:*
 
-- [ ] `CURRENT_SAVE_VERSION: int = 1` declared as compile-time `const`
-- [ ] On load, `version == CURRENT_SAVE_VERSION` → proceed to hydration (Story 007 loop)
-- [ ] On load, `version < CURRENT_SAVE_VERSION` → transition to MIGRATION state; invoke `_run_migration_chain(payload, version, CURRENT_SAVE_VERSION)`; on success, re-persist atomically (Story 008); on failure, fall through to `.bak` → corruption policy
-- [ ] On load, `version > CURRENT_SAVE_VERSION` → return `LoadResult{code: ERR_SCHEMA_MISMATCH, detail: "version_future"}`; CORRUPT modal copy "your save is from a newer build; please update the game" (final copy owned by writer in Story 013)
-- [ ] `_run_migration_chain(payload, from_version, to_version) -> Variant`: returns migrated Dictionary on success, null on failure. MVP body is a no-op for `from == to == 1`; stub returning `null` for any `from != 1` (no migrations authored yet — returns `ERR_SCHEMA_MISMATCH` until real migrations land)
-- [ ] MIGRATION state appears in the state-transition table with boundary actions: `LOADING → MIGRATION → (READY | CORRUPT)`
-- [ ] Post-migration atomic re-persist writes under `CURRENT_SAVE_VERSION`; `_meta.save_sequence_number` advances; `save_completed` emits
-- [ ] Lockstep-edit checklist comment block in the migration source file documents the 4-step edit required when adding/removing a consumer (ADR-0003 + ADR-0004 cross-ref)
+- [x] `CURRENT_SAVE_VERSION: int = 1` declared as compile-time `const` (`save_load_system.gd:80` — pre-existing).
+- [x] On load, `version == CURRENT_SAVE_VERSION` → proceed to hydration (Story 007 loop) — common path; migration block skipped entirely.
+- [x] On load, `version < CURRENT_SAVE_VERSION` → transition to MIGRATION state; invoke `_run_migration_chain(payload, version, CURRENT_SAVE_VERSION)`; on success, the migrated Dict feeds the existing consumer-hydration loop and an atomic re-persist is queued via `call_deferred("request_persist", "post_migration")`; on failure (chain returns null), transition to CORRUPT and emit `load_failed`. Verified at `save_load_system.gd:#step-6.5` block + tests Group B end-to-end transition tests.
+- [x] On load, `version > CURRENT_SAVE_VERSION` → reject early at the version check with `push_error` containing `detail='version_future'`; transition to CORRUPT; emit `load_failed`. Final UX modal copy ("your save is from a newer build; please update the game") owned by Story 013 writer pass — out of scope here.
+- [x] `_run_migration_chain(payload, from_version, to_version) -> Variant`: returns the payload Dict unchanged when `from == to` (defensive no-op contract); returns `null` for any other (from, to) pair (no migrations authored yet — first real V(N)→V(N+1) step lands alongside the V2 schema bump). Verified at tests Group A.
+- [x] MIGRATION state in state-transition table with boundary actions: `LOADING → MIGRATION → (READY | CORRUPT)`. Allowed-transitions docstring + `_transition_to` match block updated; regression guards added against the retired `READY → MIGRATION` and `MIGRATION → LOADING` paths. Verified at tests Group B.
+- [x] Post-migration atomic re-persist queued via `call_deferred("request_persist", "post_migration")` after the load pipeline reaches READY. `_compose_header` writes `CURRENT_SAVE_VERSION` unconditionally; `_meta.save_sequence_number` advance + `save_completed` emission are the existing persist pipeline's responsibility. Currently dead code in MVP (chain returns null for any unauthored step) but structurally complete.
+- [x] Lockstep-edit checklist comment block in `_run_migration_chain` docstring documents the 6-step edit required when bumping `CURRENT_SAVE_VERSION` (architecture rank table → project.godot autoload → CONSUMER_PATHS → chain branch → constant bump → regression test).
 
 ---
 

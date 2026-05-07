@@ -106,14 +106,15 @@ const CONSUMER_PATHS: PackedStringArray = [
 ##   UNLOADED    → LOADING       (entry in load pipeline)
 ##   LOADING     → READY         (load pipeline succeeds)
 ##   LOADING     → CORRUPT       (both slots unreadable / tampered)
+##   LOADING     → MIGRATION     (schema version mismatch detected mid-pipeline; Story 010)
 ##   READY       → PERSISTING    (persist trigger: heartbeat, scene-boundary, graceful-exit)
-##   READY       → MIGRATION     (schema version mismatch detected on load)
 ##   PERSISTING  → READY         (persist completes successfully)
 ##   PERSISTING  → PERSISTING    (overlap coalesce — drops new trigger + push_warning)
 ##   CORRUPT     is terminal (no exit transition in MVP)
-##   MIGRATION   → LOADING       (migration completes; re-enter load pipeline)
+##   MIGRATION   → READY         (migration chain succeeded; consumers hydrated from migrated payload)
+##   MIGRATION   → CORRUPT       (migration chain returned null; no migration authored for this version step)
 ##
-## ADR-0003 Amendment #2, TR-save-load-045
+## ADR-0003 Amendment #2, TR-save-load-045, Story 010 (schema migration)
 enum State {
 	## Initial state before the load pipeline fires. No save data is available.
 	UNLOADED,
@@ -603,17 +604,26 @@ func request_full_load(reason: String) -> void:
 		load_failed.emit(reason, ERR_FILE_CORRUPT)
 		return
 	var version: int = int(parsed.version)
-	if version != CURRENT_SAVE_VERSION:
-		# Sprint 12+ owns schema migration (Story 010). MVP rejects the
-		# version-mismatched envelope as CORRUPT — the migration path lands
-		# alongside the next save-schema bump.
+	# Story 010 — split version-mismatch into forward-version (cannot migrate)
+	# and prior-version (deferred to migration chain after envelope parse).
+	if version > CURRENT_SAVE_VERSION:
+		# Future-build save: this build doesn't know how to read a newer
+		# schema; cannot migrate forward (no time travel). Per Story 010 AC:
+		# "version > CURRENT_SAVE_VERSION → ERR_SCHEMA_MISMATCH detail=
+		# 'version_future'; CORRUPT modal copy 'your save is from a newer
+		# build; please update the game'" (final UX copy owned by Story 013).
 		push_error(
-			"SaveLoadSystem.request_full_load: VERSION %d != CURRENT_SAVE_VERSION %d — " % [version, CURRENT_SAVE_VERSION] +
-			"schema migration is Sprint 12+ scope (Story 010); rejecting (reason='%s')" % reason
+			"SaveLoadSystem.request_full_load: VERSION %d > CURRENT_SAVE_VERSION %d — " % [version, CURRENT_SAVE_VERSION] +
+			"detail='version_future'; cannot migrate forward (reason='%s')" % reason
 		)
 		_transition_to(State.CORRUPT)
 		load_failed.emit(reason, ERR_FILE_CORRUPT)
 		return
+	# version < CURRENT_SAVE_VERSION → MIGRATION path runs after JSON parse
+	# (line further down) once the payload Dict is in hand. Falling through
+	# to envelope-split + HMAC + JSON parse is intentional: even an old-
+	# version envelope must pass HMAC validation before its bytes are
+	# trusted enough to feed into a migration transform.
 
 	# 4. Split + payload-length cross-check (ADR-0004 §DoS defense Rule 2).
 	var parts: Dictionary = _split_envelope(envelope)
@@ -671,6 +681,52 @@ func request_full_load(reason: String) -> void:
 		return
 	var root_dict: Dictionary = parse_result as Dictionary
 
+	# 6.5. Migration (Story 010) — runs only when version < CURRENT_SAVE_VERSION.
+	#      The forward-version case (version > CURRENT) was rejected at step 3.
+	#      The same-version case (version == CURRENT) is the common path and
+	#      skips this block entirely. The migration chain transforms the
+	#      envelope's Dict into a Dict matching the current schema before
+	#      consumer hydration runs. On chain failure (null return), the load
+	#      fails with CORRUPT — fallback to .bak / corruption policy.
+	#
+	#      MVP placeholder: the chain returns null for any version != 1 (no
+	#      migrations authored yet; this branch is dead until V2 ships). When
+	#      the first real migration lands, the chain success branch must also
+	#      atomically re-persist under CURRENT_SAVE_VERSION (Story 008's atomic
+	#      write pipeline) so the on-disk save catches up to the migrated
+	#      schema. The re-persist is guarded behind a "did the migration chain
+	#      actually transform the payload" check to keep version==CURRENT
+	#      loads zero-overhead.
+	var migrated_via_chain: bool = false
+	if version < CURRENT_SAVE_VERSION:
+		push_warning(
+			"SaveLoadSystem.request_full_load: VERSION %d < CURRENT_SAVE_VERSION %d — " % [version, CURRENT_SAVE_VERSION] +
+			"entering MIGRATION (reason='%s')" % reason
+		)
+		_transition_to(State.MIGRATION)
+		var chain_result: Variant = _run_migration_chain(root_dict, version, CURRENT_SAVE_VERSION)
+		if chain_result == null:
+			push_error(
+				"SaveLoadSystem.request_full_load: migration chain returned null for " +
+				"VERSION %d → %d — no migration authored for this version step " % [version, CURRENT_SAVE_VERSION] +
+				"(reason='%s')" % reason
+			)
+			_transition_to(State.CORRUPT)
+			load_failed.emit(reason, ERR_FILE_CORRUPT)
+			return
+		if not (chain_result is Dictionary):
+			# Defensive: chain contract is "Dict on success or null on failure";
+			# anything else is a programmer error in the chain implementation.
+			push_error(
+				"SaveLoadSystem.request_full_load: migration chain returned %s (not Dictionary) " % typeof(chain_result) +
+				"— chain contract violation (reason='%s')" % reason
+			)
+			_transition_to(State.CORRUPT)
+			load_failed.emit(reason, ERR_FILE_CORRUPT)
+			return
+		root_dict = chain_result as Dictionary
+		migrated_via_chain = true
+
 	# 7. Iterate CONSUMER_PATHS, hydrate each via load_save_data. Per Save/Load
 	#    GDD §C: missing per-consumer keys are tolerated — load_save_data is
 	#    contractually responsible for handling absent fields with first-
@@ -704,8 +760,22 @@ func request_full_load(reason: String) -> void:
 		node.call("load_save_data", consumer_data)
 
 	# 8. Success: transition READY + emit load_completed.
+	#    For migration path (Story 010), this also implicitly satisfies the
+	#    "MIGRATION → READY" transition. Atomic re-persist is queued as a
+	#    deferred persist trigger so the on-disk save catches up to the
+	#    migrated schema; persist runs after we exit the load pipeline so
+	#    it lands as a normal READY → PERSISTING → READY cycle (rather than
+	#    needing a special MIGRATION → PERSISTING transition that doesn't
+	#    fit the state machine cleanly).
 	_transition_to(State.READY)
 	load_completed.emit(reason)
+	if migrated_via_chain:
+		# Story 010 AC: post-migration atomic re-persist writes under
+		# CURRENT_SAVE_VERSION (the persist body composes the header with
+		# CURRENT_SAVE_VERSION unconditionally — see _compose_header) and
+		# advances _meta.save_sequence_number. call_deferred avoids the
+		# stack of running another sync I/O cycle inside the load handler.
+		call_deferred("request_persist", "post_migration")
 
 
 # ---------------------------------------------------------------------------
@@ -718,12 +788,13 @@ func request_full_load(reason: String) -> void:
 ##   UNLOADED    → LOADING
 ##   LOADING     → READY
 ##   LOADING     → CORRUPT
+##   LOADING     → MIGRATION   (Story 010 — version mismatch on load)
 ##   READY       → PERSISTING
-##   READY       → MIGRATION
 ##   PERSISTING  → READY
 ##   PERSISTING  → PERSISTING  (coalesce — push_warning; drops new trigger)
 ##   CORRUPT     → (terminal; any next value push_warning + no-op)
-##   MIGRATION   → LOADING
+##   MIGRATION   → READY        (chain success; consumers hydrated from migrated payload)
+##   MIGRATION   → CORRUPT      (chain returned null; no migration authored)
 ##
 ## Same-state no-ops (except PERSISTING→PERSISTING which warns + drops):
 ##   All other same-state calls are silent no-ops (idempotent boot guard).
@@ -760,13 +831,18 @@ func _transition_to(next: State) -> void:
 		State.UNLOADED:
 			allowed = next == State.LOADING
 		State.LOADING:
-			allowed = next == State.READY or next == State.CORRUPT
+			# Story 010: LOADING → MIGRATION added for version-mismatch path.
+			allowed = next == State.READY or next == State.CORRUPT or next == State.MIGRATION
 		State.READY:
-			allowed = next == State.PERSISTING or next == State.MIGRATION
+			allowed = next == State.PERSISTING
 		State.PERSISTING:
 			allowed = next == State.READY
 		State.MIGRATION:
-			allowed = next == State.LOADING
+			# Story 010: MIGRATION terminates in READY (chain success) or
+			# CORRUPT (chain failure). The "MIGRATION → LOADING re-enter"
+			# model from earlier docstring drafts is retired — chain success
+			# does its own hydrate + atomic re-persist before transitioning.
+			allowed = next == State.READY or next == State.CORRUPT
 
 	if not allowed:
 		push_warning(
@@ -776,6 +852,52 @@ func _transition_to(next: State) -> void:
 		return
 
 	_state = next
+
+
+## Runs the schema-migration chain to transform an old-version payload Dict
+## into a Dict matching CURRENT_SAVE_VERSION. Returns the migrated Dict on
+## success or null on failure (no migration authored for the requested
+## version step).
+##
+## MVP placeholder behavior (Story 010):
+## - from_version == to_version: returns the payload unchanged (no-op,
+##   defensive contract for callers that pass equal versions).
+## - any other (from, to) pair: returns null. No migrations have been
+##   authored yet because no schema version bump has shipped — the first
+##   real migration lands alongside the V2 schema bump and adds a branch
+##   to this chain (e.g., `if from_version == 1 and to_version == 2:
+##   return _migrate_v1_to_v2(payload)`).
+##
+## Chain idiom (when migrations land):
+## - Each migration step is `_migrate_from_vN_to_vN_plus_1(payload) -> Variant`.
+## - Multi-step chains compose by feeding each step's output into the next.
+## - Any step returning null aborts the chain and propagates null to the caller.
+##
+## Lockstep-edit checklist when bumping CURRENT_SAVE_VERSION:
+##   1. `architecture.md` rank table — note the schema version bump in the
+##      Save/Load row's history column.
+##   2. `project.godot [autoload]` — no edit unless adding a new autoload
+##      consumer (which is itself an ADR-0003 + ADR-0004 lockstep edit).
+##   3. `SaveLoadSystem.CONSUMER_PATHS` — no edit unless consumer surface
+##      changed; if it did, the consumer's `load_save_data` body owns the
+##      missing-field defaults per Save/Load Rule 11.
+##   4. This method — add `_migrate_from_vN_to_vN_plus_1` step + chain branch.
+##   5. `CURRENT_SAVE_VERSION` constant — bump to the new value.
+##   6. Author a regression test that loads a V(N) envelope and asserts
+##      the post-migration consumer state matches the expected V(N+1) shape.
+##
+## ADR-0004 §Migration Plan, ADR-0003 §Consumer Lockstep, TR-save-load-007,
+## TR-save-load-045 (MIGRATION state), TR-save-load-055 (ERR_SCHEMA_MISMATCH).
+func _run_migration_chain(payload: Dictionary, from_version: int, to_version: int) -> Variant:
+	# Same-version contract: no-op pass-through. This branch is dead code
+	# from the load pipeline (the migration call site only fires when
+	# version < CURRENT_SAVE_VERSION) but the contract is preserved for
+	# direct callers (e.g., tests, V1.0+ batch-migration tooling).
+	if from_version == to_version:
+		return payload
+	# No migrations authored yet — every (from, to) where from != to
+	# returns null until a real V(N) → V(N+1) step lands.
+	return null
 
 
 ## Resolves a consumer node by path; exits the process on miss in production.
