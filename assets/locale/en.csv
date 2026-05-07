@@ -22,3 +22,19 @@ return_to_app_floors_format,%d floors cleared
 return_to_app_cap_reached_notice_format,(Capped at %d hours offline.)
 return_to_app_acknowledge_button,Continue
 return_to_app_no_summary_fallback,No recent rewards to summarize.
+recruit_error_insufficient_gold,Not enough gold.
+recruit_error_roster_full,Roster full.
+recruit_error_unresolvable_class,This class is no longer available.
+recruit_owned_format,(owned: %d)
+hero_detail_level_up_format,Level Up — %s gold
+hero_detail_owned_format,(%d %s total)
+hero_detail_xp_capped,MAX LEVEL
+hero_detail_xp_format,XP: %d / %d
+matchup_floor_locked_format,Clear Floor %d to unlock.
+matchup_select_format,Select Floor %d — %s
+victory_biome_completed_format,%s completed!
+victory_continuation_prompt,Tap to continue
+victory_gold_gained_format,+%d gold
+victory_headline_format,%s — Floor %d cleared
+victory_level_up_format,%s reached level %d
+victory_unlock_format,Floor %d now available.
