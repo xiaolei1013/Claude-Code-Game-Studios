@@ -1,7 +1,7 @@
 # Story 009: debug_unlock_all + UI fanfare losing/win equivalence invariant
 
 > **Epic**: floor-unlock-system
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #16. Test evidence: `tests/unit/floor_unlock_system/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Feature
 > **Type**: Logic + Integration
 > **Manifest Version**: 2026-04-26

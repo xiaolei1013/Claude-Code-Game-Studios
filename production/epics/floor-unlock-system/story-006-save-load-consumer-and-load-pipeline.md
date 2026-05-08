@@ -1,7 +1,7 @@
 # Story 006: Save/Load consumer contract + per-value processing pipeline
 
 > **Epic**: floor-unlock-system
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #16. Test evidence: `tests/unit/floor_unlock_system/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Feature
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26
