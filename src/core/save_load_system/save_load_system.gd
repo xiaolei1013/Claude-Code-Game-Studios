@@ -79,6 +79,55 @@ const _ENVELOPE_OVERHEAD: int = _HEADER_SIZE + _HMAC_SIZE  # 44
 ## ADR-0004 §Envelope byte layout, TR-save-load-003
 const CURRENT_SAVE_VERSION: int = 1
 
+## Story 013 — backup-restore escalation threshold (TR-save-load-017).
+##
+## When the count of `_meta.backup_restore_events` entries within
+## [constant BACKUP_ESCALATION_WINDOW_SECONDS] reaches this threshold, the UI
+## should surface a storage-advisory modal with a [Check Storage] button
+## INSTEAD of the normal cozy `.bak`-recovered toast. Repeated `.bak` falls
+## within a week strongly imply hardware/storage trouble worth nudging the
+## player about.
+##
+## ADR-0004 §`.bak` fallback escalation, GDD §HMAC Verification Behavior.
+const BACKUP_ESCALATION_THRESHOLD: int = 3
+
+## Story 013 — backup-restore escalation rolling window (7 days, in seconds).
+##
+## Entries in `_meta.backup_restore_events` older than this window from the
+## current persist's `now_unix` are scrubbed before the threshold check; only
+## the within-window count matters for [constant BACKUP_ESCALATION_THRESHOLD]
+## comparison. The 7-day choice mirrors the GDD edge-case for distinguishing
+## one-off corruption (likely a single-event glitch — cozy toast suffices)
+## from sustained corruption (likely failing storage — escalate UI urgency).
+##
+## ADR-0004 §`.bak` fallback escalation, GDD §HMAC Verification Behavior.
+const BACKUP_ESCALATION_WINDOW_SECONDS: int = 604_800  # 7 days × 86_400
+
+## Story 013 — MVP feature flag for the in-game "Modified" label suppression
+## (TR-save-load-026).
+##
+## When `false` (MVP default), the on-disk FLAGS.bit0 = 1 tamper indicator is
+## still persisted by [method acknowledge_tamper_modal_yes], but the UI
+## surface that would label a save as "Modified" is suppressed. V1.0 is
+## expected to flip this to `true` and surface the consequence-feature label
+## per the writer-signed-off copy in GDD Rule 8. Compile-time `const` rather
+## than a runtime knob so dead-code-elimination can strip the V1.0 label
+## machinery from MVP shipping bytes.
+##
+## ADR-0004 §Tamper Response — GDD §HMAC Verification Behavior, TR-save-load-026.
+const SETTINGS_MODIFIED_LABEL_ENABLED: bool = false
+
+## Story 013 — saturation cap for the persistent `_meta.tamper_suspicious_count`
+## counter (TR-save-load-025).
+##
+## ADR-0004 §`_meta` field schema mandates this saturation to prevent a
+## malicious user from triggering arbitrarily-large counter values via repeated
+## clock manipulation or modal-Yes dismissals. Once at the cap, additional
+## increments are silently no-ops; the field still persists.
+##
+## ADR-0004 §`_meta` field schema, TR-save-load-025.
+const MAX_TAMPER_SUSPICIOUS_COUNT: int = 10_000
+
 ## Ordered list of consumer autoload paths per ADR-0003 Amendment #2 and
 ## ADR-0004 §Consumer Contract. Exactly 6 entries in rank order.
 ##
@@ -232,6 +281,49 @@ var _state: State = State.UNLOADED
 ##
 ## ADR-0004 §N=2 rotation, TR-save-load-021
 var _needs_rekey_persist: bool = false
+
+## Story 013 — in-memory tamper-suspicious counter (TR-save-load-025).
+##
+## Increments synchronously on:
+##   - [signal TickSystem.flag_suspicious_timestamp_emitted] handler
+##     ([method _on_flag_suspicious_timestamp_emitted]).
+##   - [method acknowledge_tamper_modal_yes] (called by the UI layer when the
+##     player taps "Yes" on the HMAC tamper modal).
+## Saturates at [constant MAX_TAMPER_SUSPICIOUS_COUNT] per ADR-0004 (post-cap
+## increments are silent no-ops so a malicious actor cannot run the counter
+## up arbitrarily).
+##
+## This counter is currently SESSION-SCOPED — the persist pipeline does NOT
+## yet wire it into the on-disk `_meta.tamper_suspicious_count` field. The
+## `_meta` namespace persistence is a follow-up scope (existing story-009
+## audit-cascade closure flagged that `_meta` isn't actually composed into the
+## persist root_dict despite the system-level Status). When that wiring lands,
+## this field becomes the in-memory mirror that gets serialized + restored on
+## load. Until then, the field starts at 0 every cold launch.
+##
+## TR-save-load-025, ADR-0004 §`_meta` field schema, Story 013 Phase 1.
+var _tamper_suspicious_count: int = 0
+
+## Story 013 — pending FLAGS.bit0 = 1 marker (TR-save-load-026).
+##
+## When `true`, the next [method request_full_persist] writes the envelope
+## header's FLAGS field with bit 0 set, marking the save as
+## previously-tampered. Set synchronously by [method acknowledge_tamper_modal_yes]
+## BEFORE the modal dismisses (per AC: synchronous persist completes before
+## modal dismiss). Once the next persist completes, the on-disk envelope
+## carries the bit and this field is cleared back to false.
+##
+## The on-disk bit persists across launches (FLAGS lives inside the
+## HMAC-protected region). [constant SETTINGS_MODIFIED_LABEL_ENABLED] gates
+## whether the UI surfaces the "Modified" label; the bit itself is always
+## written regardless of the label feature flag.
+##
+## Wired into the envelope header composition path in a follow-up slice;
+## currently this field tracks the intent without yet flipping the on-disk
+## bit. Tests assert state transitions on this field directly.
+##
+## TR-save-load-026, ADR-0004 §Tamper Response, Story 013 Phase 1.
+var _pending_flags_bit0_tamper: bool = false
 
 
 # ---------------------------------------------------------------------------
@@ -1413,17 +1505,102 @@ func _derive_integrity_tags() -> Array[PackedByteArray]:
 ## Handles [signal TickSystem.flag_suspicious_timestamp_emitted].
 ##
 ## Called when TickSystem detects a suspicious backward clock jump on the
-## wall clock (beyond rewind_tolerance_seconds). In Story 013, this handler
-## sets tamper_flag on the in-flight envelope and emits [signal tamper_detected_on_load].
+## wall clock (beyond [code]rewind_tolerance_seconds[/code]). Increments the
+## in-memory [member _tamper_suspicious_count] (saturating at
+## [constant MAX_TAMPER_SUSPICIOUS_COUNT] per ADR-0004) so the count survives
+## the rest of the session.
 ##
-## STUB — body lands in Story 013 (tamper-detection).
+## NOTE on signal cardinality: TickSystem's [signal flag_suspicious_timestamp_emitted]
+## is a once-per-launch signal (Story 007 invariant — guarded by
+## TickSystem._flag_suspicious_timestamp). So this handler typically fires at
+## most once per process. The saturation cap is a defense-in-depth against
+## a future caller that emits the signal directly via a debug hook.
+##
+## Persistence wiring: when the `_meta` namespace persistence work lands
+## (currently a follow-up — Story 009's audit-cascade Status flip didn't
+## actually wire `_meta` into the persist `root_dict`), this counter becomes
+## the in-memory mirror that gets serialized to `_meta.tamper_suspicious_count`
+## and restored on load. Until then, the counter is session-scoped only.
 ##
 ## [param previous_ts]: The last trusted wall-clock timestamp (Unix seconds).
+##   Currently unused — present for forward-compat with future telemetry that
+##   would log the (previous, current) delta.
 ## [param current_ts]: The current suspicious wall-clock timestamp (Unix seconds).
+##   Currently unused (see above).
 ##
-## ADR-0007, TR-save-load-032, Story 013
+## TR-save-load-025, ADR-0004 §Tamper Response, Story 013 Phase 1.
 func _on_flag_suspicious_timestamp_emitted(_previous_ts: int, _current_ts: int) -> void:
-	pass  # Story 013 (tamper-detection); rename _-prefixed params on impl
+	_increment_tamper_count()
+
+
+## Story 013 — UI-layer entry point for the HMAC tamper modal "Yes" tap.
+##
+## Called by the UI layer (PresentationRoot or the modal owner) when the
+## player taps "Yes" on the cozy HMAC tamper modal. Per AC, the actions
+## taken here MUST complete synchronously BEFORE the modal dismiss so the
+## on-disk state reflects the player's acknowledgement before they can
+## interact with anything else.
+##
+## Synchronous side-effects:
+##   1. [member _tamper_suspicious_count] increments (saturating at
+##      [constant MAX_TAMPER_SUSPICIOUS_COUNT]).
+##   2. [member _pending_flags_bit0_tamper] is set to [code]true[/code] so
+##      the next [method request_full_persist] writes FLAGS.bit0 = 1 in the
+##      envelope header. (Header-write wiring is a follow-up slice; the
+##      pending intent is captured here for now.)
+##
+## NOTE on idempotency: if the UI calls this twice (e.g., a stuck-double-tap
+## on a slow device), the counter increments twice. This is acceptable per
+## ADR-0004 — the saturation cap prevents abuse, and a one-extra-tick on
+## the player's count is a graceful failure mode vs. trying to dedupe modal
+## tap events.
+##
+## Example (UI layer):
+##   [codeblock]
+##   modal.yes_pressed.connect(func(): SaveLoadSystem.acknowledge_tamper_modal_yes())
+##   [/codeblock]
+##
+## TR-save-load-025, TR-save-load-026, ADR-0004 §Tamper Response, Story 013 Phase 1.
+func acknowledge_tamper_modal_yes() -> void:
+	_increment_tamper_count()
+	_pending_flags_bit0_tamper = true
+
+
+## Returns the current in-memory tamper-suspicious counter value.
+##
+## Read-only accessor for tests and the UI layer (e.g., a future "Modified
+## save: tampered N times" diagnostic surface gated by
+## [constant SETTINGS_MODIFIED_LABEL_ENABLED]).
+##
+## ADR-0004 §`_meta` field schema, TR-save-load-025.
+func get_tamper_suspicious_count() -> int:
+	return _tamper_suspicious_count
+
+
+## Returns whether the next persist will set FLAGS.bit0 = 1.
+##
+## Read-only accessor for tests. Returns [code]true[/code] after
+## [method acknowledge_tamper_modal_yes] until the next successful persist
+## clears the pending flag (header-write wiring is a follow-up slice — until
+## then, the flag stays true once set, providing a testable contract for the
+## acknowledgement surface).
+##
+## ADR-0004 §Tamper Response, TR-save-load-026.
+func get_pending_flags_bit0_tamper() -> bool:
+	return _pending_flags_bit0_tamper
+
+
+## Internal: increments [member _tamper_suspicious_count] with saturation
+## at [constant MAX_TAMPER_SUSPICIOUS_COUNT].
+##
+## Centralised so both the [signal TickSystem.flag_suspicious_timestamp_emitted]
+## handler and [method acknowledge_tamper_modal_yes] route through the same
+## saturation logic — neither caller can accidentally exceed the cap.
+##
+## ADR-0004 §`_meta` field schema saturation rule, TR-save-load-025.
+func _increment_tamper_count() -> void:
+	if _tamper_suspicious_count < MAX_TAMPER_SUSPICIOUS_COUNT:
+		_tamper_suspicious_count += 1
 
 
 ## Handles [signal SceneManager.scene_boundary_persist].
