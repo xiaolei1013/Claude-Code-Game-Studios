@@ -1,7 +1,7 @@
 # Story 008: First-launch Theron seed
 
 > **Epic**: hero-roster
-> **Status**: Complete (system shipped; see systems-index Implementation Status #9. Test evidence: `tests/{unit,integration}/hero_roster/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — audit-cascade caveat resolved; required test file exists and passes; ACs ticked.)
 > **Layer**: Feature
 > **Type**: Logic
 > **Manifest Version**: 2026-04-26
@@ -25,9 +25,9 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-hero-roster-020: `seed_first_launch_state()` creates Warrior at instance_id=1, display_name="Theron", current_level=1, in formation slot 0
-- [ ] TR-hero-roster-020: emits `hero_recruited(instance)` exactly once
-- [ ] TR-hero-roster-021: "Theron" is a hardcoded constant; reinstalls always see the same name (deterministic for QA)
+- [x] TR-hero-roster-020: `seed_first_launch_state()` creates Warrior at instance_id=1, display_name="Theron", current_level=1, in formation slot 0
+- [x] TR-hero-roster-020: emits `hero_recruited(instance)` exactly once
+- [x] TR-hero-roster-021: "Theron" is a hardcoded constant; reinstalls always see the same name (deterministic for QA)
 
 ---
 

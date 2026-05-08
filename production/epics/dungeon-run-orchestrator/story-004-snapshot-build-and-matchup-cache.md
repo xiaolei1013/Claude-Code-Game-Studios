@@ -1,7 +1,7 @@
 # Story 004: Formation snapshot deep-copy + floor serialize-by-id + matchup cache build
 
 > **Epic**: dungeon-run-orchestrator
-> **Status**: Complete (system shipped; see systems-index Implementation Status #13. Test evidence: `tests/{unit,integration}/dungeon_run_orchestrator/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — audit-cascade caveat resolved; required test file exists and passes; ACs ticked.)
 > **Layer**: Feature
 > **Type**: Logic
 > **Manifest Version**: 2026-04-26
@@ -26,10 +26,10 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-004: `RunSnapshot.formation_snapshot` is a deep copy via `.duplicate(true)`; mutations to source HeroRoster do NOT propagate
-- [ ] TR-006: `floor_id: String` stored (NOT a Floor reference); resolved via `DataRegistry.resolve("floors", floor_id)` on load; null → NO_RUN
-- [ ] TR-012: `_build_matchup_cache(formation, floor)` pre-populates entry for every archetype in `kill_schedule`; no KeyError possible during offline replay
-- [ ] TR-013: `_build_matchup_cache` runs ONCE at DISPATCHING; subsequent ticks read from cache (zero resolver calls during replay)
+- [x] TR-004: `RunSnapshot.formation_snapshot` is a deep copy via `.duplicate(true)`; mutations to source HeroRoster do NOT propagate
+- [x] TR-006: `floor_id: String` stored (NOT a Floor reference); resolved via `DataRegistry.resolve("floors", floor_id)` on load; null → NO_RUN
+- [x] TR-012: `_build_matchup_cache(formation, floor)` pre-populates entry for every archetype in `kill_schedule`; no KeyError possible during offline replay
+- [x] TR-013: `_build_matchup_cache` runs ONCE at DISPATCHING; subsequent ticks read from cache (zero resolver calls during replay)
 
 ---
 

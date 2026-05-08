@@ -1,7 +1,7 @@
 # Story 004: effectiveness_label hook on MatchupResult (S4-N1 quick-spec)
 
 > **Epic**: matchup-resolver
-> **Status**: Complete (system shipped; see systems-index Implementation Status #10. Test evidence: `tests/{unit,integration}/matchup_resolver/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — audit-cascade caveat resolved; required test file exists and passes; ACs ticked.)
 > **Layer**: Feature
 > **Type**: Logic
 > **Manifest Version**: 2026-04-26
@@ -25,13 +25,13 @@
 
 ## Acceptance Criteria
 
-- [ ] `MatchupResult.effectiveness_label: String = "Even"` default added.
-- [ ] `resolve_formation_matchup` populates `effectiveness_label`:
+- [x] `MatchupResult.effectiveness_label: String = "Even"` default added.
+- [x] `resolve_formation_matchup` populates `effectiveness_label`:
   - `is_advantaged == true` → `"Strong"`
   - non-empty formation with zero matches → `"Weak"`
   - otherwise (mixed / empty) → `"Even"`
-- [ ] `resolve_floor_matchup` aggregates labels: `"Strong"` if any per-archetype is Strong, else `"Weak"` if all per-archetype are Weak, else `"Even"`.
-- [ ] Existing tests from Stories 001–003 continue to pass (label is additive, not breaking).
+- [x] `resolve_floor_matchup` aggregates labels: `"Strong"` if any per-archetype is Strong, else `"Weak"` if all per-archetype are Weak, else `"Even"`.
+- [x] Existing tests from Stories 001–003 continue to pass (label is additive, not breaking).
 
 ---
 

@@ -1,7 +1,7 @@
 # Story 009: Name pool generation + DataRegistry name_pools category
 
 > **Epic**: hero-roster
-> **Status**: Complete (system shipped; see systems-index Implementation Status #9. Test evidence: `tests/{unit,integration}/hero_roster/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — audit-cascade caveat resolved; required test file exists and passes; ACs ticked.)
 > **Layer**: Feature
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26
@@ -26,10 +26,10 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-hero-roster-022: `_generate_name(class_id)` uniform random over unused names; never returns a name already used by an existing hero of the same class
-- [ ] TR-hero-roster-022: Pool exhaustion fallback returns "{base} the {Ordinal}" (e.g., "Theron the Second", "Theron the Third")
-- [ ] TR-hero-roster-023: Each MVP class (warrior, mage, rogue) has >=20 names in its pool .tres
-- [ ] TR-hero-roster-023: Pools loaded via `DataRegistry.resolve("name_pools", class_id)`; "name_pools" added to DataRegistry ORDERED_CATEGORIES
+- [x] TR-hero-roster-022: `_generate_name(class_id)` uniform random over unused names; never returns a name already used by an existing hero of the same class
+- [x] TR-hero-roster-022: Pool exhaustion fallback returns "{base} the {Ordinal}" (e.g., "Theron the Second", "Theron the Third")
+- [x] TR-hero-roster-023: Each MVP class (warrior, mage, rogue) has >=20 names in its pool .tres
+- [x] TR-hero-roster-023: Pools loaded via `DataRegistry.resolve("name_pools", class_id)`; "name_pools" added to DataRegistry ORDERED_CATEGORIES
 
 ---
 
