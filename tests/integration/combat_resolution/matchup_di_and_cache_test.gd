@@ -51,13 +51,13 @@ func _make_hero(class_id: String, instance_id: int = 1) -> RefCounted:
 
 func test_build_matchup_cache_calls_resolver_once_per_distinct_archetype() -> void:
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	var spy: SpyMatchupResolver = SpyMatchupResolver.new()
+	var matchup_spy: SpyMatchupResolver = SpyMatchupResolver.new()
 	# Floor with 5 distinct archetypes (the MVP cap per TR-012).
 	var floor_archetypes: Array = ["bruiser", "caster", "armored", "swarm", "ranged"]
 	var formation: Array = [_make_hero(WARRIOR_ID, 1)]
-	var cache: Dictionary = resolver.build_matchup_cache(formation, floor_archetypes, spy)
+	var cache: Dictionary = resolver.build_matchup_cache(formation, floor_archetypes, matchup_spy)
 	# 5 distinct archetypes → exactly 5 resolver calls.
-	assert_int(spy.call_count).is_equal(5)
+	assert_int(matchup_spy.call_count).is_equal(5)
 	# Cache has 5 entries.
 	assert_int(cache.size()).is_equal(5)
 
@@ -65,32 +65,32 @@ func test_build_matchup_cache_calls_resolver_once_per_distinct_archetype() -> vo
 func test_build_matchup_cache_dedupes_duplicate_archetype_entries() -> void:
 	# Floor with duplicates → dedup before calling resolver.
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	var spy: SpyMatchupResolver = SpyMatchupResolver.new()
+	var matchup_spy: SpyMatchupResolver = SpyMatchupResolver.new()
 	var floor_archetypes: Array = ["bruiser", "bruiser", "caster", "bruiser"]
 	var formation: Array = [_make_hero(WARRIOR_ID, 1)]
-	resolver.build_matchup_cache(formation, floor_archetypes, spy)
+	resolver.build_matchup_cache(formation, floor_archetypes, matchup_spy)
 	# Only 2 distinct → 2 calls, NOT 4.
-	assert_int(spy.call_count).is_equal(2)
+	assert_int(matchup_spy.call_count).is_equal(2)
 	# Per-archetype call count: bruiser called once, caster called once.
-	assert_int(int(spy.calls_by_archetype.get(&"bruiser", 0))).is_equal(1)
-	assert_int(int(spy.calls_by_archetype.get(&"caster", 0))).is_equal(1)
+	assert_int(int(matchup_spy.calls_by_archetype.get(&"bruiser", 0))).is_equal(1)
+	assert_int(int(matchup_spy.calls_by_archetype.get(&"caster", 0))).is_equal(1)
 
 
 func test_build_matchup_cache_empty_floor_archetypes_zero_calls() -> void:
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	var spy: SpyMatchupResolver = SpyMatchupResolver.new()
-	resolver.build_matchup_cache([_make_hero(WARRIOR_ID, 1)], [], spy)
-	assert_int(spy.call_count).is_equal(0)
+	var matchup_spy: SpyMatchupResolver = SpyMatchupResolver.new()
+	resolver.build_matchup_cache([_make_hero(WARRIOR_ID, 1)], [], matchup_spy)
+	assert_int(matchup_spy.call_count).is_equal(0)
 
 
 func test_build_matchup_cache_skips_empty_archetype_strings() -> void:
 	# Defensive: empty archetype entries are silently dropped (don't reach resolver).
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	var spy: SpyMatchupResolver = SpyMatchupResolver.new()
+	var matchup_spy: SpyMatchupResolver = SpyMatchupResolver.new()
 	var floor_archetypes: Array = ["", "bruiser", ""]
-	resolver.build_matchup_cache([_make_hero(WARRIOR_ID, 1)], floor_archetypes, spy)
+	resolver.build_matchup_cache([_make_hero(WARRIOR_ID, 1)], floor_archetypes, matchup_spy)
 	# Only "bruiser" reaches resolver.
-	assert_int(spy.call_count).is_equal(1)
+	assert_int(matchup_spy.call_count).is_equal(1)
 
 
 # ===========================================================================
@@ -99,19 +99,19 @@ func test_build_matchup_cache_skips_empty_archetype_strings() -> void:
 
 func test_build_matchup_cache_returns_advantaged_true_for_matching_archetype() -> void:
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	var spy: SpyMatchupResolver = SpyMatchupResolver.new()
-	spy.canned_results = {"bruiser": true, "caster": false}
+	var matchup_spy: SpyMatchupResolver = SpyMatchupResolver.new()
+	matchup_spy.canned_results = {"bruiser": true, "caster": false}
 	var formation: Array = [_make_hero(WARRIOR_ID, 1), _make_hero(WARRIOR_ID, 2), _make_hero(MAGE_ID, 3)]
-	var cache: Dictionary = resolver.build_matchup_cache(formation, ["bruiser", "caster"], spy)
+	var cache: Dictionary = resolver.build_matchup_cache(formation, ["bruiser", "caster"], matchup_spy)
 	assert_bool(bool(cache.get(&"bruiser", false))).is_true()
 	assert_bool(bool(cache.get(&"caster", false))).is_false()
 
 
 func test_build_matchup_cache_returns_string_name_keys() -> void:
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	var spy: SpyMatchupResolver = SpyMatchupResolver.new()
+	var matchup_spy: SpyMatchupResolver = SpyMatchupResolver.new()
 	var cache: Dictionary = resolver.build_matchup_cache(
-		[_make_hero(WARRIOR_ID, 1)], ["bruiser"], spy
+		[_make_hero(WARRIOR_ID, 1)], ["bruiser"], matchup_spy
 	)
 	# Cache key should be StringName, not String — for snapshot.matchup_cache
 	# typed-Dictionary[StringName, bool] consistency.
