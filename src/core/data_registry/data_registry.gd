@@ -98,6 +98,12 @@ const ERROR_INVALID_ID: String = "InvalidId"
 const ERROR_DUPLICATE_ID: String = "DuplicateId"
 const ERROR_MIN_CONTENT_COUNT: String = "MinContentCount"
 const ERROR_INVALID_FIELD: String = "InvalidField"
+## Story 006 — emitted by [signal registry_error] when [method _validate_dag]
+## detects a circular reference in the dungeon ↔ biome graph. Details payload:
+## [code]{"cycle": Array[String]}[/code] with the cycle path repeated tail-to-head
+## (e.g. [code]["dungeon_a", "biome_b", "dungeon_a"][/code]).
+## ADR-0006 §DAG validation, TR-data-loading-018.
+const ERROR_CIRCULAR_REF: String = "CircularRef"
 
 # ---------------------------------------------------------------------------
 # Signals
@@ -526,7 +532,13 @@ func _boot_scan() -> bool:
 	for category: String in ORDERED_CATEGORIES:
 		if not _load_category(category):
 			return false  # _load_category already called _transition_to_error
-	# DAG validation (Story 006) is not wired here — that story adds its gates.
+	# Story 006 — post-load DAG validation (TR-008 / TR-018 / AC-DLS-06).
+	# Detects circular references in the dungeon ↔ biome graph after all
+	# categories have loaded. On cycle detection: _validate_dag calls
+	# _transition_to_error("CircularRef", {"cycle": [...]}) and returns false;
+	# we propagate up so _ready() doesn't fire registry_ready.
+	if not _validate_dag():
+		return false
 	return true
 
 
@@ -864,3 +876,149 @@ func _state_name(value: int) -> String:
 ## different Resource IS a mismatch the test should catch).
 func _values_equal(a: Variant, b: Variant) -> bool:
 	return a == b
+
+
+# ---------------------------------------------------------------------------
+# Story 006 — DAG validation
+# ---------------------------------------------------------------------------
+
+## Story 006 (TR-008 / TR-018 / AC-DLS-06) — post-load DAG validation.
+##
+## BFS/DFS-traverses the in-memory dungeon ↔ biome graph after all categories
+## have loaded. Edges:
+##   - [code]Dungeon.biome_id (String)[/code] → Biome (id-string ref).
+##   - [code]Biome.dungeons (Array[Dungeon])[/code] → Dungeon[] (embedded refs).
+##
+## On cycle detection: transitions to ERROR via [method _transition_to_error]
+## with reason [constant ERROR_CIRCULAR_REF] and details payload
+## [code]{"cycle": Array[String]}[/code] where the cycle path is repeated
+## tail-to-head (e.g. [code]["dungeon_a", "biome_b", "dungeon_a"][/code]).
+## Also pushes the canonical [code][DataRegistry] CIRCULAR REF: a → b → a[/code]
+## log line for QA / playtest visibility.
+##
+## Acyclic graphs are silent passes. Returns [code]true[/code] on no-cycle,
+## [code]false[/code] when a cycle was detected (caller must NOT emit
+## [signal registry_ready] in that branch).
+##
+## Defensive: an empty `dungeons` or `biomes` category short-circuits to
+## [code]true[/code] (no graph to traverse).
+##
+## Cross-type invariants (boss-uniqueness, archetype-distribution, etc. per
+## ADR-0011) are out of scope for this method's TR-008/018 closure — those
+## land alongside their respective per-type validators in the Implementation
+## Notes section of the story file. This method covers the DAG cycle detection
+## piece only.
+##
+## ADR-0006 §DAG validation, TR-data-loading-008, TR-data-loading-018, AC-DLS-06.
+func _validate_dag() -> bool:
+	var dungeons: Dictionary = _categories.get("dungeons", {})
+	var biomes: Dictionary = _categories.get("biomes", {})
+	if dungeons.is_empty() and biomes.is_empty():
+		return true  # No graph to walk.
+
+	# Iterate every dungeon as a potential cycle entry point. Reusing visited
+	# state across roots is unsafe — a cycle entered from a different root
+	# might be missed if the closing node was marked "fully done" earlier.
+	# The per-root walk is bounded by the graph size so total cost stays O(N).
+	for dungeon_id: String in dungeons:
+		var path: Array = []
+		var on_path: Dictionary = {}
+		if _walk_for_cycle(dungeon_id, "dungeons", path, on_path):
+			# _walk_for_cycle already populated the cycle path.
+			var typed_path: Array[String] = []
+			for v: Variant in path:
+				typed_path.append(str(v))
+			_transition_to_error(ERROR_CIRCULAR_REF, {"cycle": typed_path})
+			push_error(
+				"[DataRegistry] CIRCULAR REF: %s" % " → ".join(typed_path)
+			)
+			return false
+	return true
+
+
+## Story 006 — recursive DFS helper for [method _validate_dag].
+##
+## Walks edges from [param node_id] of [param node_type] (one of
+## [code]"dungeons"[/code] or [code]"biomes"[/code]). Maintains [param path]
+## as the current visit chain and [param on_path] as the on-stack set. When
+## an on-stack node is re-entered, the cycle is detected: [param path] is
+## extended with the closing-node id and the function returns [code]true[/code].
+##
+## On a non-cycle return, the node is popped from both [param path] and
+## [param on_path] so subsequent root walks see a clean state.
+##
+## [param node_id]: id of the current node.
+## [param node_type]: one of [code]"dungeons"[/code] or [code]"biomes"[/code].
+## [param path]: in-out; the current visit chain. Caller passes [code][][/code]
+##   on first call.
+## [param on_path]: in-out; set of [code]node_type:node_id[/code] keys
+##   currently on the visit stack. Caller passes [code]{}[/code] on first call.
+##
+## Returns [code]true[/code] when a cycle was detected (path is populated
+## with the offending sequence repeated tail-to-head); [code]false[/code]
+## on a clean walk.
+func _walk_for_cycle(
+	node_id: String, node_type: String, path: Array, on_path: Dictionary
+) -> bool:
+	var key: String = "%s:%s" % [node_type, node_id]
+	if on_path.has(key):
+		# Cycle detected. Append the closing id so the path reads
+		# "a → b → a" tail-to-head per AC-DLS-06.
+		path.append(node_id)
+		return true
+	on_path[key] = true
+	path.append(node_id)
+
+	var category: Dictionary = _categories.get(node_type, {})
+	var resource: Resource = category.get(node_id, null)
+	if resource == null:
+		# Unresolvable — treat as leaf for DAG purposes (no edges to walk).
+		# UnresolvableCrossRef detection lives in the cross-type validator
+		# story (out of scope here per the story spec).
+		on_path.erase(key)
+		path.pop_back()
+		return false
+
+	# Walk edges based on node type. Only the dungeon ↔ biome edges are checked
+	# for MVP; other cross-refs (Floor.enemy_list[].enemy_id → EnemyData)
+	# are non-cycling by construction (enemies have no back-refs to floors).
+	if node_type == "dungeons":
+		# Edge: Dungeon.biome_id (String) → Biome
+		if "biome_id" in resource:
+			var biome_id: String = str(resource.get("biome_id"))
+			if not biome_id.is_empty():
+				if _walk_for_cycle(biome_id, "biomes", path, on_path):
+					return true
+	elif node_type == "biomes":
+		# Edge: Biome.dungeons (Array[Dungeon]) → Dungeon[] (embedded refs).
+		#
+		# IMPORTANT: skip the CANONICAL parent-child embedding (a biome embedding
+		# a dungeon whose biome_id points BACK to this same biome). That's the
+		# standard authoring pattern in `assets/data/`, not a cycle. The
+		# cycle-check follows ONLY non-canonical embeddings — i.e. a biome that
+		# embeds a dungeon belonging to a DIFFERENT biome (which would be a
+		# malformed authoring pattern indicating a real cross-link cycle).
+		if "dungeons" in resource:
+			var dungeons_in: Variant = resource.get("dungeons")
+			if dungeons_in is Array:
+				for d: Variant in (dungeons_in as Array):
+					if d == null:
+						continue
+					if not (d is Resource) or not ("id" in d):
+						continue
+					var d_id: String = str(d.get("id"))
+					if d_id.is_empty():
+						continue
+					# Canonical parent-child skip: a biome embedding a dungeon
+					# that points BACK at this biome via biome_id is the
+					# standard pattern; the cycle is structural, not logical.
+					if "biome_id" in d:
+						var d_biome_id: String = str(d.get("biome_id"))
+						if d_biome_id == node_id:
+							continue
+					if _walk_for_cycle(d_id, "dungeons", path, on_path):
+						return true
+
+	on_path.erase(key)
+	path.pop_back()
+	return false

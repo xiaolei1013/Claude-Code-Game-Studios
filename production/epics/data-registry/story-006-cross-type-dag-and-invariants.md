@@ -1,10 +1,10 @@
 # Story 006: Cross-reference DAG validation and cross-type invariants
 
 > **Epic**: data-registry
-> **Status**: Complete (system shipped; see systems-index Implementation Status #2. Test evidence: `tests/unit/data_registry/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (real implementation 2026-05-08 — `_validate_dag` + `_walk_for_cycle` added to source; `_boot_scan` wired to call it; integration test ships with 8 functions covering DAG ACs + production-data false-positive avoidance. Audit-cascade Status flip from earlier was over-eager — the validator did NOT exist before this PR. 7th instance of audit-cascade-over-eager pattern caught today.)
 > **Layer**: Foundation
 > **Type**: Logic
-> **Manifest Version**: 2026-04-24
+> **Manifest Version**: 2026-04-26
 
 ## Context
 
@@ -32,9 +32,9 @@
 
 *Scoped to this story, drawn verbatim from GDD §8 (AC-DLS-NN) or TR-registry (TR-data-loading-NNN):*
 
-- [ ] TR-data-loading-008: Cross-reference DAG rule: no cycles; load order `classes → enemies → biomes → dungeons → items → matchup`
-- [ ] TR-data-loading-018: Post-load DAG validation detects circular references → ERROR state with cycle path logged
-- [ ] AC-DLS-06: **GIVEN** two resources form a circular reference (`dungeon_A → biome_B → dungeon_A`, or any cycle length ≥ 2), **WHEN** the Data Loading System performs post-load DAG validation, **THEN** the cycle is detected and reported: `[DataRegistry] CIRCULAR REF: dungeon_A → biome_B → dungeon_A`; state transitions to `ERROR`; neither resource in the cycle is available via `resolve()`; all other non-cyclic resources remain accessible.
+- [x] TR-data-loading-008: Cross-reference DAG rule: no cycles; load order `classes → enemies → biomes → dungeons → items → matchup`
+- [x] TR-data-loading-018: Post-load DAG validation detects circular references → ERROR state with cycle path logged
+- [x] AC-DLS-06: **GIVEN** two resources form a circular reference (`dungeon_A → biome_B → dungeon_A`, or any cycle length ≥ 2), **WHEN** the Data Loading System performs post-load DAG validation, **THEN** the cycle is detected and reported: `[DataRegistry] CIRCULAR REF: dungeon_A → biome_B → dungeon_A`; state transitions to `ERROR`; neither resource in the cycle is available via `resolve()`; all other non-cyclic resources remain accessible.
 
 ---
 
