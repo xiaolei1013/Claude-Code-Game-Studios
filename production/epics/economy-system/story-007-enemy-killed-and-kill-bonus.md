@@ -1,7 +1,7 @@
 # Story 007: enemy_killed signal handler + kill bonus
 
 > **Epic**: economy-system
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #5. Test evidence: `tests/unit/economy/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Core
 > **Type**: Integration
 > **Manifest Version**: 2026-04-24

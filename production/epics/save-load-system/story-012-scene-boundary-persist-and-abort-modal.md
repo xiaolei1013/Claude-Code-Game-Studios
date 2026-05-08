@@ -1,7 +1,7 @@
 # Story 012: Scene-boundary persist + `save_failed` abort modal coupling
 
 > **Epic**: save-load-system
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #3. Test evidence: `tests/{unit,integration}/save_load/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Foundation
 > **Type**: Integration
 > **Manifest Version**: 2026-04-24

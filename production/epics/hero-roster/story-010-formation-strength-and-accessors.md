@@ -1,7 +1,7 @@
 # Story 010: Formation strength + accessors + AC H-14 perf
 
 > **Epic**: hero-roster
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #9. Test evidence: `tests/{unit,integration}/hero_roster/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Feature
 > **Type**: Logic (with Performance for AC H-14)
 > **Manifest Version**: 2026-04-26

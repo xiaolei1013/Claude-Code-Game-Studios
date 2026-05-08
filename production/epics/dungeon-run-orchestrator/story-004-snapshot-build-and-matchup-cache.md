@@ -1,7 +1,7 @@
 # Story 004: Formation snapshot deep-copy + floor serialize-by-id + matchup cache build
 
 > **Epic**: dungeon-run-orchestrator
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #13. Test evidence: `tests/{unit,integration}/dungeon_run_orchestrator/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Feature
 > **Type**: Logic
 > **Manifest Version**: 2026-04-26

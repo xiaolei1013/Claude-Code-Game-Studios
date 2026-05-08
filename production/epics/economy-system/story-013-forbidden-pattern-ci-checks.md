@@ -1,7 +1,7 @@
 # Story 013: 4 forbidden-pattern CI grep checks for Economy
 
 > **Epic**: economy-system
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #5. Test evidence: `tests/unit/economy/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Core
 > **Type**: Config/Data
 > **Manifest Version**: 2026-04-24

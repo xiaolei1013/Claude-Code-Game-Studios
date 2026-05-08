@@ -1,7 +1,7 @@
 # Story 007: Economy + Combat consumer wiring
 
 > **Epic**: matchup-resolver
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #10. Test evidence: `tests/{unit,integration}/matchup_resolver/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Feature
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26

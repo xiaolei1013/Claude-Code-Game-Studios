@@ -1,7 +1,7 @@
 # Story 004: effectiveness_label hook on MatchupResult (S4-N1 quick-spec)
 
 > **Epic**: matchup-resolver
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #10. Test evidence: `tests/{unit,integration}/matchup_resolver/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Feature
 > **Type**: Logic
 > **Manifest Version**: 2026-04-26

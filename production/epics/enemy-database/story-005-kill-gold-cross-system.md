@@ -1,7 +1,7 @@
 # Story 005: Kill-gold formula cross-system consistency (Economy ↔ Enemy DB ↔ Matchup)
 
 > **Epic**: enemy-database
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #7. Test evidence: `tests/{unit,integration}/enemy_database/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Core
 > **Type**: Integration
 > **Manifest Version**: 2026-04-24

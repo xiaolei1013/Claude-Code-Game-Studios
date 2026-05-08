@@ -1,7 +1,7 @@
 # Story 009: level_cost geometric formula + LEVEL_CAP sentinel (-1)
 
 > **Epic**: economy-system
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #5. Test evidence: `tests/unit/economy/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Core
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24

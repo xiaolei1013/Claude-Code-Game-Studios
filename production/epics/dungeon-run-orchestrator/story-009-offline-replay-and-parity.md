@@ -1,7 +1,7 @@
 # Story 009: ACTIVE_OFFLINE_REPLAY compute + D.4 loop-walk + foreground/offline parity
 
 > **Epic**: dungeon-run-orchestrator
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #13. Test evidence: `tests/{unit,integration}/dungeon_run_orchestrator/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Feature
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26

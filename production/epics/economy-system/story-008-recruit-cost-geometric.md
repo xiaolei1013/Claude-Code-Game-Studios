@@ -1,7 +1,7 @@
 # Story 008: recruit_cost geometric formula (1.8× per copy)
 
 > **Epic**: economy-system
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #5. Test evidence: `tests/unit/economy/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Core
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24

@@ -1,7 +1,7 @@
 # Story 006: Cross-reference DAG validation and cross-type invariants
 
 > **Epic**: data-registry
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #2. Test evidence: `tests/unit/data_registry/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Foundation
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24

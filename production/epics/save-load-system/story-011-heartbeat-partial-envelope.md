@@ -1,7 +1,7 @@
 # Story 011: Heartbeat partial-envelope — `request_heartbeat_persist(time_fields)` (≤512 bytes)
 
 > **Epic**: save-load-system
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #3. Test evidence: `tests/{unit,integration}/save_load/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Foundation
 > **Type**: Integration
 > **Manifest Version**: 2026-04-24

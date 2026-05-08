@@ -1,7 +1,7 @@
 # Story 010: Edge cases (input-block, back-to-back queue, BG mid-transition) + performance verification (H-10, H-11, H-12)
 
 > **Epic**: scene-manager
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #4. Test evidence: `tests/{unit,integration}/scene_manager/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Foundation
 > **Type**: Integration (Performance)
 > **Manifest Version**: 2026-04-24

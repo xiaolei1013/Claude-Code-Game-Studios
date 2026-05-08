@@ -1,7 +1,7 @@
 # Story 010: Performance budget + Orchestrator synchronous integration
 
 > **Epic**: combat-resolution
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #11. Test evidence: `tests/{unit,integration}/combat_resolution/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Feature
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26

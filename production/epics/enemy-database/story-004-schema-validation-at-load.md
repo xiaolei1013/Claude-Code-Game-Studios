@@ -1,7 +1,7 @@
 # Story 004: EnemyData schema validation at load time
 
 > **Epic**: enemy-database
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #7. Test evidence: `tests/{unit,integration}/enemy_database/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Core
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24

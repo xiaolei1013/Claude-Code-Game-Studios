@@ -1,7 +1,7 @@
 # Story 009: `reduce_motion` accessibility flag + offline-replay cozy-modal coordination
 
 > **Epic**: scene-manager
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #4. Test evidence: `tests/{unit,integration}/scene_manager/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Foundation
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26

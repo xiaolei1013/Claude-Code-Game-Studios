@@ -1,7 +1,7 @@
 # Story 004: Cross-resource schema validation at load time
 
 > **Epic**: biome-dungeon-database
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #8. Test evidence: `tests/{unit,integration}/biome_dungeon_database/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Core
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24

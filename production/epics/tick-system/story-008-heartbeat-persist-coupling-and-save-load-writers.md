@@ -1,7 +1,7 @@
 # Story 008: Heartbeat persist coupling + Save/Load writer surface
 
 > **Epic**: tick-system
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #1. Test evidence: `tests/{unit,integration}/tick_system/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Foundation
 > **Type**: Integration
 > **Manifest Version**: 2026-04-24

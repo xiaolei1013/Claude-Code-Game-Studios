@@ -1,7 +1,7 @@
 # Story 009: 3 V1.0 stub class .tres files + flavor_text advisory check
 
 > **Epic**: hero-class-database
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #6. Test evidence: `tests/{unit,integration}/hero_class_database/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Core
 > **Type**: Config/Data
 > **Manifest Version**: 2026-04-24

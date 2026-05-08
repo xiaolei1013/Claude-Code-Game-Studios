@@ -1,7 +1,7 @@
 # Story 007: Boot validation order + orphan handling + last-write-wins
 
 > **Epic**: hero-roster
-> **Status**: Ready
+> **Status**: Complete (system shipped; see systems-index Implementation Status #9. Test evidence: `tests/{unit,integration}/hero_roster/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
 > **Layer**: Feature
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26
