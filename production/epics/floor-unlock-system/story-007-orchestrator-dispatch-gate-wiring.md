@@ -1,7 +1,7 @@
 # Story 007: Orchestrator DISPATCHING gate — FloorUnlock.is_unlocked check
 
 > **Epic**: floor-unlock-system
-> **Status**: Complete (system shipped; see systems-index Implementation Status #16. Test evidence: `tests/unit/floor_unlock_system/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (real implementation 2026-05-08 — added lazy-bind in orchestrator `_ready()` + new integration test (5 functions) covering all 4 ACs. Type widened from `RefCounted` to `Object` to accept the Node autoload. 2 adjacent tests updated for the AC-mandated fail-open removal.)
 > **Layer**: Feature
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26
@@ -25,10 +25,10 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-026 lazy-bind: orchestrator `_ready()` auto-binds `_floor_unlock = FloorUnlock` when no spy injected; pre-injected spy survives
-- [ ] TR-026 locked rejection: dispatch with `floor_index` where `FloorUnlock.is_unlocked(floor_index) == false` triggers `validation_failed("floor_locked", {"floor_index": <i>})` and state → RUN_ENDED
-- [ ] TR-026 unlocked passes: dispatch with valid floor proceeds normally (snapshot built, ACTIVE_FOREGROUND entered)
-- [ ] TR-026 fail-open removed: with production FloorUnlock bound, `is_unlocked(0)` returns false (sentinel); previous test-env null-fail-open path no longer reached in production
+- [x] TR-026 lazy-bind: orchestrator `_ready()` auto-binds `_floor_unlock = FloorUnlock` when no spy injected; pre-injected spy survives
+- [x] TR-026 locked rejection: dispatch with `floor_index` where `FloorUnlock.is_unlocked(floor_index) == false` triggers `validation_failed("floor_locked", {"floor_index": <i>})` and state → RUN_ENDED
+- [x] TR-026 unlocked passes: dispatch with valid floor proceeds normally (snapshot built, ACTIVE_FOREGROUND entered)
+- [x] TR-026 fail-open removed: with production FloorUnlock bound, `is_unlocked(0)` returns false (sentinel); previous test-env null-fail-open path no longer reached in production
 
 ---
 

@@ -35,8 +35,23 @@ const HeroInstanceScript = preload("res://src/core/hero_roster/hero_instance.gd"
 # Helpers
 # ---------------------------------------------------------------------------
 
+## Test-only RefCounted spy that returns true for every floor — insulates
+## cascade tests from the production FloorUnlock's per-biome unlock state
+## (which gates floor_index > highest_cleared+1). After Story 007 landed
+## the lazy-bind in `_ready()`, the orchestrator binds /root/FloorUnlock by
+## default; cascade tests using floor_index > 1 against a fresh-save
+## FloorUnlock would fail the dispatch's lock check. This spy bypasses that.
+class _AlwaysUnlockedSpy extends RefCounted:
+	func is_unlocked(_floor_index: int) -> bool:
+		return true
+
+
 func _make_orch() -> Node:
 	var orch: Node = OrchestratorScript.new()
+	# Inject the always-unlocked spy BEFORE add_child so the lazy-bind in
+	# _ready sees the pre-injected spy and skips auto-binding the production
+	# FloorUnlock autoload.
+	orch.set_floor_unlock(_AlwaysUnlockedSpy.new())
 	add_child(orch)
 	auto_free(orch)
 	return orch
