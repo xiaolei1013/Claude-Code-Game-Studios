@@ -1,7 +1,7 @@
 # Story 005: advance_unlock + DungeonRunOrchestrator signal subscription + monotonicity invariant
 
 > **Epic**: floor-unlock-system
-> **Status**: Complete (system shipped; see systems-index Implementation Status #16. Test evidence: `tests/unit/floor_unlock_system/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — implementation + tests already exist in `tests/unit/floor_unlock_system/floor_unlock_system_test.gd`. Paperwork-only closure.)
 > **Layer**: Feature
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26
@@ -27,11 +27,11 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-006: `_ready()` subscribes to `DungeonRunOrchestrator.floor_cleared_first_time` with default flags; idempotent (re-call doesn't double-connect)
-- [ ] TR-007: handler signature is `_on_floor_cleared_first_time(floor_index: int, biome_id: String, losing_run: bool)`
-- [ ] TR-008: source-grep canary — no `_unlock_state[X] -= ...` or `_unlock_state[X] = N` where N could be lower; only `_unlock_state[X] = max(...)` patterns OR Story 006's clamp branches
-- [ ] TR-009: handler treats losing_run=true and losing_run=false identically — same advance, same final state
-- [ ] TR-010: duplicate signal (same floor_index for same biome_id) is silent no-op — `_unlock_state` unchanged
+- [x] TR-006: `_ready()` subscribes to `DungeonRunOrchestrator.floor_cleared_first_time` with default flags; idempotent (re-call doesn't double-connect)
+- [x] TR-007: handler signature is `_on_floor_cleared_first_time(floor_index: int, biome_id: String, losing_run: bool)`
+- [x] TR-008: source-grep canary — no `_unlock_state[X] -= ...` or `_unlock_state[X] = N` where N could be lower; only `_unlock_state[X] = max(...)` patterns OR Story 006's clamp branches
+- [x] TR-009: handler treats losing_run=true and losing_run=false identically — same advance, same final state
+- [x] TR-010: duplicate signal (same floor_index for same biome_id) is silent no-op — `_unlock_state` unchanged
 
 ---
 
