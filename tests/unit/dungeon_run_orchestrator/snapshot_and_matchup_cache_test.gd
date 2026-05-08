@@ -287,16 +287,16 @@ func test_matchup_cache_built_exactly_once_at_dispatch() -> void:
 	# Arrange — orchestrator with a counting spy resolver.
 	var orch: Node = OrchestratorScript.new()
 	var combat: RefCounted = DefaultCombatResolverScript.new()
-	var spy: RefCounted = CountingMatchupResolverSpy.new()
+	var matchup_spy: RefCounted = CountingMatchupResolverSpy.new()
 	orch.set_combat_resolver(combat)
-	orch.set_matchup_resolver(spy)
+	orch.set_matchup_resolver(matchup_spy)
 	add_child(orch)
 	auto_free(orch)
 
 	# Act — dispatch (synthetic 3-enemy floor → 1 distinct archetype "bruiser"
 	# → 1 resolver call expected per build_matchup_cache's dedup).
 	orch.dispatch([_make_hero(WARRIOR_ID, 1)], 1, "forest_reach")
-	var post_dispatch_calls: int = spy.resolve_formation_matchup_call_count
+	var post_dispatch_calls: int = matchup_spy.resolve_formation_matchup_call_count
 
 	# Assert — cache built once. The 3-enemy synthetic floor has 1 distinct
 	# archetype, so call count is exactly 1 after dispatch.
@@ -313,12 +313,12 @@ func test_per_tick_replay_does_not_invoke_matchup_resolver() -> void:
 	# Arrange
 	var orch: Node = OrchestratorScript.new()
 	orch.set_combat_resolver(DefaultCombatResolverScript.new())
-	var spy: RefCounted = CountingMatchupResolverSpy.new()
-	orch.set_matchup_resolver(spy)
+	var matchup_spy: RefCounted = CountingMatchupResolverSpy.new()
+	orch.set_matchup_resolver(matchup_spy)
 	add_child(orch)
 	auto_free(orch)
 	orch.dispatch([_make_hero(WARRIOR_ID, 1, 5)], 1, "forest_reach")
-	var dispatch_call_count: int = spy.resolve_formation_matchup_call_count
+	var dispatch_call_count: int = matchup_spy.resolve_formation_matchup_call_count
 
 	# Act — fire 100 simulated ticks. None should invoke the resolver.
 	for n: int in range(1, 101):
@@ -328,7 +328,7 @@ func test_per_tick_replay_does_not_invoke_matchup_resolver() -> void:
 			break
 
 	# Assert — total resolver calls unchanged from post-dispatch baseline.
-	assert_int(spy.resolve_formation_matchup_call_count).is_equal(dispatch_call_count)
+	assert_int(matchup_spy.resolve_formation_matchup_call_count).is_equal(dispatch_call_count)
 
 
 # ===========================================================================

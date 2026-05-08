@@ -101,13 +101,13 @@ func test_lazy_default_does_not_overwrite_pre_injected_spy() -> void:
 	# Arrange — instantiate orchestrator, inject spy, THEN add_child (which
 	# fires _ready()).
 	var orch: Node = OrchestratorScript.new()
-	var spy: TestSpyResolver = TestSpyResolver.new()
-	orch.set_matchup_resolver(spy)
+	var resolver_spy: TestSpyResolver = TestSpyResolver.new()
+	orch.set_matchup_resolver(resolver_spy)
 	add_child(orch)  # _ready() fires here
 	auto_free(orch)
 
 	# Assert — spy survives; lazy-default did NOT overwrite.
-	assert_object(orch._matchup_resolver).is_equal(spy)
+	assert_object(orch._matchup_resolver).is_equal(resolver_spy)
 
 
 # ===========================================================================
@@ -185,34 +185,34 @@ func test_spy_subclass_pattern_resolve_formation_matchup_returns_canned_value() 
 	# return values on the spy BEFORE the orchestrator dispatches; assert
 	# the spy was called with expected args.
 	# Arrange
-	var spy: TestSpyResolver = TestSpyResolver.new()
-	spy.canned_advantaged = true
-	spy.canned_label = "Strong"
+	var resolver_spy: TestSpyResolver = TestSpyResolver.new()
+	resolver_spy.canned_advantaged = true
+	resolver_spy.canned_label = "Strong"
 	var formation: Array = [_make_hero("warrior", 1)]
 
 	# Act — call the spy directly (a more thorough test would inject into
 	# orchestrator and drive a dispatch; this isolates the spy contract).
-	var result: MatchupResult = spy.resolve_formation_matchup(formation, "bruiser")
+	var result: MatchupResult = resolver_spy.resolve_formation_matchup(formation, "bruiser")
 
 	# Assert — canned values returned; call_count incremented; log entry recorded.
 	assert_bool(result.is_advantaged).is_true()
 	assert_str(result.effectiveness_label).is_equal("Strong")
-	assert_int(spy.resolve_formation_matchup_call_count).is_equal(1)
-	assert_int(spy.call_log.size()).is_equal(1)
-	assert_int(int(spy.call_log[0]["formation_size"])).is_equal(1)
-	assert_str(str(spy.call_log[0]["archetype"])).is_equal("bruiser")
+	assert_int(resolver_spy.resolve_formation_matchup_call_count).is_equal(1)
+	assert_int(resolver_spy.call_log.size()).is_equal(1)
+	assert_int(int(resolver_spy.call_log[0]["formation_size"])).is_equal(1)
+	assert_str(str(resolver_spy.call_log[0]["archetype"])).is_equal("bruiser")
 
 
 func test_spy_subclass_injected_into_orchestrator_intercepts_resolver_calls() -> void:
 	# Full DI loop: inject spy → orchestrator builds matchup_cache via
 	# CombatResolver.build_matchup_cache(formation, archetypes, _matchup_resolver)
-	# → spy.resolve_formation_matchup is invoked.
+	# → resolver_spy.resolve_formation_matchup is invoked.
 	#
 	# Arrange — orchestrator with spy injection BEFORE add_child.
 	var orch: Node = OrchestratorScript.new()
-	var spy: TestSpyResolver = TestSpyResolver.new()
-	spy.canned_advantaged = false  # all archetypes return disadvantaged
-	orch.set_matchup_resolver(spy)
+	var resolver_spy: TestSpyResolver = TestSpyResolver.new()
+	resolver_spy.canned_advantaged = false  # all archetypes return disadvantaged
+	orch.set_matchup_resolver(resolver_spy)
 	# Combat resolver remains the real DefaultCombatResolver (lazy-default).
 	add_child(orch)
 	auto_free(orch)
@@ -223,16 +223,16 @@ func test_spy_subclass_injected_into_orchestrator_intercepts_resolver_calls() ->
 	]
 
 	# Act — dispatch triggers _build_combat_snapshot → build_matchup_cache →
-	# spy.resolve_formation_matchup per distinct archetype.
+	# resolver_spy.resolve_formation_matchup per distinct archetype.
 	orch.dispatch(formation, 1, "forest_reach")
 
 	# Assert — spy was invoked at least once during dispatch.
 	# (Synthetic 3-enemy fallback floor has 1 distinct archetype "bruiser" →
 	# ≥1 call; real-floor paths could call up to 5 per TR-012.)
-	assert_int(spy.resolve_formation_matchup_call_count).is_greater_equal(1)
+	assert_int(resolver_spy.resolve_formation_matchup_call_count).is_greater_equal(1)
 	# Call args reflect formation size + the archetype the orchestrator
 	# extracted from the snapshot.
-	assert_int(int(spy.call_log[0]["formation_size"])).is_equal(3)
+	assert_int(int(resolver_spy.call_log[0]["formation_size"])).is_equal(3)
 
 
 func test_spy_subclass_call_count_does_not_grow_during_per_tick_replay() -> void:
@@ -242,16 +242,16 @@ func test_spy_subclass_call_count_does_not_grow_during_per_tick_replay() -> void
 	#
 	# Arrange
 	var orch: Node = OrchestratorScript.new()
-	var spy: TestSpyResolver = TestSpyResolver.new()
-	orch.set_matchup_resolver(spy)
+	var resolver_spy: TestSpyResolver = TestSpyResolver.new()
+	orch.set_matchup_resolver(resolver_spy)
 	add_child(orch)
 	auto_free(orch)
 	orch.dispatch([_make_hero("warrior", 1)], 1, "forest_reach")
-	var post_dispatch_count: int = spy.resolve_formation_matchup_call_count
+	var post_dispatch_count: int = resolver_spy.resolve_formation_matchup_call_count
 
 	# Act — fire 50 simulated ticks.
 	for n: int in range(1, 51):
 		orch._on_tick_fired(n)
 
 	# Assert — total call count unchanged (cache hit, not resolver invocation).
-	assert_int(spy.resolve_formation_matchup_call_count).is_equal(post_dispatch_count)
+	assert_int(resolver_spy.resolve_formation_matchup_call_count).is_equal(post_dispatch_count)

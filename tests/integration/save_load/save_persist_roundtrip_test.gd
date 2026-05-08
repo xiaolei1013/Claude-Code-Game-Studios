@@ -173,8 +173,8 @@ func test_full_envelope_round_trip_preserves_all_consumer_state() -> void:
 	sl._state = SaveLoadScript.State.READY
 
 	# Snapshot before persist.
-	var before: Dictionary = _capture_consumer_snapshots()
-	assert_int(before.size()).is_equal(7)
+	var snapshot_before: Dictionary = _capture_consumer_snapshots()
+	assert_int(snapshot_before.size()).is_equal(7)
 
 	# Persist.
 	sl.request_full_persist("roundtrip_persist")
@@ -193,16 +193,16 @@ func test_full_envelope_round_trip_preserves_all_consumer_state() -> void:
 	assert_int(sl.get_state()).is_equal(SaveLoadScript.State.READY)
 
 	# Snapshot after load + compare.
-	var after: Dictionary = _capture_consumer_snapshots()
-	assert_int(after.size()).is_equal(before.size())
-	for key: String in before.keys():
-		assert_bool(after.has(key)).is_true()
+	var snapshot_after: Dictionary = _capture_consumer_snapshots()
+	assert_int(snapshot_after.size()).is_equal(snapshot_before.size())
+	for key: String in snapshot_before.keys():
+		assert_bool(snapshot_after.has(key)).is_true()
 		# Per consumer, the get_save_data() return must round-trip equal.
 		# JSON.stringify provides a deterministic byte-equal comparison
 		# across Dictionary instances (same keys + values produce the same
 		# string per Godot's stable key ordering).
-		var before_str: String = JSON.stringify(before[key])
-		var after_str: String = JSON.stringify(after[key])
+		var before_str: String = JSON.stringify(snapshot_before[key])
+		var after_str: String = JSON.stringify(snapshot_after[key])
 		assert_str(after_str).is_equal(before_str)
 
 	_disconnect_spies(sl)

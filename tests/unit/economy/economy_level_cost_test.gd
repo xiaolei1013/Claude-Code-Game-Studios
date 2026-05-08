@@ -124,9 +124,9 @@ func test_level_cost_unknown_tier_returns_minus_one() -> void:
 
 func test_level_cost_does_not_mutate_gold_balance() -> void:
 	var economy: Node = get_tree().root.get_node_or_null("Economy")
-	var before: int = economy.get_gold_balance()
+	var gold_before: int = economy.get_gold_balance()
 	economy.level_cost(1, 7)
-	assert_int(economy.get_gold_balance()).is_equal(before)
+	assert_int(economy.get_gold_balance()).is_equal(gold_before)
 
 
 func test_level_cost_is_deterministic_for_same_inputs() -> void:

@@ -69,8 +69,8 @@ func test_orchestrator_calls_combat_emit_events_once_per_tick_handler_invocation
 		push_warning("Skipped: DataRegistry cannot resolve classes")
 		return
 	var orch: Node = OrchestratorScript.new()
-	var spy: CountingCombatResolverSpy = CountingCombatResolverSpy.new()
-	orch.set_combat_resolver(spy)
+	var combat_spy: CountingCombatResolverSpy = CountingCombatResolverSpy.new()
+	orch.set_combat_resolver(combat_spy)
 	orch.set_matchup_resolver(DefaultMatchupResolverScript.new())
 	add_child(orch)
 	auto_free(orch)
@@ -89,7 +89,7 @@ func test_orchestrator_calls_combat_emit_events_once_per_tick_handler_invocation
 			break  # run ended; stop firing ticks
 
 	# Assert — spy invoked exactly tick_count times (1 call per tick handler).
-	assert_int(spy.emit_events_call_count).is_equal(tick_count)
+	assert_int(combat_spy.emit_events_call_count).is_equal(tick_count)
 
 
 func test_combat_call_log_uses_monotonic_tick_ranges_per_orchestrator_handler() -> void:
@@ -99,8 +99,8 @@ func test_combat_call_log_uses_monotonic_tick_ranges_per_orchestrator_handler() 
 		push_warning("Skipped")
 		return
 	var orch: Node = OrchestratorScript.new()
-	var spy: CountingCombatResolverSpy = CountingCombatResolverSpy.new()
-	orch.set_combat_resolver(spy)
+	var combat_spy: CountingCombatResolverSpy = CountingCombatResolverSpy.new()
+	orch.set_combat_resolver(combat_spy)
 	orch.set_matchup_resolver(DefaultMatchupResolverScript.new())
 	add_child(orch)
 	auto_free(orch)
@@ -115,7 +115,7 @@ func test_combat_call_log_uses_monotonic_tick_ranges_per_orchestrator_handler() 
 
 	# Assert — recorded ranges are monotonic; each call's tick_lo == previous
 	# call's tick_hi.
-	var call_log: Array = spy.call_log
+	var call_log: Array = combat_spy.call_log
 	if call_log.size() >= 2:
 		for i: int in range(1, call_log.size()):
 			var prev_hi: int = int(call_log[i - 1]["tick_hi"])

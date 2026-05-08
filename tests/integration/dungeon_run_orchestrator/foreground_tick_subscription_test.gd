@@ -31,11 +31,11 @@ class SpyCombatResolver extends RefCounted:
 # Build a fresh orchestrator + spy combat resolver injected before _ready.
 func _make_orch_with_spy() -> Array:
 	var orch: Node = OrchestratorScript.new()
-	var spy: SpyCombatResolver = SpyCombatResolver.new()
-	orch.set_combat_resolver(spy)
+	var combat_spy: SpyCombatResolver = SpyCombatResolver.new()
+	orch.set_combat_resolver(combat_spy)
 	add_child(orch)
 	auto_free(orch)
-	return [orch, spy]
+	return [orch, combat_spy]
 
 
 # Build a minimal RunSnapshot suitable for tick handler tests.
@@ -104,13 +104,13 @@ func test_subscription_idempotent_on_repeated_enter() -> void:
 func test_on_tick_fired_calls_combat_resolver() -> void:
 	var pair: Array = _make_orch_with_spy()
 	var orch: Node = pair[0]
-	var spy: SpyCombatResolver = pair[1]
+	var combat_spy: SpyCombatResolver = pair[1]
 	orch.run_snapshot = _make_snapshot(0)
 	orch._set_state(DungeonRunStateScript.State.ACTIVE_FOREGROUND)
 	orch._on_tick_fired(5)
-	assert_int(spy.call_count).is_equal(1)
-	assert_int(spy.last_tick_lo).is_equal(0)
-	assert_int(spy.last_tick_hi).is_equal(5)
+	assert_int(combat_spy.call_count).is_equal(1)
+	assert_int(combat_spy.last_tick_lo).is_equal(0)
+	assert_int(combat_spy.last_tick_hi).is_equal(5)
 
 
 func test_on_tick_fired_advances_last_emitted_tick() -> void:
@@ -126,12 +126,12 @@ func test_on_tick_fired_advances_last_emitted_tick() -> void:
 func test_five_consecutive_ticks_produce_five_combat_calls() -> void:
 	var pair: Array = _make_orch_with_spy()
 	var orch: Node = pair[0]
-	var spy: SpyCombatResolver = pair[1]
+	var combat_spy: SpyCombatResolver = pair[1]
 	orch.run_snapshot = _make_snapshot(0)
 	orch._set_state(DungeonRunStateScript.State.ACTIVE_FOREGROUND)
 	for n: int in [1, 2, 3, 4, 5]:
 		orch._on_tick_fired(n)
-	assert_int(spy.call_count).is_equal(5)
+	assert_int(combat_spy.call_count).is_equal(5)
 	assert_int(orch.run_snapshot.last_emitted_tick).is_equal(5)
 
 
@@ -142,12 +142,12 @@ func test_five_consecutive_ticks_produce_five_combat_calls() -> void:
 func test_duplicate_tick_is_no_op() -> void:
 	var pair: Array = _make_orch_with_spy()
 	var orch: Node = pair[0]
-	var spy: SpyCombatResolver = pair[1]
+	var combat_spy: SpyCombatResolver = pair[1]
 	orch.run_snapshot = _make_snapshot(0)
 	orch._set_state(DungeonRunStateScript.State.ACTIVE_FOREGROUND)
 	orch._on_tick_fired(5)  # first call: 1 combat call
 	orch._on_tick_fired(5)  # duplicate: should NOT trigger another call
-	assert_int(spy.call_count).is_equal(1)
+	assert_int(combat_spy.call_count).is_equal(1)
 
 
 func test_strict_rewind_is_no_op() -> void:
@@ -156,11 +156,11 @@ func test_strict_rewind_is_no_op() -> void:
 	# behavior (no combat call).
 	var pair: Array = _make_orch_with_spy()
 	var orch: Node = pair[0]
-	var spy: SpyCombatResolver = pair[1]
+	var combat_spy: SpyCombatResolver = pair[1]
 	orch.run_snapshot = _make_snapshot(5)  # last_emitted = 5
 	orch._set_state(DungeonRunStateScript.State.ACTIVE_FOREGROUND)
 	orch._on_tick_fired(3)  # rewind
-	assert_int(spy.call_count).is_equal(0)
+	assert_int(combat_spy.call_count).is_equal(0)
 
 
 # ===========================================================================
@@ -170,11 +170,11 @@ func test_strict_rewind_is_no_op() -> void:
 func test_on_tick_fired_no_op_when_state_not_active_foreground() -> void:
 	var pair: Array = _make_orch_with_spy()
 	var orch: Node = pair[0]
-	var spy: SpyCombatResolver = pair[1]
+	var combat_spy: SpyCombatResolver = pair[1]
 	# State is NO_RUN by default.
 	orch.run_snapshot = _make_snapshot(0)
 	orch._on_tick_fired(5)
-	assert_int(spy.call_count).is_equal(0)
+	assert_int(combat_spy.call_count).is_equal(0)
 
 
 func test_on_tick_fired_no_op_when_run_snapshot_null() -> void:
@@ -183,11 +183,11 @@ func test_on_tick_fired_no_op_when_run_snapshot_null() -> void:
 	# S7-M12 handler must tolerate the not-yet-built case).
 	var pair: Array = _make_orch_with_spy()
 	var orch: Node = pair[0]
-	var spy: SpyCombatResolver = pair[1]
+	var combat_spy: SpyCombatResolver = pair[1]
 	orch._set_state(DungeonRunStateScript.State.ACTIVE_FOREGROUND)
 	# run_snapshot stays null.
 	orch._on_tick_fired(5)
-	assert_int(spy.call_count).is_equal(0)
+	assert_int(combat_spy.call_count).is_equal(0)
 
 
 # ===========================================================================

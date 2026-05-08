@@ -132,9 +132,9 @@ func test_recruit_cost_tier_not_in_base_recruit_returns_minus_one() -> void:
 
 func test_recruit_cost_does_not_mutate_gold_balance() -> void:
 	var economy: Node = get_tree().root.get_node_or_null("Economy")
-	var before: int = economy.get_gold_balance()
+	var gold_before: int = economy.get_gold_balance()
 	economy.recruit_cost("warrior", 5)
-	assert_int(economy.get_gold_balance()).is_equal(before)
+	assert_int(economy.get_gold_balance()).is_equal(gold_before)
 
 
 func test_recruit_cost_is_deterministic_for_same_inputs() -> void:

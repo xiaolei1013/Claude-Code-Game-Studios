@@ -119,13 +119,13 @@ func test_per_tick_replay_makes_zero_matchup_resolver_calls_after_dispatch() -> 
 		return
 	# Arrange
 	var orch: Node = OrchestratorScript.new()
-	var spy: CountingMatchupResolverSpy = CountingMatchupResolverSpy.new()
+	var matchup_spy: CountingMatchupResolverSpy = CountingMatchupResolverSpy.new()
 	orch.set_combat_resolver(DefaultCombatResolverScript.new())
-	orch.set_matchup_resolver(spy)
+	orch.set_matchup_resolver(matchup_spy)
 	add_child(orch)
 	auto_free(orch)
 	orch.dispatch([_make_hero("warrior", 1, 5)], 1, "forest_reach")
-	var post_dispatch_count: int = spy.resolve_formation_matchup_call_count
+	var post_dispatch_count: int = matchup_spy.resolve_formation_matchup_call_count
 
 	# Act — fire 100 ticks (or until run ends).
 	for n: int in range(1, 101):
@@ -135,7 +135,7 @@ func test_per_tick_replay_makes_zero_matchup_resolver_calls_after_dispatch() -> 
 			break
 
 	# Assert — call count unchanged from post-dispatch baseline.
-	assert_int(spy.resolve_formation_matchup_call_count).is_equal(post_dispatch_count)
+	assert_int(matchup_spy.resolve_formation_matchup_call_count).is_equal(post_dispatch_count)
 
 
 # ===========================================================================
@@ -270,9 +270,9 @@ func test_orchestrator_dispatch_with_empty_formation_does_not_crash() -> void:
 	# validation_failed("empty_formation", {}) and transitions to RUN_ENDED
 	# WITHOUT calling the matchup resolver.
 	var orch: Node = OrchestratorScript.new()
-	var spy: CountingMatchupResolverSpy = CountingMatchupResolverSpy.new()
+	var matchup_spy: CountingMatchupResolverSpy = CountingMatchupResolverSpy.new()
 	orch.set_combat_resolver(DefaultCombatResolverScript.new())
-	orch.set_matchup_resolver(spy)
+	orch.set_matchup_resolver(matchup_spy)
 	add_child(orch)
 	auto_free(orch)
 
@@ -280,5 +280,5 @@ func test_orchestrator_dispatch_with_empty_formation_does_not_crash() -> void:
 	orch.dispatch([], 1, "forest_reach")
 
 	# Assert — resolver not invoked; state is RUN_ENDED.
-	assert_int(spy.resolve_formation_matchup_call_count).is_equal(0)
+	assert_int(matchup_spy.resolve_formation_matchup_call_count).is_equal(0)
 	assert_int(orch.state).is_equal(DungeonRunStateScript.State.RUN_ENDED)

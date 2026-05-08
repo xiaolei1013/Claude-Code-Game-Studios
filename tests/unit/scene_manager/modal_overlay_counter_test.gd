@@ -375,23 +375,23 @@ func test_scene_manager_on_pause_called_on_push_overlay() -> void:
 
 	# Inject a SpyScreen as current_screen directly. This bypasses the transition
 	# machinery — fine because we're testing the modal API contract, not transitions.
-	var spy: Node = SpyScreenScript.new()
-	sm.current_screen = spy
+	var screen_spy: Node = SpyScreenScript.new()
+	sm.current_screen = screen_spy
 	sm.current_screen_id = "spy_screen"
 
 	# Pre-condition: spy hook log is empty
-	assert_int(spy.hook_log.size()).is_equal(0)
+	assert_int(screen_spy.hook_log.size()).is_equal(0)
 
 	# Act
 	sm.push_overlay("settings", true)
 
 	# Assert: on_pause was called exactly once
-	assert_int(spy.hook_log.size()).is_equal(1)
-	assert_str(spy.hook_log[0]["hook"]).is_equal("on_pause")
+	assert_int(screen_spy.hook_log.size()).is_equal(1)
+	assert_str(screen_spy.hook_log[0]["hook"]).is_equal("on_pause")
 
 	# Cleanup
 	sm.pop_overlay("settings")
-	spy.free()
+	screen_spy.free()
 	await _cleanup_wired(sm, main_root)
 
 
@@ -401,19 +401,19 @@ func test_scene_manager_on_resume_called_on_last_pop_overlay() -> void:
 	var sm: Node = result[0]
 	var main_root: Node = result[1]
 
-	var spy: Node = SpyScreenScript.new()
-	sm.current_screen = spy
+	var screen_spy: Node = SpyScreenScript.new()
+	sm.current_screen = screen_spy
 	sm.current_screen_id = "spy_screen"
 
 	sm.push_overlay("settings", true)
 	sm.pop_overlay("settings")
 
 	# After full cycle: hook_log = [on_pause, on_resume] in order
-	assert_int(spy.hook_log.size()).is_equal(2)
-	assert_str(spy.hook_log[0]["hook"]).is_equal("on_pause")
-	assert_str(spy.hook_log[1]["hook"]).is_equal("on_resume")
+	assert_int(screen_spy.hook_log.size()).is_equal(2)
+	assert_str(screen_spy.hook_log[0]["hook"]).is_equal("on_pause")
+	assert_str(screen_spy.hook_log[1]["hook"]).is_equal("on_resume")
 
-	spy.free()
+	screen_spy.free()
 	await _cleanup_wired(sm, main_root)
 
 
@@ -423,8 +423,8 @@ func test_scene_manager_on_resume_only_after_all_overlays_pop() -> void:
 	var sm: Node = result[0]
 	var main_root: Node = result[1]
 
-	var spy: Node = SpyScreenScript.new()
-	sm.current_screen = spy
+	var screen_spy: Node = SpyScreenScript.new()
+	sm.current_screen = screen_spy
 	sm.current_screen_id = "spy_screen"
 
 	# Push two overlays
@@ -438,7 +438,7 @@ func test_scene_manager_on_resume_only_after_all_overlays_pop() -> void:
 	# when current_screen exists). Verify the actual contract.
 	# Filter the hook log for on_resume entries — should be 0 at this point.
 	var resume_count_after_inner_pop: int = 0
-	for entry: Dictionary in spy.hook_log:
+	for entry: Dictionary in screen_spy.hook_log:
 		if entry["hook"] == "on_resume":
 			resume_count_after_inner_pop += 1
 	assert_int(resume_count_after_inner_pop).is_equal(0)
@@ -446,10 +446,10 @@ func test_scene_manager_on_resume_only_after_all_overlays_pop() -> void:
 	# Pop the outer one — on_resume must now fire (state returns to IDLE).
 	sm.pop_overlay("settings")
 	var resume_count_after_outer_pop: int = 0
-	for entry: Dictionary in spy.hook_log:
+	for entry: Dictionary in screen_spy.hook_log:
 		if entry["hook"] == "on_resume":
 			resume_count_after_outer_pop += 1
 	assert_int(resume_count_after_outer_pop).is_equal(1)
 
-	spy.free()
+	screen_spy.free()
 	await _cleanup_wired(sm, main_root)

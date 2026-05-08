@@ -119,25 +119,25 @@ func test_orchestrator_run_snapshot_initial_value_is_null() -> void:
 
 func test_set_combat_resolver_replaces_internal_field() -> void:
 	var orch: Node = OrchestratorScript.new()
-	var spy: RefCounted = RefCounted.new()
-	orch.set_combat_resolver(spy)
-	assert_object(orch._combat_resolver).is_same(spy)
+	var test_spy: RefCounted = RefCounted.new()
+	orch.set_combat_resolver(test_spy)
+	assert_object(orch._combat_resolver).is_same(test_spy)
 	orch.free()
 
 
 func test_set_matchup_resolver_replaces_internal_field() -> void:
 	var orch: Node = OrchestratorScript.new()
-	var spy: RefCounted = RefCounted.new()
-	orch.set_matchup_resolver(spy)
-	assert_object(orch._matchup_resolver).is_same(spy)
+	var test_spy: RefCounted = RefCounted.new()
+	orch.set_matchup_resolver(test_spy)
+	assert_object(orch._matchup_resolver).is_same(test_spy)
 	orch.free()
 
 
 func test_set_error_logger_replaces_internal_field() -> void:
 	var orch: Node = OrchestratorScript.new()
-	var spy: RefCounted = RefCounted.new()
-	orch.set_error_logger(spy)
-	assert_object(orch._error_logger).is_same(spy)
+	var test_spy: RefCounted = RefCounted.new()
+	orch.set_error_logger(test_spy)
+	assert_object(orch._error_logger).is_same(test_spy)
 	orch.free()
 
 
@@ -147,30 +147,30 @@ func test_set_error_logger_replaces_internal_field() -> void:
 
 func test_injected_combat_resolver_survives_ready_call() -> void:
 	var orch: Node = OrchestratorScript.new()
-	var spy: RefCounted = RefCounted.new()
-	orch.set_combat_resolver(spy)
+	var test_spy: RefCounted = RefCounted.new()
+	orch.set_combat_resolver(test_spy)
 	# Add to scene tree triggers _ready(). Lazy-default must NOT overwrite spy.
 	add_child(orch)
 	auto_free(orch)
-	assert_object(orch._combat_resolver).is_same(spy)
+	assert_object(orch._combat_resolver).is_same(test_spy)
 
 
 func test_injected_matchup_resolver_survives_ready_call() -> void:
 	var orch: Node = OrchestratorScript.new()
-	var spy: RefCounted = RefCounted.new()
-	orch.set_matchup_resolver(spy)
+	var test_spy: RefCounted = RefCounted.new()
+	orch.set_matchup_resolver(test_spy)
 	add_child(orch)
 	auto_free(orch)
-	assert_object(orch._matchup_resolver).is_same(spy)
+	assert_object(orch._matchup_resolver).is_same(test_spy)
 
 
 func test_injected_error_logger_survives_ready_call() -> void:
 	var orch: Node = OrchestratorScript.new()
-	var spy: RefCounted = RefCounted.new()
-	orch.set_error_logger(spy)
+	var test_spy: RefCounted = RefCounted.new()
+	orch.set_error_logger(test_spy)
 	add_child(orch)
 	auto_free(orch)
-	assert_object(orch._error_logger).is_same(spy)
+	assert_object(orch._error_logger).is_same(test_spy)
 
 
 # ===========================================================================
@@ -232,8 +232,8 @@ func test_setters_can_be_called_after_ready_to_replace_lazy_default() -> void:
 	var pre_default: RefCounted = orch._combat_resolver
 	assert_object(pre_default).is_not_null()
 	# Now replace with a spy.
-	var spy: RefCounted = RefCounted.new()
-	orch.set_combat_resolver(spy)
-	assert_object(orch._combat_resolver).is_same(spy)
+	var test_spy: RefCounted = RefCounted.new()
+	orch.set_combat_resolver(test_spy)
+	assert_object(orch._combat_resolver).is_same(test_spy)
 	# Crucially, the spy is NOT the prior default.
 	assert_object(orch._combat_resolver).is_not_same(pre_default)
