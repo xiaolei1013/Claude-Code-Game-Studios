@@ -1,7 +1,7 @@
 # Story 006: Save/Load consumer contract + per-value processing pipeline
 
 > **Epic**: floor-unlock-system
-> **Status**: Complete (system shipped; see systems-index Implementation Status #16. Test evidence: `tests/unit/floor_unlock_system/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — implementation + tests already exist in `tests/unit/floor_unlock_system/floor_unlock_system_test.gd`. Paperwork-only closure.)
 > **Layer**: Feature
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26
@@ -27,13 +27,13 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-015: `get_save_data() -> {"highest_cleared": <dict>}`; `load_save_data(d)` reads `d["highest_cleared"]`
-- [ ] TR-016: load pipeline executes 6 steps in order; each step's failure mode tested individually
-- [ ] TR-017: float values from JSON round-trip (e.g., 5.0) are int()-cast before write
-- [ ] TR-018: non-numeric value (String, bool, NIL) triggers `_warning_logger`; resets that biome's value to 0; key still present in `_unlock_state`
-- [ ] TR-019: save dict missing the `"floor_unlock"` key → load_save_data falls back to fresh-save default; no error
-- [ ] TR-020: stale biome_id (not in DataRegistry active list) preserved in `_unlock_state` after load round-trip with push_warning
-- [ ] TR-029: under-range value (e.g., -3) clamps to 0 with warning; over-range (e.g., 99 with N=5) clamps to N with warning
+- [x] TR-015: `get_save_data() -> {"highest_cleared": <dict>}`; `load_save_data(d)` reads `d["highest_cleared"]`
+- [x] TR-016: load pipeline executes 6 steps in order; each step's failure mode tested individually
+- [x] TR-017: float values from JSON round-trip (e.g., 5.0) are int()-cast before write
+- [x] TR-018: non-numeric value (String, bool, NIL) triggers `_warning_logger`; resets that biome's value to 0; key still present in `_unlock_state`
+- [x] TR-019: save dict missing the `"floor_unlock"` key → load_save_data falls back to fresh-save default; no error
+- [x] TR-020: stale biome_id (not in DataRegistry active list) preserved in `_unlock_state` after load round-trip with push_warning
+- [x] TR-029: under-range value (e.g., -3) clamps to 0 with warning; over-range (e.g., 99 with N=5) clamps to N with warning
 
 ---
 
