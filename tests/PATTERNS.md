@@ -371,7 +371,55 @@ The runtime check is intentional — it prevents silent type drift on later muta
 
 ---
 
-## 11. CONNECT_ONE_SHOT for spies that should fire exactly once
+## 11a. auto_free in `_make_*` factory helpers (preserve orphan-zero baseline)
+
+When a test factory helper instantiates a `Node`-extending type via `.new()` (typical for autoloads constructed outside the scene tree), the returned Node is NOT auto-freed by Godot — `Node.new()` returns an unparented Node that leaks at suite teardown. This shows up in the gdunit4 sweep as "N orphan nodes" warnings.
+
+```gdscript
+# WRONG — leaks one Node per call; sweep reports orphans accumulating across the suite.
+func _make_sls() -> Node:
+    return SaveLoadScript.new()
+
+# RIGHT — auto_free registers the Node for cleanup at test end.
+func _make_sls() -> Node:
+    var sls: Node = SaveLoadScript.new()
+    auto_free(sls)
+    return sls
+```
+
+The canonical pattern is at `tests/unit/floor_unlock_system/floor_unlock_system_test.gd:_make_floor_unlock_with_stubs`. RefCounted-extending types (`extends RefCounted`) auto-clean via reference-counting; the `auto_free` is only required for `extends Node` (or descendant) types instantiated outside the scene tree.
+
+Why it matters: a 0-orphan baseline means a future genuinely-leaked Node surfaces immediately as "1 orphan" in CI. A baseline of "15 orphans (pre-existing)" hides the new leak in the noise. Treat the orphan count as a leak detector, not a tolerance band.
+
+---
+
+## 11b. Clear class-level signal-spy fields in `before_test`, not mid-test
+
+gdunit4 does NOT auto-clear class-level fields between tests. Class-level spy arrays/counters accumulate across tests — a spy that captured one signal in test A will carry that captured value into test B's assertions.
+
+```gdscript
+# WRONG — spy state carries across tests; "expected size 1, got 2" failures
+var _load_failed_calls: Array[Dictionary] = []
+
+func before_test() -> void:
+    _reset_save_load_state()
+    # forgot to clear _load_failed_calls — bleeds across tests
+
+# RIGHT — explicit clear in before_test
+func before_test() -> void:
+    _reset_save_load_state()
+    _load_failed_calls.clear()
+    _load_completed_calls.clear()
+    _tamper_calls = 0
+```
+
+Discovered during S18-N4 (forged-envelope migration test) — V0 test passed but V2 test failed at `_load_failed_calls.size().is_equal(1)` with actual size 2 because V0's load_failed call was still in the array.
+
+Some test files (`save_persist_roundtrip_test.gd`) clear spies mid-test before the relevant assertion. That works for single-suite scenarios but doesn't generalize when adding new tests later — the next test author will reuse the spy field and forget the mid-test clear. The `before_test` hoist is the safer default.
+
+---
+
+## 12. CONNECT_ONE_SHOT for spies that should fire exactly once
 
 When the spy is set up to verify a single emission, prefer `CONNECT_ONE_SHOT` so the lambda auto-disconnects after firing:
 
@@ -407,4 +455,6 @@ For continuous-emission spies (counters), omit the flag and ensure cleanup expli
 | gdunit4 API correction | Sprint 12 S12-M5 | ~0.5d (25 tests against fictional API rewritten) |
 | CI grep forbidden-pattern | Sprint 12 S12-M5 | New pattern from ADR-0014 enforcement need |
 | Wired-vs-autoload + order-of-operations | Sprint 10 S10-S3 | 71-test failure cascade until reordered |
+| auto_free in `_make_*` factory helpers | Sprint 18 hygiene cycle (commit `f826643`) | ~0.2d (15-orphan baseline masked detection) |
+| Clear spy fields in `before_test` | Sprint 18 hygiene cycle (commit `e42c657`) | ~0.1d (V2 test sized 2 vs expected 1) |
 | Typed-collection literal-rejection | Sprint 11 S11-X10 (Recruitment) — re-surfaced Sprint 14 S14-M4 Story 4 | Fix is mechanical; the gotcha resurfaces every time net-new test code seeds a typed-collection field |
