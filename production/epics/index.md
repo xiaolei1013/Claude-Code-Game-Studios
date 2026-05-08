@@ -1,18 +1,18 @@
 # Epics Index
 
-> **Last Updated**: 2026-04-25
+> **Last Updated**: 2026-05-08 (post per-story Status audit `f2c4c00` + per-EPIC.md Status flip `3ce4c1c`; counts + Status now reflect shipped reality)
 > **Engine**: Godot 4.6
 > **Control Manifest Version**: 2026-04-24
-> **Layers Processed**: Foundation ✅ · Core ✅ (4/5 — audio-system blocked on GDD) · Feature ✅ (5/9 — 4 systems blocked on GDDs) · Presentation
+> **Layers Processed**: Foundation ✅ (3/4 fully shipped — save-load + tick + data-registry retain 1-3 pending stories each; scene-manager 13/13 done) · Core ✅ (3/4 fully shipped — economy + hero-class-database retain pending stories) · Feature ✅ (5/5 fully shipped) · Presentation (scaffolds shipped; visual polish pending)
 
 ## Foundation Layer
 
 | Epic | System | GDD | Governing ADRs | Risk | Stories | Status |
 |---|---|---|---|---|---|---|
-| [save-load-system](save-load-system/EPIC.md) | Save/Load System | [save-load-system.md](../../design/gdd/save-load-system.md) | ADR-0003, 0004, 0005, 0007, 0014 | **HIGH** | 15 (all Ready) | Ready |
-| [tick-system](tick-system/EPIC.md) | Game Time & Tick System | [game-time-and-tick.md](../../design/gdd/game-time-and-tick.md) | ADR-0003, 0005, 0014 | MEDIUM | 11 (all Ready) | Ready |
-| [data-registry](data-registry/EPIC.md) | Data Loading System | [data-loading.md](../../design/gdd/data-loading.md) | ADR-0003, 0006, 0011 | MEDIUM | 8 (all Ready) | Ready |
-| [scene-manager](scene-manager/EPIC.md) | Scene/Screen Manager | [scene-screen-manager.md](../../design/gdd/scene-screen-manager.md) | ADR-0003, 0007, 0008, 0014 | **HIGH** | 10 (all Ready) | Ready |
+| [save-load-system](save-load-system/EPIC.md) | Save/Load System | [save-load-system.md](../../design/gdd/save-load-system.md) | ADR-0003, 0004, 0005, 0007, 0014 | **HIGH** | 16 (14 done, 1 Ready, 1 COMPLETE-WITH-NOTES) | Ready (story-013 tamper detection pending) |
+| [tick-system](tick-system/EPIC.md) | Game Time & Tick System | [game-time-and-tick.md](../../design/gdd/game-time-and-tick.md) | ADR-0003, 0005, 0014 | MEDIUM | 11 (9 done, 2 Ready) | Ready (stories 005/007 signal emit paths pending) |
+| [data-registry](data-registry/EPIC.md) | Data Loading System | [data-loading.md](../../design/gdd/data-loading.md) | ADR-0003, 0006, 0011 | MEDIUM | 8 (7 done, 1 Ready) | Ready (story-007 hot-reload pending) |
+| [scene-manager](scene-manager/EPIC.md) | Scene/Screen Manager | [scene-screen-manager.md](../../design/gdd/scene-screen-manager.md) | ADR-0003, 0007, 0008, 0014 | **HIGH** | 13 (all done) | Complete |
 
 **Foundation-layer flagged gap (not an epic)**: UI Framework / Theme (systems-index
 Foundation #4) has no standalone GDD. ADR-0008 + art bible cover architecturally;
@@ -25,10 +25,10 @@ bounded epic is desired.
 
 | Epic | System | GDD | Governing ADRs | Risk | Stories | Status |
 |---|---|---|---|---|---|---|
-| [economy-system](economy-system/EPIC.md) | Economy | [economy-system.md](../../design/gdd/economy-system.md) | ADR-0002, 0003, 0004, 0005, 0011, 0013, 0014 | MEDIUM | 13 (4 done, 9 Ready) | Ready |
-| [hero-class-database](hero-class-database/EPIC.md) | Hero Class Database | [hero-class-database.md](../../design/gdd/hero-class-database.md) | ADR-0003, 0006, 0011 | MEDIUM | 10 (3 done, 7 Ready) | Ready |
-| [enemy-database](enemy-database/EPIC.md) | Enemy Database | [enemy-database.md](../../design/gdd/enemy-database.md) | ADR-0003, 0006, 0011 | MEDIUM | 6 (all Ready) | Ready |
-| [biome-dungeon-database](biome-dungeon-database/EPIC.md) | Biome / Dungeon / Floor Database | [biome-dungeon-database.md](../../design/gdd/biome-dungeon-database.md) | ADR-0003, 0006, 0011, 0014 | MEDIUM | 7 (all Ready) | Ready |
+| [economy-system](economy-system/EPIC.md) | Economy | [economy-system.md](../../design/gdd/economy-system.md) | ADR-0002, 0003, 0004, 0005, 0011, 0013, 0014 | MEDIUM | 13 (10 done, 3 Ready) | Ready (stories 010/011/012 — compute_offline_batch trio pending) |
+| [hero-class-database](hero-class-database/EPIC.md) | Hero Class Database | [hero-class-database.md](../../design/gdd/hero-class-database.md) | ADR-0003, 0006, 0011 | MEDIUM | 10 (9 done, 1 Ready) | Ready (story-010 unique-silhouette manual art QA pending) |
+| [enemy-database](enemy-database/EPIC.md) | Enemy Database | [enemy-database.md](../../design/gdd/enemy-database.md) | ADR-0003, 0006, 0011 | MEDIUM | 6 (all done) | Complete |
+| [biome-dungeon-database](biome-dungeon-database/EPIC.md) | Biome / Dungeon / Floor Database | [biome-dungeon-database.md](../../design/gdd/biome-dungeon-database.md) | ADR-0003, 0006, 0011, 0014 | MEDIUM | 7 (all done) | Complete |
 
 **Core-layer flagged gap (not an epic yet)**: `audio-system` is named in the
 systems index and has a planned ADR-C03 slot, but neither the GDD
@@ -51,11 +51,11 @@ ADR-0003.
 
 | Epic | System | GDD | Governing ADRs | Risk | Stories | Status |
 |---|---|---|---|---|---|---|
-| [hero-roster](hero-roster/EPIC.md) | Hero Roster | [hero-roster.md](../../design/gdd/hero-roster.md) | ADR-0003, 0004, 0011, 0012 | LOW | Not yet created | Ready |
-| [matchup-resolver](matchup-resolver/EPIC.md) | Class-vs-Enemy Matchup Resolver | [class-vs-enemy-matchup-resolver.md](../../design/gdd/class-vs-enemy-matchup-resolver.md) | ADR-0003 Amend #3, 0009 | LOW | Not yet created | Ready |
-| [combat-resolution](combat-resolution/EPIC.md) | Combat Resolution | [combat-resolution.md](../../design/gdd/combat-resolution.md) | ADR-0003 Amend #3, 0009, 0010, 0014 | MEDIUM | Not yet created | Ready |
-| [dungeon-run-orchestrator](dungeon-run-orchestrator/EPIC.md) | Dungeon Run Orchestrator | [dungeon-run-orchestrator.md](../../design/gdd/dungeon-run-orchestrator.md) | ADR-0001, 0002, 0003 Amend #3, 0007, 0009, 0010, 0014 | MEDIUM | Not yet created | Ready |
-| [floor-unlock-system](floor-unlock-system/EPIC.md) | Floor / Biome Unlock System | [floor-unlock-system.md](../../design/gdd/floor-unlock-system.md) | ADR-0002, 0003, 0007, 0011, 0014 | LOW | Not yet created | Ready |
+| [hero-roster](hero-roster/EPIC.md) | Hero Roster | [hero-roster.md](../../design/gdd/hero-roster.md) | ADR-0003, 0004, 0011, 0012 | LOW | 10 (all done) | Complete |
+| [matchup-resolver](matchup-resolver/EPIC.md) | Class-vs-Enemy Matchup Resolver | [class-vs-enemy-matchup-resolver.md](../../design/gdd/class-vs-enemy-matchup-resolver.md) | ADR-0003 Amend #3, 0009 | LOW | 8 (all done) | Complete |
+| [combat-resolution](combat-resolution/EPIC.md) | Combat Resolution | [combat-resolution.md](../../design/gdd/combat-resolution.md) | ADR-0003 Amend #3, 0009, 0010, 0014 | MEDIUM | 10 (all done) | Complete |
+| [dungeon-run-orchestrator](dungeon-run-orchestrator/EPIC.md) | Dungeon Run Orchestrator | [dungeon-run-orchestrator.md](../../design/gdd/dungeon-run-orchestrator.md) | ADR-0001, 0002, 0003 Amend #3, 0007, 0009, 0010, 0014 | MEDIUM | 13 (12 done, 1 COMPLETE-WITH-NOTES) | Complete |
+| [floor-unlock-system](floor-unlock-system/EPIC.md) | Floor / Biome Unlock System | [floor-unlock-system.md](../../design/gdd/floor-unlock-system.md) | ADR-0002, 0003, 0007, 0011, 0014 | LOW | 9 (all done) | Complete |
 
 **Feature-layer flagged gaps (no GDD authored yet)**: 4 systems from the
 systems index lack GDDs and cannot become epics until designed:
