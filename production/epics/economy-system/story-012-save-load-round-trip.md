@@ -1,10 +1,10 @@
 # Story 012: get_save_data + load_save_data round-trip
 
 > **Epic**: economy-system
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Core
 > **Type**: Integration
-> **Manifest Version**: 2026-04-24
+> **Manifest Version**: 2026-04-26
 
 ## Context
 
@@ -28,13 +28,13 @@
 
 ## Acceptance Criteria
 
-- [ ] **H-11**: GIVEN Economy with `gold_balance = 12345`, `lifetime_gold_earned = 98765`, `floor_clear_bonus_credited = {1: 500, 2: 1200, 3: 1500}` (F1+F2 fully credited; F3 LOSING-half-credited; F4+F5 absent / not yet credited), WHEN `get_save_data()` called, new instance created, `load_save_data(data)` called, THEN restored: gold = 12345, lifetime = 98765, ledger dict matches exactly key-for-key including absent keys (3 keys present, NOT 5)
-- [ ] **H-11 reclaim path**: subsequent `try_award_floor_clear(3, 3000)` on restored instance credits delta `3000 - 1500 = 1500`; ledger advances to 3000
-- [ ] `get_save_data()` includes a `schema_version: int` field (start at 1)
-- [ ] `load_save_data(data)` is signal-quiet — zero `gold_changed` AND zero `first_clear_awarded` emissions during restore
-- [ ] Restored instance can immediately process ticks AND accept `try_spend` without reinitialization (no internal "uninitialized" state)
-- [ ] `load_save_data` with malformed/missing keys → `push_error` with detailed message; load fails gracefully (instance left in well-defined post-load state — defaults applied for missing keys, errors raised)
-- [ ] Schema-version mismatch (V0 or V2) → `push_error("Economy.load_save_data: unsupported schema_version=X")`; load aborts; instance state unchanged
+- [x] **H-11**: GIVEN Economy with `gold_balance = 12345`, `lifetime_gold_earned = 98765`, `floor_clear_bonus_credited = {1: 500, 2: 1200, 3: 1500}` (F1+F2 fully credited; F3 LOSING-half-credited; F4+F5 absent / not yet credited), WHEN `get_save_data()` called, new instance created, `load_save_data(data)` called, THEN restored: gold = 12345, lifetime = 98765, ledger dict matches exactly key-for-key including absent keys (3 keys present, NOT 5)
+- [x] **H-11 reclaim path**: subsequent `try_award_floor_clear(3, 3000)` on restored instance credits delta `3000 - 1500 = 1500`; ledger advances to 3000
+- [x] `get_save_data()` includes a `schema_version: int` field (start at 1)
+- [x] `load_save_data(data)` is signal-quiet — zero `gold_changed` AND zero `first_clear_awarded` emissions during restore
+- [x] Restored instance can immediately process ticks AND accept `try_spend` without reinitialization (no internal "uninitialized" state)
+- [x] `load_save_data` with malformed/missing keys → `push_error` with detailed message; load fails gracefully (instance left in well-defined post-load state — defaults applied for missing keys, errors raised)
+- [x] Schema-version mismatch (V0 or V2) → `push_error("Economy.load_save_data: unsupported schema_version=X")`; load aborts; instance state unchanged
 
 ---
 
@@ -127,7 +127,25 @@
 **Story Type**: Integration
 **Required evidence**: `tests/integration/economy/economy_save_load_round_trip_test.gd` — must exist and pass
 
-**Status**: [ ] Not yet created
+**Status**: [x] `tests/integration/economy/economy_save_load_round_trip_test.gd` — 16 test functions, 16/16 PASS. Full project suite: 1648/1648 PASS, zero regressions. Two stub-era tests in `tests/unit/economy/economy_autoload_skeleton_test.gd` updated from null/empty-stub assertions to V1-schema implemented-contract assertions.
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-05-08
+**Criteria**: 7/7 ACs passing
+**Test Evidence**: `tests/integration/economy/economy_save_load_round_trip_test.gd` — 16 test functions covering AC H-11 round-trip (3 boundary points: full state, empty ledger, GOLD_SANITY_CAP), reclaim path (credit-the-gap with no first_clear_awarded re-emit), schema-version mismatch handling (V0, V2, missing), signal-quiet contract (zero emissions across both signals), forward-compat extra-keys tolerance, post-restore try_spend + add_gold pipelines, JSON round-trip type coercion (TYPE_FLOAT values + String dict keys), defensive clamping (negative gold → 0, gold > sanity cap → cap), get_save_data deep-copy isolation. Full project suite: 1648/1648 PASS, zero regressions.
+**Files changed**:
+- `src/core/economy/economy.gd` — added `SAVE_SCHEMA_VERSION = 1` constant; replaced `get_save_data` stub with V1 4-key schema (schema_version + gold_balance + lifetime_gold_earned + deep-copied floor_clear_bonus_credited); replaced `load_save_data` stub with full validating body (schema-version gate, JSON-round-trip-safe int + Dictionary[int,int] coercion, GOLD_SANITY_CAP clamping, signal-quiet via direct field assignment).
+- `tests/integration/economy/economy_save_load_round_trip_test.gd` — new file, 16 test functions.
+- `tests/unit/economy/economy_autoload_skeleton_test.gd` — flipped two stub-era assertions:
+  - `test_economy_get_save_data_returns_empty_dictionary_stub` → `test_economy_get_save_data_returns_v1_schema_with_four_keys`
+  - `test_economy_load_save_data_completes_without_error` → `test_economy_load_save_data_with_v1_schema_restores_state` (also adds the now-required `schema_version` to the test data — old test would have aborted under the new contract since it had no schema_version key).
+**Deviations**: None blocking. Two minor style choices documented:
+1. **Did NOT use `_is_offline_replay` as a signal-quiet flag during restore** (the story Implementation Notes pseudocode proposed this). Reasoning: the hydration assigns to private fields directly (NOT via add_gold), so no signal-emitting path is reachable from `load_save_data`. The simpler implementation is the safer one — flag-flipping would only matter if a future maintainer added an indirect signal-emit path, in which case the flag could mask a bug. The signal-quiet contract is enforced by structural argument (test 5 verifies zero emissions empirically).
+2. **Extra defensive clamping on load** (negative gold → 0, > GOLD_SANITY_CAP → cap) — beyond the story's strict ACs, but matches `add_gold`'s runtime invariant and was straightforward to add. Tests 14 + 15 verify the clamps; documented in `load_save_data`'s doc-comment.
+**Code Review**: Solo mode — `/code-review` skipped per project review-mode.txt (consistent with same-day data-registry/story-007 + economy-system/story-010 audit pattern).
 
 ---
 

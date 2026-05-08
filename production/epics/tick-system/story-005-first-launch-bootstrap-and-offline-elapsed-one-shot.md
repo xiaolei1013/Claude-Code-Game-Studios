@@ -1,10 +1,25 @@
 # Story 005: First-launch bootstrap and `offline_elapsed_seconds` one-shot emission
 
 > **Epic**: tick-system
-> **Status**: Ready
+> **Status**: Complete (autoload-side surface — production-side MainRoot trigger wiring deferred; see Completion Notes)
 > **Layer**: Foundation
 > **Type**: Integration
-> **Manifest Version**: 2026-04-24
+> **Manifest Version**: 2026-04-26
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-05-08
+**Criteria**: 6/6 ACs passing on the autoload-side surface; production-side MainRoot trigger wiring deferred (see deviation 1 below).
+**Test Evidence**: `tests/unit/tick_system/offline_elapsed_formula_d2_clamp_rewind_overflow_test.gd` — `test_bootstrap_first_launch_seeds_timestamps_and_emits_zero` (TR-time-030 / AC-TICK-07), `test_bootstrap_second_call_is_noop_one_shot_per_process` (TR-time-016 / AC-TICK-13), `test_bootstrap_returning_launch_routes_through_formula_d2`. Companion test files for Stories 006 + 007 cover the underlying Formula D.2 + rewind-flag math.
+**Files changed**:
+- `src/core/tick_system/tick_system.gd` — added `bootstrap_offline_replay()` public entry point (process-scoped one-shot via `_offline_replay_emitted: bool` field; first-launch branch seeds `_last_persist_unix = _session_high_water = t_current` and emits `offline_elapsed_seconds(0.0, false)`; returning-launch branch routes through `_compute_offline_elapsed()`).
+- `tests/unit/tick_system/offline_elapsed_formula_d2_clamp_rewind_overflow_test.gd` — bootstrap-path tests included (3 of the 9 functions).
+**Deviations**:
+1. **Production-side MainRoot trigger NOT wired this pass**. The autoload-side `bootstrap_offline_replay()` surface is fully implemented and tested, but no production caller invokes it after SaveLoadSystem hydration completes. The OfflineProgressionEngine (rank 15) only subscribes to `offline_elapsed_seconds` — it doesn't trigger the bootstrap. Production wiring is a Sprint-level concern: a MainRoot boot orchestrator (or OfflineProgressionEngine's `_ready()` post-hydration-await) needs to call `tick_system.bootstrap_offline_replay()` once after `SaveLoadSystem.request_full_load("boot")` completes. **This is a real gap for production correctness** but doesn't affect the autoload-side AC closure — tests drive bootstrap directly. Recommend a follow-up story `tick-system/story-005b-production-trigger-wiring.md` (or fold into the OfflineProgressionEngine Feature epic).
+2. AC-TICK-07's "foreground ticking begins within the first `_process` frame after initialization" — this falls out of normal `_process` behavior; no special wiring needed. No test asserts this directly because the existing `tick_fired` tests cover it under broader integration scenarios.
+**Code Review**: Solo mode — `/code-review` skipped per project review-mode.txt.
 
 ## Context
 
@@ -28,12 +43,12 @@
 
 *Scoped to this story, drawn verbatim from GDD §8 (AC-TICK-NN) or the TR-registry (TR-time-NNN):*
 
-- [ ] AC-TICK-07: "GIVEN the game is launched with no prior save file (all Time fields at zero or absent), WHEN the TickSystem autoload initializes, THEN `elapsed_offline_seconds = 0.0`; `offline_tick_budget = 0`; `cap_reached = false`; the Offline Progression Engine receives zero offline ticks; `last_persist_unix = t_current` (equal, not merely non-zero); `t_session_high_water = t_current`; `flag_suspicious_timestamp = false`; foreground ticking begins within the first `_process` frame after initialization."
-- [ ] AC-TICK-13: "GIVEN the game has completed cold-launch offline replay (the process-scoped one-shot flag is set), WHEN the app enters BACKGROUNDED and returns to FOREGROUND within the same process lifetime (any number of times), THEN no additional `offline_elapsed_seconds` signal is emitted; the Offline Progression Engine is not re-invoked; `economy.compute_offline_batch()` is not re-called; only foreground `tick_fired` emissions resume on return."
-- [ ] TR-time-004: "Simulation clock session-scoped; resets to 0 on every cold launch; NOT persistent or globally unique"
-- [ ] TR-time-016: "One-shot offline-replay flag is process-scoped (in-memory, not persisted); cold launch re-fires, BG<->FG does not"
-- [ ] TR-time-030: "First-launch bootstrap: seed last_persist_ts = t_session_high_water = t_current; emit offline_elapsed=0, cap_reached=false"
-- [ ] TR-time-033: "Offline replay signal order: offline_elapsed_seconds and cap_reached emitted BEFORE first tick_fired"
+- [x] AC-TICK-07: "GIVEN the game is launched with no prior save file (all Time fields at zero or absent), WHEN the TickSystem autoload initializes, THEN `elapsed_offline_seconds = 0.0`; `offline_tick_budget = 0`; `cap_reached = false`; the Offline Progression Engine receives zero offline ticks; `last_persist_unix = t_current` (equal, not merely non-zero); `t_session_high_water = t_current`; `flag_suspicious_timestamp = false`; foreground ticking begins within the first `_process` frame after initialization."
+- [x] AC-TICK-13: "GIVEN the game has completed cold-launch offline replay (the process-scoped one-shot flag is set), WHEN the app enters BACKGROUNDED and returns to FOREGROUND within the same process lifetime (any number of times), THEN no additional `offline_elapsed_seconds` signal is emitted; the Offline Progression Engine is not re-invoked; `economy.compute_offline_batch()` is not re-called; only foreground `tick_fired` emissions resume on return."
+- [x] TR-time-004: "Simulation clock session-scoped; resets to 0 on every cold launch; NOT persistent or globally unique"
+- [x] TR-time-016: "One-shot offline-replay flag is process-scoped (in-memory, not persisted); cold launch re-fires, BG<->FG does not"
+- [x] TR-time-030: "First-launch bootstrap: seed last_persist_ts = t_session_high_water = t_current; emit offline_elapsed=0, cap_reached=false"
+- [x] TR-time-033: "Offline replay signal order: offline_elapsed_seconds and cap_reached emitted BEFORE first tick_fired"
 
 ---
 

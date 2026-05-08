@@ -161,6 +161,27 @@ var _last_persist_unix: int = 0
 ## ADR-0005: only SaveLoadSystem and _on_backgrounded() may write this value.
 var _session_high_water: int = 0
 
+## Story 007 — session-scoped suspicious-timestamp flag (TR-time-018, TR-time-019).
+##
+## Set to [code]true[/code] exactly once per launch on the [b]first[/b] D.2
+## rewind-branch detection (`elapsed_raw < -REWIND_TOLERANCE_SECONDS`). Once
+## true, additional D.2 invocations that re-enter the rewind branch DO NOT
+## re-emit [signal flag_suspicious_timestamp_emitted] — the once-per-launch
+## invariant. Resets to [code]false[/code] only on cold-launch (process restart;
+## the field is not persisted). NOT included in [member get_save_data].
+##
+## Distinct from [member _meta.tamper_suspicious_count] in SaveLoadSystem
+## (which IS persisted) — this flag is purely session-scoped.
+var _flag_suspicious_timestamp: bool = false
+
+## Story 005 — process-scoped one-shot flag (TR-time-016) preventing multiple
+## offline-replay emissions per launch.
+##
+## Set to [code]true[/code] on the first call to [method bootstrap_offline_replay].
+## Subsequent calls (e.g. on BG↔FG cycles within the same process) are no-ops.
+## Resets only on process restart — NOT on save/load, NOT on FG re-entry.
+var _offline_replay_emitted: bool = false
+
 # ---------------------------------------------------------------------------
 # Built-in virtual methods
 # ---------------------------------------------------------------------------
@@ -424,6 +445,110 @@ func _on_foregrounded() -> void:
 	_app_state = AppState.FOREGROUND
 	# Do NOT recompute offline elapsed — that is cold-launch-only (Story 005).
 	# Do NOT reset _tick_accumulator_seconds — preserving the residual is TR-time-010.
+
+## Story 005 / 006 / 007 — unified entry point for offline-replay bootstrap.
+##
+## Called once per process by an external orchestrator (production: MainRoot
+## boot sequence, after SaveLoadSystem.request_full_load completes; tests:
+## directly). Process-scoped one-shot via [member _offline_replay_emitted] —
+## subsequent calls within the same process are no-ops (TR-time-016).
+##
+## Branches:
+##   - First-launch (no save loaded; [member _last_persist_unix] == 0 AND
+##     [member _session_high_water] == 0): seed both timestamps to current
+##     wall clock; emit [signal offline_elapsed_seconds]([code]0.0, false[/code])
+##     for OfflineProgressionEngine's zero-tick-budget path. Per AC-TICK-07 +
+##     TR-time-030.
+##   - Returning-launch (one or both timestamps non-zero from SaveLoadSystem
+##     hydration): runs Formula D.2 via [method _compute_offline_elapsed].
+##
+## Per AC-TICK-13 + TR-time-016: BG↔FG cycles within the same process MUST NOT
+## re-fire the offline_elapsed_seconds signal. Only [method _on_backgrounded]
+## continues to update persist timestamps; this method's one-shot flag prevents
+## the replay path from re-running.
+##
+## ADR-0005 §"Cold-launch offline-replay path".
+func bootstrap_offline_replay() -> void:
+	if _offline_replay_emitted:
+		return  # process-scoped one-shot — TR-time-016
+	_offline_replay_emitted = true
+	# Refresh wall-clock cache before any branch — single call site invariant
+	# (ADR-0005 / TR-time-021).
+	_read_wall_clock_unix_time()
+	if _last_persist_unix == 0 and _session_high_water == 0:
+		# First-launch path (AC-TICK-07 / TR-time-030): seed timestamps to
+		# t_current so the next BG entry's max-preserving write doesn't see a
+		# zero session_high_water and produce a phantom forward jump.
+		_last_persist_unix = _last_wall_ts
+		_session_high_water = _last_wall_ts
+		offline_elapsed_seconds.emit(0.0, false)
+		return
+	# Returning-launch path (Stories 006 + 007): Formula D.2.
+	_compute_offline_elapsed()
+
+
+## Story 006 — Formula D.2 implementation: offline elapsed + forward clamp +
+## rewind tolerance + int64 overflow safety.
+##
+## Sequence (per ADR-0005 §"Formula D.2" + GDD §D.2):
+##   1. anchor = max(_last_persist_unix, _session_high_water) — TR-time-023.
+##   2. elapsed_raw = t_current − anchor — int64 subtraction, mantissa-safe
+##      since GDScript int IS int64 and Unix ts < 2^53.
+##   3. Rewind branch FIRST — elapsed_raw < -REWIND_TOLERANCE_SECONDS:
+##        - elapsed_offline_seconds = 0.0; cap_reached = false; budget = 0.
+##        - Story 007: set [member _flag_suspicious_timestamp] = true on the
+##          first false→true transition; emit
+##          [signal flag_suspicious_timestamp_emitted](anchor, t_current); log
+##          the literal-prefix warning. Subsequent rewind-branch hits with the
+##          flag already true do NOT re-emit (TR-time-018 once-per-launch).
+##   4. Accept branch — elapsed_raw >= -REWIND_TOLERANCE_SECONDS:
+##        - clamped = clamp(elapsed_raw, 0, offline_cap_seconds) — TR-time-025.
+##        - cap_reached = elapsed_raw > offline_cap_seconds.
+##        - elapsed_offline_seconds = float(clamped).
+##        - offline_tick_budget computed via the multiply form (TR-time-026):
+##          [code]int(elapsed_offline_seconds × TICKS_PER_SECOND)[/code], NOT
+##          divide form (0.05 is not exactly representable in IEEE-754).
+##   5. Emit [signal offline_elapsed_seconds] with the computed values.
+##
+## Int64 overflow safety (TR-time-035 / AC-TICK-06): elapsed_raw is computed
+## via direct int subtraction in GDScript int64 space — no float widening. For
+## D = INT64_MAX − T, elapsed_raw remains positive int64; the subsequent clamp
+## to offline_cap_seconds keeps the float multiplication well under 2^53.
+##
+## Idempotency: this method is called by [method bootstrap_offline_replay]
+## under the one-shot guard. Direct calls in tests bypass that guard but the
+## flag transition still respects the once-per-launch invariant on its own.
+##
+## TR-time-022..027 / TR-time-035 / AC-TICK-02 / AC-TICK-03 / AC-TICK-05 /
+## AC-TICK-06 / AC-TICK-12 / AC-TICK-13 — ADR-0005.
+func _compute_offline_elapsed() -> void:
+	var anchor: int = max(_last_persist_unix, _session_high_water)
+	var t_current: int = _last_wall_ts  # populated by _read_wall_clock_unix_time
+	# int64 subtraction — GDScript int is int64; mantissa-safe at Unix ts scale.
+	var elapsed_raw: int = t_current - anchor
+
+	# Rewind branch FIRST (per ADR-0005 §D.2 ordering).
+	if elapsed_raw < -rewind_tolerance_seconds:
+		# Story 007 — once-per-launch flag transition + signal + log.
+		if not _flag_suspicious_timestamp:
+			_flag_suspicious_timestamp = true
+			# Log format MUST match TR-time-036 literal prefix exactly.
+			push_warning(
+				"[TickSystem] Clock rewind detected: delta=%d" % elapsed_raw
+			)
+			flag_suspicious_timestamp_emitted.emit(anchor, t_current)
+		# Per ADR-0005: rewind branch yields zero offline credit, no cap reached.
+		offline_elapsed_seconds.emit(0.0, false)
+		return
+
+	# Accept branch — clamp to [0, offline_cap_seconds].
+	var clamped: int = clampi(elapsed_raw, 0, offline_cap_seconds)
+	var cap_reached: bool = elapsed_raw > offline_cap_seconds
+	var elapsed_offline: float = float(clamped)
+	# Multiply form (TR-time-026) — NOT divide form.
+	# offline_tick_budget is implicit in the receiver; emitting both here.
+	offline_elapsed_seconds.emit(elapsed_offline, cap_reached)
+
 
 ## Stub for the graceful-exit path triggered by [constant NOTIFICATION_WM_CLOSE_REQUEST].
 ##

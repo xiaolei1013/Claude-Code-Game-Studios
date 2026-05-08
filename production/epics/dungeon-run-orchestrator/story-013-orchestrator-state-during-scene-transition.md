@@ -1,6 +1,6 @@
 # Story 013: Orchestrator state advancement during SceneManager TRANSITIONING
 
-> **Status**: SPEC — Ready for implementation
+> **Status**: Complete
 > **Layer**: Foundation (cross-system: dungeon-run-orchestrator + scene-manager)
 > **Type**: Architectural refactor + Integration
 > **Manifest Version**: 2026-05-06
@@ -110,11 +110,11 @@ Defer Options B/C unless other consumers (AudioRouter, future Settings overlay) 
 
 ## Acceptance Criteria
 
-- [ ] **TR-orchestrator-014-001 (NEW)**: When SceneManager.state == TRANSITIONING at the moment a DungeonRunOrchestrator state transition fires, the `state_changed` signal is buffered and replayed after `SceneManager.transition_complete`. Verified: no `state_changed` listener fires during TRANSITIONING in any state-transition path.
-- [ ] **TR-orchestrator-014-002 (NEW)**: When SceneManager.state == IDLE at the moment of an orchestrator state transition, `state_changed` fires synchronously (no buffering). Verified: timing-sensitive listeners (e.g., dungeon_run_view's tick subscription) receive the emit on the same frame as the state advance.
-- [ ] **TR-orchestrator-014-003 (NEW)**: Fast-path RUN_ENDED arriving during FADE_TO_BLACK no longer requires the screen-level hotfix in `dungeon_run_view._deferred_run_end_route`. The screen's existing `_on_state_changed` handler (slow-path) handles BOTH cases identically.
-- [ ] **TR-orchestrator-014-004 (NEW)**: If multiple orchestrator state transitions occur during a single TRANSITIONING window, the buffered replay emits only the most recent (terminal) state — intermediate states are coalesced. Documented in the buffer-replay comment.
-- [ ] Existing test suite (1450 tests) continues to pass — the existing screen-level hotfix is REMOVED as part of this story; if removal causes test failures, those are the regressions Story 013 fixes structurally.
+- [x] **TR-orchestrator-014-001 (NEW)**: When SceneManager.state == TRANSITIONING at the moment a DungeonRunOrchestrator state transition fires, the `state_changed` signal is buffered and replayed after `SceneManager.transition_complete`. Verified: no `state_changed` listener fires during TRANSITIONING in any state-transition path.
+- [x] **TR-orchestrator-014-002 (NEW)**: When SceneManager.state == IDLE at the moment of an orchestrator state transition, `state_changed` fires synchronously (no buffering). Verified: timing-sensitive listeners (e.g., dungeon_run_view's tick subscription) receive the emit on the same frame as the state advance.
+- [x] **TR-orchestrator-014-003 (NEW)**: Fast-path RUN_ENDED arriving during FADE_TO_BLACK no longer requires the screen-level hotfix in `dungeon_run_view._deferred_run_end_route`. The screen's existing `_on_state_changed` handler (slow-path) handles BOTH cases identically.
+- [x] **TR-orchestrator-014-004 (NEW)**: If multiple orchestrator state transitions occur during a single TRANSITIONING window, the buffered replay emits only the most recent (terminal) state — intermediate states are coalesced. Documented in the buffer-replay comment.
+- [x] Existing test suite (1450 tests) continues to pass — the existing screen-level hotfix is REMOVED as part of this story; if removal causes test failures, those are the regressions Story 013 fixes structurally. (Verified 2026-05-08: full project suite 1648/1648 PASS.)
 
 ## Implementation Notes
 
@@ -142,7 +142,26 @@ Defer Options B/C unless other consumers (AudioRouter, future Settings overlay) 
 - `tests/integration/dungeon_run_orchestrator/run_pacing_minimum_duration_test.gd` — EXISTING. Verifies the fast-path dwell still holds after the screen-level hotfix is removed (regression coverage).
 - The full S9-M2 fast-path scenario: combat resolves during FADE_TO_BLACK → fast path → dwell holds → CROSS_FADE to main_menu. Verified by the existing `test_run_pacing_fast_path_dwell_holds_when_run_ended_at_on_enter` assertion remains green WITHOUT the screen-level hotfix in place.
 
-**Status**: [ ] Not yet created (this story SPECs the work; implementation creates the tests)
+**Status**: [x] All evidence files exist and pass (verified 2026-05-08).
+- `tests/integration/dungeon_run_orchestrator/state_buffered_during_transition_test.gd` — 6 test functions, 6/6 PASS. Covers TR-014-001 (buffer-during-TRANSITIONING), TR-014-002 (synchronous-when-IDLE), TR-014-004 (coalesce to terminal state), `_replay_buffered_state_change` no-op when buffer empty, and self-transition no-buffer.
+- `tests/integration/dungeon_run_orchestrator/run_pacing_minimum_duration_test.gd` — existing regression coverage; the fast-path dwell test still holds after the screen-level hotfix removal.
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-05-08 (paperwork-only — implementation pre-existed in source as of an earlier sprint; this story-done pass verifies the in-source code matches the spec and that 1648/1648 tests pass green.)
+**Criteria**: 5/5 ACs passing
+**Test Evidence**: `tests/integration/dungeon_run_orchestrator/state_buffered_during_transition_test.gd` — 6 functions, 6/6 PASS. Full project suite: 1648/1648 PASS, zero regressions.
+**Files verified in source** (no new edits required this pass):
+- `src/core/dungeon_run_orchestrator/dungeon_run_orchestrator.gd` — `_buffered_state_change: Dictionary = {}` field at line 285; `_emit_state_changed_or_buffer(new, old)` at line 560; `_replay_buffered_state_change(_screen_id, _transition_type)` at line 596; `_set_state` routes through the buffered path at line 543. Implementation matches Option A in the Architectural Alternatives section verbatim.
+- `src/core/scene_manager/scene_manager.gd` — `transition_complete(screen_id, transition_type)` signal at line 168, emitted at lines 1023 + 1047.
+- `assets/screens/dungeon_run_view/dungeon_run_view.gd` — Sprint 8 S8-M4 + Sprint 9 S9-M2 hotfix has been removed (only the documentation-trail comment at lines 195-198 remains, citing this story file). The `on_enter` early-detection block and `_deferred_run_end_route` helper are both gone.
+- `tests/integration/dungeon_run_orchestrator/state_buffered_during_transition_test.gd` — 6 test functions matching the AC table 1:1.
+
+**Deviations**: None. Implementation chose Option A (orchestrator-level state replay queue) per the spec's Recommendation. Coalesce semantic preserves the original `old_state` rather than the most-recent intermediate (matches the "cross-transition transition" intent in the doc-comment).
+
+**Code Review**: Solo mode — `/code-review` skipped per project review-mode.txt. The implementation has been in source for at least one sprint (per the Sprint 13 S13-S1 carry-forward note) and was implicitly reviewed by the on-going test runs. No regression has been observed.
 
 ## Risks
 

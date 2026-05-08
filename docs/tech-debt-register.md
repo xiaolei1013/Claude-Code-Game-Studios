@@ -355,3 +355,49 @@ severity (LOW / MEDIUM / HIGH), and a Resolution condition describing what
 
 - **Blocks**: Nothing. S8-S3 ships with all 4 acceptance criteria covered;
   the test suite is green; Sprint 8 sign-off doesn't depend on this.
+
+## TD-012 — DataRegistry `hot_reload` + `verify_integrity` follow-up hardening (Story 007 advisory)
+
+- **Logged**: 2026-05-08 (during `/story-done` for `data-registry/story-007`).
+- **Surfaced by**: `qa-tester` review during `/code-review` Phase 7.
+- **Severity**: ADVISORY — none of these block Story 007 closure; all 8 tests pass and the full project suite is 1622/1622. They are quality-of-defense items for a future hygiene pass on `src/core/data_registry/data_registry.gd`.
+
+Three items, ordered by risk:
+
+1. **Unknown `content_type` silently succeeds in `hot_reload()`.** Calling
+   `DataRegistry.hot_reload("nonsense")` (where `"nonsense"` is not in
+   `ORDERED_CATEGORIES`) currently no-ops successfully: the Dictionary `erase` is
+   a safe no-op, `_load_category("nonsense")` walks a missing dir and returns
+   `true` via `_validate_min_content_count`, and `hot_reload_complete("nonsense")`
+   emits. **Recommended fix**: add an early guard in `hot_reload()`:
+   `if not ORDERED_CATEGORIES.has(content_type): push_warning(...); return`.
+   Adds ~3 lines.
+
+2. **Re-entrant `hot_reload()` from within a `registry_ready` handler is
+   unguarded.** A consumer that subscribes to `registry_ready` and synchronously
+   calls `dr.hot_reload(...)` would re-enter `hot_reload` while still inside the
+   first `_ready()` call stack. State would round-trip `READY → HOT_RELOAD → READY`
+   inside the boot path, which is an unusual but technically permitted condition.
+   **Recommended fix**: a `_hot_reload_in_progress: bool` flag refused early in
+   `hot_reload()` with a `push_warning("re-entrant hot_reload refused")`, OR a
+   documented architectural rule that consumers MUST NOT call `hot_reload` from
+   `registry_ready` handlers. Adds ~5 lines + 1 test.
+
+3. **`verify_integrity()` cannot detect mutations to fields nested inside
+   sub-Resource references.** The snapshot stores `resource.get(prop_name)` for
+   storage-flagged properties; for sub-Resource property values, `_values_equal`
+   uses `==` which is identity-based for Resource refs. So
+   `hero.stats.base_attack = 999` (where `stats` is a `HeroStats` Resource)
+   leaves `hero.stats` pointing at the same object identity and is NOT caught.
+   This matches ADR-0006's `duplicate_deep()`-doesn't-cross-`ExtResource()`
+   boundary by design. **Recommended fix**: document this explicit limitation in
+   the `verify_integrity()` doc-comment, AND consider extending the snapshot to
+   recursively descend into sub-Resource refs once `HeroClass`/`EnemyData` etc.
+   start declaring nested Resource fields. Until concrete subtypes ship nested
+   Resources, this is a documentation-only fix.
+
+- **Resolution path**: bundle as a single follow-up story
+  `data-registry/story-009-hot-reload-hardening.md` (or fold into Story 008
+  performance work if convenient). Estimated <1d total.
+
+- **Blocks**: Nothing. Story 007 ships with all AC covered, full project suite green.

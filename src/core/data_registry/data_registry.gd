@@ -15,6 +15,13 @@ extends Node
 ## ADR-0006: DataRegistry boot scan strategy + state machine contract
 ## ADR-0003: Autoload Rank Table (rank 1; zero-arg _init invariant — Amendment #3)
 ## ADR-0011: Per-type validator specifications + load-time validation semantics
+##
+## TR-data-loading-027 (no patch-time live updates):
+## The in-memory index is populated exactly once per cold boot via [method _boot_scan].
+## New `.tres` files dropped into `assets/data/` at runtime are NOT automatically
+## picked up — the next launch rebuilds the full index. Debug builds may opt in
+## to a one-category re-enumeration via [method hot_reload]; production builds
+## no-op the call (see [method hot_reload] for the runtime gate).
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -213,6 +220,22 @@ var _category_paths: Dictionary = {}
 # does not crash on regex calls (they guard with null check).
 var _snake_case_id_regex: RegEx = null
 
+## Per-category property snapshots used by [method verify_integrity] to detect
+## consumer mutation of resources returned by [method resolve] / [method get_all_by_type].
+##
+## Structure: [code]{ "classes": { "hero_warrior": { "display_name": "Warrior", ... } } }[/code]
+##
+## Populated for every loaded resource at the end of [method _ready] (post-boot)
+## and at the end of a successful [method hot_reload] (for the reloaded category).
+## Only populated under [code]OS.is_debug_build()[/code] — release builds carry
+## no snapshot state to keep memory + boot cost zero.
+##
+## The snapshot stores values for properties whose [code]usage[/code] flags include
+## [constant PROPERTY_USAGE_STORAGE], excluding the engine-owned object meta
+## fields (`script`, `resource_local_to_scene`, `resource_path`, `resource_name`,
+## `resource_scene_unique_id`).
+var _integrity_snapshots: Dictionary = {}
+
 # ---------------------------------------------------------------------------
 # Built-in virtual methods
 # ---------------------------------------------------------------------------
@@ -245,6 +268,13 @@ func _ready() -> void:
 	assert(compile_err == OK, "DataRegistry: snake_case id regex failed to compile")
 	if _boot_scan():
 		state = State.READY
+		# Snapshot all loaded resources for the read-only integrity check
+		# (debug-only, ADR-0006 §Read-only contract; TR-data-loading-028).
+		# Performed BEFORE registry_ready emits so the first consumer that resolves
+		# a resource and stashes a reference cannot beat the snapshot.
+		if OS.is_debug_build():
+			for category: String in ORDERED_CATEGORIES:
+				_snapshot_category_for_integrity_check(category)
 		registry_ready.emit()
 	# On failure, _boot_scan() calls _transition_to_error() — no action needed here.
 
@@ -336,19 +366,130 @@ func get_all_by_type(content_type: String) -> Array[Resource]:
 ## [param content_type]. No-ops in release builds and when state != READY.
 ##
 ## Preconditions enforced:
-##   - OS.is_debug_build() must be true (stripped from release exports)
-##   - state must be READY (guards against re-entrant or premature calls)
+##   - [code]OS.is_debug_build()[/code] must be true (stripped from release exports
+##     by the runtime gate, NOT a compile-time strip).
+##   - [member state] must be [enum State.READY] (guards against re-entrant or
+##     premature calls; non-READY callers receive a [code]push_warning[/code] and
+##     no state change).
 ##
-## The full re-enumeration body and hot_reload_complete emission are pending —
-## this stub exists to lock the precondition contract and signal declaration.
+## On success the call walks [method _load_category] for the target [param content_type]
+## only — no other category is touched. Cached resources for OTHER categories
+## remain identity-equal across the call (Godot's [code]ResourceLoader[/code] cache
+## is also unchanged for un-touched files). The integrity snapshot for the
+## reloaded category is refreshed.
+##
+## State transitions: [enum State.READY] → [enum State.HOT_RELOAD] → [enum State.READY]
+## (success) or [enum State.ERROR] (validator failure during reload — terminal).
+##
+## On failure (e.g. [code]_load_category[/code] reports a duplicate id, missing
+## min count, etc.), [method _transition_to_error] has already moved state to
+## [enum State.ERROR] and the [signal hot_reload_complete] signal is NOT emitted.
+##
+## Log format on success:
+##   [code][DataRegistry] HOT RELOAD: classes — N resources re-registered in Mms[/code]
 ##
 ## Example:
-##   DataRegistry.hot_reload("heroes")  # refreshes hero .tres files in-editor
-func hot_reload(_content_type: String) -> void:
+##   [codeblock]
+##   DataRegistry.hot_reload("classes")  # refreshes classes/*.tres in-editor
+##   [/codeblock]
+func hot_reload(content_type: String) -> void:
 	if not OS.is_debug_build():
 		return
 	if state != State.READY:
+		push_warning(
+			"[DataRegistry] hot_reload requested while state=%s; ignoring"
+			% _state_name(state)
+		)
 		return
+	state = State.HOT_RELOAD
+	var start_ms: int = Time.get_ticks_msec()
+	# Wipe both the resource cache and the path-tracking dict for the target
+	# category so _load_category re-walks the directory from a clean slate.
+	# Other categories remain untouched — caller-held references to their
+	# resources stay identity-equal across this call.
+	_categories[content_type] = {}
+	_category_paths[content_type] = {}
+	if not _load_category(content_type):
+		# _load_category already called _transition_to_error(); state is now ERROR
+		# (terminal per ADR-0006). Do NOT emit hot_reload_complete in this branch.
+		return
+	state = State.READY
+	# Refresh the integrity snapshot for the reloaded category — debug-only.
+	# Other categories' snapshots are untouched and remain valid baselines.
+	_snapshot_category_for_integrity_check(content_type)
+	var loaded_count: int = _categories[content_type].size()
+	var elapsed_ms: int = Time.get_ticks_msec() - start_ms
+	print(
+		"[DataRegistry] HOT RELOAD: %s — %d resources re-registered in %dms"
+		% [content_type, loaded_count, elapsed_ms]
+	)
+	hot_reload_complete.emit(content_type)
+
+
+## Compares each loaded resource's storage-flagged property values against the
+## baseline captured at boot (or after the most recent successful [method hot_reload]).
+##
+## Use in test builds to assert the read-only contract from ADR-0006: consumers
+## that mutate a resource returned by [method resolve] or [method get_all_by_type]
+## corrupt every cached holder of that same id (Godot's resource cache returns
+## the same object). This helper surfaces such mutations as structured records.
+##
+## Returns an [Array][Dictionary] of mismatches; each element has shape:
+##   [code]{ "content_type": String, "id": String, "property": String, "expected": Variant, "actual": Variant }[/code]
+##
+## Returns an empty array when:
+##   - No mutation has occurred since the snapshot was taken, OR
+##   - [code]OS.is_debug_build() == false[/code] (release builds carry no snapshot), OR
+##   - No snapshot has been taken yet (e.g. called before [method _ready] completes).
+##
+## NOTE: Only properties with [constant PROPERTY_USAGE_STORAGE] are tracked, and
+## the engine-owned object meta fields (`script`, `resource_local_to_scene`,
+## `resource_path`, `resource_name`, `resource_scene_unique_id`) are excluded —
+## the contract concerns authored content fields, not engine plumbing.
+##
+## Example (test):
+##   [codeblock]
+##   var dr: Node = _boot_registry()
+##   var hero: Resource = dr.resolve("classes", "hero_warrior")
+##   hero.display_name = "MUTATED"
+##   var mismatches: Array[Dictionary] = dr.verify_integrity()
+##   assert(mismatches.size() == 1 and mismatches[0]["property"] == "display_name")
+##   [/codeblock]
+func verify_integrity() -> Array[Dictionary]:
+	var mismatches: Array[Dictionary] = []
+	if not OS.is_debug_build():
+		return mismatches
+	if _integrity_snapshots.is_empty():
+		return mismatches
+	for content_type: String in _integrity_snapshots:
+		var category_snapshot: Dictionary = _integrity_snapshots[content_type]
+		var category: Dictionary = _categories.get(content_type, {})
+		for id: String in category_snapshot:
+			if not category.has(id):
+				# Resource was removed since snapshot — surface as a mismatch with
+				# property=null so callers can distinguish removal from mutation.
+				mismatches.append({
+					"content_type": content_type,
+					"id": id,
+					"property": "<removed>",
+					"expected": "<present>",
+					"actual": null,
+				})
+				continue
+			var resource: Resource = category[id]
+			var snapshot: Dictionary = category_snapshot[id]
+			for prop_name: String in snapshot:
+				var expected: Variant = snapshot[prop_name]
+				var actual: Variant = resource.get(prop_name)
+				if not _values_equal(expected, actual):
+					mismatches.append({
+						"content_type": content_type,
+						"id": id,
+						"property": prop_name,
+						"expected": expected,
+						"actual": actual,
+					})
+	return mismatches
 
 # ---------------------------------------------------------------------------
 # Private methods
@@ -636,3 +777,90 @@ func _transition_to_error(reason: String, details: Dictionary) -> void:
 		return
 	state = State.ERROR
 	registry_error.emit(reason, details)
+
+
+## Set of property names skipped by [method _snapshot_category_for_integrity_check].
+##
+## These are engine-owned [Resource] / [Object] fields that are NOT authored
+## content; tracking them would produce false positives whenever Godot writes
+## an internal id (e.g. resource_path on save) or re-anchors a sub-resource.
+## ADR-0006's read-only contract concerns @export-style content fields only.
+const _SNAPSHOT_SKIP_PROPS: Array[String] = [
+	"script",
+	"resource_local_to_scene",
+	"resource_path",
+	"resource_name",
+	"resource_scene_unique_id",
+]
+
+
+## Captures a property snapshot for every resource currently loaded under
+## [param content_type] and stores it in [member _integrity_snapshots].
+##
+## Snapshots only properties whose [code]usage[/code] flags include
+## [constant PROPERTY_USAGE_STORAGE], skipping the engine-owned meta fields
+## listed in [constant _SNAPSHOT_SKIP_PROPS].
+##
+## No-ops in release builds — the read-only contract enforcement is debug-only
+## per ADR-0006 (defensive [code].duplicate()[/code] per-read would burn budget
+## and defeat the cache).
+##
+## [param content_type]: One of [constant ORDERED_CATEGORIES]. Categories absent
+##   from [member _categories] are silently skipped.
+func _snapshot_category_for_integrity_check(content_type: String) -> void:
+	if not OS.is_debug_build():
+		return
+	if not _categories.has(content_type):
+		return
+	var category: Dictionary = _categories[content_type]
+	var category_snapshot: Dictionary = {}
+	for id: String in category:
+		var resource: Resource = category[id]
+		if resource == null:
+			continue
+		var resource_snapshot: Dictionary = {}
+		for prop_info: Dictionary in resource.get_property_list():
+			var usage: int = int(prop_info.get("usage", 0))
+			if usage & PROPERTY_USAGE_STORAGE == 0:
+				continue
+			var prop_name: String = String(prop_info.get("name", ""))
+			if prop_name.is_empty():
+				continue
+			if _SNAPSHOT_SKIP_PROPS.has(prop_name):
+				continue
+			resource_snapshot[prop_name] = resource.get(prop_name)
+		category_snapshot[id] = resource_snapshot
+	_integrity_snapshots[content_type] = category_snapshot
+
+
+## Maps a [enum State] enum value to its readable name for log messages.
+##
+## Kept private to avoid exposing a stringly-typed surface; callers that need
+## state introspection should compare against the [enum State] constants directly.
+func _state_name(value: int) -> String:
+	match value:
+		State.UNLOADED:
+			return "UNLOADED"
+		State.LOADING:
+			return "LOADING"
+		State.READY:
+			return "READY"
+		State.ERROR:
+			return "ERROR"
+		State.HOT_RELOAD:
+			return "HOT_RELOAD"
+		_:
+			return "UNKNOWN(%d)" % value
+
+
+## Variant-aware equality for snapshot comparison.
+##
+## [code]==[/code] on Object/Resource compares object identity, which would
+## report false-mismatch when the snapshot stored a primitive value but the
+## resource still holds the same primitive. For primitives, container types
+## (Array, Dictionary, PackedArrays), and Strings, [code]==[/code] is value-based
+## and works correctly. For Resource references, identity equality is the
+## semantically-correct comparison (mutating a Resource property to point at a
+## different Resource IS a mismatch the test should catch).
+func _values_equal(a: Variant, b: Variant) -> bool:
+	return a == b
