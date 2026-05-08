@@ -59,11 +59,11 @@ func _reference_seed(version: int) -> PackedByteArray:
 	return ctx.finish()
 
 
-## Computes the reference chunk block SHA256(seed || u32_le(chunk_index)).
-func _reference_chunk(seed: PackedByteArray, chunk_index: int) -> PackedByteArray:
+## Computes the reference chunk block SHA256(mask_seed || u32_le(chunk_index)).
+func _reference_chunk(mask_seed: PackedByteArray, chunk_index: int) -> PackedByteArray:
 	var ctx := HashingContext.new()
 	ctx.start(HashingContext.HASH_SHA256)
-	ctx.update(seed)
+	ctx.update(mask_seed)
 	var chunk_bytes := PackedByteArray()
 	chunk_bytes.resize(4)
 	chunk_bytes.encode_u32(0, chunk_index)
@@ -81,10 +81,10 @@ func test_derive_mask_seed_version1_returns_32_bytes() -> void:
 	var sls: Node = _make_sls()
 
 	# Act
-	var seed: PackedByteArray = sls._derive_mask_seed(1)
+	var mask_seed: PackedByteArray = sls._derive_mask_seed(1)
 
 	# Assert
-	assert_int(seed.size()).is_equal(32)
+	assert_int(mask_seed.size()).is_equal(32)
 
 
 ## _derive_mask_seed(1) matches the reference SHA256(MAGIC || u16_le(1) || NAMESPACE).
@@ -136,10 +136,10 @@ func test_derive_mask_seed_is_deterministic() -> void:
 func test_generate_mask_zero_length_returns_empty() -> void:
 	# Arrange
 	var sls: Node = _make_sls()
-	var seed: PackedByteArray = _reference_seed(1)
+	var mask_seed: PackedByteArray = _reference_seed(1)
 
 	# Act
-	var mask: PackedByteArray = sls._generate_mask(seed, 0)
+	var mask: PackedByteArray = sls._generate_mask(mask_seed,0)
 
 	# Assert
 	assert_int(mask.size()).is_equal(0)
@@ -149,11 +149,11 @@ func test_generate_mask_zero_length_returns_empty() -> void:
 func test_generate_mask_length_32_returns_one_full_chunk() -> void:
 	# Arrange
 	var sls: Node = _make_sls()
-	var seed: PackedByteArray = _reference_seed(1)
-	var expected: PackedByteArray = _reference_chunk(seed, 0)
+	var mask_seed: PackedByteArray = _reference_seed(1)
+	var expected: PackedByteArray = _reference_chunk(mask_seed,0)
 
 	# Act
-	var mask: PackedByteArray = sls._generate_mask(seed, 32)
+	var mask: PackedByteArray = sls._generate_mask(mask_seed,32)
 
 	# Assert
 	assert_int(mask.size()).is_equal(32)
@@ -164,15 +164,15 @@ func test_generate_mask_length_32_returns_one_full_chunk() -> void:
 func test_generate_mask_length_33_spans_two_chunks() -> void:
 	# Arrange
 	var sls: Node = _make_sls()
-	var seed: PackedByteArray = _reference_seed(1)
-	var chunk0: PackedByteArray = _reference_chunk(seed, 0)
-	var chunk1: PackedByteArray = _reference_chunk(seed, 1)
+	var mask_seed: PackedByteArray = _reference_seed(1)
+	var chunk0: PackedByteArray = _reference_chunk(mask_seed,0)
+	var chunk1: PackedByteArray = _reference_chunk(mask_seed,1)
 	var expected := PackedByteArray()
 	expected.append_array(chunk0)
 	expected.append_array(chunk1.slice(0, 1))
 
 	# Act
-	var mask: PackedByteArray = sls._generate_mask(seed, 33)
+	var mask: PackedByteArray = sls._generate_mask(mask_seed,33)
 
 	# Assert
 	assert_int(mask.size()).is_equal(33)
@@ -187,14 +187,14 @@ func test_generate_mask_length_33_spans_two_chunks() -> void:
 func test_generate_mask_length_100_chunk_structure_correct() -> void:
 	# Arrange
 	var sls: Node = _make_sls()
-	var seed: PackedByteArray = _reference_seed(1)
-	var chunk0: PackedByteArray = _reference_chunk(seed, 0)
-	var chunk1: PackedByteArray = _reference_chunk(seed, 1)
-	var chunk2: PackedByteArray = _reference_chunk(seed, 2)
-	var chunk3: PackedByteArray = _reference_chunk(seed, 3)
+	var mask_seed: PackedByteArray = _reference_seed(1)
+	var chunk0: PackedByteArray = _reference_chunk(mask_seed,0)
+	var chunk1: PackedByteArray = _reference_chunk(mask_seed,1)
+	var chunk2: PackedByteArray = _reference_chunk(mask_seed,2)
+	var chunk3: PackedByteArray = _reference_chunk(mask_seed,3)
 
 	# Act
-	var mask: PackedByteArray = sls._generate_mask(seed, 100)
+	var mask: PackedByteArray = sls._generate_mask(mask_seed,100)
 
 	# Assert — total length
 	assert_int(mask.size()).is_equal(100)
@@ -213,11 +213,11 @@ func test_generate_mask_length_100_chunk_structure_correct() -> void:
 func test_generate_mask_is_deterministic() -> void:
 	# Arrange
 	var sls: Node = _make_sls()
-	var seed: PackedByteArray = _reference_seed(1)
+	var mask_seed: PackedByteArray = _reference_seed(1)
 
 	# Act
-	var mask_a: PackedByteArray = sls._generate_mask(seed, 100)
-	var mask_b: PackedByteArray = sls._generate_mask(seed, 100)
+	var mask_a: PackedByteArray = sls._generate_mask(mask_seed,100)
+	var mask_b: PackedByteArray = sls._generate_mask(mask_seed,100)
 
 	# Assert
 	assert_array(mask_a).is_equal(mask_b)
@@ -233,8 +233,8 @@ func test_apply_xor_mask_self_inverse_json_fixture() -> void:
 	# Arrange
 	var sls: Node = _make_sls()
 	var plaintext: PackedByteArray = '{"gold": 100}'.to_utf8_buffer()  # 13 bytes
-	var seed: PackedByteArray = _reference_seed(1)
-	var mask: PackedByteArray = sls._generate_mask(seed, plaintext.size())
+	var mask_seed: PackedByteArray = _reference_seed(1)
+	var mask: PackedByteArray = sls._generate_mask(mask_seed,plaintext.size())
 
 	# Act
 	var masked: PackedByteArray = sls._apply_xor_mask(plaintext, mask)
@@ -249,8 +249,8 @@ func test_apply_xor_mask_self_inverse_single_byte() -> void:
 	# Arrange
 	var sls: Node = _make_sls()
 	var plaintext := PackedByteArray([0x42])
-	var seed: PackedByteArray = _reference_seed(1)
-	var mask: PackedByteArray = sls._generate_mask(seed, 1)
+	var mask_seed: PackedByteArray = _reference_seed(1)
+	var mask: PackedByteArray = sls._generate_mask(mask_seed,1)
 
 	# Act
 	var masked: PackedByteArray = sls._apply_xor_mask(plaintext, mask)
@@ -268,8 +268,8 @@ func test_apply_xor_mask_self_inverse_exactly_32_bytes() -> void:
 	plaintext.resize(32)
 	for i: int in range(32):
 		plaintext.encode_u8(i, i)  # [0x00, 0x01, ..., 0x1F]
-	var seed: PackedByteArray = _reference_seed(1)
-	var mask: PackedByteArray = sls._generate_mask(seed, 32)
+	var mask_seed: PackedByteArray = _reference_seed(1)
+	var mask: PackedByteArray = sls._generate_mask(mask_seed,32)
 
 	# Act
 	var masked: PackedByteArray = sls._apply_xor_mask(plaintext, mask)
@@ -285,8 +285,8 @@ func test_apply_xor_mask_all_zero_plaintext_produces_nonzero() -> void:
 	var sls: Node = _make_sls()
 	var plaintext := PackedByteArray()
 	plaintext.resize(32)  # 32 zero bytes
-	var seed: PackedByteArray = _reference_seed(1)
-	var mask: PackedByteArray = sls._generate_mask(seed, 32)
+	var mask_seed: PackedByteArray = _reference_seed(1)
+	var mask: PackedByteArray = sls._generate_mask(mask_seed,32)
 
 	# Act
 	var masked: PackedByteArray = sls._apply_xor_mask(plaintext, mask)
@@ -308,8 +308,8 @@ func test_apply_xor_mask_self_inverse_large_payload() -> void:
 	plaintext.resize(LARGE_SIZE)
 	for i: int in range(LARGE_SIZE):
 		plaintext.encode_u8(i, i & 0xFF)
-	var seed: PackedByteArray = _reference_seed(1)
-	var mask: PackedByteArray = sls._generate_mask(seed, LARGE_SIZE)
+	var mask_seed: PackedByteArray = _reference_seed(1)
+	var mask: PackedByteArray = sls._generate_mask(mask_seed,LARGE_SIZE)
 
 	# Act
 	var masked: PackedByteArray = sls._apply_xor_mask(plaintext, mask)

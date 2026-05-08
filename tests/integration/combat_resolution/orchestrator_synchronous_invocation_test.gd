@@ -115,11 +115,11 @@ func test_combat_call_log_uses_monotonic_tick_ranges_per_orchestrator_handler() 
 
 	# Assert — recorded ranges are monotonic; each call's tick_lo == previous
 	# call's tick_hi.
-	var log: Array = spy.call_log
-	if log.size() >= 2:
-		for i: int in range(1, log.size()):
-			var prev_hi: int = int(log[i - 1]["tick_hi"])
-			var curr_lo: int = int(log[i]["tick_lo"])
+	var call_log: Array = spy.call_log
+	if call_log.size() >= 2:
+		for i: int in range(1, call_log.size()):
+			var prev_hi: int = int(call_log[i - 1]["tick_hi"])
+			var curr_lo: int = int(call_log[i]["tick_lo"])
 			assert_int(curr_lo).is_equal(prev_hi)
 
 
