@@ -24,7 +24,7 @@ All 30 systems serve the four pillars:
 
 ## Implementation Status
 
-> **Snapshot date**: 2026-05-07. The Status column in the Systems Enumeration table below records design state (Approved / Designed / DRAFT / STUB DRAFT) and is intentionally verbose with audit history. This block is the orthogonal **implementation tracker** — what's actually shipped in `src/` with green test evidence in `tests/` — and is the index to keep in sync as systems flip from Approved-only to Approved-and-Implemented. See S18-N5 in `production/sprints/sprint-18.md` for the maintenance protocol.
+> **Snapshot date**: 2026-05-08 (initially authored 2026-05-07; refreshed 2026-05-08 after the per-story Status audit `f2c4c00` + per-EPIC.md flip `3ce4c1c` + epics index refresh `0f56ce4` made story/epic-level Status fields consistent with this section's system-level breakdown). The Status column in the Systems Enumeration table below records design state (Approved / Designed / DRAFT / STUB DRAFT) and is intentionally verbose with audit history. This block is the orthogonal **implementation tracker** — what's actually shipped in `src/` with green test evidence in `tests/` — and is the index to keep in sync as systems flip from Approved-only to Approved-and-Implemented. See S18-N5 in `production/sprints/sprint-18.md` for the maintenance protocol.
 
 ### Implemented (Foundation + Core gameplay autoloads)
 
