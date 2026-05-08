@@ -1,7 +1,7 @@
 # Story 009: `reduce_motion` accessibility flag + offline-replay cozy-modal coordination
 
 > **Epic**: scene-manager
-> **Status**: Complete (system shipped; see systems-index Implementation Status #4. Test evidence: `tests/{unit,integration}/scene_manager/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — audit-cascade caveat resolved; required test file exists and passes; ACs ticked.)
 > **Layer**: Foundation
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26
@@ -30,19 +30,19 @@
 
 *Verbatim from tr-registry:*
 
-- [ ] TR-scene-manager-006: "Transitions not player-skippable; all standard 150-300ms, ceremony up to 800ms" (with reduce_motion clamp override)
-- [ ] TR-scene-manager-027: "reduce_motion accessibility knob: clamps all transitions to 50ms, ceremony becomes instant cut; persisted in save"
-- [ ] TR-scene-manager-036: "Ceremony ColorRect alpha cut is instantaneous when reduce_motion=true"
+- [x] TR-scene-manager-006: "Transitions not player-skippable; all standard 150-300ms, ceremony up to 800ms" (with reduce_motion clamp override)
+- [x] TR-scene-manager-027: "reduce_motion accessibility knob: clamps all transitions to 50ms, ceremony becomes instant cut; persisted in save"
+- [x] TR-scene-manager-036: "Ceremony ColorRect alpha cut is instantaneous when reduce_motion=true"
 
 *Verbatim from GDD §G Tuning Knobs:*
 
-- [ ] `reduce_motion` default is `false`; toggle exposed in Settings overlay (surface owned by Settings GDD #30 — the plumbing is wired here)
-- [ ] When `reduce_motion == true`: all standard transitions (CROSS_FADE, SLIDE_*, FADE_TO_BLACK, PUSH_MODAL) clamp to **50ms**; CEREMONY becomes instant cut + reward number reveal; touch feedback 1.05× / 80ms stays
+- [x] `reduce_motion` default is `false`; toggle exposed in Settings overlay (surface owned by Settings GDD #30 — the plumbing is wired here)
+- [x] When `reduce_motion == true`: all standard transitions (CROSS_FADE, SLIDE_*, FADE_TO_BLACK, PUSH_MODAL) clamp to **50ms**; CEREMONY becomes instant cut + reward number reveal; touch feedback 1.05× / 80ms stays
 
 *From ADR-0014 coordination:*
 
-- [ ] `SceneManager.show_modal(modal: Control)` adds the modal to `OverlayLayer` with `pause_on_open = false`; `SceneManager.hide_modal(modal: Control)` removes it
-- [ ] Modal auto-dismisses when `OfflineProgressionEngine.offline_rewards_collected` fires (owned by OfflineProgressionEngine side; SceneManager exposes the `hide_modal` API)
+- [x] `SceneManager.show_modal(modal: Control)` adds the modal to `OverlayLayer` with `pause_on_open = false`; `SceneManager.hide_modal(modal: Control)` removes it
+- [x] Modal auto-dismisses when `OfflineProgressionEngine.offline_rewards_collected` fires (owned by OfflineProgressionEngine side; SceneManager exposes the `hide_modal` API)
 
 ---
 

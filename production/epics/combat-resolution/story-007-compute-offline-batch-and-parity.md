@@ -1,7 +1,7 @@
 # Story 007: compute_offline_batch + foreground/offline parity
 
 > **Epic**: combat-resolution
-> **Status**: Complete (system shipped; see systems-index Implementation Status #11. Test evidence: `tests/{unit,integration}/combat_resolution/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — audit-cascade caveat resolved; required test file exists and passes; ACs ticked.)
 > **Layer**: Feature
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26
@@ -17,12 +17,12 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-002: `compute_offline_batch(snapshot, tick_budget) -> CombatBatchResult` — pure-function entry
-- [ ] TR-003: foreground + offline share the same `_kill_schedule_for_loop` private helper (verified via single source of truth)
-- [ ] TR-015: returned CombatBatchResult populates all 7 fields (kills_by_archetype, kills_by_tier, loops_completed, first_clear_tick, hp_bonus_factor, survived, final_tick)
-- [ ] TR-021 determinism: 100 repeated calls with same args → field-equal results; source formation unmutated (verify via deep-copy hash)
-- [ ] TR-022 parity: `emit_events_in_range(0, 1000)` union == `compute_offline_batch(snapshot, 1000)` aggregate (kills_by_archetype, kills_by_tier dicts byte-equal); 5 × 200-tick batches produce identical aggregate
-- [ ] TR-023: 15k+ kill scenarios return aggregate CombatBatchResult only (no Array[KillEvent] retained); foreground retains per-event detail
+- [x] TR-002: `compute_offline_batch(snapshot, tick_budget) -> CombatBatchResult` — pure-function entry
+- [x] TR-003: foreground + offline share the same `_kill_schedule_for_loop` private helper (verified via single source of truth)
+- [x] TR-015: returned CombatBatchResult populates all 7 fields (kills_by_archetype, kills_by_tier, loops_completed, first_clear_tick, hp_bonus_factor, survived, final_tick)
+- [x] TR-021 determinism: 100 repeated calls with same args → field-equal results; source formation unmutated (verify via deep-copy hash)
+- [x] TR-022 parity: `emit_events_in_range(0, 1000)` union == `compute_offline_batch(snapshot, 1000)` aggregate (kills_by_archetype, kills_by_tier dicts byte-equal); 5 × 200-tick batches produce identical aggregate
+- [x] TR-023: 15k+ kill scenarios return aggregate CombatBatchResult only (no Array[KillEvent] retained); foreground retains per-event detail
 
 ## Implementation Notes
 Foreground emit walks the schedule appending `KillEvent` records. Offline batch walks the SAME schedule but folds entries into `kills_by_archetype: Dictionary[StringName, int]` increments — same iteration order, same per-enemy timing, no per-event Array overhead.

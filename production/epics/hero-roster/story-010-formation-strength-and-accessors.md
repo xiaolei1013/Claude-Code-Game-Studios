@@ -1,7 +1,7 @@
 # Story 010: Formation strength + accessors + AC H-14 perf
 
 > **Epic**: hero-roster
-> **Status**: Complete (system shipped; see systems-index Implementation Status #9. Test evidence: `tests/{unit,integration}/hero_roster/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — audit-cascade caveat resolved; required test file exists and passes; ACs ticked.)
 > **Layer**: Feature
 > **Type**: Logic (with Performance for AC H-14)
 > **Manifest Version**: 2026-04-26
@@ -25,12 +25,12 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-hero-roster-017: `get_formation_strength() -> float` = clamp(1.0 + (avg_level - 1) * 0.2, 1.0, 3.0)
-- [ ] TR-hero-roster-017: empty formation (all slots 0) returns exactly 1.0 via guard (no division by zero)
-- [ ] TR-hero-roster-018: `avg_formation_level = sum(current_level) / non_empty_slot_count`; skips empty slots (id=0)
-- [ ] TR-hero-roster-024: AC H-14 — get_formation_strength p99 < 50µs over 1000 calls on dev hardware
-- [ ] TR-hero-roster-026: `get_all_heroes()` default sort BY_CLASS (DataRegistry order) then BY_LEVEL_DESC tiebreaker
-- [ ] TR-hero-roster-027: `get_formation_heroes() -> Array[HeroInstance]` skips empty slots; ordered by slot index
+- [x] TR-hero-roster-017: `get_formation_strength() -> float` = clamp(1.0 + (avg_level - 1) * 0.2, 1.0, 3.0)
+- [x] TR-hero-roster-017: empty formation (all slots 0) returns exactly 1.0 via guard (no division by zero)
+- [x] TR-hero-roster-018: `avg_formation_level = sum(current_level) / non_empty_slot_count`; skips empty slots (id=0)
+- [x] TR-hero-roster-024: AC H-14 — get_formation_strength p99 < 50µs over 1000 calls on dev hardware
+- [x] TR-hero-roster-026: `get_all_heroes()` default sort BY_CLASS (DataRegistry order) then BY_LEVEL_DESC tiebreaker
+- [x] TR-hero-roster-027: `get_formation_heroes() -> Array[HeroInstance]` skips empty slots; ordered by slot index
 
 ---
 
