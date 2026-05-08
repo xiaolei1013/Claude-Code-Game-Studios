@@ -4,7 +4,7 @@
 > **GDD**: `design/gdd/class-vs-enemy-matchup-resolver.md`
 > **Architecture Module**: `MatchupResolver` (`extends RefCounted`, NOT an autoload — DI service)
 > **Control Manifest Version**: 2026-04-24
-> **Status**: Ready
+> **Status**: Complete (all stories shipped — see systems-index Implementation Status; per-story Status fields flipped 2026-05-08)
 > **Stories**: 8 — authored 2026-04-26 via S6-M10 pre-flight
 
 ## Overview

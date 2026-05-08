@@ -4,7 +4,7 @@
 > **GDD**: `design/gdd/scene-screen-manager.md`
 > **Architecture Module**: `SceneManager` (autoload rank 8 per ADR-0003 Amendment #4)
 > **Control Manifest Version**: 2026-04-26
-> **Status**: Ready
+> **Status**: Complete (all stories shipped — see systems-index Implementation Status; per-story Status fields flipped 2026-05-08)
 > **Stories**: 13 defined (Stories 001–010 = SM kernel; Stories 011–013 = first concrete screens for Sprint 8 VS)
 
 ## Overview

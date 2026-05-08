@@ -4,7 +4,7 @@
 > **GDD**: `design/gdd/floor-unlock-system.md`
 > **Architecture Module**: `FloorUnlock` (autoload — rank governed by ADR-0003 Amendment table; item #3 in `CONSUMER_PATHS`)
 > **Control Manifest Version**: 2026-04-26
-> **Status**: Ready (stories authored 2026-04-27)
+> **Status**: Complete (all stories shipped — see systems-index Implementation Status; per-story Status fields flipped 2026-05-08)
 > **Stories**: 9 stories authored — see table below
 
 ## Overview

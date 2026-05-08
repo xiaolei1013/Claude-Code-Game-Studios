@@ -4,7 +4,7 @@
 > **GDD**: `design/gdd/combat-resolution.md`
 > **Architecture Module**: `CombatResolver` (`extends RefCounted`, stateless DI service)
 > **Control Manifest Version**: 2026-04-24
-> **Status**: Ready
+> **Status**: Complete (all stories shipped — see systems-index Implementation Status; per-story Status fields flipped 2026-05-08)
 > **Stories**: 10 — authored 2026-04-26 via S6-M11 pre-flight
 
 ## Overview

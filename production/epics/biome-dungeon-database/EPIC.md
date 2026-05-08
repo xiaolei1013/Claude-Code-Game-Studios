@@ -3,7 +3,7 @@
 > **Layer**: Core
 > **GDD**: design/gdd/biome-dungeon-database.md
 > **Architecture Module**: `BiomeDungeonDatabase` (autoload rank 6) — `docs/architecture/architecture.md` §Core Layer
-> **Status**: Ready
+> **Status**: Complete (all stories shipped — see systems-index Implementation Status; per-story Status fields flipped 2026-05-08)
 > **Stories**: 7 (all Ready) — see Stories table below
 
 ## Overview

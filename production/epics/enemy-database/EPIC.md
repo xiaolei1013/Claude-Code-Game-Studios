@@ -3,7 +3,7 @@
 > **Layer**: Core
 > **GDD**: design/gdd/enemy-database.md
 > **Architecture Module**: `EnemyDatabase` (autoload rank 5) — `docs/architecture/architecture.md` §Core Layer
-> **Status**: Ready
+> **Status**: Complete (all stories shipped — see systems-index Implementation Status; per-story Status fields flipped 2026-05-08)
 > **Stories**: 6 (all Ready) — see Stories table below
 
 ## Overview

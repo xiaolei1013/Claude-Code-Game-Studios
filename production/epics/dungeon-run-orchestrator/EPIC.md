@@ -4,7 +4,7 @@
 > **GDD**: `design/gdd/dungeon-run-orchestrator.md`
 > **Architecture Module**: `DungeonRunOrchestrator` (autoload — rank 6+ governed by ADR-0003 Amendment table)
 > **Control Manifest Version**: 2026-04-24
-> **Status**: Ready
+> **Status**: Complete (all stories shipped — see systems-index Implementation Status; per-story Status fields flipped 2026-05-08)
 > **Stories**: 12 defined (Ready)
 
 ## Overview

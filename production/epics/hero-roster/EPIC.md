@@ -4,7 +4,7 @@
 > **GDD**: `design/gdd/hero-roster.md`
 > **Architecture Module**: `HeroRoster` (autoload — rank position governed by ADR-0003 Amendment table)
 > **Control Manifest Version**: 2026-04-24
-> **Status**: Ready
+> **Status**: Complete (all stories shipped — see systems-index Implementation Status; per-story Status fields flipped 2026-05-08)
 > **Stories**: 10 defined (Ready)
 
 ## Overview
