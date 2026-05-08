@@ -1,7 +1,7 @@
 # Story 002: Public read API + FloorState enum
 
 > **Epic**: floor-unlock-system
-> **Status**: Complete (system shipped; see systems-index Implementation Status #16. Test evidence: `tests/unit/floor_unlock_system/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — implementation + tests already exist in source. Paperwork-only closure: ACs ticked + Test Evidence path corrected. Story spec named `tests/unit/floor_unlock/read_api_test.gd` but the canonical location is `tests/unit/floor_unlock_system/floor_unlock_system_test.gd` — same coverage, different path.)
 > **Layer**: Feature
 > **Type**: Logic
 > **Manifest Version**: 2026-04-26
@@ -25,9 +25,9 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-004: public methods `is_unlocked(floor_index)`, `get_highest_cleared(biome_id)`, `get_floor_state(biome_id, floor_index)` exist with documented signatures
-- [ ] TR-011: `is_unlocked(0)` returns false; `is_unlocked(N>=1)` reflects unlock state
-- [ ] TR-014: `FloorState` enum {UNAVAILABLE, LOCKED, ACCESSIBLE, CLEARED} declared at script level; `get_floor_state` derives correct bucket per (biome availability + highest_cleared + floor_index) tuple
+- [x] TR-004: public methods `is_unlocked(floor_index)`, `get_highest_cleared(biome_id)`, `get_floor_state(biome_id, floor_index)` exist with documented signatures
+- [x] TR-011: `is_unlocked(0)` returns false; `is_unlocked(N>=1)` reflects unlock state
+- [x] TR-014: `FloorState` enum {UNAVAILABLE, LOCKED, ACCESSIBLE, CLEARED} declared at script level; `get_floor_state` derives correct bucket per (biome availability + highest_cleared + floor_index) tuple
 
 ---
 

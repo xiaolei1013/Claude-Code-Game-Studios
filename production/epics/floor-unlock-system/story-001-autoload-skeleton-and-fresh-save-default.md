@@ -1,7 +1,7 @@
 # Story 001: Autoload skeleton + _unlock_state typed dict + fresh-save default
 
 > **Epic**: floor-unlock-system
-> **Status**: Complete (system shipped; see systems-index Implementation Status #16. Test evidence: `tests/unit/floor_unlock_system/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — implementation + tests already exist in source. Paperwork-only closure: ACs ticked. Test evidence at `tests/unit/floor_unlock_system/floor_unlock_system_test.gd` (Group A: autoload + project.godot lockstep; Group C: fresh-save default state).)
 > **Layer**: Feature
 > **Type**: Logic
 > **Manifest Version**: 2026-04-26
@@ -26,10 +26,10 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-001: `FloorUnlockSystem extends Node` with `class_name`; autoload at `/root/FloorUnlock`
-- [ ] TR-002: `_unlock_state` is typed `Dictionary[String, int]`; not plain `Dictionary`
-- [ ] TR-003: autoload boot order matches the rank table — registered AFTER DataRegistry/SaveLoadSystem/Economy, BEFORE DungeonRunOrchestrator
-- [ ] TR-005: fresh-save default state contains exactly one key (`forest_reach: 0`); no planned-V1 biomes seeded
+- [x] TR-001: `FloorUnlockSystem extends Node` with `class_name`; autoload at `/root/FloorUnlock`
+- [x] TR-002: `_unlock_state` is typed `Dictionary[String, int]`; not plain `Dictionary`
+- [x] TR-003: autoload boot order matches the rank table — registered AFTER DataRegistry/SaveLoadSystem/Economy, BEFORE DungeonRunOrchestrator
+- [x] TR-005: fresh-save default state contains exactly one key (`forest_reach: 0`); no planned-V1 biomes seeded
 
 ---
 
