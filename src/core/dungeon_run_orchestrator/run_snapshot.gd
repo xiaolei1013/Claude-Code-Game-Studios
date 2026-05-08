@@ -99,6 +99,26 @@ var losing_run: bool = false
 ## starting a new dispatch.
 var floor_clear_emitted: bool = false
 
+## Story 011 (TR-orchestrator-031) — distinguishes ADR-0014's two failure modes
+## when offline replay produces an empty `kill_schedule`:
+##   - `true` (default): floor archetypes are valid; the empty kill_schedule
+##     means the formation lost without producing any kills ("lost badly").
+##   - `false`: floor authoring bug — the source Floor resource has missing
+##     or invalid archetype data, so Combat had no enemies to schedule.
+##     Set explicitly via [method DungeonRunOrchestrator.mark_floor_invalid_for_offline_replay]
+##     (which also `push_error`s the authoring-bug diagnostic).
+##
+## Default is `true` because the typical case at dispatch time is a valid
+## floor — only the explicit invalid-marking path flips this to `false`.
+##
+## Serialized in [method to_dict] / [method from_dict] so the Return-to-App
+## Screen can render the distinction correctly across the persist boundary
+## (a floor authoring bug detected during offline replay is still a bug
+## after relaunch).
+##
+## TR-orchestrator-031, ADR-0014.
+var floor_was_valid: bool = true
+
 
 # ---------------------------------------------------------------------------
 # Serialization (TR-orchestrator-003) — round-trip via to_dict / from_dict
@@ -121,6 +141,7 @@ func to_dict() -> Dictionary:
 		"kill_schedule": kill_schedule.duplicate(true),
 		"loop_counter": loop_counter,
 		"kill_count": kill_count,
+		"floor_was_valid": floor_was_valid,
 	}
 
 
@@ -156,6 +177,9 @@ func from_dict(d: Dictionary) -> void:
 	# Bools — explicit, never re-derived (ADR-0014 §B4).
 	losing_run = bool(d.get("losing_run", false))
 	floor_clear_emitted = bool(d.get("floor_clear_emitted", false))
+	# Story 011 — default `true` if absent so legacy saves (pre-field) hydrate
+	# as "valid floor" rather than spuriously claiming an authoring bug.
+	floor_was_valid = bool(d.get("floor_was_valid", true))
 
 
 ## Returns true if [param other] has equal values for all 9 fields.
@@ -178,4 +202,5 @@ func equals(other: RunSnapshot) -> bool:
 		and kill_schedule == other.kill_schedule
 		and loop_counter == other.loop_counter
 		and kill_count == other.kill_count
+		and floor_was_valid == other.floor_was_valid
 	)

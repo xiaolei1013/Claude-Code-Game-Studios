@@ -373,6 +373,71 @@ func _subscribe_to_formation_reassignment() -> void:
 		fa.formation_reassignment_committed.connect(_on_formation_reassignment_committed)
 
 
+## Story 011 (TR-orchestrator-029) — UI / OfflineProgressionEngine entry point
+## for offline-replay errors per ADR-0014.
+##
+## When an error occurs during offline replay (e.g., resolver returned malformed
+## data, RNG seed mismatch detected, internal invariant violation), the caller
+## (typically OfflineProgressionEngine) invokes this method to:
+##   1. Emit [signal validation_failed] with reason `"offline_replay_error"`
+##      and a payload carrying [param partial_gold] — the gold credited to
+##      Economy BEFORE the error occurred. Per ADR-0014: NO ROLLBACK. The
+##      partial gold is intentionally retained because it was already added
+##      via [code]Economy.add_gold[/code] during the replay loop.
+##   2. Transition to [enum DungeonRunState.State.RUN_ENDED]. Allowed from
+##      ACTIVE_OFFLINE_REPLAY (the canonical error-from-replay edge) AND
+##      from any other state defensively (a caller invoking this method
+##      from an unusual state still gets the visible run-ended outcome).
+##
+## Idempotent: calling twice is safe — the signal emits twice (caller is
+## responsible for not double-reporting), but the state transition is a
+## no-op self-transition the second time per [method _set_state]'s guard.
+##
+## Example (OfflineProgressionEngine error-handling):
+##   [codeblock]
+##   if not _try_replay(result, tick_budget):
+##       DungeonRunOrchestrator.report_offline_replay_error(result.total_gold)
+##   [/codeblock]
+##
+## TR-orchestrator-029, ADR-0014.
+func report_offline_replay_error(partial_gold: int) -> void:
+	validation_failed.emit("offline_replay_error", {"partial_gold": partial_gold})
+	_set_state(DungeonRunStateScript.State.RUN_ENDED)
+
+
+## Story 011 (TR-orchestrator-031) — flips [member RunSnapshot.floor_was_valid]
+## to `false` for the active run + logs the authoring-bug diagnostic per
+## ADR-0014.
+##
+## Called by OfflineProgressionEngine (or other offline-replay infrastructure)
+## when an empty `kill_schedule` is detected AND the source Floor's archetype
+## list is verified missing/invalid — distinguishing the "lost badly" case
+## (kill_schedule empty + valid archetypes) from the "floor authoring bug"
+## case (kill_schedule empty + missing archetype data).
+##
+## Side-effects:
+##   - [member run_snapshot.floor_was_valid] = `false` (the field defaults to
+##     `true` on snapshot construction; this flips it).
+##   - [code]push_error[/code] with the floor_id for surfacing the authoring
+##     bug at QA / playtest time. Per ADR-0014, this is a fail-loud surface
+##     so the bug is caught before ship rather than silently degrading the
+##     player's offline run.
+##
+## Defensive: if [member run_snapshot] is null (NO_RUN state, or test setup
+## without a snapshot), this is a silent no-op. The caller is responsible
+## for only invoking this when there's an active run to mark.
+##
+## TR-orchestrator-031, ADR-0014.
+func mark_floor_invalid_for_offline_replay() -> void:
+	if run_snapshot == null:
+		return
+	run_snapshot.floor_was_valid = false
+	push_error(
+		"[Orchestrator] floor '%s' produced empty kill_schedule with no valid archetypes — likely authoring bug"
+		% run_snapshot.floor_id
+	)
+
+
 ## Story 008 — handles the mid-run formation reassignment cascade per ADR-0001.
 ##
 ## Sequence (ACTIVE_FOREGROUND only — other states are silent no-ops):

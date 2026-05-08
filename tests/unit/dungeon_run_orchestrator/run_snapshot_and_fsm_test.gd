@@ -317,16 +317,17 @@ func test_run_snapshot_default_loop_counter_is_zero() -> void:
 # Group F: TR-orchestrator-003 — to_dict shape + values
 # ===========================================================================
 
-func test_to_dict_returns_ten_key_dict() -> void:
-	# Sprint 7 S7-M13 added `kill_count` field as the 10th — tracking running
-	# kills since DISPATCHING. Persisted via to_dict for save/load round-trip.
+func test_to_dict_returns_eleven_key_dict() -> void:
+	# Sprint 7 S7-M13 added `kill_count` field as the 10th. Story 011
+	# (2026-05-08) added `floor_was_valid` field as the 11th — distinguishes
+	# ADR-0014's "lost badly" vs "floor authoring bug" cases on RunSnapshot.
 	var snap: RunSnapshot = RunSnapshotScript.new()
 	var d: Dictionary = snap.to_dict()
-	assert_int(d.size()).is_equal(10)
+	assert_int(d.size()).is_equal(11)
 	for key: String in [
 		"formation_snapshot", "floor_id", "current_tick", "last_emitted_tick",
 		"losing_run", "floor_clear_emitted", "matchup_cache", "kill_schedule",
-		"loop_counter", "kill_count",
+		"loop_counter", "kill_count", "floor_was_valid",
 	]:
 		assert_bool(d.has(key)).override_failure_message(
 			"to_dict missing key '%s'" % key
