@@ -59,7 +59,7 @@ var _orch_last_dispatch_ms_snapshot: int = 0
 ## TRANSITIONING (so request_screen queues rather than crashing via
 ## _execute_transition → _get_screen_container assert-crash without MainRoot).
 ## These snapshots allow after_test() to restore SM state cleanly.
-var _sm_state_snapshot: int = 0
+var _sm_state_snapshot: SceneManager.State = SceneManager.State.UNINITIALIZED
 var _sm_queued_request_snapshot: Dictionary = {}
 var _sm_current_screen_id_snapshot: String = ""
 

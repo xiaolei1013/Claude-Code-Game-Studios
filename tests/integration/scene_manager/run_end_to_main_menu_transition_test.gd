@@ -54,7 +54,7 @@ var _orch_run_snapshot_snapshot: RunSnapshot = null
 var _orch_last_dispatch_ms_snapshot: int = 0
 
 ## Snapshots of SceneManager state modified by tests.
-var _sm_state_snapshot: int = 0
+var _sm_state_snapshot: SceneManager.State = SceneManager.State.UNINITIALIZED
 var _sm_queued_request_snapshot: Dictionary = {}
 var _sm_current_screen_id_snapshot: String = ""
 

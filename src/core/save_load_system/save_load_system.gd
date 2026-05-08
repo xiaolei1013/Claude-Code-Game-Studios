@@ -1165,7 +1165,14 @@ func _derive_mask_seed(version: int) -> PackedByteArray:
 ##   var mask := _generate_mask(seed, plaintext.size())
 ##   var masked := _apply_xor_mask(plaintext, mask)
 ##
-## ADR-0004 §XOR mask derivation, TR-save-load-020
+## ADR-0004 §XOR mask derivation, TR-save-load-020.
+##
+## Note: parameter name `seed` shadows GDScript's built-in `seed()` RNG
+## function. Kept because `seed` is the canonical cryptographic-domain term
+## for SHA-256 mask derivation (matches the algorithm spec + every comment
+## referencing it). The body never calls `seed()` so the shadow is purely
+## informational; suppressed here to keep the lint baseline at zero.
+@warning_ignore("shadowed_global_identifier")
 func _generate_mask(seed: PackedByteArray, payload_length: int) -> PackedByteArray:
 	if payload_length <= 0:
 		return PackedByteArray()
