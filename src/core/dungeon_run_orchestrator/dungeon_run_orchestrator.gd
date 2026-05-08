@@ -342,6 +342,79 @@ func _ready() -> void:
 	# error_logger remains null in MVP; push_error / push_warning are the default.
 	# Story 003+ may inject a recording_logger Callable here per GDD §J.4.
 
+	# Story 008 — subscribe to FormationAssignment.formation_reassignment_committed
+	# so mid-run formation reassignment cascades: ACTIVE_FOREGROUND → RUN_ENDED →
+	# DISPATCHING (new formation). Per ADR-0001 the formation is locked at dispatch;
+	# attempting reassignment during a run terminates the current run and
+	# immediately re-dispatches with the new lineup. `formation_browse_opened` is
+	# intentionally NOT subscribed (TR-021: read-only signal, no state change).
+	_subscribe_to_formation_reassignment()
+
+
+## Story 008 — subscribes to [signal FormationAssignment.formation_reassignment_committed]
+## via the autoload at [code]/root/FormationAssignment[/code].
+##
+## Idempotent: if the connection already exists (e.g., the autoload was
+## resolved + subscribed in an earlier _ready that re-fired during scene
+## reload), a duplicate connection is skipped via [method Signal.is_connected].
+##
+## Test envs without the autoload (FormationAssignment not registered) silently
+## skip the subscription. The cascade behavior in those envs requires direct
+## handler invocation via [method _on_formation_reassignment_committed].
+##
+## TR-orchestrator-020, ADR-0001.
+func _subscribe_to_formation_reassignment() -> void:
+	var fa: Node = (
+		get_node_or_null("/root/FormationAssignment") if get_tree() != null else null
+	)
+	if fa == null or not fa.has_signal("formation_reassignment_committed"):
+		return
+	if not fa.formation_reassignment_committed.is_connected(_on_formation_reassignment_committed):
+		fa.formation_reassignment_committed.connect(_on_formation_reassignment_committed)
+
+
+## Story 008 — handles the mid-run formation reassignment cascade per ADR-0001.
+##
+## Sequence (ACTIVE_FOREGROUND only — other states are silent no-ops):
+##   1. Capture the dispatched floor_index + biome_id BEFORE state transition
+##      (the `dispatch()` call below will repopulate these).
+##   2. Transition ACTIVE_FOREGROUND → RUN_ENDED via the validated state-machine
+##      path. The transition matrix already permits this edge with the
+##      `run_ended` trigger (matrix row 3).
+##   3. Clear the dispatch debounce stamp so the cascade re-dispatch is NOT
+##      rejected as a rapid-fire double-dispatch. The cascade is internally
+##      triggered by player intent (formation commit), not a UI signal storm,
+##      so the debounce protection doesn't apply here.
+##   4. Call [method dispatch] with the new formation + the captured floor /
+##      biome ids. This advances RUN_ENDED → DISPATCHING and Story 004's
+##      snapshot-build path takes over from there.
+##
+## Non-ACTIVE_FOREGROUND states (NO_RUN, DISPATCHING, RUN_ENDED, ACTIVE_OFFLINE_REPLAY)
+## are silent no-ops — the player can re-arrange the formation freely outside
+## a live run; only mid-run reassignment cascades.
+##
+## [param new_formation]: the new formation array from FormationAssignment's
+##   commit. Forwarded verbatim to [method dispatch] which validates it
+##   (empty-formation rejection still applies — passing an empty Array here
+##   would dispatch then fail validation at dispatch's own guard).
+##
+## TR-orchestrator-020, TR-orchestrator-021 — ADR-0001.
+func _on_formation_reassignment_committed(new_formation: Array) -> void:
+	if state != DungeonRunStateScript.State.ACTIVE_FOREGROUND:
+		return
+	# Capture pre-cascade dispatch context. After _set_state(RUN_ENDED) +
+	# dispatch(), these fields will be overwritten — so snapshot first.
+	var captured_floor_index: int = _dispatched_floor_index
+	var captured_biome_id: String = _dispatched_biome_id
+	# Cascade step 1: ACTIVE_FOREGROUND → RUN_ENDED via the validated transition.
+	_set_state(DungeonRunStateScript.State.RUN_ENDED)
+	# Bypass dispatch debounce — the cascade is internally-triggered, not a
+	# UI signal storm. Without this clear, a cascade firing within
+	# DISPATCH_DEBOUNCE_MS of the original dispatch would be silently rejected.
+	_last_dispatch_ms = 0
+	# Cascade step 2: RUN_ENDED → DISPATCHING (with new formation).
+	dispatch(new_formation, captured_floor_index, captured_biome_id)
+
 
 # ---------------------------------------------------------------------------
 # DI setters — TR-orchestrator-024
