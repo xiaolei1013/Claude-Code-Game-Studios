@@ -1,7 +1,7 @@
 # Sprint 5 — 2026-06-22 to 2026-07-03
 
 > **Generated**: 2026-04-26 by `/sprint-plan` (autonomous; solo review mode)
-> **Status**: Ready
+> **Status**: Complete (elapsed; closed by sprint-6 kickoff. Sprint plan retained for historical audit.)
 > **Engine**: Godot 4.6 (pinned 2026-02-12)
 
 ## Sprint Goal
