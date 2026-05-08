@@ -1,7 +1,7 @@
 # Story 004: BIOME_FLOOR_COUNT lookup + handler guards + DI loggers
 
 > **Epic**: floor-unlock-system
-> **Status**: Complete (system shipped; see systems-index Implementation Status #16. Test evidence: `tests/unit/floor_unlock_system/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (real implementation 2026-05-08 — added missing `set_error_logger`/`set_warning_logger` DI setters + new focused test file with 11 functions covering all 5 ACs.)
 > **Layer**: Feature
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26
@@ -25,11 +25,11 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-013: `BIOME_FLOOR_COUNT["forest_reach"] == 5` after `_ready()` (matches forest_reach Biome.dungeons[0].floors.size())
-- [ ] TR-012 guard ordering: handler rejects unavailable biome BEFORE checking BIOME_FLOOR_COUNT; rejects unknown biome BEFORE range check
-- [ ] TR-012 range guard: floor_index outside `[1, BIOME_FLOOR_COUNT[b]]` triggers `_error_logger.call(...)` and rejects
-- [ ] TR-021: `set_error_logger(c)` / `set_warning_logger(c)` setters exist; injected Callables receive log messages instead of push_error/push_warning
-- [ ] TR-021: when no logger injected, falls back to push_error / push_warning (production default)
+- [x] TR-013: `BIOME_FLOOR_COUNT["forest_reach"] == 5` after `_ready()` (matches forest_reach Biome.dungeons[0].floors.size())
+- [x] TR-012 guard ordering: handler rejects unavailable biome BEFORE checking BIOME_FLOOR_COUNT; rejects unknown biome BEFORE range check
+- [x] TR-012 range guard: floor_index outside `[1, BIOME_FLOOR_COUNT[b]]` triggers `_error_logger.call(...)` and rejects
+- [x] TR-021: `set_error_logger(c)` / `set_warning_logger(c)` setters exist; injected Callables receive log messages instead of push_error/push_warning
+- [x] TR-021: when no logger injected, falls back to push_error / push_warning (production default)
 
 ---
 

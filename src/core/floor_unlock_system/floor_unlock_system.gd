@@ -76,6 +76,37 @@ var _warning_logger: Callable = func(msg: String) -> void: push_warning(msg)
 ## Mirrors the orchestrator's _error_logger pattern.
 var _error_logger: Callable = func(msg: String) -> void: push_error(msg)
 
+
+## Story 004 (TR-021) — public DI setter for the warning logger.
+##
+## Tests inject a capturing Callable to assert specific warning messages
+## without intercepting `push_warning` (which gdunit4 doesn't natively do).
+## Production callers MUST NOT use this — the default lambda routes through
+## `push_warning` which is the correct production behavior.
+##
+## Example (test):
+##   var captured: Array[String] = []
+##   fu.set_warning_logger(func(msg: String) -> void: captured.append(msg))
+##
+## TR-021, ADR-0009 §DI patterns.
+func set_warning_logger(logger: Callable) -> void:
+	_warning_logger = logger
+
+
+## Story 004 (TR-021) — public DI setter for the error logger.
+##
+## Same DI pattern as [method set_warning_logger]: tests inject a capturing
+## Callable to assert specific error messages. Production default routes
+## through `push_error`.
+##
+## Example (test):
+##   var captured: Array[String] = []
+##   fu.set_error_logger(func(msg: String) -> void: captured.append(msg))
+##
+## TR-021, ADR-0009 §DI patterns.
+func set_error_logger(logger: Callable) -> void:
+	_error_logger = logger
+
 ## Debug/QA flag (G.2). Not @export — toggling is via test fixture or in-editor
 ## inspector. When true (and OS.is_debug_build()), get_floor_state returns
 ## CLEARED for every in-range floor.
