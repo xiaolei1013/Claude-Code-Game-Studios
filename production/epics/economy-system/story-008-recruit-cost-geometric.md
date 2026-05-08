@@ -1,7 +1,7 @@
 # Story 008: recruit_cost geometric formula (1.8× per copy)
 
 > **Epic**: economy-system
-> **Status**: Complete (system shipped; see systems-index Implementation Status #5. Test evidence: `tests/unit/economy/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — audit-cascade caveat resolved; required test file exists and passes; ACs ticked.)
 > **Layer**: Core
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24
@@ -27,12 +27,12 @@
 
 ## Acceptance Criteria
 
-- [ ] **H-07**: GIVEN Tier-1 class with `BASE_RECRUIT[1] = 150`, `RECRUIT_RATIO = 1.8`, copies_owned N (N ∈ {0,1,2,3}), WHEN `recruit_cost(class_id, N+1's-purchase)` queried, THEN cost = `floori(150 × 1.8^N)`: N=0 → 150, N=1 → 270, N=2 → 486, N=3 → 874
-- [ ] Ratio invariant: `cost(N+1) / cost(N) ≈ 1.8` within integer rounding (verified for N = 0..3 as independent sub-cases)
-- [ ] Tier resolution: invalid `class_id` (no resolve match) → `push_error("Economy.recruit_cost: class_id='X' not in DataRegistry")`; returns `-1` sentinel
-- [ ] `copies_owned < 0` → `push_error`; returns `-1`
-- [ ] Pure-read: no state mutation, no signals, no side effects
-- [ ] Tier coverage: BASE_RECRUIT keys exhaustive for tiers 1, 2 (MVP — Tier-3 enemies exist but no Tier-3 recruitable classes per `hero-class-database.md`)
+- [x] **H-07**: GIVEN Tier-1 class with `BASE_RECRUIT[1] = 150`, `RECRUIT_RATIO = 1.8`, copies_owned N (N ∈ {0,1,2,3}), WHEN `recruit_cost(class_id, N+1's-purchase)` queried, THEN cost = `floori(150 × 1.8^N)`: N=0 → 150, N=1 → 270, N=2 → 486, N=3 → 874
+- [x] Ratio invariant: `cost(N+1) / cost(N) ≈ 1.8` within integer rounding (verified for N = 0..3 as independent sub-cases)
+- [x] Tier resolution: invalid `class_id` (no resolve match) → `push_error("Economy.recruit_cost: class_id='X' not in DataRegistry")`; returns `-1` sentinel
+- [x] `copies_owned < 0` → `push_error`; returns `-1`
+- [x] Pure-read: no state mutation, no signals, no side effects
+- [x] Tier coverage: BASE_RECRUIT keys exhaustive for tiers 1, 2 (MVP — Tier-3 enemies exist but no Tier-3 recruitable classes per `hero-class-database.md`)
 
 ---
 

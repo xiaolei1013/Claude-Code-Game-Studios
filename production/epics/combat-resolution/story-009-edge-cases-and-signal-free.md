@@ -1,7 +1,7 @@
 # Story 009: Edge cases — empty formation, bad class_id, signal-free invariants
 
 > **Epic**: combat-resolution
-> **Status**: Complete (system shipped; see systems-index Implementation Status #11. Test evidence: `tests/{unit,integration}/combat_resolution/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — audit-cascade caveat resolved; required test file exists and passes; ACs ticked.)
 > **Layer**: Feature
 > **Type**: Logic
 > **Manifest Version**: 2026-04-26
@@ -17,11 +17,11 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-018: Combat reports `first_clear_in_range` markers per-call; the once-per-dispatch idempotency flag lives on the Orchestrator (NOT in Combat)
-- [ ] TR-019: `compute_offline_batch(empty_formation, ...)` → empty CombatBatchResult; `push_warning("[CombatResolver] empty formation")`; no `0/0` division
-- [ ] TR-020: hero with unresolvable class_id (`DataRegistry.resolve("classes", "ghost")` returns null) → contributes 0 to formation_dps, 0 to formation_total_hp; calls injected `error_logger.call(message)` if logger is non-null
-- [ ] TR-027: source grep `combat_resolver.gd` + `default_combat_resolver.gd` for `randi()`, `randf()`, `Time.`, `OS.get_ticks` → zero hits
-- [ ] TR-030 reaffirmed (also covered by Story 008): zero signal declarations in resolver source
+- [x] TR-018: Combat reports `first_clear_in_range` markers per-call; the once-per-dispatch idempotency flag lives on the Orchestrator (NOT in Combat)
+- [x] TR-019: `compute_offline_batch(empty_formation, ...)` → empty CombatBatchResult; `push_warning("[CombatResolver] empty formation")`; no `0/0` division
+- [x] TR-020: hero with unresolvable class_id (`DataRegistry.resolve("classes", "ghost")` returns null) → contributes 0 to formation_dps, 0 to formation_total_hp; calls injected `error_logger.call(message)` if logger is non-null
+- [x] TR-027: source grep `combat_resolver.gd` + `default_combat_resolver.gd` for `randi()`, `randf()`, `Time.`, `OS.get_ticks` → zero hits
+- [x] TR-030 reaffirmed (also covered by Story 008): zero signal declarations in resolver source
 
 ## QA Test Cases
 

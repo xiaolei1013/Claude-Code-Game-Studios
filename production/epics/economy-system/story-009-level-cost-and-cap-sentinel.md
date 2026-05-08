@@ -1,7 +1,7 @@
 # Story 009: level_cost geometric formula + LEVEL_CAP sentinel (-1)
 
 > **Epic**: economy-system
-> **Status**: Complete (system shipped; see systems-index Implementation Status #5. Test evidence: `tests/unit/economy/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — audit-cascade caveat resolved; required test file exists and passes; ACs ticked.)
 > **Layer**: Core
 > **Type**: Logic
 > **Manifest Version**: 2026-04-24
@@ -26,13 +26,13 @@
 
 ## Acceptance Criteria
 
-- [ ] **H-08**: GIVEN Tier-1 hero at `current_level = L` (L ∈ {1..14}), `BASE_LEVEL[1] = 40`, `LEVEL_RATIO = 1.6`, `LEVEL_CAP = 15`, WHEN `level_cost(1, L+1)` queried, THEN cost = `floori(40 × 1.6^(L-1))`: L=1 → 40, L=2 → 64, ..., L=14 → 18018
-- [ ] **At-cap sentinel**: `level_cost(1, 15+1)` (querying level 16) returns **-1** (sentinel "past cap"), NOT a valid gold amount
-- [ ] Boundary: `level_cost(1, 15)` (current = cap, level-up to 16) returns `-1`
-- [ ] Below-bound defensive: `current_level < 1` → `push_error`; returns `-1`
-- [ ] Unknown tier: `class_tier` not in `BASE_LEVEL` keys → `push_error("Economy.level_cost: tier=X has no BASE_LEVEL entry")`; returns `-1`
-- [ ] Pure-read: no state mutation, no signals
-- [ ] Distinct return for "valid cost" vs "past cap": cost is always `>= 0`; `-1` is only used for past-cap
+- [x] **H-08**: GIVEN Tier-1 hero at `current_level = L` (L ∈ {1..14}), `BASE_LEVEL[1] = 40`, `LEVEL_RATIO = 1.6`, `LEVEL_CAP = 15`, WHEN `level_cost(1, L+1)` queried, THEN cost = `floori(40 × 1.6^(L-1))`: L=1 → 40, L=2 → 64, ..., L=14 → 18018
+- [x] **At-cap sentinel**: `level_cost(1, 15+1)` (querying level 16) returns **-1** (sentinel "past cap"), NOT a valid gold amount
+- [x] Boundary: `level_cost(1, 15)` (current = cap, level-up to 16) returns `-1`
+- [x] Below-bound defensive: `current_level < 1` → `push_error`; returns `-1`
+- [x] Unknown tier: `class_tier` not in `BASE_LEVEL` keys → `push_error("Economy.level_cost: tier=X has no BASE_LEVEL entry")`; returns `-1`
+- [x] Pure-read: no state mutation, no signals
+- [x] Distinct return for "valid cost" vs "past cap": cost is always `>= 0`; `-1` is only used for past-cap
 
 ---
 

@@ -1,7 +1,7 @@
 # Story 005: V1.0 stub biome (forward-compat fixture + filter test)
 
 > **Epic**: biome-dungeon-database
-> **Status**: Complete (system shipped; see systems-index Implementation Status #8. Test evidence: `tests/{unit,integration}/biome_dungeon_database/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — audit-cascade caveat resolved; required test file exists and passes; ACs ticked.)
 > **Layer**: Core
 > **Type**: Config/Data
 > **Manifest Version**: 2026-04-24
@@ -25,17 +25,17 @@
 
 ## Acceptance Criteria
 
-- [ ] At least 1 V1.0 stub biome `.tres` exists in `assets/data/biomes/` with:
+- [x] At least 1 V1.0 stub biome `.tres` exists in `assets/data/biomes/` with:
   - `id` distinct from "forest_reach" (e.g., "stormwood_keep" or another from systems-index V1.0 list)
   - `status = "planned_v1"`
   - `display_name` non-empty
   - `dungeons = []` (empty array — TR-biome-dungeon-db-013 forward-compat)
   - `flavor_text` non-empty (advisory; gives the stub identity)
-- [ ] **AC H-07 + TR-biome-dungeon-db-013**: stub passes Story 004 schema validation (`status` is in valid enum; empty dungeons array is acceptable for `planned_v1` stubs)
-- [ ] Stub resolvable via `BiomeDungeonDatabase.get_biome_by_id("[stub_id]")` (returns non-null)
-- [ ] **AC H-08**: stub absent from `get_playable_biomes()` (Story 002 filter excludes status != "active")
-- [ ] `get_all_biome_ids()` includes BOTH Forest Reach AND the stub (filter is one-way — they're loaded, just not playable)
-- [ ] `design/registry/entities.yaml` updated with the V1.0 stub entry (or confirmed already present from Sprint 1 systems-index work)
+- [x] **AC H-07 + TR-biome-dungeon-db-013**: stub passes Story 004 schema validation (`status` is in valid enum; empty dungeons array is acceptable for `planned_v1` stubs)
+- [x] Stub resolvable via `BiomeDungeonDatabase.get_biome_by_id("[stub_id]")` (returns non-null)
+- [x] **AC H-08**: stub absent from `get_playable_biomes()` (Story 002 filter excludes status != "active")
+- [x] `get_all_biome_ids()` includes BOTH Forest Reach AND the stub (filter is one-way — they're loaded, just not playable)
+- [x] `design/registry/entities.yaml` updated with the V1.0 stub entry (or confirmed already present from Sprint 1 systems-index work)
 
 ---
 
