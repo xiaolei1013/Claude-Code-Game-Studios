@@ -132,12 +132,17 @@ func test_unlocked_floor_with_non_empty_formation_advances_to_active_foreground(
 
 
 func test_null_floor_unlock_skips_lock_check_and_advances_to_active_foreground() -> void:
-	# Pre-production fail-open: when _floor_unlock is null, the lock check
-	# is SKIPPED — dispatch with a non-empty formation now reaches
-	# ACTIVE_FOREGROUND (Sprint 7 S7-M13 wires DISPATCHING → ACTIVE_FOREGROUND
-	# automatically via snapshot construction).
+	# floor-unlock-system/story-007 (TR-026) update 2026-05-08:
+	# The previous "fail-open when _floor_unlock is null" path was REMOVED by
+	# the lazy-bind in orchestrator's _ready(): production runs auto-bind
+	# /root/FloorUnlock so _floor_unlock is never null in production. This
+	# test now exercises the explicit-null-after-clear path: tests that
+	# deliberately want the no-floor-unlock behavior must clear the field
+	# AFTER add_child (after _ready's lazy-bind fires).
 	var orch: Node = _make_orch()
-	# Deliberately do not call set_floor_unlock — _floor_unlock stays null.
+	# Clear the lazy-bound _floor_unlock to exercise the legacy fail-open
+	# branch (still present in dispatch() for null-defensive behavior).
+	orch._floor_unlock = null
 	orch.dispatch([{"id": 1}], 99, "forest_reach")
 	assert_int(orch.state).is_equal(DungeonRunStateScript.State.ACTIVE_FOREGROUND)
 

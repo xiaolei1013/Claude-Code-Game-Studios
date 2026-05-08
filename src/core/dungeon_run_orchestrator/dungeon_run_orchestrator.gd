@@ -164,7 +164,12 @@ var _error_logger: RefCounted = null
 ## a real FloorUnlock before the orchestrator dispatches.
 ##
 ## TR-orchestrator-027 — ADR-0009
-var _floor_unlock: RefCounted = null
+## Story 007 (TR-026) — widened from `RefCounted` to `Object` so the lazy-bind
+## in `_ready()` can assign /root/FloorUnlock (which is a Node autoload, not
+## RefCounted). The duck-typed `has_method("is_unlocked")` check at the call
+## site already enforces the contract; the field type just needs to accept
+## both Node + RefCounted impls.
+var _floor_unlock: Object = null
 
 
 # ---------------------------------------------------------------------------
@@ -342,6 +347,21 @@ func _ready() -> void:
 	# error_logger remains null in MVP; push_error / push_warning are the default.
 	# Story 003+ may inject a recording_logger Callable here per GDD §J.4.
 
+	# floor-unlock-system/story-007 (TR-026) — lazy-bind /root/FloorUnlock as
+	# the FloorUnlock dependency when no spy was pre-injected via
+	# set_floor_unlock(). Production: the autoload at /root/FloorUnlock binds
+	# automatically. Tests: pre-inject a spy via set_floor_unlock() BEFORE
+	# add_child() to override; the lazy-bind here sees `_floor_unlock != null`
+	# and skips. Removes the previous test-env null-fail-open path from
+	# production runs (was: dispatch() skipped floor-lock check when
+	# _floor_unlock was null; now: production always has a bound dependency).
+	if _floor_unlock == null:
+		var fu: Node = (
+			get_node_or_null("/root/FloorUnlock") if get_tree() != null else null
+		)
+		if fu != null and fu.has_method("is_unlocked"):
+			_floor_unlock = fu
+
 	# Story 008 — subscribe to FormationAssignment.formation_reassignment_committed
 	# so mid-run formation reassignment cascades: ACTIVE_FOREGROUND → RUN_ENDED →
 	# DISPATCHING (new formation). Per ADR-0001 the formation is locked at dispatch;
@@ -518,7 +538,9 @@ func set_error_logger(l: RefCounted) -> void:
 ## FloorUnlock autoload, both must implement [code]is_unlocked(floor_index: int) -> bool[/code].
 ##
 ## TR-orchestrator-027
-func set_floor_unlock(fu: RefCounted) -> void:
+func set_floor_unlock(fu: Object) -> void:
+	# TR-026: param widened from `RefCounted` to `Object` to accept both Node
+	# (production /root/FloorUnlock autoload) and RefCounted (test spies).
 	_floor_unlock = fu
 
 
