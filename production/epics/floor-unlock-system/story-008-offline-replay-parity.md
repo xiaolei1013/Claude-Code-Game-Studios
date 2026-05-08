@@ -1,7 +1,7 @@
 # Story 008: Offline replay parity — floor_cleared_first_time emission lockstep
 
 > **Epic**: floor-unlock-system
-> **Status**: Complete (system shipped; see systems-index Implementation Status #16. Test evidence: `tests/unit/floor_unlock_system/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (real implementation 2026-05-08 — focused integration test ships with 6 functions covering both ACs. The handler purity invariant (FloorUnlock has no offline-specific branch — same `_on_floor_cleared_first_time` for foreground + offline) is the load-bearing parity property; tests verify directly + verify the source-grep TR-025 canary.)
 > **Layer**: Feature
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26
@@ -25,9 +25,9 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-030: offline batch path (DungeonRunOrchestrator.compute_offline_batch consumer) emits `floor_cleared_first_time` for first-clears in the batch
-- [ ] TR-030 parity: a foreground run that clears floor 3 produces `_unlock_state["forest_reach"] == 3`; an offline replay covering the same logical run produces the same final state
-- [ ] TR-025: `advance_unlock` does NOT call any save-dirty-mark method; relies on heartbeat (60s cadence per Save/Load Rule 5)
+- [x] TR-030: offline batch path (DungeonRunOrchestrator.compute_offline_batch consumer) emits `floor_cleared_first_time` for first-clears in the batch
+- [x] TR-030 parity: a foreground run that clears floor 3 produces `_unlock_state["forest_reach"] == 3`; an offline replay covering the same logical run produces the same final state
+- [x] TR-025: `advance_unlock` does NOT call any save-dirty-mark method; relies on heartbeat (60s cadence per Save/Load Rule 5)
 
 ---
 
