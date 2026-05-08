@@ -22,13 +22,24 @@ extends Node
 # ---------------------------------------------------------------------------
 ## Returned by [method compute_offline_batch] after an offline replay pass.
 ##
-## Declared inline per ADR-0013 NOTE #9. Fields are added in Story 010;
-## for this skeleton the class is an empty RefCounted shell so
-## [method compute_offline_batch] can be correctly typed at declaration time.
+## Declared inline (RefCounted, NOT Object) per ADR-0013 NOTE #9 — prevents
+## the memory leak that would result if the result were a plain Object held
+## via a non-parent reference.
 ##
-## ADR-0013 §NOTE #9
+## Fields:
+##   [member total_gold]: Net gold delta produced by the replay (sum of drip,
+##     kill bonuses, and any floor-clear bonuses awarded during the batch).
+##   [member floors_cleared]: Indices of floors that received their first-clear
+##     bonus during this batch, in the order they were credited.
+##   [member events_log]: High-level event entries for HUD display
+##     (`{"type": "drip", "amount": int, "ticks": int}` for the drip arm;
+##     extended in later stories with kill / floor-clear entries).
+##
+## ADR-0013 §NOTE #9 + GDD §C.6 OfflineResult contract.
 class OfflineResult extends RefCounted:
-	pass  # fields added in Story 010
+	var total_gold: int = 0
+	var floors_cleared: Array[int] = []
+	var events_log: Array = []
 
 # ---------------------------------------------------------------------------
 # Constants (structural engineering ceilings — NOT tuning knobs)
@@ -52,6 +63,18 @@ const GOLD_SANITY_CAP: int = 1_000_000_000_000
 ## distinguish offline-batch updates from foreground drip/kill emissions.
 ## ADR-0013 — only two constants are allowlisted in this file.
 const OFFLINE_REPLAY_REASON: String = "offline_replay"
+
+## Save schema version for [method get_save_data] / [method load_save_data].
+##
+## Bumped when the persisted Economy state shape changes in a non-additive way.
+## V1 (current) ships these keys: [code]gold_balance[/code], [code]lifetime_gold_earned[/code],
+## [code]floor_clear_bonus_credited[/code]. Forward-compat: extra unknown keys
+## are tolerated by [method load_save_data]. Backward-compat: a saved
+## [code]schema_version != SAVE_SCHEMA_VERSION[/code] aborts the load via
+## [code]push_error[/code] and the instance retains its current state.
+##
+## ADR-0004 §Consumer contract — ADR-0013 §save schema.
+const SAVE_SCHEMA_VERSION: int = 1
 
 # ---------------------------------------------------------------------------
 # Signals
@@ -150,6 +173,28 @@ var _offline_pending_first_clears: Array[int] = []
 ## this field directly.
 ## ADR-0013 §Requirements — single source of truth for tuning knobs.
 var _config: EconomyConfig = null
+
+## Test-only DI override for the formation_strength input read by
+## [method compute_offline_batch]. Set via [method set_offline_replay_inputs].
+##
+## Sentinel value [code]-1.0[/code] means "no override — fall through to
+## [code]HeroRoster.get_formation_strength()[/code] (or default 1.0 if the
+## autoload is absent in test envs)". Any non-negative float is used verbatim.
+##
+## Production callers MUST NOT set this — the OfflineProgressionEngine is the
+## sole legitimate source of offline replay inputs and reads them from the
+## RunSnapshot, not via this override.
+var _offline_replay_formation_strength_override: float = -1.0
+
+## Test-only DI override for the floor_index input read by
+## [method compute_offline_batch]. Set via [method set_offline_replay_inputs].
+##
+## Sentinel value [code]0[/code] means "no override — fall through to floor 1
+## as the safe default". Any value in [code][1, 5][/code] is used verbatim.
+##
+## Production callers MUST NOT set this — the future RunSnapshot integration
+## will pass floor_index per the offline window's active floor.
+var _offline_replay_floor_index_override: int = 0
 
 # ---------------------------------------------------------------------------
 # Built-in virtual methods
@@ -334,27 +379,155 @@ func try_award_floor_clear(floor_index: int, bonus_amount: int) -> bool:
 	return true
 
 
-## Computes the full offline gold batch for [param tick_budget] ticks.
+## Computes the full offline gold batch for [param tick_budget] ticks via the
+## closed-form drip path (single multiplication — NOT a per-tick loop).
 ##
-## Sets [member _is_offline_replay] to true for signal suppression during replay,
-## computes drip + kill totals via closed-form math, calls [method add_gold] and
-## [method try_award_floor_clear] as needed, then emits one aggregate
-## [signal gold_changed] after replay completes.
+## Determinism contract (AC H-09): for identical starting state, this call
+## produces a [member OfflineResult.total_gold] equal to what
+## [code]tick_budget[/code] foreground tick_fired emissions would have produced
+## via the canonical drip path. Bit-exact across repeated runs.
 ##
-## Returns an [OfflineResult] with totals and event log. Returns [code]null[/code]
-## for this skeleton (real OfflineResult fields land in Story 010).
+## Sequence:
+##   1. Defensive guard: [param tick_budget] [code]<= 0[/code] returns an empty
+##      [OfflineResult] with zero state changes and no signal emissions.
+##   2. [member _is_offline_replay] flips to [code]true[/code], suppressing
+##      [signal gold_changed] / [signal first_clear_awarded] emissions inside
+##      [method add_gold] and [method try_award_floor_clear] for the duration.
+##   3. Closed-form drip: [code]drip_total = floori(BASE_DRIP[floor-1] * formation_strength
+##      * MATCHUP_DRIP_BONUS * tick_budget)[/code] — a single multiplication, NOT a loop.
+##   4. [method add_gold] is called once with the cumulative drip_total.
+##   5. RunSnapshot kill events + floor clears (future integration via
+##      OfflineProgressionEngine) are NOT yet wired — empty arrays for MVP.
+##   6. [member _is_offline_replay] flips to [code]false[/code] BEFORE the
+##      aggregate signal emit (so subscribers see the post-replay flag state).
+##   7. Exactly ONE [signal gold_changed] with reason [constant OFFLINE_REPLAY_REASON]
+##      fires AFTER replay completes (skipped when total_delta == 0).
 ##
-## STUB — returns [code]null[/code]. Real batch logic lands in Story 010.
+## RNG seed contract (per ADR-0013 §Decision): seeded RNG for any future
+## event-cadence estimation uses [code]t_last_persist XOR offline_tick_budget[/code].
+## MVP closed-form drip path does NOT consume any random numbers — the seed
+## contract is established here for forward-compat; Story 011's chunking +
+## kill-event integration will exercise it.
 ##
-## [param tick_budget]: Number of offline ticks to replay (capped upstream by
-##   TickSystem.offline_cap_seconds × TICKS_PER_SECOND).
+## Inputs (formation_strength + floor_index) are resolved via
+## [method _resolve_offline_replay_formation_strength] and
+## [method _resolve_offline_replay_floor_index]. Tests inject via
+## [method set_offline_replay_inputs]; production reads from [HeroRoster] +
+## the future RunSnapshot integration.
+##
+## [param tick_budget]: Number of offline ticks to replay. Capped upstream
+##   by [code]TickSystem.offline_cap_seconds × TICKS_PER_SECOND[/code]
+##   (default 28_800 × 20 = 576_000 ticks at 8h cap). Values [code]<= 0[/code]
+##   return an empty result.
+##
+## Returns an [OfflineResult] (RefCounted; auto-frees when last reference drops).
 ##
 ## Example:
-##   var result: Economy.OfflineResult = Economy.compute_offline_batch(3600 * 20)
+##   var result: Economy.OfflineResult = Economy.compute_offline_batch(576_000)
+##   print("offline gold: %d" % result.total_gold)
 ##
-## ADR-0013 §Requirements — GDD §C.5, §C.6, §D.6 — ADR-X02
-func compute_offline_batch(_tick_budget: int) -> OfflineResult:
-	return null  # Story 010; rename _tick_budget on impl
+## ADR-0013 §Decision §C.6 — ADR-0014 (chunking out of scope here)
+func compute_offline_batch(tick_budget: int) -> OfflineResult:
+	var result: OfflineResult = OfflineResult.new()
+	if tick_budget <= 0:
+		return result
+	if _config == null:
+		push_error("Economy.compute_offline_batch: _config is null — cannot compute drip. " +
+			"DataRegistry boot likely failed; this method requires resolved EconomyConfig.")
+		return result
+	_is_offline_replay = true
+	var balance_before: int = _gold_balance
+	# Closed-form drip: single multiplication, NOT a loop over ticks.
+	var formation_strength: float = _resolve_offline_replay_formation_strength()
+	var floor_index: int = _resolve_offline_replay_floor_index()
+	var base_drip: int = _config.BASE_DRIP[floor_index - 1]
+	var drip_total: int = floori(
+		float(base_drip) * formation_strength * _config.MATCHUP_DRIP_BONUS * float(tick_budget)
+	)
+	if drip_total > 0:
+		add_gold(drip_total)
+	# RunSnapshot kill events + floor clears — not yet integrated with the
+	# OfflineProgressionEngine RunSnapshot schema; out of scope for this
+	# determinism story (Story 011 + Feature epic land that wiring).
+	# Build the event log entry for the drip arm — feeds the Return-to-App HUD.
+	if drip_total > 0:
+		result.events_log.append({
+			"type": "drip",
+			"amount": drip_total,
+			"ticks": tick_budget,
+			"floor_index": floor_index,
+			"formation_strength": formation_strength,
+		})
+	result.total_gold = _gold_balance - balance_before
+	# Future stories populate floors_cleared from try_award_floor_clear during
+	# the batch (the call site appends to result.floors_cleared); empty for MVP.
+	_is_offline_replay = false
+	# Aggregate emit AFTER flag clears (so re-entrant subscribers see post-replay state).
+	# Skip the emit on a zero-delta no-op so consumers don't get a phantom update.
+	if result.total_gold != 0:
+		gold_changed.emit(_gold_balance, result.total_gold, OFFLINE_REPLAY_REASON)
+	return result
+
+
+## Test-only DI seam for [method compute_offline_batch] inputs.
+##
+## Production callers MUST NOT use this method — the OfflineProgressionEngine
+## is the sole legitimate source of offline replay inputs and reads them from
+## the RunSnapshot. This setter exists so Story 010 determinism tests can
+## inject fixed values without booting the full HeroRoster + RunSnapshot stack.
+##
+## Pass [code]formation_strength = -1.0[/code] to clear the override (return
+## to autoload-read fallback). Pass [code]floor_index = 0[/code] to clear that
+## override.
+##
+## [param formation_strength]: Override value in [code][1.0, 3.0][/code] per
+##   ADR-0012, or [code]-1.0[/code] to clear.
+## [param floor_index]: Override value in [code][1, 5][/code], or [code]0[/code]
+##   to clear.
+##
+## Example (test):
+##   economy.set_offline_replay_inputs(1.0, 2)
+##   var result: Economy.OfflineResult = economy.compute_offline_batch(576_000)
+##
+## ADR-0013 §Requirements — DI seam pattern matches [method set_economy_config].
+func set_offline_replay_inputs(formation_strength: float, floor_index: int) -> void:
+	_offline_replay_formation_strength_override = formation_strength
+	_offline_replay_floor_index_override = floor_index
+
+
+## Resolves the formation_strength input for [method compute_offline_batch].
+##
+## Order of precedence:
+##   1. Test override via [method set_offline_replay_inputs] (>= 0.0).
+##   2. [code]HeroRoster.get_formation_strength()[/code] when the autoload is
+##      present (production path).
+##   3. Safe default of [code]1.0[/code] when no source is available
+##      (test envs without autoloads).
+func _resolve_offline_replay_formation_strength() -> float:
+	if _offline_replay_formation_strength_override >= 0.0:
+		return _offline_replay_formation_strength_override
+	var roster: Node = (
+		get_node_or_null("/root/HeroRoster") if get_tree() != null else null
+	)
+	if roster != null and roster.has_method("get_formation_strength"):
+		return roster.get_formation_strength()
+	return 1.0
+
+
+## Resolves the floor_index input for [method compute_offline_batch].
+##
+## Order of precedence:
+##   1. Test override via [method set_offline_replay_inputs] (in [code][1, 5][/code]).
+##   2. Safe default of [code]1[/code] (the floor where every save begins).
+##
+## DungeonRunOrchestrator does not yet expose a public "current floor for
+## offline replay" accessor; the future RunSnapshot integration will pass
+## the active floor explicitly. Until then, the safe default holds and the
+## test override is the production-equivalent surface.
+func _resolve_offline_replay_floor_index() -> int:
+	if _offline_replay_floor_index_override >= 1 and _offline_replay_floor_index_override <= 5:
+		return _offline_replay_floor_index_override
+	return 1
 
 
 ## Drains per-chunk-suppressed offline-replay signals into single aggregate
@@ -396,41 +569,128 @@ func flush_offline_signals() -> void:
 ## Returns the economy state for serialisation by SaveLoadSystem.
 ##
 ## Keys (fixed insertion order per ADR-0004):
+##   "schema_version" → [constant SAVE_SCHEMA_VERSION]
 ##   "gold_balance" → [member _gold_balance]
 ##   "lifetime_gold_earned" → [member _lifetime_gold_earned]
-##   "floor_clear_bonus_credited" → [member _floor_clear_bonus_credited]
+##   "floor_clear_bonus_credited" → [member _floor_clear_bonus_credited] (deep-copied)
 ##
-## [member _is_offline_replay] is NOT included — it is transient.
+## [member _is_offline_replay] and the offline accumulator fields are NOT
+## included — they are transient and re-derived on demand.
 ##
-## STUB — returns [code]{}[/code]. Real serialisation body lands in Story 012.
+## The [code]floor_clear_bonus_credited[/code] dictionary is deep-copied via
+## [code]Dictionary.duplicate(true)[/code] so callers cannot accidentally
+## mutate Economy's internal ledger by modifying the returned value (and
+## conversely, post-save Economy mutations don't bleed into the persisted dict).
 ##
 ## Example:
 ##   var data: Dictionary = Economy.get_save_data()
-##   # data == {"gold_balance": 500, "lifetime_gold_earned": 1200, "floor_clear_bonus_credited": {1: 500}}
+##   # data == {"schema_version": 1, "gold_balance": 500,
+##   #          "lifetime_gold_earned": 1200, "floor_clear_bonus_credited": {1: 500}}
 ##
 ## ADR-0013 §Requirements — ADR-0004 consumer contract
 func get_save_data() -> Dictionary:
-	return {}  # Story 012
+	return {
+		"schema_version": SAVE_SCHEMA_VERSION,
+		"gold_balance": _gold_balance,
+		"lifetime_gold_earned": _lifetime_gold_earned,
+		"floor_clear_bonus_credited": _floor_clear_bonus_credited.duplicate(true),
+	}
 
 
 ## Restores economy state from a SaveLoadSystem envelope.
 ##
-## Reads the 3 persisted keys with safe defaults (0 / 0 / {}).
-## Clamps gold_balance to [constant GOLD_SANITY_CAP] on load (push_warning on
-## invalid). MUST NOT emit [signal gold_changed] (ADR-0004 signal-suppression
-## during boot validation).
+## Validates [code]schema_version[/code] first (must equal [constant SAVE_SCHEMA_VERSION]
+## or the load aborts via [code]push_error[/code] with the instance state
+## unchanged). On schema match, hydrates the three persisted state fields with
+## safe defaults for missing keys.
 ##
-## STUB — empty body. Real deserialisation + validation body lands in Story 012.
+## Signal-quiet during restore: [signal gold_changed] / [signal first_clear_awarded]
+## are NOT emitted by this method. The hydration assigns to [member _gold_balance]
+## directly (NOT via [method add_gold]), so the signal-suppression contract holds
+## without any flag-flipping. The pseudocode in the story file's Implementation
+## Notes proposes reusing [member _is_offline_replay] as a defensive guard; we
+## omit it here because no signal-emitting path is reachable from the field
+## assignments below — the simpler implementation is the safer one.
 ##
-## [param data]: Dictionary as returned by [method get_save_data].
+## JSON round-trip type-safety (per project memory `project_json_int_round_trip_typeof_pattern`):
+##   - Numeric values may arrive as either [code]TYPE_INT[/code] or [code]TYPE_FLOAT[/code]
+##     (JSON.parse_string yields TYPE_FLOAT). All numeric reads pass through
+##     [code]int(...)[/code] for safety.
+##   - Dictionary keys may arrive as [code]String[/code] when round-tripped
+##     through JSON. The [code]floor_clear_bonus_credited[/code] dict is rebuilt
+##     key-by-key with explicit [code]int(key)[/code] coercion so a typed
+##     [code]Dictionary[int, int][/code] target is honored.
+##
+## Forward-compat: extra unknown keys in [param data] are tolerated and ignored.
+## Backward-compat: missing optional keys default to safe values
+## ([code]gold_balance = 0[/code], [code]lifetime_gold_earned = 0[/code],
+## [code]floor_clear_bonus_credited = {}[/code]).
+##
+## [param data]: Dictionary as returned by [method get_save_data] (possibly
+##   round-tripped through SaveLoadSystem's JSON envelope).
 ##
 ## Example:
-##   Economy.load_save_data({"gold_balance": 500, "lifetime_gold_earned": 1200,
-##       "floor_clear_bonus_credited": {1: 500}})
+##   Economy.load_save_data({"schema_version": 1, "gold_balance": 500,
+##       "lifetime_gold_earned": 1200, "floor_clear_bonus_credited": {1: 500}})
 ##
 ## ADR-0013 §Requirements — ADR-0004 consumer contract
-func load_save_data(_data: Dictionary) -> void:
-	pass  # Story 012; rename _data on impl
+func load_save_data(data: Dictionary) -> void:
+	if not data.has("schema_version"):
+		push_error("Economy.load_save_data: missing schema_version key — load aborted, state unchanged")
+		return
+	var raw_version: Variant = data["schema_version"]
+	# Defensive: a malicious / corrupt save could deliver a non-numeric
+	# schema_version. Reject anything that isn't TYPE_INT or TYPE_FLOAT.
+	if typeof(raw_version) != TYPE_INT and typeof(raw_version) != TYPE_FLOAT:
+		push_error(
+			"Economy.load_save_data: schema_version has unexpected type=%d — load aborted"
+			% typeof(raw_version)
+		)
+		return
+	var version: int = int(raw_version)
+	if version != SAVE_SCHEMA_VERSION:
+		push_error(
+			"Economy.load_save_data: unsupported schema_version=%d (expected %d) — load aborted, state unchanged"
+			% [version, SAVE_SCHEMA_VERSION]
+		)
+		return
+
+	# Schema OK — hydrate. Field assignments are direct (NOT via add_gold);
+	# no signal-emitting path is reachable, so the signal-quiet contract holds
+	# without any explicit flag-flipping.
+	_gold_balance = int(data.get("gold_balance", 0))
+	_lifetime_gold_earned = int(data.get("lifetime_gold_earned", 0))
+	# Clamp restored balance defensively to GOLD_SANITY_CAP. A save authored
+	# by a tampered build could exceed the cap; clamping keeps the in-memory
+	# invariant consistent with add_gold's runtime ceiling.
+	if _gold_balance > GOLD_SANITY_CAP:
+		push_warning(
+			"Economy.load_save_data: gold_balance=%d exceeds GOLD_SANITY_CAP=%d — clamping"
+			% [_gold_balance, GOLD_SANITY_CAP]
+		)
+		_gold_balance = GOLD_SANITY_CAP
+	if _gold_balance < 0:
+		push_warning(
+			"Economy.load_save_data: gold_balance=%d is negative — clamping to 0"
+			% _gold_balance
+		)
+		_gold_balance = 0
+	# Rebuild the floor-clear ledger with explicit int(key)/int(value) coercion
+	# so JSON-round-tripped String keys / TYPE_FLOAT values produce the typed
+	# Dictionary[int, int] shape that the rest of the API depends on.
+	var ledger_in: Variant = data.get("floor_clear_bonus_credited", {})
+	var ledger_out: Dictionary[int, int] = {}
+	if typeof(ledger_in) == TYPE_DICTIONARY:
+		for key: Variant in (ledger_in as Dictionary):
+			var typed_key: int = int(key)
+			var typed_value: int = int((ledger_in as Dictionary)[key])
+			ledger_out[typed_key] = typed_value
+	else:
+		push_warning(
+			"Economy.load_save_data: floor_clear_bonus_credited has unexpected type=%d — defaulting to empty"
+			% typeof(ledger_in)
+		)
+	_floor_clear_bonus_credited = ledger_out
 
 # ---------------------------------------------------------------------------
 # Public API — read methods (display surfaces)

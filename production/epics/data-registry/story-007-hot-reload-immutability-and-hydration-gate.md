@@ -1,10 +1,10 @@
 # Story 007: Hot-reload, immutability enforcement, and SaveLoadSystem hydration gate
 
 > **Epic**: data-registry
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Integration
-> **Manifest Version**: 2026-04-24
+> **Manifest Version**: 2026-04-26
 
 ## Context
 
@@ -32,14 +32,14 @@
 
 *Scoped to this story, drawn verbatim from GDD §8 (AC-DLS-NN) or TR-registry (TR-data-loading-NNN):*
 
-- [ ] TR-data-loading-009: Read-only contract: resolved resources immutable at runtime; no consumer mutates `@export` fields
-- [ ] TR-data-loading-010: Hot-reload (dev only) via `hot_reload(content_type)` gated by `is_dev_build` compile flag; stripped from shipped builds
-- [ ] TR-data-loading-013: Emits `hot_reload_complete(content_type)` signal after dev re-enumeration
-- [ ] TR-data-loading-027: Patch-time live content updates NOT supported at runtime; next launch rebuilds full index
-- [ ] TR-data-loading-028: Read-only enforcement check in debug/test builds via post-test property snapshot comparison
-- [ ] AC-DLS-01: **GIVEN** the app launches with `assets/data/` containing the full MVP content set and no file is malformed, **WHEN** the Data Loading System completes enumeration and registration, **THEN** the system emits `registry_ready` and transitions internal state from `LOADING` to `READY`; `DataRegistry.state == READY` is observable by all dependents before the first gameplay frame; typed accessors for all six content categories return non-null collections with expected cardinality.
-- [ ] AC-DLS-08: **GIVEN** a resolved resource instance is obtained via `DataRegistry.resolve("classes", "hero_warrior")`, **WHEN** any consumer attempts to mutate a property, **THEN** in debug/test builds, the mutation either raises an assertion or is caught by a post-test integrity check comparing property values against the load-time snapshot; the registered resource's stored state is unchanged after the test; release builds do not enforce at runtime, but the unit test suite includes at least one test catching this pattern.
-- [ ] AC-DLS-09: **GIVEN** the game runs in the Godot editor or a debug export build and `DataRegistry.hot_reload_enabled == true`, **WHEN** `DataRegistry.hot_reload("classes")` is called, **THEN** only the `classes` category is re-enumerated and re-registered; other category registries are unmodified; `resolve()` calls after the reload return updated values from modified `.tres` files; the reload completes without restarting the scene tree; log confirms `[DataRegistry] HOT RELOAD: classes — {N} resources re-registered in {Ms}ms`.
+- [x] TR-data-loading-009: Read-only contract: resolved resources immutable at runtime; no consumer mutates `@export` fields
+- [x] TR-data-loading-010: Hot-reload (dev only) via `hot_reload(content_type)` gated by `is_dev_build` compile flag; stripped from shipped builds
+- [x] TR-data-loading-013: Emits `hot_reload_complete(content_type)` signal after dev re-enumeration
+- [x] TR-data-loading-027: Patch-time live content updates NOT supported at runtime; next launch rebuilds full index
+- [x] TR-data-loading-028: Read-only enforcement check in debug/test builds via post-test property snapshot comparison
+- [x] AC-DLS-01: **GIVEN** the app launches with `assets/data/` containing the full MVP content set and no file is malformed, **WHEN** the Data Loading System completes enumeration and registration, **THEN** the system emits `registry_ready` and transitions internal state from `LOADING` to `READY`; `DataRegistry.state == READY` is observable by all dependents before the first gameplay frame; typed accessors for all six content categories return non-null collections with expected cardinality.
+- [x] AC-DLS-08: **GIVEN** a resolved resource instance is obtained via `DataRegistry.resolve("classes", "hero_warrior")`, **WHEN** any consumer attempts to mutate a property, **THEN** in debug/test builds, the mutation either raises an assertion or is caught by a post-test integrity check comparing property values against the load-time snapshot; the registered resource's stored state is unchanged after the test; release builds do not enforce at runtime, but the unit test suite includes at least one test catching this pattern.
+- [x] AC-DLS-09: **GIVEN** the game runs in the Godot editor or a debug export build and `DataRegistry.hot_reload_enabled == true`, **WHEN** `DataRegistry.hot_reload("classes")` is called, **THEN** only the `classes` category is re-enumerated and re-registered; other category registries are unmodified; `resolve()` calls after the reload return updated values from modified `.tres` files; the reload completes without restarting the scene tree; log confirms `[DataRegistry] HOT RELOAD: classes — {N} resources re-registered in {Ms}ms`.
 
 ---
 
@@ -124,7 +124,7 @@
 **Story Type**: Integration
 **Required evidence**: `tests/integration/data_registry/hot_reload_immutability_and_hydration_gate_test.gd` — must exist and pass
 
-**Status**: [ ] Not yet created
+**Status**: [x] `tests/integration/data_registry/hot_reload_immutability_and_hydration_gate_test.gd` — 8 test functions, 8/8 PASS (full project suite: 1622/1622 PASS, zero regressions). Covers AC-DLS-01 happy + ERROR paths, AC-DLS-08 read-only contract, AC-DLS-09 hot_reload semantics, TR-009/010/013/027/028.
 
 ---
 
@@ -132,3 +132,16 @@
 
 - **Depends on**: Story 006
 - **Unlocks**: Story 008
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-05-08
+**Criteria**: 8/8 passing (5 TRs + AC-DLS-01 happy & ERROR paths + AC-DLS-08 + AC-DLS-09)
+**Test Evidence**: `tests/integration/data_registry/hot_reload_immutability_and_hydration_gate_test.gd` — 8 test functions, 8/8 PASS. Full project suite: 1622/1622 PASS, zero regressions.
+**Code Review**: Complete (2026-05-08). godot-gdscript-specialist + qa-tester reviewed. Verdict APPROVED WITH SUGGESTIONS. One BLOCKING gap surfaced (AC-DLS-01 ERROR-path consumer-refuses-hydration sub-case had no test) — resolved by adding `test_registry_error_signal_observable_by_consumer_refusing_hydration` (Test 7b). One redundant `as Dictionary` cast at the previous `hot_reload()` line removed. The other follow-up items (below) are non-blocking advisory.
+**Deviations**: None blocking. Three follow-up items captured for a future hygiene story:
+1. `hot_reload(content_type)` silently succeeds when `content_type` is not in `ORDERED_CATEGORIES` (no defensive guard). Recommend `if not ORDERED_CATEGORIES.has(content_type): push_warning(...); return` early in `hot_reload()`.
+2. Re-entrant `hot_reload()` from within a `registry_ready` signal handler is unguarded. Recommend a `_hot_reload_in_progress: bool` flag or explicit re-entry refusal.
+3. `verify_integrity()` cannot detect mutations to fields nested inside sub-Resource references (e.g., `hero.stats.base_attack` if `stats` is a `HeroStats` Resource). Matches ADR-0006's `duplicate_deep()` ExtResource boundary by design, but should be documented in the `verify_integrity()` doc-comment before any concrete subtype with nested Resource fields ships.

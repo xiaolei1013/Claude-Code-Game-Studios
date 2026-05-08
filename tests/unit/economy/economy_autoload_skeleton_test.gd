@@ -218,48 +218,71 @@ func test_economy_try_award_floor_clear_credits_and_returns_true() -> void:
 	economy.free()
 
 
-func test_economy_compute_offline_batch_returns_null_stub() -> void:
+func test_economy_compute_offline_batch_zero_budget_returns_empty_result() -> void:
+	# Story 010 (2026-05-08) replaced the previous null-stub assertion with the
+	# implemented contract: tick_budget <= 0 returns an empty (RefCounted)
+	# OfflineResult, NOT null. Determinism + closed-form behavior is exercised
+	# in tests/integration/economy/economy_offline_batch_determinism_test.gd.
+
 	# Arrange
 	var economy: Node = EconomyScript.new()
 
-	# Act — type declared as OfflineResult; stub returns null
-	var result: Object = economy.compute_offline_batch(1000)
+	# Act — defensive guard branch
+	var result: Object = economy.compute_offline_batch(0)
 
-	# Assert — stub returns null
-	assert_object(result).is_null()
+	# Assert — non-null RefCounted result with all-zero/empty fields
+	assert_object(result).is_not_null()
+	assert_int(result.total_gold).is_equal(0)
+	assert_int(result.floors_cleared.size()).is_equal(0)
+	assert_int(result.events_log.size()).is_equal(0)
 
 	# Cleanup
 	economy.free()
 
 
-func test_economy_get_save_data_returns_empty_dictionary_stub() -> void:
+func test_economy_get_save_data_returns_v1_schema_with_four_keys() -> void:
+	# Story 012 (2026-05-08) replaced the stub-era empty-{} assertion with the
+	# implemented V1 schema: schema_version + gold_balance + lifetime_gold_earned +
+	# floor_clear_bonus_credited. Round-trip integration is exercised in
+	# tests/integration/economy/economy_save_load_round_trip_test.gd.
+
 	# Arrange
 	var economy: Node = EconomyScript.new()
 
 	# Act
 	var result: Dictionary = economy.get_save_data()
 
-	# Assert — stub returns {}
-	assert_bool(result.is_empty()).is_true()
+	# Assert — exactly the four V1 keys with expected initial values
+	assert_int(result.size()).is_equal(4)
+	assert_bool(result.has("schema_version")).is_true()
+	assert_int(result["schema_version"]).is_equal(EconomyScript.SAVE_SCHEMA_VERSION)
+	assert_int(result["gold_balance"]).is_equal(0)
+	assert_int(result["lifetime_gold_earned"]).is_equal(0)
+	assert_int((result["floor_clear_bonus_credited"] as Dictionary).size()).is_equal(0)
 
 	# Cleanup
 	economy.free()
 
 
-func test_economy_load_save_data_completes_without_error() -> void:
+func test_economy_load_save_data_with_v1_schema_restores_state() -> void:
+	# Story 012 (2026-05-08): replaced the stub-era "completes without error"
+	# assertion with the implemented V1 schema-validated restore.
+
 	# Arrange
 	var economy: Node = EconomyScript.new()
 	var fake_data: Dictionary = {
+		"schema_version": EconomyScript.SAVE_SCHEMA_VERSION,
 		"gold_balance": 500,
 		"lifetime_gold_earned": 1200,
 		"floor_clear_bonus_credited": {},
 	}
 
-	# Act — stub body is pass; must not raise
+	# Act
 	economy.load_save_data(fake_data)
 
-	# Assert — reaching this line means no error was raised; stub leaves state unchanged
-	assert_int(economy.get_gold_balance()).is_equal(0)
+	# Assert — state restored from the V1 envelope
+	assert_int(economy.get_gold_balance()).is_equal(500)
+	assert_int(economy.get_lifetime_gold_earned()).is_equal(1200)
 
 	# Cleanup
 	economy.free()
