@@ -1,7 +1,7 @@
 # Story 003: Biome availability + completeness + get_available_biomes
 
 > **Epic**: floor-unlock-system
-> **Status**: Complete (system shipped; see systems-index Implementation Status #16. Test evidence: `tests/unit/floor_unlock_system/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (real implementation 2026-05-08 — implementation pre-existed; new focused test file `tests/unit/floor_unlock_system/biome_availability_and_completeness_test.gd` adds 16 functions covering all 6 ACs.)
 > **Layer**: Feature
 > **Type**: Logic
 > **Manifest Version**: 2026-04-26
@@ -26,12 +26,12 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-023: `is_biome_available("forest_reach")` returns true (active in V1); fictional "ghost_biome" returns false
-- [ ] TR-023: `get_available_biomes()` returns Array[String]; ordering matches DataRegistry iteration order
-- [ ] TR-024: `is_biome_completed(b)` returns false when BIOME_FLOOR_COUNT[b] == 0 (defensive — prevents 0/0 false positive)
-- [ ] TR-024: `is_biome_completed(b)` returns false when biome is unavailable (status != "active")
-- [ ] TR-024: `is_biome_completed(b)` returns true ONLY when all three guards pass
-- [ ] TR-020: stale biome_id (in `_unlock_state` but not in DataRegistry active list) preserved in dict; filtered via is_biome_available
+- [x] TR-023: `is_biome_available("forest_reach")` returns true (active in V1); fictional "ghost_biome" returns false
+- [x] TR-023: `get_available_biomes()` returns Array[String]; ordering matches DataRegistry iteration order
+- [x] TR-024: `is_biome_completed(b)` returns false when BIOME_FLOOR_COUNT[b] == 0 (defensive — prevents 0/0 false positive)
+- [x] TR-024: `is_biome_completed(b)` returns false when biome is unavailable (status != "active")
+- [x] TR-024: `is_biome_completed(b)` returns true ONLY when all three guards pass
+- [x] TR-020: stale biome_id (in `_unlock_state` but not in DataRegistry active list) preserved in dict; filtered via is_biome_available
 
 ---
 
