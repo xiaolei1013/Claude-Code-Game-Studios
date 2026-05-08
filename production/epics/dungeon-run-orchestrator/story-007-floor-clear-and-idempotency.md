@@ -1,7 +1,7 @@
 # Story 007: Floor-clear bonus + once-per-dispatch first-clear + 3-layer idempotency
 
 > **Epic**: dungeon-run-orchestrator
-> **Status**: Complete (system shipped; see systems-index Implementation Status #13. Test evidence: `tests/{unit,integration}/dungeon_run_orchestrator/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — audit-cascade caveat resolved; required test file exists and passes; ACs ticked.)
 > **Layer**: Feature
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26
@@ -20,10 +20,10 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-015: `FLOOR_CLEAR_BONUS` 1-indexed [1..5]; index 0 undefined; assert raises on out-of-range
-- [ ] TR-016: `run_snapshot.floor_clear_emitted` gates first-clear; reset to false on each new dispatch
-- [ ] TR-017: 3-layer idempotency: combat markers + orchestrator flag + Economy per-lifetime credit (verify all 3 layers prevent double-credit)
-- [ ] TR-018: `Economy.try_award_floor_clear(floor_index, bonus_amount)` invoked once per first-clear with LOSING factor pre-applied
+- [x] TR-015: `FLOOR_CLEAR_BONUS` 1-indexed [1..5]; index 0 undefined; assert raises on out-of-range
+- [x] TR-016: `run_snapshot.floor_clear_emitted` gates first-clear; reset to false on each new dispatch
+- [x] TR-017: 3-layer idempotency: combat markers + orchestrator flag + Economy per-lifetime credit (verify all 3 layers prevent double-credit)
+- [x] TR-018: `Economy.try_award_floor_clear(floor_index, bonus_amount)` invoked once per first-clear with LOSING factor pre-applied
 
 ---
 

@@ -1,7 +1,7 @@
 # Story 008: Performance bench + structural CI lint + MatchupResult equality test pattern
 
 > **Epic**: matchup-resolver
-> **Status**: Complete (system shipped; see systems-index Implementation Status #10. Test evidence: `tests/{unit,integration}/matchup_resolver/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — audit-cascade caveat resolved; required test file exists and passes; ACs ticked.)
 > **Layer**: Feature
 > **Type**: Logic
 > **Manifest Version**: 2026-04-26
@@ -28,10 +28,10 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-030 structural lint: `tools/ci/check_matchup_resolver_shape.sh` (or equivalent) returns non-zero on any of: `^var ` outside doc-comment in `matchup_resolver.gd` or `default_matchup_resolver.gd`; `^signal ` in either; `static func` on public API.
-- [ ] TR-030: lint step added to `.github/workflows/tests.yml` (or equivalent CI config).
-- [ ] TR-031: bench harness `tests/perf/matchup_resolver_perf_test.gd` runs 10,000 `resolve_formation_matchup` calls — assertion `<200ms` on CI machine.
-- [ ] TR-033: `tests/fixtures/match_result_eq.gd` provides `match_result_equals(a, b) -> bool` doing field-by-field compare; documented usage pattern in epic README or per-story.
+- [x] TR-030 structural lint: `tools/ci/check_matchup_resolver_shape.sh` (or equivalent) returns non-zero on any of: `^var ` outside doc-comment in `matchup_resolver.gd` or `default_matchup_resolver.gd`; `^signal ` in either; `static func` on public API.
+- [x] TR-030: lint step added to `.github/workflows/tests.yml` (or equivalent CI config).
+- [x] TR-031: bench harness `tests/perf/matchup_resolver_perf_test.gd` runs 10,000 `resolve_formation_matchup` calls — assertion `<200ms` on CI machine.
+- [x] TR-033: `tests/fixtures/match_result_eq.gd` provides `match_result_equals(a, b) -> bool` doing field-by-field compare; documented usage pattern in epic README or per-story.
 
 ---
 

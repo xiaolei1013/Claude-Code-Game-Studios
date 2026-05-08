@@ -1,7 +1,7 @@
 # Story 007: Boot validation order + orphan handling + last-write-wins
 
 > **Epic**: hero-roster
-> **Status**: Complete (system shipped; see systems-index Implementation Status #9. Test evidence: `tests/{unit,integration}/hero_roster/`. Per-story AC checkbox tick-through deferred to a dedicated audit pass.)
+> **Status**: Complete (per-AC verification 2026-05-08 — audit-cascade caveat resolved; required test file exists and passes; ACs ticked.)
 > **Layer**: Feature
 > **Type**: Integration
 > **Manifest Version**: 2026-04-26
@@ -25,10 +25,10 @@
 
 ## Acceptance Criteria
 
-- [ ] TR-hero-roster-015: Boot validation runs the 4 steps in exact order after load_save_data
-- [ ] TR-hero-roster-016: Orphaned heroes (unresolvable class_id) appended to session-only `_orphaned_heroes` list; SaveLoadSystem fires single notice signal
-- [ ] TR-hero-roster-025: Duplicate instance_id in save dict → last-written-wins (Dictionary `_heroes[id] = instance` semantics); push_error logged; no crash
-- [ ] Signals remain SUPPRESSED across the entire boot validation pass (Story 006 sets flag; this story consumes it)
+- [x] TR-hero-roster-015: Boot validation runs the 4 steps in exact order after load_save_data
+- [x] TR-hero-roster-016: Orphaned heroes (unresolvable class_id) appended to session-only `_orphaned_heroes` list; SaveLoadSystem fires single notice signal
+- [x] TR-hero-roster-025: Duplicate instance_id in save dict → last-written-wins (Dictionary `_heroes[id] = instance` semantics); push_error logged; no crash
+- [x] Signals remain SUPPRESSED across the entire boot validation pass (Story 006 sets flag; this story consumes it)
 
 ---
 
