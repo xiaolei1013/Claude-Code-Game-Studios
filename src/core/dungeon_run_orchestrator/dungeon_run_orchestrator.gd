@@ -1343,7 +1343,40 @@ func _build_run_snapshot(formation: Array, floor_index: int, biome_id: String,
 	snap.last_emitted_tick = 0
 	snap.loop_counter = 0
 	snap.kill_count = 0
+
+	# Class Synergy V1.0 first-pass — Sprint 21 S21-M1 (Story 1).
+	# Detect the active synergy at DISPATCHING time and freeze it on the
+	# RunSnapshot. Per ADR-0001 mid-run reassignment policy, the synergy is
+	# IMMUTABLE for the run's duration (mid-run formation edits do NOT
+	# recompute the synergy — verified by AC-CS-13).
+	#
+	# Defensive: if FormationAssignment autoload is unavailable (test env
+	# without it), fall through to "" (no synergy). Production rank table
+	# guarantees presence (rank 11).
+	#
+	# design/gdd/class-synergy-system.md §C.2 dispatch-time confirmation +
+	# AC-CS-13 mid-run reassignment immutability.
+	snap.synergy_id = _detect_synergy_for_dispatch(snap.formation_snapshot)
 	return snap
+
+
+## Resolves the active synergy id for a freshly-built formation_snapshot.
+## Defers to [FormationAssignment.detect_active_synergy] when the autoload
+## is present; returns [code]""[/code] (no synergy) otherwise.
+##
+## Test-env safety: the autoload may be absent in unit-test fixtures that
+## boot DungeonRunOrchestrator standalone. Production guarantees presence
+## via the ADR-0003 rank table (FormationAssignment is rank 11).
+##
+## Sprint 21 S21-M1 / Story 1 — `class-synergy-system.md` §C.2 + §F.
+func _detect_synergy_for_dispatch(formation_snapshot: Dictionary) -> String:
+	var fa: Node = get_node_or_null("/root/FormationAssignment")
+	if fa == null or not fa.has_method("detect_active_synergy"):
+		return ""
+	var result_v: Variant = fa.call("detect_active_synergy", formation_snapshot)
+	if result_v is String:
+		return result_v as String
+	return ""
 
 
 ## Defensive helper: resolves a Floor resource by [member RunSnapshot.floor_id]
