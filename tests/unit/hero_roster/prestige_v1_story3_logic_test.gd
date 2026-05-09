@@ -261,3 +261,36 @@ func test_prestige_locale_writer_locked_values_match_gdd() -> void:
 	assert_bool(content.contains("hall_of_retired_heroes_title,Hall of Retired Heroes")).is_true()
 	# Active-run guard tooltip
 	assert_bool(content.contains("prestige_disabled_active_run_tooltip,Prestige a hero between runs.")).is_true()
+
+
+func test_prestige_modal_body_resolves_full_string_via_tr() -> void:
+	# Regression guard for CSV quoting. Godot's csv_translation importer
+	# (delimiter=comma per en.csv.import) splits unquoted commas — the
+	# modal body text contains two internal commas, so the value MUST be
+	# wrapped in double quotes in en.csv. Without quoting, tr() returns
+	# only the first chunk and the cozy-register +5% explanation never
+	# reaches the player.
+	#
+	# This asserts the resolved string preserves the trailing clause —
+	# any future regression that drops the surrounding quotes truncates
+	# the value at the first internal comma and this test fails.
+	var resolved: String = tr("prestige_confirmation_modal_body")
+	# tr() returns the key verbatim if no translation resolves — that's
+	# already a fail signal, but assert specifically on the trailing
+	# clause to also catch silent CSV truncation.
+	assert_str(resolved).is_not_equal("prestige_confirmation_modal_body").override_failure_message(
+		"tr() returned the key — TranslationServer never loaded the en.csv translation"
+	)
+	assert_bool(resolved.ends_with("forever.")).override_failure_message(
+		"tr('prestige_confirmation_modal_body') resolved to '%s' — does not end with 'forever.', " % resolved +
+		"likely truncated by unquoted commas in en.csv"
+	).is_true()
+	# Sanity: every clause from the writer-locked value should be present.
+	for fragment: String in [
+		"earned their retirement",
+		"Hall of Retired Heroes",
+		"+5% more gold and XP",
+	]:
+		assert_bool(resolved.contains(fragment)).override_failure_message(
+			"tr() resolved string missing fragment '%s' — got: '%s'" % [fragment, resolved]
+		).is_true()
