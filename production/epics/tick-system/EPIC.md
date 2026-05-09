@@ -4,8 +4,8 @@
 > **GDD**: `design/gdd/game-time-and-tick.md`
 > **Architecture Module**: `TickSystem` (autoload rank 0)
 > **Control Manifest Version**: 2026-04-24
-> **Status**: Ready
-> **Stories**: 11 defined (all Ready)
+> **Status**: Complete (all 11 stories shipped — Status field updated 2026-05-09 to reflect long-standing audit-cascade closure. Story 005's autoload-side surface is shipped + tested; production-side MainRoot trigger wiring is a follow-up Sprint-level concern (suggested story-005b). Test evidence under `tests/{unit,integration}/tick_system/`. See systems-index Implementation Status #1.)
+> **Stories**: 11 defined (all Complete)
 
 ## Overview
 

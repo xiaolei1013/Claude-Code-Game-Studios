@@ -4,8 +4,8 @@
 > **GDD**: `design/gdd/save-load-system.md`
 > **Architecture Module**: `SaveLoadSystem` (autoload rank 2)
 > **Control Manifest Version**: 2026-04-24
-> **Status**: Ready
-> **Stories**: 15 defined (all Ready)
+> **Status**: Complete (all 16 stories shipped — last close: Story 013 Phase 2 on 2026-05-09. Test evidence under `tests/{unit,integration}/save_load/` — 159/159 PASS. See systems-index Implementation Status #3.)
+> **Stories**: 16 defined (all Complete)
 
 ## Overview
 

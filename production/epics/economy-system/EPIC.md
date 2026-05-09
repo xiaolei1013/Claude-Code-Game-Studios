@@ -3,8 +3,8 @@
 > **Layer**: Core
 > **GDD**: design/gdd/economy-system.md
 > **Architecture Module**: `Economy` (autoload rank 3) — `docs/architecture/architecture.md` §Core Layer
-> **Status**: Ready
-> **Stories**: 13 (all Ready) — see Stories table below
+> **Status**: Complete (all 13 stories shipped — Status field updated 2026-05-09 to reflect long-standing audit-cascade closure. Test evidence under `tests/{unit,integration}/economy/`. See systems-index Implementation Status #5.)
+> **Stories**: 13 (all Complete) — see Stories table below
 
 ## Overview
 

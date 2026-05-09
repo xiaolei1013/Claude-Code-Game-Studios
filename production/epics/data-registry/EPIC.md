@@ -4,8 +4,8 @@
 > **GDD**: `design/gdd/data-loading.md`
 > **Architecture Module**: `DataRegistry` (autoload rank 1)
 > **Control Manifest Version**: 2026-04-24
-> **Status**: Ready
-> **Stories**: 8 defined (all Ready)
+> **Status**: Complete (all 8 stories shipped — Status field updated 2026-05-09 to reflect long-standing audit-cascade closure. Test evidence under `tests/{unit,integration}/data_registry/`. See systems-index Implementation Status #2.)
+> **Stories**: 8 defined (all Complete)
 
 ## Overview
 
