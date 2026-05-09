@@ -90,3 +90,73 @@ func test_hall_button_pops_in_on_prestige_completed_signal() -> void:
 	HeroRoster.prestige_completed_signal.emit(fake_record, 1)
 
 	assert_bool(screen._hall_nav_button.visible).is_true()
+
+
+# ===========================================================================
+# Group C — Prestige completion toast
+# ===========================================================================
+
+func test_prestige_completion_toast_shows_with_hero_name_on_signal() -> void:
+	# Subscriber path: prestige fires → toast renders with the hero's
+	# display_name interpolated into the writer-locked
+	# `prestige_complete_toast` value. The tween starts at modulate.a=1.0
+	# and fades over TOAST_FADE_DURATION_SEC.
+	var screen: Node = _make_guild_hall()
+	screen.on_enter()
+	# Toast hidden pre-signal.
+	assert_bool(screen._toast_label.visible).is_false()
+
+	var fake_record: Dictionary = {
+		"display_name": "Theron",
+		"class_id": "warrior",
+		"level_at_retirement": 15,
+		"retirement_unix_ts": 1700000000,
+		"prestige_index": 1,
+	}
+	HeroRoster._prestige_count = 1
+	HeroRoster._prestige_multiplier = 1.05
+	HeroRoster.prestige_completed_signal.emit(fake_record, 1)
+
+	# Toast visible, opacity full, hero name in the rendered text.
+	assert_bool(screen._toast_label.visible).is_true()
+	assert_float(screen._toast_label.modulate.a).is_equal(1.0)
+	assert_str(screen._toast_label.text).contains("Theron")
+	# Tween created.
+	assert_object(screen._toast_tween).is_not_null()
+
+
+func test_prestige_completion_toast_no_op_when_record_missing_display_name() -> void:
+	# Defensive: a corrupted record without display_name should NOT
+	# render a malformed "%s joined..." toast. Skip cleanly.
+	var screen: Node = _make_guild_hall()
+	screen.on_enter()
+
+	var malformed: Dictionary = {
+		"class_id": "warrior",
+		"level_at_retirement": 15,
+		"prestige_index": 1,
+	}
+	HeroRoster.prestige_completed_signal.emit(malformed, 1)
+
+	assert_bool(screen._toast_label.visible).is_false()
+	assert_object(screen._toast_tween).is_null()
+
+
+func test_prestige_toast_kills_prior_tween_on_double_emit() -> void:
+	# Two rapid prestiges (theoretical — flow is one at a time): the
+	# second toast MUST kill the first tween before starting a new one.
+	# Mirrors the formation_assignment toast pattern.
+	var screen: Node = _make_guild_hall()
+	screen.on_enter()
+
+	var rec1: Dictionary = {"display_name": "Theron", "class_id": "warrior", "level_at_retirement": 15, "retirement_unix_ts": 1700000000, "prestige_index": 1}
+	var rec2: Dictionary = {"display_name": "Mira", "class_id": "mage", "level_at_retirement": 15, "retirement_unix_ts": 1700100000, "prestige_index": 2}
+
+	HeroRoster.prestige_completed_signal.emit(rec1, 1)
+	var first_tween: Tween = screen._toast_tween
+	assert_object(first_tween).is_not_null()
+
+	HeroRoster.prestige_completed_signal.emit(rec2, 2)
+	# New tween created (different reference); text updated to Mira.
+	assert_object(screen._toast_tween).is_not_same(first_tween)
+	assert_str(screen._toast_label.text).contains("Mira")
