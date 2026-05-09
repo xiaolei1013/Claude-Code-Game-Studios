@@ -79,6 +79,10 @@ const _SCREEN_DUNGEON_RUN_VIEW: PackedScene = preload("res://assets/screens/dung
 const _SCREEN_VICTORY_MOMENT: PackedScene = preload("res://assets/screens/victory_moment/victory_moment.tscn")
 const _SCREEN_RETURN_TO_APP: PackedScene = preload("res://assets/screens/return_to_app/return_to_app.tscn")
 const _SCREEN_MATCHUP_ASSIGNMENT: PackedScene = preload("res://assets/screens/matchup_assignment/matchup_assignment.tscn")
+## Sprint 21+ Prestige V1.0 / Story 3 UI (Slice B) — Hall of Retired Heroes.
+## Reachable from Guild Hall when `HeroRoster.get_prestige_count() > 0`.
+## Per `design/gdd/prestige-system.md` §F + AC-PR-13.
+const _SCREEN_HALL_OF_RETIRED_HEROES: PackedScene = preload("res://assets/screens/hall_of_retired_heroes/hall_of_retired_heroes.tscn")
 
 ## Path to the scene manager tuning-knob config resource.
 ## Loaded at _ready() time; consumed by Stories 005/009.
@@ -204,6 +208,7 @@ var _screen_registry: Dictionary = {
 	"victory_moment": _SCREEN_VICTORY_MOMENT,
 	"return_to_app": _SCREEN_RETURN_TO_APP,
 	"matchup_assignment": _SCREEN_MATCHUP_ASSIGNMENT,
+	"hall_of_retired_heroes": _SCREEN_HALL_OF_RETIRED_HEROES,
 }
 
 ## Placeholder queue slot for requests arriving while in UNINITIALIZED state.

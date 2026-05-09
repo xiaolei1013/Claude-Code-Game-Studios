@@ -473,11 +473,13 @@ func test_same_screen_request_does_not_free_current_screen() -> void:
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
-# E-01: _screen_registry has exactly 8 entries
+# E-01: _screen_registry has exactly 9 entries
+# (Sprint 21+ Prestige V1.0 / Story 3 UI Slice B added
+#  `hall_of_retired_heroes`, growing 8 → 9.)
 # ---------------------------------------------------------------------------
-func test_screen_registry_has_eight_entries() -> void:
+func test_screen_registry_has_nine_entries() -> void:
 	var sm: Node = SceneManagerScript.new()
-	assert_int(sm._screen_registry.size()).is_equal(8)
+	assert_int(sm._screen_registry.size()).is_equal(9)
 	sm.free()
 
 
@@ -529,6 +531,7 @@ func test_screen_registry_resource_paths_match_canonical_layout() -> void:
 		"dungeon_run_view": "res://assets/screens/dungeon_run_view/dungeon_run_view.tscn",
 		"victory_moment": "res://assets/screens/victory_moment/victory_moment.tscn",
 		"return_to_app": "res://assets/screens/return_to_app/return_to_app.tscn",
+		"hall_of_retired_heroes": "res://assets/screens/hall_of_retired_heroes/hall_of_retired_heroes.tscn",
 	}
 
 	for id: String in expected_paths.keys():
