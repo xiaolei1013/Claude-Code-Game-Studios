@@ -494,17 +494,19 @@ func _ready() -> void:
 		# to avoid triggering this error path. Tests verify behavior on a standalone
 		# instance without requiring the full autoload stack.
 
-	# --- SceneManager connection — DEFENSIVE (DEV-2: not yet implemented) ---
-	# SceneManager is scheduled for the scene-manager Foundation epic (0/10 done).
-	# Absence at boot is expected; connection is deferred with a push_warning.
-	# ADR-0007, Sprint 4 deviation note DEV-2 in file header.
+	# --- SceneManager connection — DEFENSIVE (test-fixture safety net) ---
+	# SceneManager is implemented + registered as autoload in production
+	# (project.godot rank table). The null-check guards test fixtures that
+	# instantiate SaveLoadSystem standalone without the full autoload stack;
+	# in production this branch is unreachable. ADR-0007.
 	var scene_manager: Node = get_node_or_null("/root/SceneManager")
 	if scene_manager != null:
 		scene_manager.scene_boundary_persist.connect(_on_scene_boundary_persist)
 	else:
 		push_warning(
 			"SaveLoadSystem._ready: SceneManager not present at /root/SceneManager. " +
-			"scene_boundary_persist wiring deferred until scene-manager epic implements its autoload."
+			"scene_boundary_persist wiring skipped (test-fixture path; production " +
+			"always has SceneManager at the canonical autoload path)."
 		)
 
 	# --- DataRegistry state check (rank 1 < 2; its _ready has fired) ---
@@ -661,7 +663,8 @@ func request_full_persist(reason: String) -> void:
 
 	# 6. Atomic write: open .tmp, store_buffer with abort-on-false (per Save/Load
 	#    GDD Rule 7), close (auto-flush), rename .tmp → final path. The .bak
-	#    rotation is deferred to Story 007b.
+	#    rotation lands at step 6.5 below — Story 013 Phase 2 closed it
+	#    (was previously deferred to Story 007b in the Sprint 11 stub).
 	var tmp_path: String = save_file_path + ".tmp"
 	var tmp_file: FileAccess = FileAccess.open(tmp_path, FileAccess.WRITE)
 	if tmp_file == null:

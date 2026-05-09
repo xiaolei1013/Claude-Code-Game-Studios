@@ -2,10 +2,11 @@
 ## derivation per design/gdd/floor-unlock-system.md.
 ##
 ## Sprint 11 S11-X1 (2026-05-05): runtime-MVP implementation per the GDD's
-## R1-R10 rules + §C.2 FloorState derivation. Closes one of the three missing
+## R1-R10 rules + §C.2 FloorState derivation. Closed one of the three missing
 ## consumer autoloads in CONSUMER_PATHS (Economy + HeroRoster + DungeonRunOrchestrator
-## already exist; FloorUnlock is the third — FormationAssignment + Recruitment
-## remain as Sprint 12+ work).
+## already existed; FloorUnlock was the third). The remaining two
+## (FormationAssignment + Recruitment) shipped during the Sprint 11 closure
+## sweep — CONSUMER_PATHS is now full at 6 entries per control-manifest.md.
 ##
 ## Autoload name is `FloorUnlock` (per project.godot [autoload] section + GDD
 ## §C.3 D2 lockstep). Script `class_name` is `FloorUnlockSystem` — the two are
