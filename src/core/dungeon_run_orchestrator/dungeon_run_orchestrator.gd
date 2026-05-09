@@ -194,6 +194,33 @@ const MATCHUP_MULT_DIS: float = 0.7
 ## Half-loot per the GDD.
 const LOSING_RUN_LOOT_FACTOR: float = 0.5
 
+# ---------------------------------------------------------------------------
+# Class Synergy V1.0 first-pass — Sprint 21 S21-S1 (Story 2) constants.
+#
+# Per design/gdd/class-synergy-system.md §G Tuning Knobs. Cozy-register hard
+# floor (OQ-32-6 + AC-CS-16): all synergy multipliers ≤ 1.5. Current first-pass
+# uses ≤ 1.25 — well under the cap. Test: a static-analysis CI test asserts
+# all three constants are ≤ 1.5 (cozy_register_cap_test.gd).
+# ---------------------------------------------------------------------------
+
+## Steel Wall (3 Warriors) gold multiplier vs `archetype = "bruiser"`.
+## Conditional — applies only when the formation is 3 Warriors AND the kill
+## archetype is bruiser. Per GDD §C.1 + §D.2 + AC-CS-06/07.
+const STEEL_WALL_GOLD_MULT: float = 1.25
+
+## Triple Threat (1W+1M+1R) gold multiplier — unconditional.
+## Per GDD §C.1 + §D.2 + AC-CS-08.
+const TRIPLE_THREAT_GOLD_MULT: float = 1.15
+
+## Arcane Elite (3 Mages) XP multiplier — unconditional.
+## Per GDD §C.1 + §D.3 + AC-CS-10.
+const ARCANE_ELITE_XP_MULT: float = 1.20
+
+## Base XP per tier-1 kill (V1.0 introduces; MVP ships with stub +1-per-clear
+## per S10-M4). XP per kill = BASE_XP_PER_KILL × tier × synergy_multiplier.
+## Per GDD §D.3.
+const BASE_XP_PER_KILL: int = 10
+
 ## Sprint 8 S8-N5 (Story 007) — per-floor first-clear gold bonus, 1-indexed
 ## table per TR-015. floor_index 0 is undefined sentinel — assert raises in
 ## debug if hit. Sourced from ADR-0013 §C floor-clear curve.
@@ -1014,11 +1041,93 @@ func _process_kill_events(events: Variant) -> void:
 ## arithmetic result without clamping (callers can cap if needed).
 ##
 ## TR-orchestrator-014 — ADR-0013 §C
-func attribute_kill_gold(tier: int, advantaged: bool, losing_run: bool) -> int:
+##
+## Sprint 21 S21-S1 (Class Synergy V1.0 Story 2): extended with optional
+## [param synergy_id] + [param archetype] for the 4-factor (now 5-factor with
+## prestige in Sprint 22+) multiplicative formula. Backwards-compatible:
+## existing callers passing only (tier, advantaged, losing_run) get
+## synergy_id="" (no synergy) and the original 3-factor result. Per
+## `class-synergy-system.md` §C.3 + §D.2 + AC-CS-06..09.
+func attribute_kill_gold(tier: int, advantaged: bool, losing_run: bool, synergy_id: String = "", archetype: String = "") -> int:
 	var base: int = int(BASE_KILL.get(tier, 0))
 	var matchup_mult: float = MATCHUP_MULT_ADV if advantaged else MATCHUP_MULT_DIS
 	var loot_factor: float = LOSING_RUN_LOOT_FACTOR if losing_run else 1.0
-	return floori(float(base) * matchup_mult * loot_factor)
+	var synergy_mult: float = _resolve_synergy_gold_multiplier(synergy_id, archetype)
+	return floori(float(base) * matchup_mult * loot_factor * synergy_mult)
+
+
+## Sprint 21 S21-S1 (Class Synergy V1.0 Story 2): per-kill XP attribution
+## formula. New surface introduced by the V1.0 Class Synergy block; MVP
+## ships with stub +1-per-clear XP grant per S10-M4 + the orchestrator's
+## existing `_grant_stub_levels_to_formation` path. The V1.0 implementation
+## epic wires this method into the per-kill schedule alongside
+## [method attribute_kill_gold] when Story 4 lands the screen + UX
+## integration.
+##
+## Formula: [code]floori(BASE_XP_PER_KILL * tier * synergy_mult)[/code]
+##
+##   - [constant BASE_XP_PER_KILL] (10): tier-1 base XP.
+##   - [param tier]: enemy tier (1..5). Output scales linearly with tier
+##     so tier-3 kills are 3× the XP of tier-1 kills.
+##   - [param synergy_id]: active formation synergy id; resolved via
+##     [method _resolve_synergy_xp_multiplier].
+##
+## Output range for MVP tiers (1..5) with default synergy (none):
+##   floori(10 * 1 * 1.0) = 10 (tier-1 baseline)
+##   floori(10 * 5 * 1.0) = 50 (tier-5 baseline)
+## With Arcane Elite synergy active (×1.20):
+##   floori(10 * 5 * 1.20) = 60 (tier-5 boosted)
+##
+## Per `class-synergy-system.md` §C.3 + §D.3 + AC-CS-10/11.
+func attribute_kill_xp(tier: int, synergy_id: String = "") -> int:
+	var synergy_mult: float = _resolve_synergy_xp_multiplier(synergy_id)
+	return floori(float(BASE_XP_PER_KILL) * float(tier) * synergy_mult)
+
+
+## Resolves the gold multiplier for a given (synergy_id, archetype) pair.
+## Returns 1.0 (no multiplier) for: empty synergy_id, archetype-conditional
+## synergies whose archetype doesn't match, or unknown synergy_ids
+## (V1.5+ forward-compat per AC-CS-18).
+##
+## Per `class-synergy-system.md` §D.2.
+func _resolve_synergy_gold_multiplier(synergy_id: String, archetype: String) -> float:
+	match synergy_id:
+		"":
+			return 1.0
+		"steel_wall":
+			# Conditional: only applies vs bruiser archetype kills.
+			return STEEL_WALL_GOLD_MULT if archetype == "bruiser" else 1.0
+		"triple_threat":
+			# Unconditional: applies to all kill archetypes.
+			return TRIPLE_THREAT_GOLD_MULT
+		"arcane_elite":
+			# Arcane Elite affects XP only (per GDD §C.1 effect type column).
+			return 1.0
+		_:
+			# AC-CS-18 forward-compat: unknown synergy_id (e.g., V1.5
+			# "veteran_squad") falls back to no multiplier. Graceful
+			# degradation, no crash.
+			return 1.0
+
+
+## Resolves the XP multiplier for a given synergy_id. Returns 1.0 (no
+## multiplier) for: empty synergy_id, gold-only synergies, or unknown
+## synergy_ids (V1.5+ forward-compat per AC-CS-18).
+##
+## Per `class-synergy-system.md` §D.3.
+func _resolve_synergy_xp_multiplier(synergy_id: String) -> float:
+	match synergy_id:
+		"":
+			return 1.0
+		"arcane_elite":
+			# Unconditional XP boost.
+			return ARCANE_ELITE_XP_MULT
+		"steel_wall", "triple_threat":
+			# Gold-only synergies (XP path is baseline).
+			return 1.0
+		_:
+			# AC-CS-18 forward-compat fallback.
+			return 1.0
 
 
 ## Drains per-chunk-suppressed offline-replay signals into aggregate
