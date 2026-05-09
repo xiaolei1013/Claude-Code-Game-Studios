@@ -31,8 +31,11 @@ reports/
 tests/fixtures/data_registry/*/
 
 # === Build Output ===
-build/
-builds/
+# Anchored to repo root so `tools/build/` (the build-script source dir,
+# Sprint 19 S19-M5 scaffold) is NOT excluded — only the export-output
+# `/build/` dir at the repo root is.
+/build/
+/builds/
 bin/
 !addons/**/bin/
 obj/
@@ -47,18 +50,23 @@ dist/
 # === Engine: Godot ===
 .godot/
 *.translation
-export_presets.cfg
+# export_presets.cfg is committed for this project — it's the canonical
+# build-pipeline source per tools/build/README.md (Sprint 19 S19-M5).
+# Hand-edits should stay in sync with the editor's Project → Export dialog.
 # Uncomment if using Godot:
 # *.import
 
 # === Engine: Unity ===
-[Ll]ibrary/
-[Tt]emp/
-[Oo]bj/
-[Bb]uild/
-[Bb]uilds/
-[Ll]ogs/
-[Uu]ser[Ss]ettings/
+# All Unity dirs live at the project root by convention; anchoring the
+# patterns to / prevents them from matching `tools/build/` (the Godot
+# build-script source dir, Sprint 19 S19-M5).
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
 *.csproj
 *.unityproj
 *.sln
