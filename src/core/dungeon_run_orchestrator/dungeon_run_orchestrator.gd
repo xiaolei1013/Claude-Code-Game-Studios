@@ -960,6 +960,23 @@ func _process_kill_events(events: Variant) -> void:
 	# keyed by tier, populated lazily on first per-tier sighting.
 	var xp_by_tier_cache: Dictionary = {}
 
+	# Class Synergy V1.0 (Sprint 21 Story 4 — per-kill wiring) — hoist the
+	# active synergy id + XP multiplier OUT of the per-kill loop. The
+	# multiplier is constant for the run (synergy_id is frozen-at-dispatch
+	# per AC-CS-13). Computing it once amortizes the resolver over all
+	# kills in the batch; the gold multiplier varies per archetype so it
+	# stays inside the loop via attribute_kill_gold's archetype param.
+	#
+	# `class-synergy-system.md` §C.3 — synergy multipliers compose
+	# multiplicatively with the existing 3-factor (matchup × loot × base)
+	# kill output formula. The 4-factor product is:
+	#   gold = floori(BASE_KILL[tier] × matchup × loot × synergy)
+	#   xp   = floori(xp_per_kill(tier) × synergy_xp_multiplier)
+	var synergy_id: String = ""
+	if run_snapshot != null:
+		synergy_id = run_snapshot.synergy_id
+	var synergy_xp_multiplier: float = _resolve_synergy_xp_multiplier(synergy_id)
+
 	for ke: Variant in kills_array:
 		# KillEvent fields — duck-typed reads against the value-type contract:
 		# enemy_id (StringName), archetype (StringName), tier (int), is_boss (bool).
@@ -969,11 +986,14 @@ func _process_kill_events(events: Variant) -> void:
 		# Gold attribution → Economy. Production Economy.add_gold takes a
 		# single int; the "kill" attribution stays implicit at the call site
 		# (Economy's gold_changed signal carries a generic "add_gold" reason).
-		var gold: int = attribute_kill_gold(tier, advantaged, losing_run)
+		# Class Synergy V1.0 — pass synergy_id + archetype to attribute_kill_gold
+		# so Steel Wall (3W vs bruiser) and Triple Threat (1+1+1 unconditional)
+		# multiply the gold output. `class-synergy-system.md` §C.3 + §D.2.
+		var archetype_str: String = String(archetype_sn)
+		var gold: int = attribute_kill_gold(tier, advantaged, losing_run, synergy_id, archetype_str)
 		if economy_can_add_gold and gold > 0:
 			economy.add_gold(gold)
 		# Per-kill signals.
-		var archetype_str: String = String(archetype_sn)
 		enemy_killed.emit(tier, archetype_str, advantaged)
 		if "is_boss" in ke and bool(ke.is_boss):
 			var enemy_id_str: String = String(ke.enemy_id) if "enemy_id" in ke else ""
@@ -988,7 +1008,12 @@ func _process_kill_events(events: Variant) -> void:
 		if xp_amount < 0:
 			xp_amount = xp_per_kill(tier)
 			xp_by_tier_cache[tier] = xp_amount
-		_grant_xp_to_formation(roster_for_xp, xp_amount)
+		# Class Synergy V1.0 — apply Arcane Elite's ×1.20 XP multiplier
+		# (or 1.0 for any other synergy_id, including ""). Per
+		# `class-synergy-system.md` §C.3. The multiplier is loop-invariant
+		# (hoisted above) so this is a single float multiplication per kill.
+		var xp_with_synergy: int = floori(float(xp_amount) * synergy_xp_multiplier)
+		_grant_xp_to_formation(roster_for_xp, xp_with_synergy)
 
 	if bool(events.get("first_clear_in_range")):
 		# Sprint 8 S8-N5 (Story 007) — 3-layer idempotency:
