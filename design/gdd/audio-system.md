@@ -362,6 +362,15 @@ If `assets/audio/audio_bus_layout.tres` is missing at boot, Godot's AudioServer 
 - **None at runtime** — audio is a sink, not a source. Gameplay continues correctly with audio entirely muted.
 - **Settings overlay** — depends on AudioRouter's volume API. Implemented in Sprint 12 alongside the Settings UX work.
 
+### V1.0 progression-layer cue additions (added 2026-05-09)
+
+Both V1.0 progression-layer systems add cues and signal subscriptions:
+
+- **Class Synergy System** (#32, V1.0 first-pass 2026-05-09) — adds 2 new cues: `sfx_class_synergy_detected` (live preview at slot edit) + `sfx_class_synergy_dispatched` (warm sting at run start with active synergy). Subscribes to 2 new signals declared on FormationAssignment + DungeonRunOrchestrator: `class_synergy_detected_signal(synergy_id)` + `class_synergy_dispatched_signal(synergy_id, run_id)`. Throttle: `class_synergy_audio_suppress_window_seconds = 2.0` (per F.2 throttle pattern). Per `class-synergy-system.md` §C.4 + §F.
+- **Prestige System** (#31, V1.0 first-pass 2026-05-09) — adds 2 new cues: `sfx_prestige_completed` (warm sting on retirement action) + `sfx_hall_card_revealed` (subtle parchment-rustle on Hall first-open). Subscribes to `prestige_completed_signal(record, new_count)` declared on HeroRoster. Throttle: `prestige_audio_suppress_window_seconds = 2.0`. Per `prestige-system.md` §C.2 + §F.
+
+Both V1.0 cue additions follow the existing F.2 throttle pattern and respect the cozy-register no-overlap policy. The 4 net-new cues bring the total V1.0 audio surface to (current MVP cue count + 4); CSV taxonomy update is a Sprint 22+ implementation epic line item.
+
 ---
 
 ## G. Tuning Knobs

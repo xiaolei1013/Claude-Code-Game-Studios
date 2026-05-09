@@ -211,6 +211,12 @@ Hero Leveling GDD #15 §C.4 multi-level cascade emits N hero_leveled signals. Gu
 - `formation_assignment` (#17) — back-navigation lands here (per ADR-0007 transition contract)
 - `Recruit Screen` (#21) — back-navigation lands here
 
+### V1.0 progression-layer additions (added 2026-05-09)
+
+The following V1.0-tier system extends this screen:
+
+- **Prestige System** (#31, V1.0 first-pass 2026-05-09) — adds a "Hall of Retired Heroes" button visible only when `HeroRoster._retired_hero_records.size() > 0` (i.e., the player has prestiged at least one hero). The button routes to a new gallery view showing retired-hero portraits with parchment-warm laurel crown overlays per Art Bible Visual Identity Anchor. Locale key: `hall_of_retired_heroes_title`. The button is hidden in fresh-save first-launch state and reveals after the first prestige action. Per `prestige-system.md` §C.4 + §F.
+
 ---
 
 ## G. Tuning Knobs

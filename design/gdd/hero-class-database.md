@@ -559,6 +559,8 @@ Result: `stat_at_level("attack", warrior_data, 20)` returns the same value as `s
 | **Recruit Screen** (#21, undesigned) | Soft | Displays `display_name`, `flavor_text`, portrait | `display_name`, `flavor_text`, `portrait_path`, `tier` |
 | **Roster / Hero Detail Screen** (#22, undesigned) | Soft | Displays full stat block | Full resource |
 | **Enemy Database** (#7, undesigned) | Hard — reverse | This GDD **declares the archetype tag strings** (`bruiser`, `caster`, `armored`, plus V1.0 tags) that Enemy Database resources must use | `EnemyArchetypes` constant set from C.2 |
+| **Class Synergy System** (#32, V1.0 first-pass 2026-05-09) | Hard — read-only | Reads `class_id` strings ("warrior", "mage", "rogue") for the V1.0 first-pass synergy detection multiset comparison. The 3 first-pass synergies (Steel Wall, Arcane Elite, Triple Threat) are keyed by exact class_id multisets. Per `class-synergy-system.md` §C.1 + §D.1. | `class_id` (stable identifier) |
+| **Prestige System** (#31, V1.0 first-pass 2026-05-09) | Hard — read-only via resolver | Hall of Retired Heroes renders `RetiredHeroRecord.class_id` strings via `HeroClassDatabase.resolve_or_default(class_id) -> HeroClass` (existing). Defensive fallback: if a future class_id removal orphans existing Hall portraits, the resolver returns a "Retired Hero (Class Lost)" placeholder per `prestige-system.md` §E.8. | `class_id` resolver + portrait/icon paths |
 
 ### Bidirectional Consistency
 
