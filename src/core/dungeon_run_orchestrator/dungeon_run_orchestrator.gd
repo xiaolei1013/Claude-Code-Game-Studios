@@ -132,6 +132,25 @@ signal boss_killed(enemy_id: String)
 ## TR-orchestrator-022
 signal floor_cleared_first_time(floor_index: int, biome_id: String, losing_run: bool)
 
+## Class Synergy V1.0 first-pass (Sprint 21 S21-S2 / Story 3) — dispatch-time
+## signal fired when a run begins with an active synergy. Emitted from
+## [method dispatch] after the state transitions to ACTIVE_FOREGROUND.
+## NOT fired when [code]run_snapshot.synergy_id == ""[/code] (no synergy
+## active for the run).
+##
+## Per `class-synergy-system.md` §C.4 audio integration: AudioRouter
+## subscribes and fires `sfx_class_synergy_dispatched` (warm sting) ONCE
+## per dispatch. NOT throttled — the dispatch event is naturally rate-
+## limited by the orchestrator's DISPATCH_DEBOUNCE_MS (250ms).
+##
+## [param synergy_id]: the run's active synergy id String. Always non-empty
+##   when the signal fires (per the no-emit-on-empty contract). One of
+##   "steel_wall", "arcane_elite", "triple_threat" in V1.0 first-pass.
+##
+## design/gdd/class-synergy-system.md §C.4 + AC-CS-14.
+@warning_ignore("unused_signal")
+signal class_synergy_dispatched_signal(synergy_id: String)
+
 
 # ---------------------------------------------------------------------------
 # Injected dependencies — lazy-default-with-public-setters per ADR-0009.
@@ -692,6 +711,14 @@ func dispatch(formation: Array, floor_index: int, biome_id: String) -> void:
 	if economy_for_gold != null and economy_for_gold.has_method("get_gold_balance"):
 		run_snapshot.pre_dispatch_gold = int(economy_for_gold.get_gold_balance())
 	_set_state(DungeonRunStateScript.State.ACTIVE_FOREGROUND)
+
+	# Class Synergy V1.0 (Sprint 21 S21-S2 / Story 3) — emit dispatch-time
+	# synergy signal AFTER state transition so subscribers see the run
+	# already in ACTIVE_FOREGROUND. Only emits when a synergy is active
+	# (run_snapshot.synergy_id != ""). AudioRouter subscribes for the
+	# warm-sting cue per `class-synergy-system.md` §C.4 + AC-CS-14.
+	if run_snapshot != null and run_snapshot.synergy_id != "":
+		class_synergy_dispatched_signal.emit(run_snapshot.synergy_id)
 
 
 # ---------------------------------------------------------------------------

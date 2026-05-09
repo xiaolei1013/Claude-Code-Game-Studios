@@ -48,6 +48,13 @@ const _DEFAULT_MUSIC_DB: float = -8.0
 const _DEFAULT_SFX_DB: float = -3.0
 const _DEFAULT_MASTER_MUTED: bool = false
 
+## Class Synergy V1.0 (Sprint 21 S21-S2 / Story 3) — live-preview detection
+## chime throttle. Per `class-synergy-system.md` §C.4 + §G + AC-CS-14:
+## rapid slot-toggling that fires the detection signal repeatedly within
+## this window plays the chime ONCE. Default 2.0s. Same pattern as the
+## gold-chime anti-spam throttle below.
+const _CLASS_SYNERGY_DETECTED_THROTTLE_MS: int = 2000
+
 ## Gold-chime throttle window per audio-system.md §F.2 + §G.
 ## Designer-tunable via @export if needed; const for now per MVP scope.
 const _GOLD_CHIME_THROTTLE_MS: int = 250
@@ -108,6 +115,12 @@ var _master_muted: bool = _DEFAULT_MASTER_MUTED
 ## Throttle clock for gold-chime anti-slot-machine filter (F.2).
 ## Stores Time.get_ticks_msec() at the last played gold chime.
 var _gold_chime_last_played_ms: int = 0
+
+## Class Synergy V1.0 (Sprint 21 S21-S2 / Story 3) — throttle clock for
+## the live-preview detection chime. Same pattern as `_gold_chime_last_played_ms`
+## but with a longer window (2.0s vs 0.25s) since slot-toggle is naturally
+## slower than gold-event spam.
+var _class_synergy_detected_last_played_ms: int = 0
 
 ## Currently-playing Ambient bed and its id. null = no bed playing.
 ## Tracked across crossfades so play_music can guard same-id no-ops.
@@ -172,7 +185,7 @@ func _ready() -> void:
 		if sm.has_signal("screen_changed") and not sm.screen_changed.is_connected(_on_screen_changed):
 			sm.screen_changed.connect(_on_screen_changed)
 
-	# DungeonRunOrchestrator (rank 14) — state, kills, floor clears.
+	# DungeonRunOrchestrator (rank 14) — state, kills, floor clears, synergy dispatch.
 	if has_node("/root/DungeonRunOrchestrator"):
 		var orch: Node = get_node("/root/DungeonRunOrchestrator")
 		if orch.has_signal("state_changed") and not orch.state_changed.is_connected(_on_run_state_changed):
@@ -183,6 +196,15 @@ func _ready() -> void:
 			orch.boss_killed.connect(_on_boss_killed)
 		if orch.has_signal("floor_cleared_first_time") and not orch.floor_cleared_first_time.is_connected(_on_floor_cleared_first_time):
 			orch.floor_cleared_first_time.connect(_on_floor_cleared_first_time)
+		# Class Synergy V1.0 — Story 3 dispatched signal subscription.
+		if orch.has_signal("class_synergy_dispatched_signal") and not orch.class_synergy_dispatched_signal.is_connected(_on_class_synergy_dispatched):
+			orch.class_synergy_dispatched_signal.connect(_on_class_synergy_dispatched)
+
+	# FormationAssignment (rank 11) — Class Synergy V1.0 live-preview chime.
+	if has_node("/root/FormationAssignment"):
+		var fa: Node = get_node("/root/FormationAssignment")
+		if fa.has_signal("class_synergy_detected_signal") and not fa.class_synergy_detected_signal.is_connected(_on_class_synergy_detected):
+			fa.class_synergy_detected_signal.connect(_on_class_synergy_detected)
 
 	# HeroRoster (rank 7) — level-up chime trigger.
 	if has_node("/root/HeroRoster"):
@@ -498,6 +520,44 @@ func _on_gold_changed(_new_balance: int, delta: int, _reason: String) -> void:
 		return
 	_gold_chime_last_played_ms = now
 	play_sfx(&"sfx_reward_gold_collected", 1.0, 1.0)
+
+
+## Class Synergy V1.0 (Sprint 21 S21-S2 / Story 3) — live-preview detection
+## chime handler. Throttled to ≤1 play per [constant _CLASS_SYNERGY_DETECTED_THROTTLE_MS]
+## (2.0s) per AC-CS-14: rapid slot-toggling that fires the detection signal
+## repeatedly within the window plays the chime ONCE.
+##
+## Per `class-synergy-system.md` §C.4 audio integration. The chime is a warm
+## "you-found-something" cozy register cue — NOT a fanfare. Routes through
+## `play_sfx` which honors the silent-MVP fallback (cue resource may be
+## absent in MVP per ADR-0016; AudioRouter logs `push_warning` and continues).
+##
+## [param synergy_id]: the detected synergy id (one of "steel_wall",
+##   "arcane_elite", "triple_threat" in V1.0 first-pass). Per FormationAssignment's
+##   notify_synergy_detected contract, this is always non-empty when fired.
+##   Currently the cue is the same regardless of synergy_id; V1.5+ may add
+##   per-synergy variants.
+func _on_class_synergy_detected(_synergy_id: String) -> void:
+	# AC-CS-14: throttle to suppress rapid-toggle spam.
+	var now: int = Time.get_ticks_msec()
+	if now - _class_synergy_detected_last_played_ms < _CLASS_SYNERGY_DETECTED_THROTTLE_MS:
+		return
+	_class_synergy_detected_last_played_ms = now
+	play_sfx(&"sfx_class_synergy_detected", 1.0, 1.0)
+
+
+## Class Synergy V1.0 (Sprint 21 S21-S2 / Story 3) — dispatch-time chime
+## handler. NOT throttled — DungeonRunOrchestrator's DISPATCH_DEBOUNCE_MS
+## (250ms) naturally rate-limits the dispatched signal.
+##
+## Per `class-synergy-system.md` §C.4: a single warm sting at run start.
+## NOT looped. Same cozy register as detection chime but a different cue
+## resource so the dispatch beat stands distinct from the live preview.
+##
+## [param synergy_id]: the run's active synergy id (always non-empty per
+##   the orchestrator's dispatch-time emit contract).
+func _on_class_synergy_dispatched(_synergy_id: String) -> void:
+	play_sfx(&"sfx_class_synergy_dispatched", 1.0, 1.0)
 
 
 # ---------------------------------------------------------------------------
