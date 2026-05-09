@@ -216,3 +216,127 @@ func set_target(biome_id: String, floor_index: int) -> void:
 ## Sprint 15 S15-N1.
 func get_target() -> Dictionary:
 	return _matchup_target.duplicate(true)
+
+
+# ---------------------------------------------------------------------------
+# Class Synergy V1.0 first-pass — Sprint 21 S21-M1 (Story 1) implementation.
+#
+# Per design/gdd/class-synergy-system.md §C.1 + §D.1: detection is a pure
+# function over the multiset of class_id strings in the formation. Returns
+# the active synergy id String, or "" if no synergy matches OR any slot
+# is empty (no partial-synergy detection in V1.0 first-pass).
+#
+# Three V1.0 first-pass synergies:
+#   - "steel_wall"     : 3 Warriors  → ×1.25 kill gold vs bruisers (cond.)
+#   - "arcane_elite"   : 3 Mages     → ×1.20 kill XP unconditional
+#   - "triple_threat"  : 1W+1M+1R    → ×1.15 kill gold unconditional
+# ---------------------------------------------------------------------------
+
+## V1.0 first-pass synergy id constants. Stable strings for the synergy
+## resolver switch (per `class-synergy-system.md` §D.2/D.3) + RunSnapshot.
+## V1.5+ may extend the synergy roster; the resolver returns 1.0 for
+## unknown synergy_ids per AC-CS-18 forward-compat.
+const SYNERGY_STEEL_WALL: String = "steel_wall"
+const SYNERGY_ARCANE_ELITE: String = "arcane_elite"
+const SYNERGY_TRIPLE_THREAT: String = "triple_threat"
+
+
+## Detects which V1.0 first-pass class synergy is active for a given formation
+## composition. Returns the synergy id String, or [code]""[/code] if no
+## synergy matches OR any slot is empty.
+##
+## Per `class-synergy-system.md` §C.1 + §D.1: pure function over the multiset
+## of class_id strings. Order of slots does NOT matter (sort-based comparison).
+## No partial-synergy detection — all 3 slots must be filled. No tier or level
+## consideration — only class_id composition.
+##
+## [param formation_snapshot]: a Dictionary with the same shape as
+## [code]RunSnapshot.formation_snapshot[/code] — either
+## [code]{ "heroes": Array[Dictionary] }[/code] (each hero dict has
+## [code]class_id[/code]) OR [code]{ "instance_ids": Array[int] }[/code]
+## (resolved via [code]/root/HeroRoster.get_hero[/code]).
+##
+## When [code]heroes[/code] is present + non-empty, that path wins (avoids
+## the autoload lookup; cleaner test path). Otherwise [code]instance_ids[/code]
+## resolves through HeroRoster.
+##
+## Returns [code]""[/code] under any of:
+##   - formation_snapshot is missing both keys
+##   - resolved class_ids count != 3 (FORMATION_SIZE per `hero-roster.md`)
+##   - any slot is empty (instance_id == 0 in instance_ids path; missing
+##     class_id in heroes path)
+##   - any HeroRoster lookup returns null (unresolvable instance_id)
+##   - the sorted class_ids multiset doesn't match any V1.0 synergy
+##
+## Idempotent: safe to call every slot edit (no signal emit, no state
+## change). O(1) — sort + 3 comparisons.
+##
+## Per AC-CS-01..05 detection accuracy. AC-CS-20 perf budget <1ms p99.
+##
+## design/gdd/class-synergy-system.md §C.1 + §D.1 + AC-CS-01..05.
+func detect_active_synergy(formation_snapshot: Dictionary) -> String:
+	var class_ids: Array[String] = []
+
+	# Path 1: heroes Array[Dictionary] (test-friendly; no autoload dep).
+	var heroes_v: Variant = formation_snapshot.get("heroes", [])
+	if heroes_v is Array and not (heroes_v as Array).is_empty():
+		for hero_v: Variant in (heroes_v as Array):
+			if not (hero_v is Dictionary):
+				return ""
+			var hero_dict: Dictionary = hero_v as Dictionary
+			var cid: String = String(hero_dict.get("class_id", ""))
+			if cid == "":
+				return ""
+			class_ids.append(cid)
+	else:
+		# Path 2: instance_ids Array[int] resolved via HeroRoster autoload.
+		var ids_v: Variant = formation_snapshot.get("instance_ids", [])
+		if not (ids_v is Array):
+			return ""
+		var ids: Array = ids_v as Array
+		if ids.is_empty():
+			return ""
+		var roster: Node = get_node_or_null("/root/HeroRoster")
+		if roster == null or not roster.has_method("get_hero"):
+			return ""
+		for instance_id_v: Variant in ids:
+			var instance_id: int = int(instance_id_v)
+			if instance_id == 0:
+				return ""
+			var hero: Object = roster.call("get_hero", instance_id)
+			if hero == null:
+				return ""
+			# HeroInstance is RefCounted with class_id field. Use Object.get
+			# for property access (works on RefCounted + Resource instances).
+			var cid_v: Variant = hero.get("class_id")
+			if not (cid_v is String):
+				return ""
+			var cid: String = cid_v as String
+			if cid == "":
+				return ""
+			class_ids.append(cid)
+
+	# FORMATION_SIZE guard (must be exactly 3 per hero-roster.md §C.10).
+	if class_ids.size() != 3:
+		return ""
+
+	class_ids.sort()  # Canonical multiset comparison.
+
+	# Match against V1.0 first-pass synergy roster. Order of comparisons
+	# matters only for readability — each pattern is mutually exclusive
+	# under the sorted-multiset comparison.
+	var sorted_warrior: Array[String] = ["warrior", "warrior", "warrior"]
+	if class_ids == sorted_warrior:
+		return SYNERGY_STEEL_WALL
+	var sorted_mage: Array[String] = ["mage", "mage", "mage"]
+	if class_ids == sorted_mage:
+		return SYNERGY_ARCANE_ELITE
+	# Triple Threat: 1 Warrior + 1 Mage + 1 Rogue. Sorted alphabetically:
+	# ["mage", "rogue", "warrior"].
+	var sorted_mix: Array[String] = ["mage", "rogue", "warrior"]
+	if class_ids == sorted_mix:
+		return SYNERGY_TRIPLE_THREAT
+
+	# No synergy matches (e.g., 2W+1M, 2W+1R, 2M+1R — V1.0 first-pass does
+	# not include 2+1 mixes; V1.5+ may extend).
+	return ""

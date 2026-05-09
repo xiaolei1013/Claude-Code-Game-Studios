@@ -119,6 +119,34 @@ var floor_clear_emitted: bool = false
 ## TR-orchestrator-031, ADR-0014.
 var floor_was_valid: bool = true
 
+## Class Synergy V1.0 first-pass — frozen-at-dispatch active synergy id.
+##
+## Set EXPLICITLY by [DungeonRunOrchestrator.snapshot_synergy_for_run] at
+## DISPATCHING from the result of [FormationAssignment.detect_active_synergy].
+## Empty string [code]""[/code] means no synergy active for this run.
+##
+## Per `class-synergy-system.md` §C.2 + ADR-0001 mid-run reassignment policy:
+## the synergy is FROZEN at dispatch and IMMUTABLE for the run's duration.
+## Mid-run formation edits do NOT recompute the synergy. This invariant is
+## load-bearing for AC-CS-13 (mid-run reassignment immutability).
+##
+## V1.0 first-pass synergy ids:
+##   - [code]""[/code] (no synergy)
+##   - [code]"steel_wall"[/code] (3 Warriors; ×1.25 kill gold vs bruisers)
+##   - [code]"arcane_elite"[/code] (3 Mages; ×1.20 kill XP unconditional)
+##   - [code]"triple_threat"[/code] (1W+1M+1R; ×1.15 kill gold unconditional)
+##
+## V1.5+ forward-compat: unknown synergy_id strings on load fall through
+## to the default 1.0 multiplier per the resolver's switch (AC-CS-18).
+## So a hypothetical V1.5 "veteran_squad" synergy_id loaded by a V1.0 build
+## degrades gracefully without crash.
+##
+## Serialized via [method to_dict] / [method from_dict]. Default-on-missing
+## is [code]""[/code] so legacy V1 saves (pre-Class-Synergy) hydrate cleanly.
+##
+## ADR: design/gdd/class-synergy-system.md §C.2 + §F + AC-CS-12 + AC-CS-18.
+var synergy_id: String = ""
+
 
 # ---------------------------------------------------------------------------
 # Serialization (TR-orchestrator-003) — round-trip via to_dict / from_dict
@@ -142,6 +170,7 @@ func to_dict() -> Dictionary:
 		"loop_counter": loop_counter,
 		"kill_count": kill_count,
 		"floor_was_valid": floor_was_valid,
+		"synergy_id": synergy_id,
 	}
 
 
@@ -180,6 +209,9 @@ func from_dict(d: Dictionary) -> void:
 	# Story 011 — default `true` if absent so legacy saves (pre-field) hydrate
 	# as "valid floor" rather than spuriously claiming an authoring bug.
 	floor_was_valid = bool(d.get("floor_was_valid", true))
+	# Class Synergy V1.0 — default "" if absent so legacy V1 saves (pre-field)
+	# hydrate as "no synergy active" per AC-CS-12 + AC-CS-18 forward-compat.
+	synergy_id = str(d.get("synergy_id", ""))
 
 
 ## Returns true if [param other] has equal values for all 9 fields.
@@ -203,4 +235,5 @@ func equals(other: RunSnapshot) -> bool:
 		and loop_counter == other.loop_counter
 		and kill_count == other.kill_count
 		and floor_was_valid == other.floor_was_valid
+		and synergy_id == other.synergy_id
 	)

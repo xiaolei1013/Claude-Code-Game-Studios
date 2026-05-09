@@ -317,17 +317,20 @@ func test_run_snapshot_default_loop_counter_is_zero() -> void:
 # Group F: TR-orchestrator-003 — to_dict shape + values
 # ===========================================================================
 
-func test_to_dict_returns_eleven_key_dict() -> void:
+func test_to_dict_returns_twelve_key_dict() -> void:
 	# Sprint 7 S7-M13 added `kill_count` field as the 10th. Story 011
 	# (2026-05-08) added `floor_was_valid` field as the 11th — distinguishes
 	# ADR-0014's "lost badly" vs "floor authoring bug" cases on RunSnapshot.
+	# Sprint 21 S21-M1 (Class Synergy V1.0 first-pass, 2026-05-09) added
+	# `synergy_id` field as the 12th — frozen-at-dispatch active synergy
+	# per `class-synergy-system.md` §C.2.
 	var snap: RunSnapshot = RunSnapshotScript.new()
 	var d: Dictionary = snap.to_dict()
-	assert_int(d.size()).is_equal(11)
+	assert_int(d.size()).is_equal(12)
 	for key: String in [
 		"formation_snapshot", "floor_id", "current_tick", "last_emitted_tick",
 		"losing_run", "floor_clear_emitted", "matchup_cache", "kill_schedule",
-		"loop_counter", "kill_count", "floor_was_valid",
+		"loop_counter", "kill_count", "floor_was_valid", "synergy_id",
 	]:
 		assert_bool(d.has(key)).override_failure_message(
 			"to_dict missing key '%s'" % key
