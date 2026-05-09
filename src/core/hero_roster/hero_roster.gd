@@ -652,6 +652,38 @@ func get_prestige_multiplier() -> float:
 	)
 
 
+## Returns a defensive deep copy of the retired-hero record list — the
+## Hall of Retired Heroes screen reads this to populate its card list.
+## Mutation by callers does not affect the internal state.
+##
+## Each record is a [Dictionary] with the schema documented on
+## [signal prestige_completed_signal]:
+## [code]{display_name, class_id, level_at_retirement,
+## retirement_unix_ts, prestige_index}[/code].
+##
+## Empty list when no prestige action has occurred yet.
+##
+## Per [code]prestige-system.md[/code] §C.4 + §C.5 + §F.
+func get_retired_hero_records() -> Array[Dictionary]:
+	# duplicate(true) → deep copy. Each record dictionary is also
+	# duplicated so a UI mutation (e.g., a renderer adding a
+	# transient "selected" key) does not contaminate persisted state.
+	var copy: Array[Dictionary] = []
+	for rec: Dictionary in _retired_hero_records:
+		copy.append(rec.duplicate(true))
+	return copy
+
+
+## Returns the current global prestige count (number of prestige actions
+## completed this save). Read-only — mutation flows exclusively through
+## [method prestige_hero]. Used by UI gating (e.g., Guild Hall's
+## "Hall of Retired Heroes" button visibility) and analytics.
+##
+## Per [code]prestige-system.md[/code] §C.5 + §F.
+func get_prestige_count() -> int:
+	return _prestige_count
+
+
 ## Updates a hero's [code]current_level[/code] to [param new_level], clamping
 ## to [code][1, level_cap()][/code]. Returns [code]true[/code] on success or
 ## [code]false[/code] when [param id] is unknown.

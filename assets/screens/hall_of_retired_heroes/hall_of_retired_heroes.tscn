@@ -1,0 +1,54 @@
+[gd_scene load_steps=2 format=3 uid="uid://screen_hall_of_retired_heroes"]
+
+[ext_resource type="Script" path="res://assets/screens/hall_of_retired_heroes/hall_of_retired_heroes.gd" id="1_hall"]
+
+[node name="HallOfRetiredHeroes" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_hall")
+
+[node name="RootVBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TitleLabel" type="Label" parent="RootVBox"]
+layout_mode = 2
+text = "Hall of Retired Heroes"
+horizontal_alignment = 1
+theme_type_variation = &"IdentityHeader"
+
+[node name="MultiplierLabel" type="Label" parent="RootVBox"]
+layout_mode = 2
+text = "×1.00"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="RootVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="CardList" type="VBoxContainer" parent="RootVBox/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="BackButton" type="Button" parent="RootVBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(180, 44)
+size_flags_horizontal = 4
+focus_mode = 0
+mouse_filter = 0
+text = "Back"
