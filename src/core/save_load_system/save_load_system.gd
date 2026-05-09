@@ -256,6 +256,71 @@ signal first_launch()
 @warning_ignore("unused_signal")
 signal corrupt_both_acknowledged()
 
+## Story 013 Phase 2 — emitted when the `.bak` fallback path recovers a valid
+## envelope after the primary `.dat` fails HMAC verification (TR-save-load-017).
+##
+## The UI layer connects this signal to surface a cozy "Save recovered from
+## backup" toast notification. This signal is mutually exclusive with
+## [signal storage_advisory_modal_required]: SaveLoadSystem emits exactly ONE
+## of the two per `.bak` recovery, gated on the within-window event count vs.
+## [constant BACKUP_ESCALATION_THRESHOLD].
+##
+## [param event_count]: Number of backup-restore events recorded within the
+##   rolling [constant BACKUP_ESCALATION_WINDOW_SECONDS] window (including
+##   this event).
+##
+## Example:
+##   SaveLoadSystem.bak_recovered_toast.connect(func(n): _show_backup_toast(n))
+##
+## ADR-0004 §`.bak` fallback escalation, TR-save-load-017, Story 013 Phase 2.
+signal bak_recovered_toast(event_count: int)
+
+## Story 013 Phase 2B — emitted when the `.bak` fallback fires AND the within-
+## window event count reaches [constant BACKUP_ESCALATION_THRESHOLD] (3) within
+## [constant BACKUP_ESCALATION_WINDOW_SECONDS] (7 days). The UI should show a
+## storage-advisory modal with a [Check Storage] button INSTEAD of the cozy
+## [signal bak_recovered_toast]. Mutually exclusive with [signal bak_recovered_toast].
+##
+## [param event_count]: Number of backup-restore events recorded within the
+##   rolling window (including this event). Always >= [constant BACKUP_ESCALATION_THRESHOLD]
+##   when this signal fires.
+##
+## TR-save-load-017, ADR-0004 §`.bak` fallback escalation, Story 013 Phase 2B.
+signal storage_advisory_modal_required(event_count: int)
+
+## Story 013 Phase 2B — emitted when both `.dat` and `.bak` fail HMAC
+## verification on the same load (AC-SL-07 Both-Corrupt path).
+##
+## The UI shows a single-button modal with the writer-signed-off Pass-5E copy:
+## "Your save couldn't be recovered. A new adventure begins — your guild will
+## grow again. [Begin]". On [Begin] tap, the UI calls
+## [method acknowledge_corrupt_both_begin] which transitions the system back
+## to UNLOADED, runs the first-launch bootstrap path, and emits
+## [signal corrupt_both_acknowledged] so consumers know to reset to factory
+## defaults.
+##
+## This signal is distinct from [signal load_failed] (which fires on any
+## CORRUPT transition) and from [signal tamper_detected_on_load] (which fires
+## on the `.dat` HMAC fail BEFORE the `.bak` attempt). Both also fire on the
+## both-corrupt path, but a UI listener should subscribe specifically to this
+## signal to gate the modal display.
+##
+## TR-save-load-017, AC-SL-07, ADR-0004 §Both-Corrupt response, Story 013 Phase 2B.
+signal corrupt_both_modal_required()
+
+## Story 013 Phase 2B — emitted at first [method request_full_load] when
+## [member DataRegistry.state] is [code]ERROR[/code] (AC-SL-08).
+##
+## The UI shows the writer-signed-off "Something went wrong loading Lantern
+## Guild's world. Please reinstall the app — your save is safe and untouched.
+## [OK]" modal. NO filesystem writes occur on this path (the save file is
+## preserved bit-identical), and [signal tamper_detected_on_load] is NOT
+## emitted (the failure is content-load, not envelope-tamper).
+##
+## TR-save-load-032, AC-SL-08, ADR-0004 §DataRegistry ERROR coexistence,
+## Story 013 Phase 2B.
+signal data_registry_error_modal_required()
+
 # ---------------------------------------------------------------------------
 # Private state
 # ---------------------------------------------------------------------------
@@ -324,6 +389,48 @@ var _tamper_suspicious_count: int = 0
 ##
 ## TR-save-load-026, ADR-0004 §Tamper Response, Story 013 Phase 1.
 var _pending_flags_bit0_tamper: bool = false
+
+## Story 013 Phase 2 — save-slot index persisted in `_meta` (TR-save-load-018).
+##
+## Tracks which logical slot this save envelope belongs to. V1.0 ships with a
+## single slot (index = 0). The field is persisted so slot-aware UI (future
+## multi-slot scope) can verify the loaded file belongs to the expected slot.
+##
+## Set at persist time via [method _compose_meta_dict] and restored at load
+## time via [method _hydrate_meta_dict]. Defaults to 0 (single-slot MVP).
+##
+## ADR-0004 §`_meta` field schema, TR-save-load-018, Story 013 Phase 2.
+var _meta_slot_index: int = 0
+
+## Story 013 Phase 2 — monotonic save-sequence counter persisted in `_meta`
+## (TR-save-load-019).
+##
+## Incremented on every successful [method request_full_persist] call so
+## the offline-progression math can detect out-of-order replay attacks
+## (a replayed older save would have a lower sequence number than the
+## in-memory value at load time). The counter starts at 0, is incremented
+## BEFORE the compose step, and is persisted in `_meta.save_sequence_number`.
+##
+## Set at persist time via [method _compose_meta_dict] and restored at load
+## time via [method _hydrate_meta_dict].
+##
+## ADR-0004 §`_meta` field schema, TR-save-load-019, Story 013 Phase 2.
+var _meta_save_sequence_number: int = 0
+
+## Story 013 Phase 2 — rolling log of backup-restore events (TR-save-load-017).
+##
+## Each entry is a Unix-second timestamp of a `.bak`-fallback recovery event.
+## At every persist, entries older than
+## ([code]now_unix - BACKUP_ESCALATION_WINDOW_SECONDS[/code]) are pruned so
+## the array never grows unboundedly. The within-window count is compared to
+## [constant BACKUP_ESCALATION_THRESHOLD] to decide toast vs. storage-advisory
+## escalation on the next `.bak` recovery.
+##
+## Set at persist time via [method _compose_meta_dict] and restored at load
+## time via [method _hydrate_meta_dict]. Starts empty (no prior events).
+##
+## ADR-0004 §`.bak` fallback escalation, TR-save-load-017, Story 013 Phase 2.
+var _meta_backup_restore_events: Array[int] = []
 
 
 # ---------------------------------------------------------------------------
@@ -465,12 +572,18 @@ func request_full_persist(reason: String) -> void:
 		save_failed.emit(reason, ERR_UNAVAILABLE)
 		return
 
-	# Sprint 11 Story 007a — happy-path implementation. Defers .bak rotation,
-	# _meta sub-schema (slot_index / save_sequence_number), FLAGS bit, and
-	# cross-tag rekey persistence to Story 007b. Existing primitives provide
-	# all the cryptographic + envelope plumbing — this method orchestrates.
+	# Story 013 Phase 2 — full persist body. Wires _meta namespace persistence
+	# (slot_index, save_sequence_number, backup_restore_events), FLAGS.bit0
+	# tamper flag, and .bak rotation (pre-copy .dat → .bak before rename).
 
 	_transition_to(State.PERSISTING)
+
+	# 0. Advance the monotonic save-sequence counter BEFORE composing the
+	#    envelope. This ensures the on-disk value is always > the prior one
+	#    (TR-save-load-019 replay-detection). Saturates at int max (unlikely
+	#    in practice; a typical player persists ~4 times/hour × ~1000 hours
+	#    = ~4 000 000 saves, well below GDScript's 2^63 − 1).
+	_meta_save_sequence_number += 1
 
 	# 1. Iterate CONSUMER_PATHS, namespace each consumer's payload under the
 	#    node's name. Per Save/Load GDD: consumer-discovery is hardcoded
@@ -509,6 +622,19 @@ func request_full_persist(reason: String) -> void:
 		# get_save_data() return.
 		root_dict[node.name] = consumer_dict
 
+	# 1b. Story 013 Phase 2 — compose `_meta` sub-dict into root_dict.
+	#     The unix timestamp is sourced from TickSystem's cache (same single-call-site
+	#     invariant as the last_persist_ts path below). Falls back to 0 if TickSystem
+	#     is absent (test environments that boot SaveLoadSystem alone).
+	var now_unix: int = 0
+	var tick_sys_early: Node = get_node_or_null("/root/TickSystem")
+	if tick_sys_early != null and tick_sys_early.has_method("now_ms"):
+		var now_ms_val: int = int(tick_sys_early.now_ms())
+		if now_ms_val > 0:
+			@warning_ignore("integer_division")
+			now_unix = now_ms_val / 1000
+	root_dict["_meta"] = _compose_meta_dict(now_unix)
+
 	# 2. Encode the assembled dict to UTF-8 JSON bytes.
 	var json_string: String = JSON.stringify(root_dict)
 	var plaintext: PackedByteArray = json_string.to_utf8_buffer()
@@ -519,8 +645,11 @@ func request_full_persist(reason: String) -> void:
 	var masked_payload: PackedByteArray = _apply_xor_mask(plaintext, mask)
 
 	# 4. Compose envelope (header + masked_payload + zero-padded HMAC placeholder).
-	#    FLAGS = 0 in Story 007a (Story 007b adds FLAGS.bit0 tamper flag handling).
-	var envelope: PackedByteArray = _compose_envelope(masked_payload, 0)
+	#    Story 013 Phase 2: FLAGS.bit0 is now written from _compute_persist_flags()
+	#    so the tamper-pending intent is baked into the on-disk envelope.
+	#    ADR-0004 §Tamper Response, TR-save-load-026.
+	var persist_flags: int = _compute_persist_flags()
+	var envelope: PackedByteArray = _compose_envelope(masked_payload, persist_flags)
 
 	# 5. Compute HMAC over (header + masked_payload) using current-build tag,
 	#    then overwrite the zero-padded placeholder in the envelope footer.
@@ -558,6 +687,23 @@ func request_full_persist(reason: String) -> void:
 		save_failed.emit(reason, ERR_FILE_CANT_WRITE)
 		return
 
+	# 6.5. Story 013 Phase 2 — pre-copy existing .dat → .bak before rename.
+	#      If the .dat already exists, copy it to the .bak path so that if the
+	#      next launch's .dat fails HMAC, the load pipeline can fall back to
+	#      the prior known-good save. This matches Save/Load GDD Rule 6:
+	#      "rotate .dat → .bak before overwriting". Failure to copy is
+	#      non-fatal (the prior .bak, if any, remains; log with push_warning).
+	#      ADR-0004 §`.bak` fallback, TR-save-load-017.
+	var bak_path: String = save_file_path + ".bak"
+	if FileAccess.file_exists(save_file_path):
+		var copy_err: int = DirAccess.copy_absolute(save_file_path, bak_path)
+		if copy_err != OK:
+			push_warning(
+				"SaveLoadSystem.request_full_persist: .dat → .bak copy failed " +
+				"(Error=%d); prior .bak preserved if it existed. " % copy_err +
+				"Continuing persist (reason='%s')" % reason
+			)
+
 	# 7. Atomic rename .tmp → final. DirAccess.rename returns Error (not bool;
 	#    Save/Load GDD Rule 7 emphasis on Godot 4.x return type).
 	var rename_err: int = DirAccess.rename_absolute(tmp_path, save_file_path)
@@ -593,8 +739,13 @@ func request_full_persist(reason: String) -> void:
 			tick_system.set_last_persist_ts(now_ms_int / 1000)
 
 	# 9. Success: transition back to READY + emit save_completed.
+	#    Clear the pending FLAGS.bit0 tamper intent AFTER the emit so any
+	#    subscriber that calls get_pending_flags_bit0_tamper() from within the
+	#    save_completed handler sees the still-set flag (predictable ordering).
+	#    Story 013 Phase 2 — TR-save-load-026, ADR-0004 §Tamper Response.
 	_transition_to(State.READY)
 	save_completed.emit(reason)
+	_pending_flags_bit0_tamper = false
 
 
 ## Requests a heartbeat persist via the canonical full-persist path.
@@ -661,6 +812,25 @@ func request_full_load(reason: String) -> void:
 			"load trigger ignored (reason='%s'). Only the initial cold-boot " % reason +
 			"load is supported in MVP."
 		)
+		load_failed.emit(reason, ERR_UNAVAILABLE)
+		return
+
+	# Story 013 Phase 2B — AC-SL-08 distinct path: DataRegistry ERROR coexistence.
+	# When DataRegistry's content load failed (state=ERROR), the on-disk save is
+	# fine but the build can't render content. Surface a dedicated "reinstall"
+	# modal and DO NOT touch the save file (no .bak attempt, no FS writes, no
+	# tamper signal). The CORRUPT transition is appropriate (terminal load
+	# failure) but the failure mode is fundamentally different from tamper.
+	# ADR-0004 §DataRegistry ERROR coexistence, AC-SL-08.
+	if DataRegistry.state == DataRegistry.State.ERROR:
+		push_error(
+			"SaveLoadSystem.request_full_load: DataRegistry.state == ERROR — " +
+			"content load failed; surfacing AC-SL-08 reinstall modal and " +
+			"aborting load (reason='%s'). Save file untouched." % reason
+		)
+		_transition_to(State.LOADING)
+		_transition_to(State.CORRUPT)
+		data_registry_error_modal_required.emit()
 		load_failed.emit(reason, ERR_UNAVAILABLE)
 		return
 
@@ -743,19 +913,60 @@ func request_full_load(reason: String) -> void:
 	if not matches_current and tags.size() >= 2:
 		var expected_prior: PackedByteArray = _integrity_wrap(tags[1], hmac_input)
 		matches_prior = (parts.footer_tag == expected_prior)
+	# Story 013 Phase 2 — set when a `.bak` fallback succeeds. The append +
+	# toast emit is deferred to a post-hydration block below so the just-
+	# occurred recovery event isn't clobbered by `_hydrate_meta_dict`
+	# (which overwrites in-memory `_meta_backup_restore_events` from the
+	# `.bak`-payload's persisted `_meta`).
+	var bak_recovery_now_unix: int = 0
 	if not (matches_current or matches_prior):
 		push_error(
 			"SaveLoadSystem.request_full_load: HMAC verification failed against " +
-			"both current + prior tags — envelope tampered or key rotation breach " +
+			"both current + prior tags on .dat — attempting .bak fallback " +
 			"(reason='%s')" % reason
 		)
-		_transition_to(State.CORRUPT)
-		# Tamper signal per ADR-0004 + Save/Load GDD AC-SL-03 (declared
-		# signal already exists). Story 013 wires the modal UX; here we
-		# emit the signal so listeners can react.
+		# Story 013 Phase 2 — .bak fallback path (TR-save-load-017).
+		# Emit tamper_detected_on_load immediately (the .dat is confirmed tampered).
+		# Then try loading from .bak before giving up with CORRUPT terminal state.
 		tamper_detected_on_load.emit()
-		load_failed.emit(reason, ERR_FILE_CORRUPT)
-		return
+		var bak_load_path: String = save_file_path + ".bak"
+		var bak_result: Dictionary = _load_envelope_from_path(bak_load_path)
+		if bak_result.get("ok", false):
+			# .bak loaded + HMAC-verified. Capture the recovery timestamp via
+			# TickSystem's cached wall clock — ADR-0005 single-call-site
+			# invariant FORBIDS direct Time.get_unix_time_from_system() here.
+			# If TickSystem's cache is cold (now_ms returns 0), the recovery
+			# event simply isn't recorded this load — acceptable degradation
+			# vs. violating the invariant. The actual prune+append+toast emit
+			# is deferred to a post-hydration block below.
+			var tick_for_bak: Node = get_node_or_null("/root/TickSystem")
+			if tick_for_bak != null and tick_for_bak.has_method("now_ms"):
+				var ms_val: int = int(tick_for_bak.now_ms())
+				if ms_val > 0:
+					@warning_ignore("integer_division")
+					bak_recovery_now_unix = ms_val / 1000
+			# Continue the load from the verified .bak envelope bytes.
+			# Re-assign 'envelope' to the bak bytes and re-split for the JSON parse below.
+			envelope = bak_result.get("envelope_bytes", PackedByteArray())
+			parts = _split_envelope(envelope)
+			# Queue a deferred re-persist so the recovered .bak data is promoted
+			# to .dat (with a fresh HMAC) on the next frame after load completes.
+			call_deferred("request_full_persist", "bak_recovery_repersist")
+			# Fall through to JSON parse below (envelope is now the .bak bytes).
+		else:
+			# Both .dat and .bak failed — genuine CORRUPT terminal state.
+			# Story 013 Phase 2B — emit corrupt_both_modal_required so the UI
+			# can show the AC-SL-07 single-button "[Begin]" modal. The signal
+			# fires BEFORE _transition_to so subscribers can read state
+			# transitions in their handlers if needed.
+			push_error(
+				"SaveLoadSystem.request_full_load: .bak fallback also failed — " +
+				"both slots unrecoverable; entering CORRUPT (reason='%s')" % reason
+			)
+			corrupt_both_modal_required.emit()
+			_transition_to(State.CORRUPT)
+			load_failed.emit(reason, ERR_FILE_CORRUPT)
+			return
 	if matches_prior and not matches_current:
 		# N=2 rotation — re-persist under current-build tag on next persist.
 		_needs_rekey_persist = true
@@ -853,6 +1064,43 @@ func request_full_load(reason: String) -> void:
 			)
 			consumer_data = {}
 		node.call("load_save_data", consumer_data)
+
+	# 7.5. Story 013 Phase 2 — hydrate `_meta` fields from root_dict.
+	#      This is intentionally done AFTER consumer hydration so a buggy
+	#      _meta value cannot influence consumer load_save_data calls.
+	#      Missing or malformed _meta is silently tolerated (first-launch
+	#      or old-version saves without _meta are valid; defaults apply).
+	#      ADR-0004 §`_meta` field schema, TR-save-load-017/018/019.
+	var meta_raw: Variant = root_dict.get("_meta", {})
+	if meta_raw is Dictionary:
+		_hydrate_meta_dict(meta_raw as Dictionary)
+
+	# 7.6. Story 013 Phase 2 — append the .bak recovery event AFTER hydration.
+	#      Order matters: hydration above sets _meta_backup_restore_events to
+	#      the .bak payload's persisted events; THEN we prune stale entries
+	#      and append this load's recovery timestamp. Doing it the other way
+	#      would let hydration clobber the just-appended event.
+	#      The toast signal also emits here so subscribers see the post-
+	#      hydration in-window count, which is what the UI escalation logic
+	#      (TR-save-load-017 BACKUP_ESCALATION_THRESHOLD) needs.
+	#      ADR-0004 §`.bak` fallback escalation, TR-save-load-017.
+	if bak_recovery_now_unix > 0:
+		var window_start: int = bak_recovery_now_unix - BACKUP_ESCALATION_WINDOW_SECONDS
+		var pruned: Array[int] = []
+		for ts: int in _meta_backup_restore_events:
+			if ts >= window_start:
+				pruned.append(ts)
+		pruned.append(bak_recovery_now_unix)
+		_meta_backup_restore_events = pruned
+		var in_window_count: int = _meta_backup_restore_events.size()
+		# Story 013 Phase 2B — escalation switch (TR-save-load-017): emit ONE
+		# OR THE OTHER signal based on within-window event count. Mutually
+		# exclusive — UI subscribers should only handle one; subscribing to
+		# both is harmless (only one fires per recovery).
+		if in_window_count >= BACKUP_ESCALATION_THRESHOLD:
+			storage_advisory_modal_required.emit(in_window_count)
+		else:
+			bak_recovered_toast.emit(in_window_count)
 
 	# 8. Success: transition READY + emit load_completed.
 	#    For migration path (Story 010), this also implicitly satisfies the
@@ -1533,6 +1781,57 @@ func _on_flag_suspicious_timestamp_emitted(_previous_ts: int, _current_ts: int) 
 	_increment_tamper_count()
 
 
+## Story 013 Phase 2B — UI-layer entry point for the Both-Corrupt modal
+## [Begin] tap (AC-SL-07).
+##
+## Called by the UI layer when the player taps [Begin] on the
+## [signal corrupt_both_modal_required] modal. Synchronously:
+##   1. Resets `_meta` private fields to first-launch defaults so the seeded
+##      bootstrap state isn't polluted by remembered tamper counters / events.
+##   2. Transitions CORRUPT → UNLOADED via direct field write (the state
+##      machine's [method _transition_to] table normally rejects CORRUPT as
+##      terminal; this player-acknowledged path is the documented exception).
+##   3. Emits [signal corrupt_both_acknowledged] so consumers can reset to
+##      factory defaults BEFORE the bootstrap load runs.
+##   4. Emits [signal first_launch] + [signal load_completed] mirroring the
+##      cold-start path in [method request_full_load], advancing state to
+##      READY so consumers can apply tutorial defaults.
+##
+## After this method returns, the system is in READY state with empty in-
+## memory state; callers should trigger a [method request_full_persist] on
+## the next save-trigger to write the fresh save to disk.
+##
+## TR-save-load-017, AC-SL-07, ADR-0004 §Both-Corrupt response, Story 013 Phase 2B.
+func acknowledge_corrupt_both_begin() -> void:
+	if _state != State.CORRUPT:
+		push_warning(
+			"SaveLoadSystem.acknowledge_corrupt_both_begin: state=%d not CORRUPT — " % _state +
+			"call ignored. This API is only legal after corrupt_both_modal_required."
+		)
+		return
+	# Reset _meta to first-launch defaults — the corrupted save's counters
+	# and events are not trustworthy, and the player has explicitly opted into
+	# starting over.
+	_tamper_suspicious_count = 0
+	_pending_flags_bit0_tamper = false
+	_meta_slot_index = 0
+	_meta_save_sequence_number = 0
+	var empty_events: Array[int] = []
+	_meta_backup_restore_events = empty_events
+	# Direct field write to bypass _transition_to's CORRUPT-terminal guard.
+	# This is the documented exception per AC-SL-07: player-acknowledged
+	# recovery from a state otherwise considered terminal.
+	_state = State.UNLOADED
+	corrupt_both_acknowledged.emit()
+	# Run the cold-start bootstrap path (mirrors request_full_load's
+	# first-launch branch). Transitions UNLOADED → LOADING → READY and emits
+	# first_launch + load_completed.
+	_transition_to(State.LOADING)
+	_transition_to(State.READY)
+	first_launch.emit()
+	load_completed.emit("corrupt_both_begin_bootstrap")
+
+
 ## Story 013 — UI-layer entry point for the HMAC tamper modal "Yes" tap.
 ##
 ## Called by the UI layer (PresentationRoot or the modal owner) when the
@@ -1601,6 +1900,154 @@ func get_pending_flags_bit0_tamper() -> bool:
 func _increment_tamper_count() -> void:
 	if _tamper_suspicious_count < MAX_TAMPER_SUSPICIOUS_COUNT:
 		_tamper_suspicious_count += 1
+
+
+## Story 013 Phase 2 — composes the `_meta` sub-dictionary for persist.
+##
+## Called by [method request_full_persist] right before JSON-stringification.
+## Prunes [member _meta_backup_restore_events] of entries older than the
+## escalation window (TR-save-load-017), then snapshots the four `_meta`
+## fields into a Dictionary suitable for JSON serialization.
+##
+## [param now_unix]: Current Unix-second timestamp from TickSystem's cache,
+##   used as the prune anchor. May be 0 in test envs without TickSystem; in
+##   that case no pruning occurs (window_start becomes negative; all entries
+##   are >= it).
+##
+## ADR-0004 §`_meta` field schema, TR-save-load-017/018/019/025.
+func _compose_meta_dict(now_unix: int) -> Dictionary:
+	var window_start: int = now_unix - BACKUP_ESCALATION_WINDOW_SECONDS
+	var pruned: Array[int] = []
+	for ts: int in _meta_backup_restore_events:
+		if ts >= window_start:
+			pruned.append(ts)
+	_meta_backup_restore_events = pruned
+	return {
+		"slot_index": _meta_slot_index,
+		"save_sequence_number": _meta_save_sequence_number,
+		"tamper_suspicious_count": _tamper_suspicious_count,
+		"backup_restore_events": _meta_backup_restore_events.duplicate(),
+	}
+
+
+## Story 013 Phase 2 — restores `_meta` private fields from a loaded payload.
+##
+## Called by [method request_full_load] after consumer hydration. Each field
+## is restored only if present in [param meta]; missing fields preserve their
+## current default (handles old-version saves without `_meta` and forward-
+## compatibility with later schema additions). Numeric values flow through
+## [code]int()[/code] coercion to handle JSON's TYPE_FLOAT round-trip
+## (project memory: `JSON.parse_string` returns floats for whole numbers).
+## [code]tamper_suspicious_count[/code] is clamped at load to defend against
+## a tampered `_meta` that exceeds [constant MAX_TAMPER_SUSPICIOUS_COUNT].
+##
+## ADR-0004 §`_meta` field schema, TR-save-load-018/019/025.
+func _hydrate_meta_dict(meta: Dictionary) -> void:
+	if meta.has("slot_index"):
+		_meta_slot_index = int(meta["slot_index"])
+	if meta.has("save_sequence_number"):
+		_meta_save_sequence_number = int(meta["save_sequence_number"])
+	if meta.has("tamper_suspicious_count"):
+		var raw_count: int = int(meta["tamper_suspicious_count"])
+		_tamper_suspicious_count = clampi(raw_count, 0, MAX_TAMPER_SUSPICIOUS_COUNT)
+	if meta.has("backup_restore_events"):
+		var raw_events: Variant = meta["backup_restore_events"]
+		if raw_events is Array:
+			var loaded: Array[int] = []
+			for v: Variant in (raw_events as Array):
+				loaded.append(int(v))
+			_meta_backup_restore_events = loaded
+
+
+## Story 013 Phase 2 — computes the FLAGS field for the next envelope header.
+##
+## Returns 1 when [member _pending_flags_bit0_tamper] is true (player
+## acknowledged the HMAC tamper modal since last persist), else 0. The
+## flag is cleared at the end of [method request_full_persist] after
+## [signal save_completed] emits.
+##
+## ADR-0004 §Tamper Response §Header FLAGS, TR-save-load-026.
+func _compute_persist_flags() -> int:
+	return 1 if _pending_flags_bit0_tamper else 0
+
+
+## Story 013 Phase 2 — reads + validates an envelope from disk.
+##
+## Replicates the MAGIC → VERSION → split → HMAC validation pipeline of
+## [method request_full_load] but as a side-effect-free helper. Used by
+## the `.bak`-fallback branch in [method request_full_load] to attempt
+## recovery from `save_file_path + ".bak"` after the primary `.dat` fails
+## HMAC verification. The validation order MUST match ADR-0004 §Validation
+## order on load — do not reorder.
+##
+## [param path]: Absolute or [code]user://[/code]-prefixed path to a save
+##   envelope file. Missing files return [code]ok = false[/code] with
+##   [code]failure = "missing"[/code].
+##
+## Returns a Dictionary with keys:
+##   [code]ok[/code]              - bool, true when the envelope passed all checks
+##   [code]envelope_bytes[/code]  - PackedByteArray, the raw envelope bytes (when ok)
+##   [code]error_code[/code]      - int, an Error enum value (OK on success)
+##   [code]failure[/code]         - String, one of: "", "missing", "open",
+##                                  "magic", "version_future", "payload_length",
+##                                  "hmac"
+##
+## On HMAC pass under prior key (N=2 rotation), this helper does NOT set
+## [member _needs_rekey_persist] — that side effect lives on the primary
+## load path. The helper is intentionally pure modulo the file read.
+##
+## ADR-0004 §Validation order on load, §`.bak` fallback, TR-save-load-016/023.
+func _load_envelope_from_path(path: String) -> Dictionary:
+	var failed_result: Dictionary = {
+		"ok": false,
+		"envelope_bytes": PackedByteArray(),
+		"error_code": ERR_FILE_CORRUPT,
+		"failure": "",
+	}
+	if not FileAccess.file_exists(path):
+		failed_result["error_code"] = ERR_FILE_NOT_FOUND
+		failed_result["failure"] = "missing"
+		return failed_result
+	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		failed_result["error_code"] = FileAccess.get_open_error()
+		failed_result["failure"] = "open"
+		return failed_result
+	var envelope_bytes: PackedByteArray = file.get_buffer(file.get_length())
+	file.close()
+	# 1. MAGIC check
+	var parsed: Dictionary = _parse_header(envelope_bytes)
+	if not parsed.magic_ok:
+		failed_result["failure"] = "magic"
+		return failed_result
+	# 2. VERSION check (forward-version save not migratable here)
+	var version: int = int(parsed.version)
+	if version > CURRENT_SAVE_VERSION:
+		failed_result["failure"] = "version_future"
+		return failed_result
+	# 3. Split + payload-length cross-check
+	var parts: Dictionary = _split_envelope(envelope_bytes)
+	if not _validate_payload_length_match(parts):
+		failed_result["failure"] = "payload_length"
+		return failed_result
+	# 4. HMAC against keys[0] then keys[1] (N=2 rotation)
+	var tags: Array[PackedByteArray] = _derive_integrity_tags()
+	var hmac_input: PackedByteArray = envelope_bytes.slice(0, envelope_bytes.size() - _HMAC_SIZE)
+	var expected_current: PackedByteArray = _integrity_wrap(tags[0], hmac_input)
+	var matches_current: bool = (parts.footer_tag == expected_current)
+	var matches_prior: bool = false
+	if not matches_current and tags.size() >= 2:
+		var expected_prior: PackedByteArray = _integrity_wrap(tags[1], hmac_input)
+		matches_prior = (parts.footer_tag == expected_prior)
+	if not (matches_current or matches_prior):
+		failed_result["failure"] = "hmac"
+		return failed_result
+	return {
+		"ok": true,
+		"envelope_bytes": envelope_bytes,
+		"error_code": OK,
+		"failure": "",
+	}
 
 
 ## Handles [signal SceneManager.scene_boundary_persist].
