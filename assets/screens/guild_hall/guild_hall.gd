@@ -13,6 +13,12 @@ extends Screen
 
 @onready var _dispatch_nav_button: Button = $DispatchNavButton
 @onready var _hall_nav_button: Button = $HallOfRetiredHeroesNavButton
+@onready var _toast_label: Label = $ToastLabel
+
+# Prestige completion toast — fades over 4.0s matching the
+# formation_assignment + Recruitment toast pattern (GDD #21 §G).
+const TOAST_FADE_DURATION_SEC: float = 4.0
+var _toast_tween: Tween = null
 
 
 func on_enter() -> void:
@@ -41,6 +47,11 @@ func on_exit() -> void:
 		_hall_nav_button.pressed.disconnect(_on_hall_nav_pressed)
 	if HeroRoster.prestige_completed_signal.is_connected(_on_prestige_completed):
 		HeroRoster.prestige_completed_signal.disconnect(_on_prestige_completed)
+	# Kill any in-flight toast tween so its bound `_dismiss_toast`
+	# callback can't fire on a being-freed node.
+	if _toast_tween != null and _toast_tween.is_valid():
+		_toast_tween.kill()
+	_toast_tween = null
 
 
 func on_pause() -> void:
@@ -66,8 +77,48 @@ func _refresh_hall_button_visibility() -> void:
 	_hall_nav_button.visible = HeroRoster.get_prestige_count() > 0
 
 
-func _on_prestige_completed(_record: Dictionary, _new_count: int) -> void:
+func _on_prestige_completed(record: Dictionary, _new_count: int) -> void:
 	_refresh_hall_button_visibility()
+	# Cozy completion toast: "[hero name] joined the Hall of Retired
+	# Heroes." Tween freezes if Guild Hall is paused under a modal at
+	# emit time (Hero Detail Modal flow), then resumes on modal close —
+	# the toast remains at modulate.a=1.0 during the modal cover and
+	# starts fading out the moment the modal dismisses. Net effect:
+	# player sees the toast appear as the modal closes. Acceptable
+	# per the existing screen pause/tween contract.
+	var display_name: String = String(record.get("display_name", ""))
+	if display_name == "":
+		return
+	# Single %s, no literal %, so the % operator is safe here.
+	var text: String = tr("prestige_complete_toast") % display_name
+	_show_prestige_toast(text)
+
+
+## Renders [param text] on the bottom-center toast label and fades it
+## over [code]TOAST_FADE_DURATION_SEC[/code]. Mirrors the formation_assignment
+## + Recruitment toast pattern (GDD #21 §G precedent). Kills any in-flight
+## prior toast before starting the new one.
+func _show_prestige_toast(text: String) -> void:
+	if _toast_label == null:
+		return
+	if _toast_tween != null and _toast_tween.is_valid():
+		_toast_tween.kill()
+	_toast_tween = null
+	_toast_label.text = text
+	_toast_label.modulate.a = 1.0
+	_toast_label.visible = true
+	_toast_tween = create_tween()
+	_toast_tween.tween_property(_toast_label, "modulate:a", 0.0, TOAST_FADE_DURATION_SEC)
+	_toast_tween.finished.connect(_dismiss_toast, CONNECT_ONE_SHOT)
+
+
+func _dismiss_toast() -> void:
+	if _toast_label != null:
+		_toast_label.visible = false
+		_toast_label.modulate.a = 1.0
+	if _toast_tween != null and _toast_tween.is_valid():
+		_toast_tween.kill()
+	_toast_tween = null
 
 
 func _on_hall_nav_pressed() -> void:

@@ -63,3 +63,21 @@ custom_minimum_size = Vector2(320, 52)
 focus_mode = 0
 mouse_filter = 0
 text = "Hall of Retired Heroes"
+
+[node name="ToastLabel" type="Label" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -240.0
+offset_top = -96.0
+offset_right = 240.0
+offset_bottom = -48.0
+grow_horizontal = 2
+grow_vertical = 0
+text = ""
+horizontal_alignment = 1
+autowrap_mode = 3
