@@ -593,6 +593,16 @@ func prestige_hero(instance_id: int) -> bool:
 	# Step 6: emit completion signal.
 	if not _suppress_signals:
 		prestige_completed_signal.emit(record, _prestige_count)
+	# Step 7: synchronous persist trigger per AC-PR-10. The save state must
+	# survive a crash immediately after prestige — the player's retirement
+	# action is a major irreversible decision; losing it to a crash would
+	# violate the cozy register's "your guild is safe" contract. Defensive:
+	# null-guard for test envs without SaveLoadSystem registered.
+	#
+	# Per `prestige-system.md` §C.2 step 6.
+	var save_load: Node = get_node_or_null("/root/SaveLoadSystem")
+	if save_load != null and save_load.has_method("request_full_persist"):
+		save_load.call("request_full_persist", "prestige_completed")
 	return true
 
 
@@ -1103,10 +1113,17 @@ func get_save_data() -> Dictionary:
 	for id: int in _heroes:
 		var instance: RefCounted = _heroes[id]
 		heroes_arr.append(instance.to_dict())
+	# Prestige V1.0 (Story 2 / Sprint 21+) — V2 schema additions per
+	# `prestige-system.md` §C.5. Three new fields persist alongside the
+	# existing 3-key V1 schema. V1 saves load via _migrate_v1_to_v2 which
+	# defaults these to 0 / 1.0 / [].
 	return {
 		"heroes": heroes_arr,
 		"formation_slots": _formation_slots.duplicate(),
 		"next_instance_id": _next_instance_id,
+		"prestige_count": _prestige_count,
+		"prestige_multiplier": _prestige_multiplier,
+		"retired_hero_records": _retired_hero_records.duplicate(true),
 	}
 
 
@@ -1175,6 +1192,24 @@ func load_save_data(d: Dictionary) -> void:
 
 	# Restore the monotonic id counter — TR-011: removed ids never reused.
 	_next_instance_id = int(d.get("next_instance_id", 1))
+
+	# Prestige V1.0 (Story 2) — hydrate V2 schema additions. Defaults
+	# match the V1→V2 migration body in SaveLoadSystem so legacy V1 saves
+	# (no prestige fields) hydrate as "no prestige yet". Per
+	# `prestige-system.md` §C.5 + AC-PR-12 + AC-PR-14.
+	#
+	# Defensive int() coercion on the count (JSON returns floats for whole
+	# numbers per project memory). Multiplier is float-native. Records is
+	# duplicated to defeat external mutation of the source dict.
+	_prestige_count = int(d.get("prestige_count", 0))
+	_prestige_multiplier = float(d.get("prestige_multiplier", 1.0))
+	var records_in: Variant = d.get("retired_hero_records", [])
+	var records_typed: Array[Dictionary] = []
+	if records_in is Array:
+		for r: Variant in (records_in as Array):
+			if r is Dictionary:
+				records_typed.append((r as Dictionary).duplicate(true))
+	_retired_hero_records = records_typed
 
 	# Sprint 8 S8-S4 (Story 007): boot validation — runs while signals still
 	# suppressed so any drops/clears don't leak hero_removed emissions.

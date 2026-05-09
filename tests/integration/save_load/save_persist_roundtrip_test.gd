@@ -258,8 +258,9 @@ func test_envelope_starts_with_lgld_magic_bytes() -> void:
 	assert_int(bytes.decode_u8(2)).is_equal(0x4C)
 	assert_int(bytes.decode_u8(3)).is_equal(0x44)
 
-	# VERSION (u16 LE at offset 4) = CURRENT_SAVE_VERSION = 1.
-	assert_int(bytes.decode_u16(4)).is_equal(1)
+	# VERSION (u16 LE at offset 4) = CURRENT_SAVE_VERSION.
+	# Sprint 21+ Prestige V1.0 Story 2 (2026-05-09) bumped 1 → 2.
+	assert_int(bytes.decode_u16(4)).is_equal(SaveLoadScript.CURRENT_SAVE_VERSION)
 
 	_disconnect_spies(sl)
 

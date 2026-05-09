@@ -201,18 +201,23 @@ func test_forged_v0_envelope_triggers_migration_then_corrupt_on_null_chain() -> 
 	_disconnect_spies(sl)
 
 
-# Sanity: forged V2 (future-version) envelope rejects EARLY at the version
+# Sanity: forged V99 (future-version) envelope rejects EARLY at the version
 # check, before HMAC/JSON parse even runs. The version > CURRENT path
 # emits load_failed with detail='version_future' and does NOT enter MIGRATION.
-func test_forged_v2_envelope_rejects_early_with_version_future() -> void:
+#
+# Test renamed from `_v2_` → `_v99_future_` after Sprint 21+ Prestige V1.0
+# Story 2 bumped CURRENT_SAVE_VERSION 1→2: V2 is no longer "future". Use
+# V99 as a clearly-future value that no foreseeable migration will ever
+# reach.
+func test_forged_v99_envelope_rejects_early_with_version_future() -> void:
 	var sl: Node = get_tree().root.get_node_or_null("SaveLoadSystem")
 	_connect_spies(sl)
 
-	# Forge a V2 envelope (any value > CURRENT_SAVE_VERSION).
-	var envelope: PackedByteArray = _forge_envelope_with_version(sl, 2)
+	# Forge a V99 envelope (any value > CURRENT_SAVE_VERSION = 2).
+	var envelope: PackedByteArray = _forge_envelope_with_version(sl, 99)
 	_write_envelope_to_fixture(envelope)
 
-	sl.request_full_load("forged_v2_future_test")
+	sl.request_full_load("forged_v99_future_test")
 
 	# Terminal state: CORRUPT (early reject at the version check).
 	assert_int(sl.get_state()).is_equal(SaveLoadScript.State.CORRUPT)
@@ -224,26 +229,26 @@ func test_forged_v2_envelope_rejects_early_with_version_future() -> void:
 	_disconnect_spies(sl)
 
 
-# Regression sanity: V1 envelope (same as CURRENT_SAVE_VERSION) skips the
-# migration block entirely and proceeds to consumer hydration on the
-# normal LOADING → READY path. This is the existing-behavior smoke check
-# that the new step 6.5 block does not accidentally route same-version
-# loads through migration.
-func test_forged_v1_envelope_skips_migration_proceeds_to_ready() -> void:
+# Sprint 21+ Prestige V1.0 Story 2 (2026-05-09): CURRENT_SAVE_VERSION
+# bumped 1→2. A forged V1 envelope is now PRIOR-version; loading it
+# triggers the V1→V2 migration chain via _migrate_v1_to_v2 (default
+# prestige fields). The post-migration payload hydrates consumers
+# successfully; LOADING → MIGRATION → READY.
+func test_forged_v1_envelope_runs_v1_to_v2_migration_proceeds_to_ready() -> void:
 	var sl: Node = get_tree().root.get_node_or_null("SaveLoadSystem")
 	_connect_spies(sl)
 
 	var envelope: PackedByteArray = _forge_envelope_with_version(sl, 1)
 	_write_envelope_to_fixture(envelope)
 
-	sl.request_full_load("forged_v1_skip_migration_test")
+	sl.request_full_load("forged_v1_runs_migration_test")
 
-	# Empty-payload envelope hydrates each consumer with empty Dict per
-	# Rule 11; consumers' load_save_data implementations handle missing
-	# fields with first-launch defaults; load completes successfully.
+	# Migration chain runs (V1 → V2 with default prestige fields).
+	# Consumer hydration uses the migrated payload + defaults from
+	# missing fields per Rule 11; load completes successfully.
 	assert_int(sl.get_state()).is_equal(SaveLoadScript.State.READY)
 	assert_int(_load_completed_calls.size()).is_equal(1)
-	assert_str(_load_completed_calls[0]).is_equal("forged_v1_skip_migration_test")
+	assert_str(_load_completed_calls[0]).is_equal("forged_v1_runs_migration_test")
 	assert_int(_load_failed_calls.size()).is_equal(0)
 	assert_int(_tamper_calls).is_equal(0)
 
