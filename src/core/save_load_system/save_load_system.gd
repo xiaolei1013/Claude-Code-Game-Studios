@@ -77,7 +77,12 @@ const _ENVELOPE_OVERHEAD: int = _HEADER_SIZE + _HMAC_SIZE  # 44
 ## Schema version embedded in every envelope header (VERSION field, u16 LE).
 ## Increment when save schema changes requiring a migration path.
 ## ADR-0004 §Envelope byte layout, TR-save-load-003
-const CURRENT_SAVE_VERSION: int = 1
+## Sprint 21+ Prestige V1.0 Story 2 (2026-05-09): bumped V1 → V2.
+## V2 adds `prestige_count: int`, `prestige_multiplier: float`, and
+## `retired_hero_records: Array[Dictionary]` to the HeroRoster save namespace.
+## V1→V2 migration is non-destructive: missing fields default to 0 / 1.0 / [].
+## Per `prestige-system.md` §C.5 + AC-PR-12 + AC-PR-14.
+const CURRENT_SAVE_VERSION: int = 2
 
 ## Story 013 — backup-restore escalation threshold (TR-save-load-017).
 ##
@@ -1241,9 +1246,65 @@ func _run_migration_chain(payload: Dictionary, from_version: int, to_version: in
 	# direct callers (e.g., tests, V1.0+ batch-migration tooling).
 	if from_version == to_version:
 		return payload
-	# No migrations authored yet — every (from, to) where from != to
-	# returns null until a real V(N) → V(N+1) step lands.
+
+	# V1 → V2: Prestige V1.0 Story 2 (2026-05-09). Per
+	# `prestige-system.md` §C.5: add 3 fields to the HeroRoster namespace
+	# with defaults (0, 1.0, []). Idempotent on re-migration.
+	if from_version == 1 and to_version == 2:
+		return _migrate_v1_to_v2(payload)
+
+	# Forward-compat / multi-step chain: if a future build introduces V3,
+	# the chain becomes:
+	#   if from_version == 1 and to_version >= 2:
+	#       payload = _migrate_v1_to_v2(payload)
+	#       from_version = 2
+	#   if from_version == 2 and to_version >= 3:
+	#       payload = _migrate_v2_to_v3(payload)
+	#       from_version = 3
+	#   ...
+	# For V2 ship, only V1→V2 is implemented.
+
+	# No migration available for this (from, to) pair.
 	return null
+
+
+## Sprint 21+ Prestige V1.0 Story 2 — V1 → V2 migration body.
+##
+## Adds 3 new fields to the HeroRoster save namespace with default values:
+##   - `prestige_count: int = 0`
+##   - `prestige_multiplier: float = 1.0`
+##   - `retired_hero_records: Array[Dictionary] = []`
+##
+## Idempotent: applying twice is a no-op (the second pass sees the fields
+## already populated and re-defaults to the existing values via `dict.get`
+## with self-as-default).
+##
+## Defensive: if the HeroRoster namespace is missing entirely, the migration
+## adds it as an empty dict with the 3 default fields. This handles edge
+## cases like saves predating the HeroRoster consumer registration.
+##
+## Per `prestige-system.md` §C.5 + AC-PR-14. Mirrors the structural pattern
+## from Class Synergy V1.0 (where `RunSnapshot.synergy_id` defaulted on
+## missing-field at hydrate time without a separate migration step — the
+## difference is that synergy_id is forward-compat-only; the prestige fields
+## are forward-compat AND require an explicit V1→V2 schema bump because
+## V1 builds must reject V2 saves they don't know how to read per
+## `save-load-system.md` Story 010 future-version rejection).
+func _migrate_v1_to_v2(payload_v1: Dictionary) -> Dictionary:
+	var payload_v2: Dictionary = payload_v1.duplicate(true)
+	if not payload_v2.has("HeroRoster"):
+		# Defensive: HeroRoster namespace missing entirely. Add a minimal
+		# stub so the V2 schema is well-formed.
+		payload_v2["HeroRoster"] = {}
+	var roster: Dictionary = payload_v2["HeroRoster"]
+	# Apply defaults if absent. Using `dict.get(key, default)` semantics:
+	# missing key → default; existing key → preserve. Idempotent.
+	roster["prestige_count"] = roster.get("prestige_count", 0)
+	roster["prestige_multiplier"] = roster.get("prestige_multiplier", 1.0)
+	var empty_records: Array = []
+	roster["retired_hero_records"] = roster.get("retired_hero_records", empty_records)
+	payload_v2["HeroRoster"] = roster
+	return payload_v2
 
 
 ## Resolves a consumer node by path; exits the process on miss in production.

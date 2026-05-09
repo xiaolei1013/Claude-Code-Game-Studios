@@ -159,9 +159,9 @@ func test_state_machine_full_path_loading_to_migration_to_corrupt() -> void:
 # Group C — CURRENT_SAVE_VERSION constant invariants
 # ===========================================================================
 
-func test_current_save_version_is_int_one() -> void:
-	# The MVP placeholder ships V1; the migration chain only fires when a
-	# loaded envelope's VERSION differs from this constant. Bumping this
-	# constant is the lockstep-edit trigger documented in
-	# `_run_migration_chain`'s docstring.
-	assert_int(SaveLoadScript.CURRENT_SAVE_VERSION).is_equal(1)
+func test_current_save_version_is_int_two() -> void:
+	# Sprint 21+ Prestige V1.0 Story 2 (2026-05-09): bumped V1 → V2.
+	# V2 adds prestige_count + prestige_multiplier + retired_hero_records
+	# to the HeroRoster save namespace per `prestige-system.md` §C.5.
+	# V1→V2 migration body in _migrate_v1_to_v2 defaults the new fields.
+	assert_int(SaveLoadScript.CURRENT_SAVE_VERSION).is_equal(2)

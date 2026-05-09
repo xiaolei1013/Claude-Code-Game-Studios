@@ -44,13 +44,22 @@ func _inject_hero(hr: Node, id: int, class_id: String = "warrior",
 # Group A: get_save_data dict shape (TR-019)
 # ===========================================================================
 
-func test_get_save_data_returns_dict_with_exactly_three_keys() -> void:
+func test_get_save_data_returns_dict_with_exactly_six_keys() -> void:
+	# V1 schema had 3 keys: heroes, formation_slots, next_instance_id.
+	# V2 adds 3 more for Prestige V1.0 Story 2 (2026-05-09): prestige_count,
+	# prestige_multiplier, retired_hero_records. Per
+	# `prestige-system.md` §C.5.
 	var hr: Node = _make_fresh_roster()
 	var d: Dictionary = hr.get_save_data()
-	assert_int(d.size()).is_equal(3)
+	assert_int(d.size()).is_equal(6)
+	# V1 keys (regression guard)
 	assert_bool(d.has("heroes")).is_true()
 	assert_bool(d.has("formation_slots")).is_true()
 	assert_bool(d.has("next_instance_id")).is_true()
+	# V2 keys
+	assert_bool(d.has("prestige_count")).is_true()
+	assert_bool(d.has("prestige_multiplier")).is_true()
+	assert_bool(d.has("retired_hero_records")).is_true()
 
 
 func test_get_save_data_heroes_is_array() -> void:

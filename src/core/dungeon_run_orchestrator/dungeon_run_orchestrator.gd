@@ -977,6 +977,22 @@ func _process_kill_events(events: Variant) -> void:
 		synergy_id = run_snapshot.synergy_id
 	var synergy_xp_multiplier: float = _resolve_synergy_xp_multiplier(synergy_id)
 
+	# Prestige V1.0 (Sprint 21+ Story 2) — hoist the global prestige
+	# multiplier outside the per-kill loop. The multiplier is global +
+	# constant for the run (it only changes via HeroRoster.prestige_hero
+	# which is only callable from NO_RUN state per `prestige-system.md`
+	# §E.2). Reading once amortizes the autoload lookup over all kills.
+	#
+	# Defensive: null-guard for test envs without HeroRoster registered.
+	# Default 1.0 means "no prestige boost" — the per-kill formula still
+	# works, just at baseline output.
+	#
+	# Per `prestige-system.md` §C.3 + AC-PR-21 (5-factor stacking).
+	var prestige_multiplier: float = 1.0
+	var roster_for_prestige: Node = roster_for_xp  # Reuse the already-resolved autoload.
+	if roster_for_prestige != null and roster_for_prestige.has_method("get_prestige_multiplier"):
+		prestige_multiplier = float(roster_for_prestige.call("get_prestige_multiplier"))
+
 	for ke: Variant in kills_array:
 		# KillEvent fields — duck-typed reads against the value-type contract:
 		# enemy_id (StringName), archetype (StringName), tier (int), is_boss (bool).
@@ -989,8 +1005,12 @@ func _process_kill_events(events: Variant) -> void:
 		# Class Synergy V1.0 — pass synergy_id + archetype to attribute_kill_gold
 		# so Steel Wall (3W vs bruiser) and Triple Threat (1+1+1 unconditional)
 		# multiply the gold output. `class-synergy-system.md` §C.3 + §D.2.
+		# Prestige V1.0 (Story 2) — apply the prestige multiplier on top of
+		# the synergy-adjusted output. Per AC-PR-21 5-factor product:
+		#   floori(BASE_KILL[tier] × matchup × loot × synergy × prestige).
 		var archetype_str: String = String(archetype_sn)
-		var gold: int = attribute_kill_gold(tier, advantaged, losing_run, synergy_id, archetype_str)
+		var gold_pre_prestige: int = attribute_kill_gold(tier, advantaged, losing_run, synergy_id, archetype_str)
+		var gold: int = floori(float(gold_pre_prestige) * prestige_multiplier)
 		if economy_can_add_gold and gold > 0:
 			economy.add_gold(gold)
 		# Per-kill signals.
@@ -1012,8 +1032,13 @@ func _process_kill_events(events: Variant) -> void:
 		# (or 1.0 for any other synergy_id, including ""). Per
 		# `class-synergy-system.md` §C.3. The multiplier is loop-invariant
 		# (hoisted above) so this is a single float multiplication per kill.
-		var xp_with_synergy: int = floori(float(xp_amount) * synergy_xp_multiplier)
-		_grant_xp_to_formation(roster_for_xp, xp_with_synergy)
+		# Prestige V1.0 (Story 2) — also apply the prestige multiplier on
+		# the XP path. Both Arcane Elite and prestige stack multiplicatively
+		# per AC-PR-21 5-factor product.
+		var xp_with_synergy_prestige: int = floori(
+			float(xp_amount) * synergy_xp_multiplier * prestige_multiplier
+		)
+		_grant_xp_to_formation(roster_for_xp, xp_with_synergy_prestige)
 
 	if bool(events.get("first_clear_in_range")):
 		# Sprint 8 S8-N5 (Story 007) — 3-layer idempotency:
