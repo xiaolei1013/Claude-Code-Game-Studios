@@ -44,14 +44,27 @@ func _add_hero_at_level(roster: Node, class_id: String, level: int, display_name
 	return hero.instance_id
 
 
+# Sprint 21+ Story 3 last-hero-protection guard (AC-PR-20) requires
+# the roster to have ≥ 2 heroes for is_prestige_eligible to return true.
+# Tests that target Story 1 mechanics (eligibility/action) need a filler
+# hero alongside the cap-level test subject; this helper adds a level-1
+# Mage to the roster so the cap-level Warrior under test is not the
+# last hero.
+func _add_filler_hero(roster: Node) -> int:
+	return _add_hero_at_level(roster, "mage", 1, "Filler")
+
+
 # ===========================================================================
 # Group A — Eligibility predicate (AC-PR-01..05)
 # ===========================================================================
 
 func test_is_prestige_eligible_hero_at_level_cap_returns_true() -> void:
 	# AC-PR-01: hero at LEVEL_CAP (= 15) AND prestige_count < MAX → true.
+	# Story 3 added AC-PR-20 last-hero protection; filler hero needed
+	# so the cap-level Warrior under test is not the last hero.
 	var roster: Node = _make_roster()
 	var id: int = _add_hero_at_level(roster, "warrior", roster.level_cap(), "Theron")
+	_add_filler_hero(roster)
 	assert_bool(roster.is_prestige_eligible(id)).is_true()
 
 
@@ -64,8 +77,10 @@ func test_is_prestige_eligible_hero_below_level_cap_returns_false() -> void:
 
 func test_is_prestige_eligible_prestige_max_reached_returns_false() -> void:
 	# AC-PR-03: prestige_count >= PRESTIGE_MAX → false.
+	# Filler ensures last-hero protection isn't the false-cause.
 	var roster: Node = _make_roster()
 	var id: int = _add_hero_at_level(roster, "warrior", roster.level_cap(), "Theron")
+	_add_filler_hero(roster)
 	# Force the count to MAX.
 	roster._prestige_count = HeroRosterScript.PRESTIGE_MAX
 	roster._prestige_multiplier = HeroRosterScript.PRESTIGE_MULTIPLIER_CAP
@@ -76,6 +91,7 @@ func test_is_prestige_eligible_multiplier_cap_reached_returns_false() -> void:
 	# AC-PR-04: multiplier >= CAP → false (defensive; should match count check).
 	var roster: Node = _make_roster()
 	var id: int = _add_hero_at_level(roster, "warrior", roster.level_cap(), "Theron")
+	_add_filler_hero(roster)
 	roster._prestige_count = HeroRosterScript.PRESTIGE_MAX
 	roster._prestige_multiplier = HeroRosterScript.PRESTIGE_MULTIPLIER_CAP
 	assert_bool(roster.is_prestige_eligible(id)).is_false()
@@ -100,19 +116,23 @@ func _on_prestige_completed(record: Dictionary, new_count: int) -> void:
 
 func test_prestige_hero_removes_hero_from_active_roster() -> void:
 	# AC-PR-06: hero gone from get_all_heroes() after prestige.
+	# Filler ensures Theron is not the last hero (AC-PR-20 guard).
 	var roster: Node = _make_roster()
 	var id: int = _add_hero_at_level(roster, "warrior", roster.level_cap(), "Theron")
-	assert_int(roster.get_all_heroes().size()).is_equal(1)
+	_add_filler_hero(roster)
+	assert_int(roster.get_all_heroes().size()).is_equal(2)
 
 	var ok: bool = roster.prestige_hero(id)
 	assert_bool(ok).is_true()
-	assert_int(roster.get_all_heroes().size()).is_equal(0)
+	# Post-action: filler remains, Theron retired.
+	assert_int(roster.get_all_heroes().size()).is_equal(1)
 
 
 func test_prestige_hero_appends_retired_record() -> void:
 	# AC-PR-07: _retired_hero_records grows by 1 with the captured snapshot.
 	var roster: Node = _make_roster()
 	var id: int = _add_hero_at_level(roster, "warrior", roster.level_cap(), "Theron")
+	_add_filler_hero(roster)
 
 	roster.prestige_hero(id)
 
@@ -130,6 +150,7 @@ func test_prestige_hero_advances_count_and_multiplier() -> void:
 	# AC-PR-08: post-action count = 1, multiplier = 1.05.
 	var roster: Node = _make_roster()
 	var id: int = _add_hero_at_level(roster, "warrior", roster.level_cap(), "Theron")
+	_add_filler_hero(roster)
 	assert_int(roster._prestige_count).is_equal(0)
 	assert_float(roster._prestige_multiplier).is_equal(1.0)
 
@@ -145,6 +166,7 @@ func test_prestige_hero_emits_prestige_completed_signal() -> void:
 	_prestige_signal_calls.clear()
 	roster.prestige_completed_signal.connect(_on_prestige_completed)
 	var id: int = _add_hero_at_level(roster, "mage", roster.level_cap(), "Mira")
+	_add_filler_hero(roster)
 
 	roster.prestige_hero(id)
 
@@ -173,13 +195,29 @@ func test_prestige_hero_returns_false_on_ineligible_hero() -> void:
 
 func test_prestige_hero_multiple_prestiges_increment_index() -> void:
 	# Sequential prestiges: index = 1, 2, 3, ...
+	# Per AC-PR-20 last-hero protection, the roster needs ≥ 2 heroes
+	# present at each prestige call. Strategy: add 4 heroes upfront (3
+	# cap-level + 1 filler); prestige the 3 cap-level ones in sequence.
+	# After each prestige the roster shrinks (4 → 3 → 2; AT 2, the next
+	# eligibility check would still be ≥ 2 = OK; after the third, roster
+	# has 1 = the filler, but we've already done 3 prestiges).
 	var roster: Node = _make_roster()
+	# Filler stays in roster throughout — never targeted for prestige.
+	_add_filler_hero(roster)
+	var hero_ids: Array[int] = []
 	for i: int in range(3):
-		var hero_id: int = _add_hero_at_level(
+		hero_ids.append(_add_hero_at_level(
 			roster, "warrior", roster.level_cap(), "Hero%d" % i
-		)
+		))
+
+	# Now 4 heroes (1 filler + 3 cap-level Warriors).
+	assert_int(roster._heroes.size()).is_equal(4)
+
+	for hero_id: int in hero_ids:
 		roster.prestige_hero(hero_id)
 
+	# After 3 prestiges: 1 filler remains, 3 retired.
+	assert_int(roster._heroes.size()).is_equal(1)
 	assert_int(roster._prestige_count).is_equal(3)
 	assert_int(roster._retired_hero_records.size()).is_equal(3)
 	for i: int in range(3):
@@ -219,6 +257,7 @@ func test_get_prestige_multiplier_matches_cached_field_after_action() -> void:
 	# After prestige_hero, get_prestige_multiplier() should match _prestige_multiplier.
 	var roster: Node = _make_roster()
 	var id: int = _add_hero_at_level(roster, "warrior", roster.level_cap(), "Theron")
+	_add_filler_hero(roster)
 	roster.prestige_hero(id)
 	assert_float(roster.get_prestige_multiplier()).is_equal(roster._prestige_multiplier)
 

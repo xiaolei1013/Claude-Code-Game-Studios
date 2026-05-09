@@ -504,11 +504,26 @@ func remove_hero(id: int) -> bool:
 ##   2. Hero is at [method level_cap]
 ##   3. Global [member _prestige_count] is below [constant PRESTIGE_MAX]
 ##   4. Global [member _prestige_multiplier] is below [constant PRESTIGE_MULTIPLIER_CAP]
+##   5. **Roster size > 1** — last-hero protection per AC-PR-20. If the
+##      to-be-prestiged hero is the only hero in the active roster,
+##      [method remove_hero] would brick the game (first-launch seed
+##      contract guarantees ≥ 1 hero). Story 3 logic guard: hide the
+##      button at the source.
+##   6. **Orchestrator state is NO_RUN** — active-run guard per
+##      AC-PR-19 + GDD §E.2. Prestige cannot fire during ACTIVE_FOREGROUND
+##      / ACTIVE_OFFLINE_REPLAY / DISPATCHING. The UI layer renders the
+##      button as disabled (greyed out) with the
+##      `prestige_disabled_active_run_tooltip` localized tooltip.
+##      Defensive: if the DungeonRunOrchestrator autoload is absent
+##      (test envs), the guard is skipped (eligibility passes on the
+##      other 5 checks).
 ##
 ## Returns [code]false[/code] (no push_warning, no error) when any check
-## fails. The Hero Detail Modal hides the Prestige button on false return.
+## fails. The Hero Detail Modal hides OR disables the Prestige button on
+## false return per the specific failure mode.
 ##
-## Per [code]prestige-system.md[/code] §C.1 + §D.2 + AC-PR-01..05.
+## Per [code]prestige-system.md[/code] §C.1 + §D.2 + §E.1 + §E.2 +
+## AC-PR-01..05 + AC-PR-19 + AC-PR-20.
 func is_prestige_eligible(instance_id: int) -> bool:
 	if not _heroes.has(instance_id):
 		return false
@@ -521,6 +536,24 @@ func is_prestige_eligible(instance_id: int) -> bool:
 		return false
 	if _prestige_multiplier >= PRESTIGE_MULTIPLIER_CAP:
 		return false
+	# AC-PR-20 last-hero protection — removing the only hero would brick
+	# the game per `hero-roster.md` first-launch seed contract.
+	if _heroes.size() <= 1:
+		return false
+	# AC-PR-19 active-run guard — prestige is only legal from NO_RUN state.
+	# Defensive null-check for test envs without the orchestrator autoload.
+	# The orchestrator exposes its state via a public `state: int` field
+	# (not a method) per dungeon_run_orchestrator.gd:56. Use Object.get
+	# to read it without coupling to the import; null return means the
+	# field doesn't exist (degenerate orchestrator) and we skip the guard.
+	var orch: Node = get_node_or_null("/root/DungeonRunOrchestrator")
+	if orch != null and "state" in orch:
+		# State enum: NO_RUN = 0 per dungeon_run_state.gd. Compare to int 0
+		# to avoid coupling to the enum import. Any non-zero state
+		# (DISPATCHING, ACTIVE_FOREGROUND, ACTIVE_OFFLINE_REPLAY, RUN_ENDED)
+		# fails eligibility.
+		if int(orch.get("state")) != 0:
+			return false
 	return true
 
 
