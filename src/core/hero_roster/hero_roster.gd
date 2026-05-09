@@ -115,6 +115,27 @@ var _next_instance_id: int = 1
 ## TR-hero-roster-016 — ADR-0012
 var _orphaned_heroes: Array = []
 
+## Prestige V1.0 (Sprint 21 / Story 1) — global count of completed prestige
+## actions. Monotonically non-decreasing per session; persisted in V2 save
+## schema (Story 2 scope). Default 0 = no prestige yet.
+##
+## design/gdd/prestige-system.md §C.5 + AC-PR-08.
+var _prestige_count: int = 0
+
+## Prestige V1.0 — cached global multiplier derived from [member _prestige_count]
+## via [method get_prestige_multiplier]. Cached value updated on every
+## successful [method prestige_hero] call. Default 1.0 (no boost).
+##
+## design/gdd/prestige-system.md §C.5 + AC-PR-08.
+var _prestige_multiplier: float = 1.0
+
+## Prestige V1.0 — append-only record of retired heroes (Hall of Retired
+## Heroes content). Each entry is a Dictionary with the schema documented
+## in [signal prestige_completed_signal]. Persisted in V2 save schema.
+##
+## design/gdd/prestige-system.md §C.4 + §C.5 + AC-PR-07.
+var _retired_hero_records: Array[Dictionary] = []
+
 ## Resolved RosterConfig instance (loaded in [method _ready] from
 ## `res://assets/data/config/roster_config.tres` via [DataRegistry]).
 ## When [code]null[/code] (config missing or invalid), the [method max_roster_size],
@@ -187,6 +208,44 @@ signal hero_removed(instance_id: int, class_id: String, display_name: String)
 ## Emitted post-suppression (after [code]_suppress_signals[/code] returns to
 ## false) so the load path itself remains signal-quiet.
 signal orphan_heroes_notice(count: int)
+
+## Prestige System V1.0 (Sprint 21 / Story 1, 2026-05-09) — fired when
+## [method prestige_hero] succeeds. Subscribers (Hall of Retired Heroes
+## screen #19, AudioRouter) react to the player's voluntary retirement
+## of a LEVEL_CAP hero.
+##
+## [param record]: the new RetiredHeroRecord Dictionary appended to
+##   [member _retired_hero_records]. Schema per `prestige-system.md` §C.5:
+##   {display_name, class_id, level_at_retirement, retirement_unix_ts,
+##    prestige_index}.
+## [param new_count]: the post-action [member _prestige_count] value
+##   (always >= 1; first prestige = 1). Subscribers compute the new
+##   multiplier via [method get_prestige_multiplier].
+##
+## design/gdd/prestige-system.md §C.2 + §F + AC-PR-09.
+@warning_ignore("unused_signal")
+signal prestige_completed_signal(record: Dictionary, new_count: int)
+
+
+# ---------------------------------------------------------------------------
+# Prestige V1.0 — Sprint 21 / Story 1 constants per `prestige-system.md` §G.
+# ---------------------------------------------------------------------------
+
+## Per-prestige multiplier gain. Applied to BOTH kill gold AND kill XP per
+## the orchestrator's per-kill formula. Default 0.05 (5% per prestige).
+## Per AC-PR-16 invariant: `PRESTIGE_GAIN_PER × PRESTIGE_MAX == PRESTIGE_MULTIPLIER_CAP - 1.0`.
+const PRESTIGE_GAIN_PER: float = 0.05
+
+## Hard ceiling on the global prestige multiplier. Default 2.0 (×2 baseline
+## maximum at full prestige). Cozy-register hard floor: prestige is voluntary,
+## not mandatory — capping at 2.0 prevents runaway compounding.
+const PRESTIGE_MULTIPLIER_CAP: float = 2.0
+
+## Hard cap on total prestige actions. Default 20 (with PRESTIGE_GAIN_PER=0.05
+## yields exactly 1.0 + 20×0.05 = 2.0 = PRESTIGE_MULTIPLIER_CAP). Beyond this,
+## [method is_prestige_eligible] returns false; the Hero Detail Modal hides
+## the Prestige button.
+const PRESTIGE_MAX: int = 20
 
 
 # ---------------------------------------------------------------------------
@@ -415,6 +474,139 @@ func remove_hero(id: int) -> bool:
 	if not _suppress_signals:
 		hero_removed.emit(id, class_id, display_name)
 	return true
+
+
+# ---------------------------------------------------------------------------
+# Prestige V1.0 — Sprint 21 / Story 1 public API.
+#
+# Per design/gdd/prestige-system.md §C.1 + §C.2 + §D.1 + §D.2 + AC-PR-01..11.
+#
+# The Hero Detail Modal queries [method is_prestige_eligible] to decide
+# whether to show the "Prestige Hero" button. On player [Prestige Hero] tap
+# (after the cozy confirmation modal), the UI layer calls [method prestige_hero]
+# which synchronously: removes the hero from the active roster + appends a
+# RetiredHeroRecord + increments the global count + recomputes the multiplier
+# + emits the completion signal. Subscribers (Hall view, AudioRouter) react.
+#
+# The orchestrator's per-kill formula reads [method get_prestige_multiplier]
+# to apply the prestige multiplier alongside matchup × loot × synergy
+# (Sprint 22+ wiring; this story ships the in-memory surface only).
+#
+# V1→V2 save schema migration is Story 2 scope (CURRENT_SAVE_VERSION bump
+# 1→2 + _migrate_v1_to_v2 body in SaveLoadSystem). This story's defaults
+# (0 / 1.0 / []) match the V1→V2 migration's default-on-missing values.
+# ---------------------------------------------------------------------------
+
+## Returns [code]true[/code] if [param instance_id] is eligible for prestige.
+##
+## Eligibility checks (all must hold):
+##   1. Hero exists at [param instance_id]
+##   2. Hero is at [method level_cap]
+##   3. Global [member _prestige_count] is below [constant PRESTIGE_MAX]
+##   4. Global [member _prestige_multiplier] is below [constant PRESTIGE_MULTIPLIER_CAP]
+##
+## Returns [code]false[/code] (no push_warning, no error) when any check
+## fails. The Hero Detail Modal hides the Prestige button on false return.
+##
+## Per [code]prestige-system.md[/code] §C.1 + §D.2 + AC-PR-01..05.
+func is_prestige_eligible(instance_id: int) -> bool:
+	if not _heroes.has(instance_id):
+		return false
+	var hero: RefCounted = _heroes[instance_id]
+	if hero == null or not ("current_level" in hero):
+		return false
+	if int(hero.current_level) != level_cap():
+		return false
+	if _prestige_count >= PRESTIGE_MAX:
+		return false
+	if _prestige_multiplier >= PRESTIGE_MULTIPLIER_CAP:
+		return false
+	return true
+
+
+## Synchronous prestige action. Removes the hero, appends a RetiredHeroRecord,
+## advances the global count + multiplier, emits [signal prestige_completed_signal].
+##
+## Returns [code]true[/code] on success, [code]false[/code] when the hero is
+## not eligible (per [method is_prestige_eligible]). On false return, no
+## state changes — idempotent reject.
+##
+## Side effects on success (in order):
+##   1. Capture the hero's display_name + class_id + current_level for the
+##      RetiredHeroRecord (must read pre-removal — the hero instance is
+##      gone after step 2).
+##   2. [method remove_hero] — drops the hero from active roster.
+##      Auto-clears formation slots; emits [signal hero_removed].
+##   3. Increment [member _prestige_count].
+##   4. Recompute [member _prestige_multiplier] = clampf(1.0 + count × GAIN_PER, 1.0, CAP).
+##   5. Append the RetiredHeroRecord to [member _retired_hero_records].
+##      Schema: {display_name, class_id, level_at_retirement,
+##               retirement_unix_ts, prestige_index}.
+##   6. Emit [signal prestige_completed_signal] with the new record + count.
+##
+## SaveLoadSystem persist trigger: Story 2 scope. This story ships the in-
+## memory mutation; the cross-system persist call lives in the V1→V2
+## migration epic.
+##
+## Per [code]prestige-system.md[/code] §C.2 + §D.1 + AC-PR-06..09.
+func prestige_hero(instance_id: int) -> bool:
+	if not is_prestige_eligible(instance_id):
+		return false
+	# Capture pre-removal state for the RetiredHeroRecord.
+	var hero: RefCounted = _heroes[instance_id]
+	var display_name: String = String(hero.display_name) if "display_name" in hero else ""
+	var class_id: String = String(hero.class_id) if "class_id" in hero else ""
+	var level_at_retirement: int = int(hero.current_level) if "current_level" in hero else 0
+	# Step 2: remove hero from active roster.
+	if not remove_hero(instance_id):
+		# Defensive: remove_hero returned false somehow (shouldn't happen
+		# since is_prestige_eligible verified existence). Abort cleanly.
+		return false
+	# Step 3-4: advance prestige count + multiplier.
+	_prestige_count += 1
+	_prestige_multiplier = clampf(
+		1.0 + float(_prestige_count) * PRESTIGE_GAIN_PER,
+		1.0,
+		PRESTIGE_MULTIPLIER_CAP
+	)
+	# Step 5: append RetiredHeroRecord. Per ADR-0005 single-call-site
+	# invariant, the wall-clock read MUST route through TickSystem's
+	# cached value — direct Time.get_unix_time_from_system() is forbidden
+	# in src/ outside tick_system.gd. If TickSystem cache is cold (returns
+	# 0), the timestamp falls back to 0 — UI degrades gracefully (Hall
+	# card renders "Day 0" or hides the date until first heartbeat).
+	var retirement_ts: int = 0
+	var tick_system_for_ts: Node = get_node_or_null("/root/TickSystem")
+	if tick_system_for_ts != null and tick_system_for_ts.has_method("now_ms"):
+		var ms_val: int = int(tick_system_for_ts.now_ms())
+		if ms_val > 0:
+			@warning_ignore("integer_division")
+			retirement_ts = ms_val / 1000
+	var record: Dictionary = {
+		"display_name": display_name,
+		"class_id": class_id,
+		"level_at_retirement": level_at_retirement,
+		"retirement_unix_ts": retirement_ts,
+		"prestige_index": _prestige_count,
+	}
+	_retired_hero_records.append(record)
+	# Step 6: emit completion signal.
+	if not _suppress_signals:
+		prestige_completed_signal.emit(record, _prestige_count)
+	return true
+
+
+## Returns the current global prestige multiplier — the value that the
+## per-kill gold + XP formulas multiply by. Default 1.0 when no prestige
+## has occurred. Pure function of [member _prestige_count].
+##
+## Per [code]prestige-system.md[/code] §D.1 + AC-PR-08.
+func get_prestige_multiplier() -> float:
+	return clampf(
+		1.0 + float(_prestige_count) * PRESTIGE_GAIN_PER,
+		1.0,
+		PRESTIGE_MULTIPLIER_CAP
+	)
 
 
 ## Updates a hero's [code]current_level[/code] to [param new_level], clamping
