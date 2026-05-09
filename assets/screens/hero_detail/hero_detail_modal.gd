@@ -72,6 +72,16 @@ var _cached_level_up_cost: int = -1
 @onready var _level_up_button: Button = $DetailPanel/ActionRow/LevelUpButton
 @onready var _close_button: Button = $DetailPanel/ActionRow/CloseButton
 
+# Prestige V1.0 — Story 3 UI (Slice A) — `prestige-system.md` §C.1 + §C.2
+# + AC-PR-19 + AC-PR-20. The Prestige button is mutually exclusive with
+# LevelUpButton: one OR the other shows depending on hero level vs cap.
+@onready var _prestige_button: Button = $DetailPanel/ActionRow/PrestigeButton
+@onready var _prestige_confirmation: Control = $PrestigeConfirmation
+@onready var _prestige_confirm_backdrop: ColorRect = $PrestigeConfirmation/ConfirmDimBackdrop
+@onready var _prestige_confirm_body_label: Label = $PrestigeConfirmation/ConfirmPanel/ConfirmContent/ConfirmBodyLabel
+@onready var _prestige_confirm_button: Button = $PrestigeConfirmation/ConfirmPanel/ConfirmContent/ConfirmButtonRow/ConfirmButton
+@onready var _prestige_cancel_button: Button = $PrestigeConfirmation/ConfirmPanel/ConfirmContent/ConfirmButtonRow/CancelButton
+
 
 # ---------------------------------------------------------------------------
 # Public API — set_target_hero (per GDD §C.2 step 2)
@@ -94,6 +104,9 @@ func _ready() -> void:
 	# Touch-feedback wired in _ready (one-time, .tscn-defined Buttons).
 	UIFrameworkScript.wire_touch_feedback(_level_up_button)
 	UIFrameworkScript.wire_touch_feedback(_close_button)
+	UIFrameworkScript.wire_touch_feedback(_prestige_button)
+	UIFrameworkScript.wire_touch_feedback(_prestige_confirm_button)
+	UIFrameworkScript.wire_touch_feedback(_prestige_cancel_button)
 
 
 func on_enter() -> void:
@@ -138,6 +151,18 @@ func on_enter() -> void:
 		_close_button.pressed.connect(_on_close_pressed)
 	if not _dim_backdrop.gui_input.is_connected(_on_backdrop_input):
 		_dim_backdrop.gui_input.connect(_on_backdrop_input)
+	# Prestige confirmation flow handlers.
+	if not _prestige_button.pressed.is_connected(_on_prestige_pressed):
+		_prestige_button.pressed.connect(_on_prestige_pressed)
+	if not _prestige_confirm_button.pressed.is_connected(_on_prestige_confirm_pressed):
+		_prestige_confirm_button.pressed.connect(_on_prestige_confirm_pressed)
+	if not _prestige_cancel_button.pressed.is_connected(_on_prestige_cancel_pressed):
+		_prestige_cancel_button.pressed.connect(_on_prestige_cancel_pressed)
+	if not _prestige_confirm_backdrop.gui_input.is_connected(_on_prestige_confirm_backdrop_input):
+		_prestige_confirm_backdrop.gui_input.connect(_on_prestige_confirm_backdrop_input)
+
+	# Confirmation overlay starts hidden every show.
+	_prestige_confirmation.visible = false
 
 	# Step 5: initial render.
 	_refresh_all()
@@ -159,6 +184,14 @@ func on_exit() -> void:
 		_close_button.pressed.disconnect(_on_close_pressed)
 	if _dim_backdrop != null and _dim_backdrop.gui_input.is_connected(_on_backdrop_input):
 		_dim_backdrop.gui_input.disconnect(_on_backdrop_input)
+	if _prestige_button != null and _prestige_button.pressed.is_connected(_on_prestige_pressed):
+		_prestige_button.pressed.disconnect(_on_prestige_pressed)
+	if _prestige_confirm_button != null and _prestige_confirm_button.pressed.is_connected(_on_prestige_confirm_pressed):
+		_prestige_confirm_button.pressed.disconnect(_on_prestige_confirm_pressed)
+	if _prestige_cancel_button != null and _prestige_cancel_button.pressed.is_connected(_on_prestige_cancel_pressed):
+		_prestige_cancel_button.pressed.disconnect(_on_prestige_cancel_pressed)
+	if _prestige_confirm_backdrop != null and _prestige_confirm_backdrop.gui_input.is_connected(_on_prestige_confirm_backdrop_input):
+		_prestige_confirm_backdrop.gui_input.disconnect(_on_prestige_confirm_backdrop_input)
 
 
 func on_pause() -> void:
@@ -177,6 +210,7 @@ func _refresh_all() -> void:
 	_refresh_header()
 	_refresh_stats()
 	_refresh_level_up_button()
+	_refresh_prestige_button()
 
 
 func _refresh_header() -> void:
@@ -226,6 +260,60 @@ func _refresh_level_up_button() -> void:
 
 
 # ---------------------------------------------------------------------------
+# Prestige V1.0 — Story 3 UI (Slice A) — `prestige-system.md` §C.1 + §C.2
+# + AC-PR-19 + AC-PR-20.
+#
+# Visibility tri-state on the at-cap hero:
+#   - eligible          → button shown + enabled
+#   - active-run        → button shown + disabled + tooltip (AC-PR-19)
+#   - last-hero / max   → button hidden (AC-PR-20 + PRESTIGE_MAX cap)
+#
+# Below cap → button always hidden (LevelUpButton owns the row instead).
+# ---------------------------------------------------------------------------
+
+func _refresh_prestige_button() -> void:
+	if _hero == null:
+		_prestige_button.visible = false
+		return
+	var cap: int = HeroRoster.level_cap()
+	if _hero.current_level < cap:
+		# Below cap — LevelUpButton handles the row, prestige stays hidden.
+		_prestige_button.visible = false
+		return
+	# Hero at cap. is_prestige_eligible already encodes all 6 checks; if it
+	# returns true, the button is shown + enabled. If false, the failure
+	# reason determines hidden vs disabled-with-tooltip.
+	if HeroRoster.is_prestige_eligible(_hero.instance_id):
+		_prestige_button.visible = true
+		_prestige_button.disabled = false
+		_prestige_button.tooltip_text = ""
+		_prestige_button.text = tr("prestige_button_label")
+		return
+	# Ineligible at cap. Distinguish active-run (show disabled) from
+	# last-hero / prestige-max (hide entirely). Per GDD §E.1 + §E.2.
+	if _is_orchestrator_in_active_run():
+		_prestige_button.visible = true
+		_prestige_button.disabled = true
+		_prestige_button.tooltip_text = tr("prestige_disabled_active_run_tooltip")
+		_prestige_button.text = tr("prestige_button_label")
+	else:
+		# Last hero, prestige cap, or other no-show reason.
+		_prestige_button.visible = false
+
+
+## Returns [code]true[/code] if [code]DungeonRunOrchestrator.state[/code] is
+## non-zero (any state other than NO_RUN). Defensive null-check for test envs
+## without the orchestrator autoload registered. Mirrors the duck-typed read
+## in [code]HeroRoster.is_prestige_eligible[/code] so the UI gating decision
+## stays consistent with the autoload-side eligibility decision.
+func _is_orchestrator_in_active_run() -> bool:
+	var orch: Node = get_node_or_null("/root/DungeonRunOrchestrator")
+	if orch == null or not ("state" in orch):
+		return false
+	return int(orch.get("state")) != 0
+
+
+# ---------------------------------------------------------------------------
 # Interaction — Level-Up press (per GDD §C.6)
 # ---------------------------------------------------------------------------
 
@@ -252,6 +340,89 @@ func _on_level_up_pressed() -> void:
 	# hero_leveled signal fires via set_hero_level; subscribers
 	# (_on_hero_leveled here, plus AudioRouter chime, plus dungeon_run_view
 	# toast if visible) react. _refresh_all is called via _on_hero_leveled.
+
+
+# ---------------------------------------------------------------------------
+# Interaction — Prestige confirmation flow (per `prestige-system.md` §C.1
+# + §C.2 + AC-PR-06..09).
+#
+# Tap flow:
+#   1. PrestigeButton tap   → _on_prestige_pressed
+#   2. Confirmation overlay → renders cozy-register modal body via tr()
+#   3. ConfirmButton tap    → _on_prestige_confirm_pressed
+#                              → HeroRoster.prestige_hero(id)
+#                              → autoload emits hero_removed →
+#                                _on_hero_removed auto-dismisses this
+#                                modal (no manual dismiss needed)
+#   4. CancelButton tap     → _on_prestige_cancel_pressed (overlay only)
+#   5. Backdrop tap         → cancel (same as CancelButton)
+#
+# Reduce-motion / hero-fade animation (AC-PR-18) is Slice C scope — the
+# confirm path here is synchronous; the player sees the modal disappear
+# the moment the autoload emits hero_removed.
+# ---------------------------------------------------------------------------
+
+func _on_prestige_pressed() -> void:
+	# Defensive: re-verify eligibility at tap time. Between the render
+	# pass and the tap, the orchestrator state could have flipped (e.g.,
+	# a tick fired a dispatch). Re-check rather than relying on stale
+	# button state.
+	if _hero == null:
+		return
+	if not HeroRoster.is_prestige_eligible(_hero.instance_id):
+		# Refresh the button so its state matches the new reality.
+		_refresh_prestige_button()
+		return
+	_show_prestige_confirmation()
+
+
+func _on_prestige_confirm_pressed() -> void:
+	if _hero == null:
+		_hide_prestige_confirmation()
+		return
+	# Capture id before the call — _hero will be torn down by the
+	# hero_removed signal handler the moment prestige_hero succeeds.
+	var id: int = _hero.instance_id
+	_hide_prestige_confirmation()
+	var ok: bool = HeroRoster.prestige_hero(id)
+	if not ok:
+		# Defensive: prestige_hero rejected (race with state change).
+		# The modal remains; refresh button state to reflect new reality.
+		_refresh_prestige_button()
+
+
+func _on_prestige_cancel_pressed() -> void:
+	# Cancel returns to the detail view — modal stays open, no autoload
+	# call. Cozy-register: undoing a tap is a free, friction-free action.
+	_hide_prestige_confirmation()
+
+
+func _on_prestige_confirm_backdrop_input(event: InputEvent) -> void:
+	# Backdrop tap = cancel. Same tap-grace as the main backdrop.
+	var is_mouse_press: bool = event is InputEventMouseButton and event.pressed
+	var is_touch_press: bool = event is InputEventScreenTouch and event.pressed
+	if is_mouse_press or is_touch_press:
+		_hide_prestige_confirmation()
+
+
+func _show_prestige_confirmation() -> void:
+	if _hero == null:
+		return
+	# Format the cozy-register body text with the hero's display name.
+	# The `prestige_confirmation_modal_body` value in en.csv contains
+	# embedded commas (so it MUST stay RFC-4180-quoted in the CSV — see
+	# `prestige_v1_story3_logic_test.gd::test_prestige_modal_body_resolves_full_string_via_tr`)
+	# AND a literal "+5%" which would collide with Godot's `%` operator.
+	# Use String.replace instead of `%` so the literal % stays intact.
+	var body: String = tr("prestige_confirmation_modal_body").replace(
+		"%s", _hero.display_name
+	)
+	_prestige_confirm_body_label.text = body
+	_prestige_confirmation.visible = true
+
+
+func _hide_prestige_confirmation() -> void:
+	_prestige_confirmation.visible = false
 
 
 # ---------------------------------------------------------------------------
@@ -285,8 +456,11 @@ func _on_hero_leveled(_id: int, _old: int, _new: int) -> void:
 	# Re-render stats + level-up button on any level change.
 	# _hero.current_level is already updated by HeroRoster before signal
 	# fires (per HeroRoster signal-after-mutation invariant).
+	# Prestige button must also re-render: a level-up that crosses the
+	# cap boundary flips LevelUpButton off and PrestigeButton on.
 	_refresh_stats()
 	_refresh_level_up_button()
+	_refresh_prestige_button()
 
 
 func _on_hero_removed(id: int, _class_id: String, _display_name: String) -> void:

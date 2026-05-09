@@ -101,9 +101,79 @@ focus_mode = 0
 mouse_filter = 0
 text = "Level Up"
 
+[node name="PrestigeButton" type="Button" parent="DetailPanel/ActionRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(180, 44)
+focus_mode = 0
+mouse_filter = 0
+text = "Prestige Hero"
+visible = false
+
 [node name="CloseButton" type="Button" parent="DetailPanel/ActionRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(120, 44)
 focus_mode = 0
 mouse_filter = 0
 text = "Close"
+
+[node name="PrestigeConfirmation" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ConfirmDimBackdrop" type="ColorRect" parent="PrestigeConfirmation"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.55)
+mouse_filter = 0
+
+[node name="ConfirmPanel" type="PanelContainer" parent="PrestigeConfirmation"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -240.0
+offset_top = -140.0
+offset_right = 240.0
+offset_bottom = 140.0
+grow_horizontal = 2
+grow_vertical = 2
+custom_minimum_size = Vector2(480, 280)
+
+[node name="ConfirmContent" type="VBoxContainer" parent="PrestigeConfirmation/ConfirmPanel"]
+layout_mode = 2
+
+[node name="ConfirmBodyLabel" type="Label" parent="PrestigeConfirmation/ConfirmPanel/ConfirmContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+autowrap_mode = 3
+text = ""
+
+[node name="ConfirmButtonRow" type="HBoxContainer" parent="PrestigeConfirmation/ConfirmPanel/ConfirmContent"]
+layout_mode = 2
+alignment = 1
+
+[node name="CancelButton" type="Button" parent="PrestigeConfirmation/ConfirmPanel/ConfirmContent/ConfirmButtonRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(140, 44)
+focus_mode = 0
+mouse_filter = 0
+text = "Cancel"
+
+[node name="ConfirmButton" type="Button" parent="PrestigeConfirmation/ConfirmPanel/ConfirmContent/ConfirmButtonRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(180, 44)
+focus_mode = 0
+mouse_filter = 0
+text = "Prestige Hero"
