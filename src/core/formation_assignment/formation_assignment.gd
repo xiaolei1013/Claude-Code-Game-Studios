@@ -43,6 +43,27 @@ signal formation_browse_opened(formation: Array[HeroInstance])
 ## formation-assignment-system.md §C.1 line 105 + §D commit ordering invariant.
 signal formation_reassignment_committed(new_formation: Array[HeroInstance])
 
+## Class Synergy V1.0 first-pass (Sprint 21 S21-S2 / Story 3) — live-preview
+## signal fired when a synergy is detected on a formation slot edit.
+##
+## Per `class-synergy-system.md` §C.4 audio integration: AudioRouter subscribes
+## and fires `sfx_class_synergy_detected` (warm chime) with a ≥2.0s throttle
+## (per audio-system.md §F suppress_window pattern). The throttle prevents
+## rapid slot-toggling spam.
+##
+## EMITTED BY: [method notify_synergy_detected] — called from the
+## formation_assignment screen's live-preview path (Story 4 wires the screen
+## integration). The pure [method detect_active_synergy] does NOT emit
+## (kept side-effect-free per AC-CS-20 perf assumption).
+##
+## [param synergy_id]: the detected synergy id String — one of "steel_wall",
+##   "arcane_elite", "triple_threat" (V1.0 first-pass roster). Empty string
+##   "" is NOT emitted — callers gate on a non-empty detection result.
+##
+## design/gdd/class-synergy-system.md §C.4 + AC-CS-14 + AC-CS-15.
+@warning_ignore("unused_signal")
+signal class_synergy_detected_signal(synergy_id: String)
+
 
 # ---------------------------------------------------------------------------
 # Public API — per formation-assignment-system.md §C.1
@@ -340,3 +361,24 @@ func detect_active_synergy(formation_snapshot: Dictionary) -> String:
 	# No synergy matches (e.g., 2W+1M, 2W+1R, 2M+1R — V1.0 first-pass does
 	# not include 2+1 mixes; V1.5+ may extend).
 	return ""
+
+
+## Class Synergy V1.0 (Sprint 21 S21-S2 / Story 3) — public emit surface
+## for the live-preview signal.
+##
+## Called by the formation_assignment screen's slot-edit path (Story 4)
+## after computing the active synergy via [method detect_active_synergy].
+## Emits [signal class_synergy_detected_signal] only when [param synergy_id]
+## is non-empty. AudioRouter subscribes for the cozy chime cue with a 2.0s
+## throttle (per audio-system.md §F + AC-CS-14).
+##
+## Idempotent: calling with [code]synergy_id == ""[/code] is a no-op (no
+## signal emit). The screen's live-preview path can call this on every
+## slot edit without conditional gating; the no-op makes empty-formation
+## edits cheap.
+##
+## design/gdd/class-synergy-system.md §C.4 + AC-CS-14.
+func notify_synergy_detected(synergy_id: String) -> void:
+	if synergy_id == "":
+		return
+	class_synergy_detected_signal.emit(synergy_id)
