@@ -43,6 +43,26 @@ var _class_data: Resource = null
 const TOAST_LINGER_MS: int = 3000
 const TOAST_FADE_SEC: float = 0.6
 
+# Prestige V1.0 — Slice C — AC-PR-18 hero-fade-to-Hall animation.
+# Cozy default: the DetailPanel fades from full opacity to 0 over a
+# brief window before HeroRoster.prestige_hero is called. The
+# autoload's hero_removed signal then auto-dismisses the modal via
+# the existing _on_hero_removed handler. Reduce-motion path skips
+# the tween and calls prestige_hero immediately (instant-cut).
+const PRESTIGE_FADE_DURATION_SEC: float = 0.28
+
+# Active fade tween. Captured so on_exit can kill it if the modal is
+# dismissed mid-fade (e.g., user taps the close button between
+# Confirm and the tween-completion callback firing).
+var _prestige_fade_tween: Tween = null
+
+# Re-entrancy guard: once a confirm tap has started the fade, ignore
+# subsequent confirm/cancel taps until the fade resolves. Prevents
+# double-tap mis-fires that would call prestige_hero twice (the second
+# call would be a no-op because the hero is already removed, but the
+# defensive flag keeps the UI state consistent).
+var _prestige_fade_in_flight: bool = false
+
 # Tap-debounce grace from on_enter (per GDD §C.9).
 const TAP_GRACE_MS: int = 200
 var _enter_time_msec: int = 0
@@ -53,10 +73,10 @@ var _cached_level_up_cost: int = -1
 
 # Node references — assumed via @onready (.tscn defines the tree).
 @onready var _dim_backdrop: ColorRect = $DimBackdrop
-## Reserved for Sprint 17 S17-M2 visual polish — modal slide-in animation
-## queries the detail panel for size/position; read deferred until that
-## work lands.
-@warning_ignore("unused_private_class_variable")
+## DetailPanel modulate is tweened during the prestige fade (Slice C —
+## AC-PR-18 hero-fade-to-Hall animation). Originally reserved for the
+## Sprint 17 S17-M2 modal slide-in animation polish; the prestige
+## fade is the first live consumer.
 @onready var _detail_panel: PanelContainer = $DetailPanel
 ## Reserved for class-portrait sourcing decision (carve-out per Sprint 17
 ## S17-M1 known scope) — placeholder while ClassPortrait sourcing follows
@@ -164,6 +184,14 @@ func on_enter() -> void:
 	# Confirmation overlay starts hidden every show.
 	_prestige_confirmation.visible = false
 
+	# Reset fade state on every show. on_enter is the canonical re-entry
+	# point per Screen GDD §C.2 ("treat each call as a fresh
+	# initialization"); a stale modulate from a prior modal show would
+	# render the panel invisible.
+	_detail_panel.modulate.a = 1.0
+	_prestige_fade_in_flight = false
+	_prestige_fade_tween = null
+
 	# Step 5: initial render.
 	_refresh_all()
 
@@ -192,6 +220,13 @@ func on_exit() -> void:
 		_prestige_cancel_button.pressed.disconnect(_on_prestige_cancel_pressed)
 	if _prestige_confirm_backdrop != null and _prestige_confirm_backdrop.gui_input.is_connected(_on_prestige_confirm_backdrop_input):
 		_prestige_confirm_backdrop.gui_input.disconnect(_on_prestige_confirm_backdrop_input)
+	# Kill any in-flight fade tween so its bound callback cannot fire on
+	# a being-freed node. The tween itself is auto-killed when its bound
+	# Node leaves the tree, but explicit kill is the documented pattern.
+	if _prestige_fade_tween != null:
+		_prestige_fade_tween.kill()
+		_prestige_fade_tween = null
+	_prestige_fade_in_flight = false
 
 
 func on_pause() -> void:
@@ -380,15 +415,55 @@ func _on_prestige_confirm_pressed() -> void:
 	if _hero == null:
 		_hide_prestige_confirmation()
 		return
+	if _prestige_fade_in_flight:
+		# Re-entrancy guard: a fade is already running; ignore the tap.
+		return
 	# Capture id before the call — _hero will be torn down by the
 	# hero_removed signal handler the moment prestige_hero succeeds.
 	var id: int = _hero.instance_id
 	_hide_prestige_confirmation()
+	# AC-PR-18: reduce-motion variant skips the fade and runs prestige
+	# synchronously. Default path (reduce_motion = false) tweens the
+	# DetailPanel modulate.a from 1.0 → 0.0 over PRESTIGE_FADE_DURATION_SEC,
+	# then calls the autoload from the tween-completion callback.
+	if _is_reduce_motion_enabled():
+		_execute_prestige(id)
+		return
+	_prestige_fade_in_flight = true
+	_prestige_fade_tween = create_tween()
+	_prestige_fade_tween.tween_property(
+		_detail_panel, "modulate:a", 0.0, PRESTIGE_FADE_DURATION_SEC
+	)
+	_prestige_fade_tween.tween_callback(_execute_prestige.bind(id))
+
+
+## Synchronous prestige action. Called either directly (reduce-motion
+## path) or as a tween-completion callback (default path). Resets fade
+## state on prestige_hero rejection so the modal can recover (e.g., a
+## race-condition rejection from the autoload-side guard).
+func _execute_prestige(id: int) -> void:
+	_prestige_fade_in_flight = false
+	_prestige_fade_tween = null
 	var ok: bool = HeroRoster.prestige_hero(id)
 	if not ok:
 		# Defensive: prestige_hero rejected (race with state change).
-		# The modal remains; refresh button state to reflect new reality.
+		# The modal remains; reset modulate so it's visible again, then
+		# refresh button state to reflect new reality.
+		_detail_panel.modulate.a = 1.0
 		_refresh_prestige_button()
+
+
+## Reads [code]SceneManager.reduce_motion[/code] defensively. Test envs
+## without the SceneManager autoload registered get the false default
+## (full-motion) — matches the existing pattern used elsewhere in this
+## file for autoload null-checks.
+func _is_reduce_motion_enabled() -> bool:
+	var sm: Node = get_node_or_null("/root/SceneManager")
+	if sm == null:
+		return false
+	if not ("reduce_motion" in sm):
+		return false
+	return bool(sm.get("reduce_motion"))
 
 
 func _on_prestige_cancel_pressed() -> void:

@@ -211,6 +211,15 @@ func test_prestige_confirm_calls_autoload_and_advances_count() -> void:
 	var ts: Node = get_tree().root.get_node_or_null("TickSystem")
 	if ts != null and ts.has_method("_read_wall_clock_unix_time"):
 		ts._read_wall_clock_unix_time()
+	# Slice C added a fade tween on the default confirm path. Force
+	# reduce_motion=true so this end-to-end assertion stays synchronous
+	# (the fade-completion branch is exercised separately by
+	# `prestige_fade_animation_test.gd::test_confirm_default_path_completes_prestige_after_tween_finishes`).
+	var sm: Node = get_tree().root.get_node_or_null("SceneManager")
+	var prior_reduce_motion: bool = false
+	if sm != null:
+		prior_reduce_motion = bool(sm.reduce_motion)
+		sm.reduce_motion = true
 	_inject_hero(812, "warrior", HeroRoster.level_cap(), "Theron")
 	_inject_hero(813, "mage", 1)
 	assert_int(HeroRoster._prestige_count).is_equal(0)
@@ -225,6 +234,9 @@ func test_prestige_confirm_calls_autoload_and_advances_count() -> void:
 	assert_int(HeroRoster._prestige_count).is_equal(1)
 	assert_bool(HeroRoster._heroes.has(812)).is_false()
 	assert_int(HeroRoster._retired_hero_records.size()).is_equal(1)
+
+	if sm != null:
+		sm.reduce_motion = prior_reduce_motion
 
 
 # ===========================================================================
