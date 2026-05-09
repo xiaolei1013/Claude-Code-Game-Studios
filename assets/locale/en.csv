@@ -43,3 +43,11 @@ class_synergy_badge_triple_threat,Triple Threat
 class_synergy_effect_steel_wall,+25% gold vs bruisers
 class_synergy_effect_arcane_elite,+20% XP from all kills
 class_synergy_effect_triple_threat,+15% gold from all kills
+prestige_button_label,Prestige Hero
+prestige_confirmation_modal_body,%s has earned their retirement. They'll join the Hall of Retired Heroes — your guild will remember them, and every future run will earn +5% more gold and XP, forever.
+prestige_confirmation_button_confirm,Prestige Hero
+prestige_confirmation_button_cancel,Cancel
+prestige_complete_toast,%s joined the Hall of Retired Heroes.
+hall_of_retired_heroes_title,Hall of Retired Heroes
+hall_card_metadata_format,%s · %s · Lv %d · Retired Day %d
+prestige_disabled_active_run_tooltip,Prestige a hero between runs.
