@@ -442,6 +442,8 @@ This case is rare — only triggered if a player stacks the same class beyond th
 | **Roster / Hero Detail Screen** (#22, undesigned) | Hard | `roster.get_all_heroes()`, `roster.get_hero(id)`; subscribes to `hero_recruited`, `hero_leveled`, `hero_removed` | Read-only display; live refresh on signals |
 | **Recruit Screen** (#21, undesigned) | Soft | `roster.get_copies_owned(class_id)`, `roster.is_at_cap()` | Display: greys out recruit buttons; per-class cost lookup |
 | **Onboarding / First-Session Flow** (#29, undesigned) | Soft | Reads `hero_recruited` signal; assumes seeded tutorial Warrior in slot 0 | Tutorial flow runs after Roster's `seed_first_launch_state()` |
+| **Class Synergy System** (#32, V1.0 first-pass 2026-05-09) | Hard — read-only | `roster.get_hero(instance_id) -> HeroInstance` (existing); reads `hero.class_id` to compose the synergy multiset per class-synergy-system.md §D.1 `detect_active_synergy` | Reads at slot edit (live preview) + at dispatch-time snapshot. No writes. |
+| **Prestige System** (#31, V1.0 first-pass 2026-05-09) | Hard — central API host | New API surface added to HeroRoster: `is_prestige_eligible(instance_id) -> bool`, `prestige_hero(instance_id) -> bool`, `get_prestige_multiplier() -> float`. New private fields: `_prestige_count: int`, `_prestige_multiplier: float`, `_retired_hero_records: Array[Dictionary]`. New signal: `prestige_completed_signal(record, new_count)`. **V1→V2 save-schema migration** adds 3 fields to the Roster save namespace. Per `prestige-system.md` §C.2 + §C.5. |
 
 ### Bidirectional Consistency
 

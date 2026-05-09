@@ -582,6 +582,8 @@ Balance is never negative. Callers (Recruitment, Leveling) are responsible for q
 | **Return-to-App / Offline Rewards Screen** (#20) | Hard | Reads `OfflineResult.events_log` to render "while you were away" summary | Read-only display |
 | **Guild Hall Screen** (#19) | Hard | Subscribes to `gold_changed(new_balance: int, delta: int, reason: String)` signal (ADR-0013 — 3-arg payload; `reason` enables HUD filtering of drip vs. kill vs. floor-clear credit surfaces) for HUD refresh | Read-only display |
 | **Recruit Screen** (#21), **Roster/Hero Detail** (#22) | Soft | Reads `gold_balance` to grey out unaffordable buttons | Read-only display |
+| **Class Synergy System** (#32, V1.0 first-pass 2026-05-09) | Hard — config storage | New constants in `economy_config.tres`: `STEEL_WALL_GOLD_MULT = 1.25`, `TRIPLE_THREAT_GOLD_MULT = 1.15`, `ARCANE_ELITE_XP_MULT = 1.20`, `BASE_XP_PER_KILL = 10`, `class_synergy_audio_suppress_window_seconds = 2.0`. Per `class-synergy-system.md` §G. No formula change to Economy itself. AC-CS-16 enforces ≤+50% multiplier cap via static analysis. |
+| **Prestige System** (#31, V1.0 first-pass 2026-05-09) | Hard — config storage | New constants in `economy_config.tres`: `PRESTIGE_GAIN_PER = 0.05`, `PRESTIGE_MULTIPLIER_CAP = 2.0`, `PRESTIGE_MAX = 20`, `prestige_audio_suppress_window_seconds = 2.0`, `hall_card_animation_duration_seconds = 0.3`. Per `prestige-system.md` §G. AC-PR-16 enforces the GAIN_PER × MAX = CAP - 1.0 invariant. |
 
 ### Bidirectional Consistency
 

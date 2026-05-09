@@ -254,6 +254,12 @@ Class portraits are placeholder rectangles in MVP per Recruit Screen GDD #21 §I
 
 - **AudioRouter** (#28) — level-up chime fires via existing `hero_leveled` subscriber; modal does not invoke audio directly
 
+### V1.0 progression-layer additions (added 2026-05-09)
+
+The following V1.0-tier system extends this modal:
+
+- **Prestige System** (#31, V1.0 first-pass 2026-05-09) — adds a "Prestige Hero" button visible when `HeroRoster.is_prestige_eligible(instance_id)` returns true (hero at LEVEL_CAP=15, prestige_count below max). Tap shows confirmation modal with cozy copy ("[hero_name] has earned their retirement..."). Confirm calls `HeroRoster.prestige_hero(instance_id)` which is synchronous + persists. The button replaces the Level-Up button at LEVEL_CAP (existing modal hides Level-Up at cap per §C.5 step 1; Prestige System fills the slot). Per `prestige-system.md` §C.2 + §F. Locale keys: `prestige_button_label`, `prestige_confirmation_modal_body`, `prestige_confirmation_button_confirm/_cancel`, `prestige_complete_toast`, `prestige_disabled_active_run_tooltip`.
+
 ---
 
 ## G. Tuning Knobs

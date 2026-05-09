@@ -264,6 +264,7 @@ FormationAssignment does NOT subscribe to any signal in MVP. It is a pure contro
 | `formation_browse_opened(formation)` | (none in MVP — Orchestrator IGNORES per §C.7 of dungeon-run-orchestrator.md; UI consumers may subscribe in V1.0) | Informational hook for "player is looking at formation" |
 | `formation_reassignment_committed(new_formation)` | `DungeonRunOrchestrator` (rank 14) | ADR-0001 mid-run-reassignment-option-(a) trigger |
 | `formation_reassignment_committed(new_formation)` | `Economy` (rank 3, possibly) | Recompute formation_strength via HeroRoster.get_formation_strength() if Economy caches it. (Currently Economy reads on-demand; Sprint 12+ may add caching with this signal as the invalidation hook.) |
+| `formation_browse_opened(formation)` AND `formation_reassignment_committed(new_formation)` | **Class Synergy System** (#32, V1.0 first-pass 2026-05-09) | Live preview hook — V1.0 implementation adds `FormationAssignment.detect_active_synergy(snapshot) -> String` + a new signal `class_synergy_detected_signal(synergy_id)`. The detection runs on every slot edit (via `commit` re-fire OR a new live-edit signal); UI shows the synergy badge on the formation panel. Per `class-synergy-system.md` §C.2 + §F. |
 
 ### Bidirectional consistency
 

@@ -646,6 +646,13 @@ This GDD claims dependence on Game Time & Tick (#1) and Data Loading (#2). Both 
 
 **Floor/Biome Unlock GDD #16** was authored 2026-04-20 and cites this dependency in its §F (Hard upstream) using the canonical method pair; consumer row in this GDD updated in lockstep via Floor-Unlock-Propagation-Edit-2.
 
+### V1.0 progression-layer downstream consumers (added 2026-05-09)
+
+The following V1.0-tier systems extend the Save/Load contract:
+
+- **Class Synergy System** (#32, V1.0 first-pass 2026-05-09) — adds `RunSnapshot.synergy_id: String` to the Orchestrator save namespace. Forward-compat: missing field on load defaults to `""` (no migration required). Per `class-synergy-system.md` §F + AC-CS-12 / AC-CS-18.
+- **Prestige System** (#31, V1.0 first-pass 2026-05-09) — **bumps `CURRENT_SAVE_VERSION` from 1 to 2** when V1.0 ships. Adds 3 fields to the HeroRoster save namespace: `prestige_count: int`, `prestige_multiplier: float`, `retired_hero_records: Array[Dictionary]`. Migration body `_migrate_v1_to_v2` authored in `prestige-system.md` §C.5 — defaults to zero/1.0/empty for V1→V2; idempotent on re-migration. AC-PR-12 + AC-PR-14 verify round-trip + migration. **This is the project's first save-format version bump** since the Story 010 schema-migration-placeholder shipped; the migration chain becomes live with V1.0.
+
 ---
 
 ---

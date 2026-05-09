@@ -219,6 +219,8 @@ Hero Leveling subscribes to NO new signals. It's a thin layer over the existing 
 - **Recruit Screen** (#21) — displays cost-to-level via `Economy.level_cost(tier, current_level + 1)`
 - **Roster / Hero Detail Screen** (#22) — displays level + XP-to-next-level progress bar
 - **DungeonRunView** (S10-M4 toast) — already wired via `hero_leveled` signal subscriber
+- **Class Synergy System** (#32, V1.0 first-pass 2026-05-09) — Arcane Elite synergy multiplies XP via the new `attribute_kill_xp` formula (`floori(BASE_XP_PER_KILL × tier × synergy_multiplier × prestige_multiplier)`). No semantic change to leveling — the leveling system reads the same XP grant; the multiplier is applied at attribution time per `class-synergy-system.md` §C.3.
+- **Prestige System** (#31, V1.0 first-pass 2026-05-09) — reads `LEVEL_CAP = 15` as the prestige eligibility threshold (per `prestige-system.md` §C.1). No semantic change to leveling. Prestige multiplier multiplies BOTH gold AND XP per `prestige-system.md` §C.3.
 
 ---
 
