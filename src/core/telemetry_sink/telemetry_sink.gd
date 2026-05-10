@@ -308,7 +308,7 @@ func _emit_run_completed() -> void:
 func _emit_event(event_type: String, payload: Dictionary) -> void:
 	var envelope: Dictionary = {
 		"schema_version": SCHEMA_VERSION,
-		"timestamp_unix": int(Time.get_unix_time_from_system()),
+		"timestamp_unix": _read_unix_seconds_via_tick_system(),
 		"session_id": _session_id,
 		"event_type": event_type,
 		"payload": payload,
@@ -317,6 +317,26 @@ func _emit_event(event_type: String, payload: Dictionary) -> void:
 	if OS.is_debug_build():
 		_test_event_log.append({"event_type": event_type, "payload": payload})
 	_append_jsonl(envelope)
+
+
+## Reads the current Unix-seconds timestamp via TickSystem's cached value,
+## per ADR-0005 single-call-site invariant. Direct
+## [code]Time.get_unix_time_from_system()[/code] is FORBIDDEN in src/ outside
+## tick_system.gd (enforced by the static-analysis test
+## process_delta_forbidden_wall_clock_single_call_site_test.gd).
+##
+## Returns 0 if TickSystem is missing or the cache is cold (pre-first-heartbeat).
+## Telemetry consumers degrade gracefully — a 0 timestamp_unix is better than
+## a crash. Mirrors HeroRoster.prestige_hero retirement_ts derivation.
+func _read_unix_seconds_via_tick_system() -> int:
+	var ts: Node = get_node_or_null("/root/TickSystem")
+	if ts == null or not ts.has_method("now_ms"):
+		return 0
+	var ms_val: int = int(ts.call("now_ms"))
+	if ms_val <= 0:
+		return 0
+	@warning_ignore("integer_division")
+	return ms_val / 1000
 
 
 ## Appends one JSON-encoded line to the day's sink file. Creates the sink
