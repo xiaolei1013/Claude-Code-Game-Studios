@@ -164,3 +164,61 @@ Append-only log per EPIC.md FR-9. Format:
   ("non-regression in baseline" implies "don't touch passing tests").
 
 ---
+
+## 2026-05-10 — US-004 economy.gd
+
+- Audited 14 public funcs: add_gold, try_spend, try_award_floor_clear,
+  compute_offline_batch, set_offline_replay_inputs, flush_offline_signals,
+  get_save_data, load_save_data, get_gold_balance, get_lifetime_gold_earned,
+  is_first_clear_awarded, get_config, recruit_cost, level_cost.
+- Coverage map (per-function):
+    * add_gold: economy_add_gold_test.gd (happy + clamp edge + zero/negative-amount edges)
+    * try_spend: economy_try_spend_test.gd (sufficient-balance happy + zero/negative/insufficient edges)
+    * try_award_floor_clear: economy_try_award_floor_clear_test.gd (first-clear happy + monotonic-credit + repeat-WIN/LOSING-after-WIN edges)
+    * compute_offline_batch + set_offline_replay_inputs:
+      tests/integration/economy/economy_offline_batch_determinism_test.gd
+      (closed-form drip happy + 100-iteration determinism + zero-tick + negative-tick + 1M-tick no-overflow edges).
+      set_offline_replay_inputs is exercised in EVERY happy/edge test of compute_offline_batch as the input-injection seam — covered transitively.
+    * flush_offline_signals: tests/unit/economy/flush_offline_signals_test.gd (per-replay flush happy + double-flush + no-pending-state edges)
+    * get_save_data / load_save_data: tests/integration/economy/economy_save_load_round_trip_test.gd (round-trip happy + schema_version_mismatch edge + malformed-payload edge)
+    * get_gold_balance / get_lifetime_gold_earned: 14 / 6 references each (happy via post-add_gold + post-try_spend; edge via fresh-instance == 0)
+    * is_first_clear_awarded: economy_autoload_skeleton_test.gd::test_economy_is_first_clear_awarded_returns_false_for_uncredited_floor (uncredited-floor edge); credited-floor happy via try_award_floor_clear_test sub-asserts.
+    * recruit_cost / level_cost: economy_recruit_cost_test.gd + economy_level_cost_test.gd (tier-1 happy at multiple copies_owned + sentinel paths: negative, orphan class_id, null _config, tier-not-in-BASE)
+    * get_config: GAP — no direct test until this iteration. Other funcs hit `_config` indirectly but the accessor itself had no happy + null-state coverage.
+- Gap closed: tests/unit/economy/economy_get_config_test.gd (6 new tests):
+    * test_get_config_after_ready_returns_registered_economy_config_instance (happy)
+    * test_get_config_returns_same_instance_on_repeat_calls (identity invariant)
+    * test_get_config_before_ready_returns_null_without_raising (pre-_ready edge)
+    * test_get_config_after_explicit_null_override_returns_null (DataRegistry-miss edge)
+    * test_get_config_does_not_mutate_gold_balance_or_lifetime (pure-accessor invariant)
+    * test_get_config_returns_handed_seeded_config_via_field_override (DI-seed pattern)
+- Test result: tests/unit/economy suite green —
+  132 cases / 0 errors / 0 failures / 1s 92ms (was 126; +6 from new file).
+- New tests added: 6.
+- Files changed: tests/unit/economy/economy_get_config_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-004 economy | passes:true | new_tests_added:6 | notes:closed get_config() accessor gap; all other 13 public funcs already at-or-above bar via existing economy/ unit + integration suites.
+
+**Learnings for future iterations:**
+- For trivial accessor funcs (`get_config`, future `get_*` getters) the
+  canonical happy+edge surface is: live-autoload happy (returns registered
+  instance with populated content) + pre-_ready null edge (bare .new()) +
+  explicit-null edge (post-_ready field reset, simulating registry-miss
+  branch) + identity invariant (repeat calls return same instance) + pure-
+  accessor invariant (no state mutation). Mirrors the
+  `recruit_cost_null_config_returns_minus_one` add_child + null-override
+  pattern from economy_recruit_cost_test.gd.
+- Audit predicate refinement: when a public func has 0 direct test
+  references (`grep -rn "<func_name>" tests/` returns nothing matching the
+  call site), it's an unambiguous gap regardless of how heavily its return
+  value is consumed elsewhere. The existing economy/ suite extensively
+  exercised `_config` via recruit_cost/level_cost/compute_offline_batch but
+  never `economy.get_config()` itself — pure accessor public surface still
+  needs at least one direct call site under assertion.
+- `set_offline_replay_inputs` is a test-only DI seam (per its docstring
+  "Production callers MUST NOT set this"); coverage via every
+  compute_offline_batch happy test counts because the seam IS the input
+  channel for those tests. Don't add a separate dedicated test for DI seams
+  whose only legitimate caller is the test harness itself.
+
+---
