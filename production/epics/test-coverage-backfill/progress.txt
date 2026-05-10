@@ -604,3 +604,81 @@ Append-only log per EPIC.md FR-9. Format:
   NOT skip the TickSystem warming step.
 
 ---
+
+## 2026-05-10 — US-010 locale_loader.gd
+
+- Audited `src/core/locale_loader/locale_loader.gd`. Public-function predicate
+  (`grep -nE "^func [a-z]"`) returns ZERO matches: only `_ready` (Godot
+  lifecycle) and `_load_csv_file` (private helper) are present, both
+  underscore-prefixed.
+- Per FR-2 strict reading: vacuously satisfied (no public functions = no
+  uncovered public functions).
+- However, the autoload's BOOT BEHAVIOR is observable + load-bearing
+  (registers Translation per locale column with TranslationServer; sets
+  TranslationServer.locale to DEFAULT_LOCALE). Prior to this iteration NO
+  dedicated unit test existed — only transitive references in
+  formation_assignment_screen_test.gd:630 + class_synergy_audio_test.gd:196
+  that exercise tr() for unrelated assertions, plus a defensive probe in
+  prestige_v1_story3_logic_test.gd:281. None of those lock in the
+  LocaleLoader contract directly.
+- Gap closed: tests/unit/locale_loader/locale_loader_test.gd (9 new tests):
+    * Group A — Constant table:
+        - test_locale_loader_locale_dir_path_is_res_assets_locale (happy)
+        - test_locale_loader_default_locale_is_en (happy)
+        - test_locale_loader_supported_locale_files_contains_en_csv (happy)
+        - test_locale_loader_supported_locale_files_size_matches_canonical_one
+          (lockstep guard against drift)
+        - test_locale_loader_supported_locale_files_all_exist_on_disk
+          (CSV-vs-disk consistency — catches typos in SUPPORTED_LOCALE_FILES)
+    * Group B — Autoload registration:
+        - test_locale_loader_autoload_resolves_at_root (happy)
+        - test_locale_loader_autoload_uses_locale_loader_script
+          (script-identity guard; mirror of audio_router_skeleton_test.gd:54)
+    * Group C — Boot side effects:
+        - test_locale_loader_boot_registers_en_in_translation_server_loaded_locales
+          (happy: TranslationServer.get_loaded_locales() includes "en")
+        - test_locale_loader_boot_makes_tr_resolve_known_en_key
+          (end-to-end: tr("formation_assignment_instructional_header") →
+          "Send your guild to:"; key chosen because it's already
+          load-bearing in formation_assignment_screen_test.gd:630)
+- Test result: tests/unit/locale_loader suite green —
+  9 cases / 0 errors / 0 failures / 56ms.
+  Full tests/unit run after addition: 1442/1442 pass / 0 errors / 0 failures
+  / 16s 835ms across 105 suites. No regressions; pre-existing prestige_completed
+  signal-handler flake (noted on US-001) did NOT appear in this run.
+- New tests added: 9.
+- Files changed: tests/unit/locale_loader/locale_loader_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-010 locale_loader | passes:true | new_tests_added:9 | notes:audit predicate vacuously satisfied (zero public funcs); added boot-behavior coverage spanning constant table + autoload identity + TranslationServer side-effect (loaded_locales + tr-resolve probe).
+
+**Learnings for future iterations:**
+- "Vacuous-satisfaction with zero public funcs" is NOT the same as "skip
+  this story". The audit predicate is grep-based, but the spirit of the
+  epic is "no behavioral gaps survive". When a file's only public-shape
+  functions are `_ready` (autoload boot) or `_init` (resource ctor), look
+  for OBSERVABLE side effects (singleton registrations, autoload
+  identity, TranslationServer / AudioServer state, signal subscriptions)
+  and lock those in. Recipe: constants → autoload identity → boot side
+  effect via consumer-grade probe (not implementation reflection).
+- For TranslationServer-touching tests, `get_loaded_locales()` is the
+  stable observable signal — it accumulates across the boot lifetime and
+  is NOT mutated by `set_locale()`. Asserting on the active locale via
+  `get_locale()` is fragile because any earlier test that calls
+  `TranslationServer.set_locale("xx")` for transient-coverage reasons
+  poisons the state. Pair `get_loaded_locales().has("en")` (registration
+  proof) with `tr("known_key")` end-to-end (resolution proof) for the
+  cleanest two-anchor lock.
+- When picking a probe key for a `tr()`-based boot-coverage test, choose
+  one that's already load-bearing in another suite (here:
+  formation_assignment_screen_test.gd:630 anchors
+  "formation_assignment_instructional_header"). That way a CSV-content
+  drift breaks both tests in lockstep, surfacing the regression at TWO
+  call sites instead of orphaning the audit-only test on its own.
+- File-existence probes (`FileAccess.file_exists`) for asset constants
+  are cheap (sub-ms), deterministic, and catch the silent-warn class of
+  bug where `_load_csv_file` `push_warning`s and continues — without an
+  on-disk check, the boot proceeds with empty translations and only
+  visual-tier UI tests catch it. Worth adopting for any constant-table
+  that lists asset paths.
+
+---
