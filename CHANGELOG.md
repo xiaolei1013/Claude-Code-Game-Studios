@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.6] - 2026-05-10
+
+### Added
+- **Telemetry Events V1.0 taxonomy + privacy spec** — Authored `production/live-ops/telemetry-events-v1.md` closing Sprint 20 S20-N3 (which Sprint 21 had referenced as "committed" but was never actually authored). Defines the 5-event opt-in local-sink layer (first_launch, recruit_purchased, run_dispatched, run_completed, prestige_completed) for answering 4 designer questions: cozy escalation curve adoption, offline progression honesty, balance bounds verification, first-session funnel. Cozy-register principles enumerate what we will NOT track (no FOMO bait, no session-length optimization, no fingerprinting, no PII). Opt-in defaults OFF; local-only sink in MVP; remote sink and a "delete diagnostic data" button explicitly deferred to V1.0+. Includes Stage 2 implementation phasing for the follow-up TelemetrySink autoload PR.
+
 ## [0.0.0.5] - 2026-05-10
 
 ### Fixed
