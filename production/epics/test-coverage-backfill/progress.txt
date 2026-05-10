@@ -1326,3 +1326,61 @@ Append-only log per EPIC.md FR-9. Format:
   invariant, not just the happy-path content.
 
 ---
+
+## 2026-05-10 — US-018 engine_bootstrap.gd
+
+- Audited 3 public funcs: get_boot_prefix_b, get_current_build_version_string,
+  get_prior_build_version_string. Two are pure-const String getters; one
+  returns `_BOOT_PREFIX_B.duplicate()` of a class-level static
+  PackedByteArray (parallel shape to BootNamespace per US-017).
+- Coverage map BEFORE this iteration:
+    * `EngineBootstrap` symbol referenced in only 1 location:
+      tests/unit/save_load/integrity_tag_derivation_test.gd:32 — and that's a
+      reference-comment ("PART_B from EngineBootstrap._BOOT_PREFIX_B") with no
+      method call and no assert_*. Per FR-2, that is NOT coverage of the
+      public API surface.
+    * No prior tests/unit/engine_bootstrap/ directory existed.
+    * The 3 getter names (get_boot_prefix_b, get_current_build_version_string,
+      get_prior_build_version_string) appear ZERO times in tests/.
+- Gap closed: tests/unit/engine_bootstrap/engine_bootstrap_test.gd (6 new tests):
+    * test_get_boot_prefix_b_returns_documented_16_byte_ascii_fragment (happy)
+    * test_get_boot_prefix_b_returns_copy_so_mutation_does_not_poison_subsequent_calls (edge — duplicate invariant)
+    * test_get_current_build_version_string_returns_documented_compile_time_const (happy)
+    * test_get_current_build_version_string_is_non_empty_and_matches_const_table (edge — non-empty + idempotency)
+    * test_get_prior_build_version_string_returns_documented_compile_time_const (happy)
+    * test_get_prior_build_version_string_is_non_empty_and_matches_const_table (edge — non-empty + idempotency)
+- Test result: tests/unit/engine_bootstrap suite green —
+  6 cases / 0 errors / 0 failures / 35ms.
+- New tests added: 6.
+- Files changed: tests/unit/engine_bootstrap/engine_bootstrap_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-018 engine_bootstrap | passes:true | new_tests_added:6 | notes:closed full public-API gap on all 3 getters; PackedByteArray getter has duplicate-invariant edge; both String getters have non-empty + idempotent edges. Per ADR-0004 §Forbidden Patterns the version strings MUST stay compile-time const — these tests pin the documented values so any drift surfaces in CI.
+
+**Learnings for future iterations:**
+- `EngineBootstrap` (US-018) and `BootNamespace` (US-017) are structurally
+  identical Foundation autoloads — both expose pure getters of class-level
+  static `PackedByteArray` plus (in EngineBootstrap's case) two const String
+  getters. The test-pattern transferred 1:1 from boot_namespace_test.gd:
+  parallel `_get_<autoload>()` accessor → group-A happy + duplicate-invariant
+  edge → optional groups for any extra getters. Reusable template for any
+  future pure-getter autoload audit.
+- For pure-const String getters (return CONST_NAME), the load-bearing edge
+  case is "non-empty + idempotent across calls" rather than "negative
+  invariant" or "boundary value". The function body has no branches —
+  what we're really pinning is "the documented const value still matches
+  the const declaration" so a refactor that swaps in a runtime-overridable
+  source (which would violate ADR-0004 §Forbidden Patterns) gets caught.
+  Two-call idempotency suffices: a runtime-mutable source would diverge
+  between calls within a single test.
+- Reference-comment-only mentions of an autoload class name (e.g.,
+  "EngineBootstrap._BOOT_PREFIX_B" inside a reference-path constants block
+  in another suite) do NOT count as coverage even if the byte values match.
+  The audit predicate is "function NAME appears in test code with assert_*
+  within 5 lines", not "the autoload's class name shows up". This is the
+  same pattern as US-017 (BootNamespace had reference comments in
+  xor_mask_derivation_test.gd:26 / integrity_tag_derivation_test.gd:26
+  with no actual call) — Foundation autoloads consumed by SaveLoadSystem
+  tend to ship with reference-path duplications in downstream suites that
+  look like coverage but aren't.
+
+---
