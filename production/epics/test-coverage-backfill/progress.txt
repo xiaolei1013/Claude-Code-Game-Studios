@@ -1430,3 +1430,56 @@ Append-only log per EPIC.md FR-9. Format:
   generalize to ANY autoload-consumed-by-SaveLoadSystem audit going forward.
 
 ---
+
+## 2026-05-10 — US-020 scene_manager/main_root.gd
+
+- Audited public-function surface: `grep -nE "^func [a-z]" src/core/scene_manager/main_root.gd`
+  returns ZERO matches. Both methods (`_ready`, `_bootstrap_save_load_and_offline_replay`)
+  are underscore-prefixed (lifecycle / private helper). Per FR-1 audit predicate,
+  there is no public-method surface to cover.
+- Per FR-7 the file would be EXEMPT ("no testable public surface"), BUT the
+  file's _ready() lifecycle carries load-bearing behavior (Story 005b boot
+  wiring: SaveLoadSystem.request_full_load("boot") → TickSystem.bootstrap_offline_replay()
+  in locked order, with parent-pointer test-fixture isolation guard). That
+  behavior is already comprehensively covered by:
+    * tests/integration/scene_manager/mainroot_boot_wiring_test.gd — 5 cases:
+        - test_mainroot_under_test_parent_skips_boot_wiring (edge: parent != /root guard)
+        - test_mainroot_under_root_invokes_request_full_load_then_bootstrap_offline_replay (happy: production path)
+        - test_mainroot_under_root_first_launch_emits_full_signal_sequence (happy: cold-launch signal chain)
+        - test_mainroot_under_root_call_order_load_before_bootstrap_offline_replay (happy: locked ordering invariant)
+        - test_mainroot_under_root_double_ready_is_safe_idempotent (edge: idempotency under double-_ready)
+    * tests/integration/scene_manager/mainroot_scene_composition_test.gd — 18 cases
+      covering canvas-layer ordering, process-mode invariants, theme loading,
+      and project.godot main_scene wiring.
+- Test result: tests/integration/scene_manager/mainroot_boot_wiring_test.gd
+  green — 5 cases / 0 errors / 0 failures / 107ms.
+- New tests added: 0 (FR-7 exemption + FR-6 existing coverage above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-020 main_root | passes:true | new_tests_added:0 | notes:audit-only; zero public-method surface (FR-7 exemption), but lifecycle _ready() boot-wiring and scene composition fully covered by existing 5+18=23 integration tests. EPIC's expectation ("existing mainroot_boot_wiring_test.gd covers this; expect passes:true") confirmed.
+
+**Learnings for future iterations:**
+- US-020 is the first story in the epic where the source file has ZERO public
+  functions but DOES have load-bearing lifecycle behavior. The audit predicate
+  `^func [a-z]` correctly returns zero matches → FR-7 exemption applies on
+  paper, but the conscientious read is "lifecycle behavior is the file's
+  contract, even though it lives in `_ready()`". Future audits of similar
+  scene-script files (any .gd with only `_ready` / `_process` / `_input` / etc.)
+  should still verify integration coverage exists for the lifecycle behavior
+  before closing as `passes:true` — the exemption is technically correct but
+  the spirit of the epic is "behavioral coverage exists".
+- The double-_ready idempotency test
+  (test_mainroot_under_root_double_ready_is_safe_idempotent) emits a documented
+  push_warning ("state=2 not UNLOADED — load trigger ignored") because
+  SaveLoadSystem rejects re-loads after the first cold-boot. That warning is
+  EXPECTED — the test is exercising the documented "subsequent invocations
+  are no-ops" contract from main_root.gd:53. Future test runs that surface
+  this warning in the integration/scene_manager suite should NOT treat it as
+  a regression.
+- Distinct from US-017/018/019 (Foundation autoloads with pure getters): those
+  three needed dedicated test files because the autoload's getter API was the
+  contract. MainRoot is a Control-extending scene root with no API — its
+  contract IS the lifecycle method, which by Godot convention starts with `_`.
+  This is the natural shape for any scene-root .gd file and the FR-1 predicate
+  handles it cleanly via FR-7.
+
+---
