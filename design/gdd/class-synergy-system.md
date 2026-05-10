@@ -59,7 +59,7 @@ Three synergies ship in the first-pass V1.0 implementation. Each is keyed by an 
 
 Per OQ-32-3 resolution: BOTH live preview during slot edit AND dispatch-time confirmation.
 
-**Live preview** (formation_assignment screen, per `formation-assignment-screen.md`):
+**Live preview** (formation_assignment screen, per `formation-assignment-system.md`):
 - Whenever the formation slot composition changes (player taps a slot to swap heroes), `FormationAssignment.detect_active_synergy(formation_snapshot) -> ClassSynergy?` runs.
 - If a synergy matches, the formation panel shows a **synergy badge** with the synergy display name + effect summary text. Localized via `tr("class_synergy_badge_<id>")` keys (e.g., `class_synergy_badge_steel_wall`).
 - If no synergy matches, the badge is hidden.
@@ -108,7 +108,7 @@ Where `_resolve_synergy_xp_multiplier(synergy_id)` returns `ARCANE_ELITE_XP_MULT
 - On dispatch with active synergy: emit `class_synergy_dispatched_signal(synergy_id, run_id)`. AudioRouter routes to `sfx_class_synergy_dispatched` — a single warm sting at run start. NOT looped.
 - No mid-run audio. The synergy is established at dispatch; the player has already "felt" it in the live preview.
 
-**Visual** (per `formation-assignment-screen.md` UX patterns):
+**Visual** (per `formation-assignment-system.md` UX patterns):
 - The formation panel shows a synergy badge (Label + small icon) when a synergy is active. Theme variation: `class_synergy_badge_active` (parchment + lantern-amber per Art Bible Visual Identity Anchor).
 - During DungeonRunOrchestrator's RUN_STARTED state, `dungeon_run_view.tscn` shows the synergy display name + effect summary as a top-bar subtitle for the first 3.0 s of the run, then fades. Player has time to read it once.
 - No popups. No modals. No fanfare animation. The synergy is a quiet bonus.
@@ -215,7 +215,7 @@ Same scenario but the kill is a Skirmisher (not Bruiser): synergy_multiplier col
 
 2. **Duplicate hero in two slots**: HeroRoster's slot-mutation contract (`hero-roster.md` §C.5 set_formation_slot) auto-clears duplicates. Synergy detection runs on the post-clear formation. If the auto-clear results in a slot becoming empty, edge case 1 applies (synergy hides).
 
-3. **Synergy active at dispatch, formation edited mid-run**: per ADR-0001 mid-run reassignment, the run's `synergy_id` is snapshotted at dispatch and is IMMUTABLE for the run's duration. The mid-run reassignment changes the run's hero list but does NOT recompute the synergy. The player sees a brief "synergy persists" tooltip if they hover the synergy badge after a mid-run edit.
+3. **Synergy active at dispatch, formation edited mid-run**: per ADR-0001 mid-run reassignment, the run's `synergy_id` is snapshotted at dispatch and is IMMUTABLE for the run's duration. The mid-run reassignment changes the run's hero list but does NOT recompute the synergy. The player can tap the synergy badge after a mid-run edit to reveal a "synergy persists from dispatch" disclosure (touch-first per `technical-preferences.md` Input section — no hover-only interactions; mobile + Steam Deck parity).
 
 4. **Hero leveling mid-run**: synergies are composition-based, not level-based. A hero leveling up mid-run does NOT change the active synergy.
 
@@ -227,7 +227,7 @@ Same scenario but the kill is a Skirmisher (not Bruiser): synergy_multiplier col
 
 8. **Audio cue suppression on rapid slot toggling**: the `class_synergy_detected_signal` fires on every slot edit. `audio-system.md`'s 2.0 s throttle prevents the cue from playing more than once per `suppress_window_seconds` window. Rapid toggling (player swapping heroes 5x/sec) plays the chime once.
 
-9. **Reduce-motion accessibility flag**: per `scene-manager.md` Story 009 reduce_motion support, the formation panel's synergy-badge glow animation is suppressed (badge appears instantly without fade) when `reduce_motion = true`. The dispatch-time top-bar subtitle persists for the full 3.0 s (it's text, not motion).
+9. **Reduce-motion accessibility flag**: per `scene-screen-manager.md` Story 009 reduce_motion support (user-toggleable per `settings-options-accessibility.md`), the formation panel's synergy-badge glow animation is suppressed (badge appears instantly without fade) when `reduce_motion = true`. The dispatch-time top-bar subtitle persists for the full 3.0 s (it's text, not motion).
 
 10. **Localization (tr() of synergy display name + effect text)**: all player-facing synergy strings route through `tr()` per `ADR-0008` localization-ready rule. Locale CSV keys: `class_synergy_badge_steel_wall`, `class_synergy_badge_arcane_elite`, `class_synergy_badge_triple_threat`, `class_synergy_effect_steel_wall`, `class_synergy_effect_arcane_elite`, `class_synergy_effect_triple_threat`. Six new keys total for V1.0 ship.
 
@@ -244,7 +244,7 @@ Same scenario but the kill is a Skirmisher (not Bruiser): synergy_multiplier col
 | System | Why | Surface used |
 |---|---|---|
 | **Hero Roster** (#9) | Hero class_id source for detection | `HeroRoster.get_hero(instance_id) -> HeroInstance` (existing); `HeroInstance.class_id: String` (existing schema field) |
-| **Formation Assignment** (#17) | Detection trigger point + live-preview UI host | New: `FormationAssignment.detect_active_synergy(snapshot) -> String` (V1.0 epic adds). Existing `formation-assignment-screen.md` UX patterns reused for badge display. |
+| **Formation Assignment** (#17) | Detection trigger point + live-preview UI host | New: `FormationAssignment.detect_active_synergy(snapshot) -> String` (V1.0 epic adds). Existing `formation-assignment-system.md` UX patterns reused for badge display. |
 | **DungeonRunOrchestrator** (#13) | Dispatch-time snapshot + per-kill multiplier application | New: `DungeonRunOrchestrator.snapshot_synergy_for_run(snapshot) -> void` adds `synergy_id` to RunSnapshot. `attribute_kill_gold` formula extends with `synergy_multiplier` factor (D.2). New `attribute_kill_xp` formula (D.3). |
 | **Hero Class Database** (#6) | class_id stable identifiers | `class_id` strings ("warrior", "mage", "rogue") match existing class_id schema in `assets/data/classes/*.tres` (verified via `class-vs-enemy-matchup-resolver.md` §F dependency surface). |
 | **Class-vs-Enemy Matchup Resolver** (#10) | Archetype string source for Steel Wall conditional | `MatchupResolver.archetype_for_enemy(enemy_id) -> String` (existing); the resolver returns archetype strings ("bruiser", "skirmisher", etc.) that Steel Wall conditions on. |
@@ -253,7 +253,7 @@ Same scenario but the kill is a Skirmisher (not Bruiser): synergy_multiplier col
 | **Hero Leveling** (#15) | XP credit destination for Arcane Elite | New: `HeroRoster.add_xp(instance_id, xp_amount)` (V1.0 introduces per Hero Leveling §D — MVP ships with stub +1-per-clear via S10-M4). Arcane Elite's `synergy_multiplier` applies before this call. |
 | **Save/Load System** (#3) | RunSnapshot persistence for `synergy_id` | `RunSnapshot.synergy_id: String` is added to the orchestrator save namespace per `save-load-system.md` Story 016. Forward-compat: missing field on load defaults to `""` (no migration required). |
 | **Audio System** (#28) | Synergy detection + dispatch cues | New cues: `sfx_class_synergy_detected`, `sfx_class_synergy_dispatched`. AudioRouter subscribes to two new signals declared on FormationAssignment + DungeonRunOrchestrator. Per `audio-system.md` §F throttle (`suppress_window_seconds = 2.0`). |
-| **Scene Manager** (#4) | reduce_motion flag honoring (badge glow suppression) | `SceneManager.reduce_motion: bool` (existing per Story 009). FormationAssignment screen reads this on theme variation selection. |
+| **Scene/Screen Manager** (#4) | reduce_motion flag honoring (badge glow suppression) | `SceneManager.reduce_motion: bool` (existing per Story 009; canonical doc `scene-screen-manager.md`; user-facing toggle defined in `settings-options-accessibility.md`). FormationAssignment screen reads this on theme variation selection. |
 | **Locale Loader** (S9-M3 LocaleLoader autoload) | tr() string resolution for 6 new synergy keys | `assets/locale/en.csv` adds 6 keys per E.10. No code change to LocaleLoader. |
 
 ### F.2 Reverse dependencies (these systems consume Class Synergy)
@@ -295,7 +295,7 @@ All knobs live in `assets/data/economy/economy_config.tres` (existing per `econo
 | `TRIPLE_THREAT_GOLD_MULT` | float | 1.15 | 1.0 – 1.5 | Triple Threat's unconditional gold bonus. Lower than Steel Wall by design (unconditional vs conditional). |
 | `ARCANE_ELITE_XP_MULT` | float | 1.20 | 1.0 – 1.5 | Arcane Elite's XP bonus across all kills. >1.5 risks "level-cap rush" dominant strategy. |
 | `BASE_XP_PER_KILL` | int | 10 | 5 – 50 | Hero Leveling V1.0 base XP per tier-1 kill. Multiplied by tier in `attribute_kill_xp`. |
-| `class_synergy_audio_suppress_window_seconds` | float | 2.0 | 0.5 – 5.0 | Throttle window for the live-preview audio cue. Per `audio-system.md` §F. |
+| `audio_suppress_window_seconds` (re-uses audio-system) | float | 2.0 | 0.5 – 5.0 | Throttle window for the `sfx_class_synergy_detected` cue. **Owned by `audio-system.md` §F** — Class Synergy does NOT introduce a separate synergy-specific knob. The audio system's per-cue throttle is the single source of truth. Listed here for designer-tuning visibility only. |
 | `class_synergy_dispatch_subtitle_duration_seconds` | float | 3.0 | 1.5 – 5.0 | How long the dispatch-time top-bar subtitle stays visible at run start. |
 | `class_synergy_badge_glow_duration_seconds` | float | 0.4 | 0.1 – 1.0 | Formation panel badge glow animation length. Suppressed entirely when `SceneManager.reduce_motion = true`. |
 
@@ -382,10 +382,12 @@ All ACs are V1.0 implementation-targets (not MVP). They become BLOCKING on the V
 **When**: synergy badge + effect summary render.
 **Then**: text comes from `tr("class_synergy_badge_<id>")` + `tr("class_synergy_effect_<id>")` calls; CI grep enforces no hardcoded synergy display names anywhere in `assets/screens/formation_assignment/` or `assets/screens/dungeon_run_view/`.
 
-### AC-CS-16 — Cozy-register hard floor: no multiplier exceeds +50%
+### AC-CS-16 — Cozy-register hard floor: no PER-SYNERGY multiplier exceeds +50%
 **Given**: any tuned configuration of all three synergy multipliers.
 **When**: `_resolve_synergy_*_multiplier` returns a value.
 **Then**: value is ≤ 1.5. Static-analysis CI test asserts that `STEEL_WALL_GOLD_MULT`, `TRIPLE_THREAT_GOLD_MULT`, `ARCANE_ELITE_XP_MULT` are all ≤ 1.5 in `economy_config.tres`. Per OQ-32-6 cozy register hard floor.
+
+> **Scope clarification**: the ≤+50% floor is **per-synergy**, not compound. The full per-kill product (BASE_KILL × matchup_mult × loot_factor × synergy_mult × prestige_mult — see J cross-system table) can legitimately exceed +50% over baseline; that compound product is bounded by each factor's own cap, not by AC-CS-16. Future synergies must be compared against the per-synergy 1.5 ceiling, never against the compound peak.
 
 ### AC-CS-17 — Reduce-motion: badge glow animation suppressed
 **Given**: `SceneManager.reduce_motion = true`; synergy detected on slot edit.

@@ -55,6 +55,13 @@ const _DEFAULT_MASTER_MUTED: bool = false
 ## gold-chime anti-spam throttle below.
 const _CLASS_SYNERGY_DETECTED_THROTTLE_MS: int = 2000
 
+## Prestige V1.0 (Sprint 21+ silent-MVP wiring) — completion fanfare throttle.
+## Per `audio-system.md` §J Prestige cross-reference:
+## `prestige_audio_suppress_window_seconds = 2.0`. Theoretical guard against
+## back-to-back prestige emissions (UI flow is one-at-a-time, but the throttle
+## hardens the audio path against future automation or test-emit bursts).
+const _PRESTIGE_COMPLETED_THROTTLE_MS: int = 2000
+
 ## Gold-chime throttle window per audio-system.md §F.2 + §G.
 ## Designer-tunable via @export if needed; const for now per MVP scope.
 const _GOLD_CHIME_THROTTLE_MS: int = 250
@@ -82,6 +89,7 @@ const _CUE_BUS_MAP: Dictionary = {
 	&"sfx_reward_level_up_chime":     &"SFX/Reward",
 	&"sfx_reward_floor_clear_fanfare":&"SFX/Reward",
 	&"sfx_reward_class_unlock_fanfare":&"SFX/Reward",
+	&"sfx_prestige_completed":        &"SFX/Reward",
 }
 
 ## Default volume multipliers per §C.2. Keys match _CUE_BUS_MAP.
@@ -98,6 +106,7 @@ const _CUE_VOLUME_MULT_MAP: Dictionary = {
 	&"sfx_reward_level_up_chime":     1.2,
 	&"sfx_reward_floor_clear_fanfare":1.4,
 	&"sfx_reward_class_unlock_fanfare":1.5,
+	&"sfx_prestige_completed":        1.2,
 }
 
 
@@ -121,6 +130,10 @@ var _gold_chime_last_played_ms: int = 0
 ## but with a longer window (2.0s vs 0.25s) since slot-toggle is naturally
 ## slower than gold-event spam.
 var _class_synergy_detected_last_played_ms: int = 0
+
+## Prestige V1.0 (Sprint 21+ silent-MVP wiring) — throttle clock for the
+## prestige-completed fanfare. 2.0s window per audio-system.md §J.
+var _prestige_completed_last_played_ms: int = 0
 
 ## Currently-playing Ambient bed and its id. null = no bed playing.
 ## Tracked across crossfades so play_music can guard same-id no-ops.
@@ -211,6 +224,11 @@ func _ready() -> void:
 		var roster: Node = get_node("/root/HeroRoster")
 		if roster.has_signal("hero_leveled") and not roster.hero_leveled.is_connected(_on_hero_leveled):
 			roster.hero_leveled.connect(_on_hero_leveled)
+		# Prestige V1.0 — silent-MVP wiring per ADR-0016. AudioRouter subscribes
+		# to prestige_completed_signal; play_sfx degrades to silent no-op until
+		# the cue resource is sourced.
+		if roster.has_signal("prestige_completed_signal") and not roster.prestige_completed_signal.is_connected(_on_prestige_completed):
+			roster.prestige_completed_signal.connect(_on_prestige_completed)
 
 	# Economy (rank 3) — gold chime trigger (throttled per F.2).
 	if has_node("/root/Economy"):
@@ -558,6 +576,30 @@ func _on_class_synergy_detected(_synergy_id: String) -> void:
 ##   the orchestrator's dispatch-time emit contract).
 func _on_class_synergy_dispatched(_synergy_id: String) -> void:
 	play_sfx(&"sfx_class_synergy_dispatched", 1.0, 1.0)
+
+
+## Prestige V1.0 (Sprint 21+ silent-MVP wiring) — completion fanfare handler.
+## Per `audio-system.md` §J Prestige cross-reference: warm sting on retirement
+## action, throttled to once per [constant _PRESTIGE_COMPLETED_THROTTLE_MS]
+## (2.0s). Routes through `play_sfx` which honors the silent-MVP fallback —
+## the cue resource is intentionally absent in MVP per ADR-0016, so this
+## handler runs to completion and plays nothing audible. When a future ADR
+## supersedes ADR-0016 and the `sfx_prestige_completed.ogg` asset lands in
+## `assets/audio/sfx/`, the fanfare becomes audible with no code change.
+##
+## [param record]: prestige record dict from HeroRoster (display_name,
+##   class_id, level_at_retirement, prestige_index). Unused here — the
+##   audio cue is per-event, not per-hero. UI handles the hero name.
+## [param new_count]: post-retirement prestige count. Unused — same reason.
+func _on_prestige_completed(_record: Dictionary, _new_count: int) -> void:
+	# Hardening throttle: theoretical guard against back-to-back emissions.
+	# UI flow is one prestige-at-a-time but the throttle keeps the audio path
+	# defensible against future automation or test-emit bursts.
+	var now: int = Time.get_ticks_msec()
+	if now - _prestige_completed_last_played_ms < _PRESTIGE_COMPLETED_THROTTLE_MS:
+		return
+	_prestige_completed_last_played_ms = now
+	play_sfx(&"sfx_prestige_completed", 1.0, 1.2)
 
 
 # ---------------------------------------------------------------------------
