@@ -682,3 +682,69 @@ Append-only log per EPIC.md FR-9. Format:
   that lists asset paths.
 
 ---
+
+## 2026-05-10 — US-011 offline_progression_engine.gd
+
+- Audited 3 public funcs: run_offline_replay, is_replay_in_flight, last_summary.
+  All 3 have >=1 happy-path + >=1 edge-case test with assert_* calls.
+- Coverage map (per-function):
+    * run_offline_replay: extensively covered across 3 test files.
+        Unit (skeleton_test.gd):
+          - test_run_offline_replay_under_cap_does_not_emit_cap_reached (happy: under cap)
+          - test_run_offline_replay_at_exactly_cap_does_not_emit_cap_reached (edge: boundary)
+          - test_run_offline_replay_above_cap_emits_cap_reached_with_clipped_delta (edge: cap clipping)
+          - test_re_entrant_run_offline_replay_is_dropped_with_warning (edge: in-flight guard)
+          - test_run_offline_replay_with_zero_elapsed_emits_nothing (edge: cold launch)
+          - test_run_offline_replay_with_negative_elapsed_emits_nothing (edge: negative defensive)
+        Integration (offline_batch_chunking_test.gd): 30+ refs covering chunking,
+        adaptive sizing, signal-suppression, flush-ordering, and replay-in-flight
+        guard branches.
+        E2E (end_to_end_offline_replay_test.gd): full pipeline test_e2e_*
+        coverage including TickSystem-trigger, summary identity, AC-OE-12 8h
+        budget, AC-OE-13 per-chunk budget proxy, cap clipping, zero-elapsed
+        silent path, replay-in-flight pipeline guard.
+    * is_replay_in_flight: skeleton_test.gd::
+        test_is_replay_in_flight_reflects_internal_state (happy: default false +
+        edge: returns true after _replay_in_flight = true). Pure-accessor
+        contract — single observable behavior per US-008's stub-shape rule
+        (the function literally `return _replay_in_flight` with zero branching).
+    * last_summary: end_to_end_offline_replay_test.gd::
+        test_e2e_summary_cached_for_late_subscriber_via_last_summary
+          (happy: pre-flight null + post-replay populated + identity-equal to
+          emitted summary — covers BOTH branches of `return _last_summary`)
+        test_e2e_zero_elapsed_silent_no_summary_no_cache_no_route
+          (edge: cache stays null after zero-elapsed no-op replay)
+- Test result: tests/unit/offline_progression_engine green —
+  16 cases / 0 errors / 0 failures / 386ms (skeleton 16 + grep-CI 10 = 26
+  across 2 suites, all green).
+  tests/integration/offline_progression_engine green —
+  30 cases / 0 errors / 0 failures / 1s 309ms (2 suites: e2e + batch chunking).
+- New tests added: 0 (FR-6: existing coverage at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-011 offline_progression_engine | passes:true | new_tests_added:0 | notes:audit-only; engine has minimal public surface (3 funcs) with comprehensive happy+edge coverage across unit + integration + e2e tiers. run_offline_replay alone has 30+ test references locking cap/zero/negative/in-flight/chunking/flush-ordering branches.
+
+**Learnings for future iterations:**
+- Pure-accessor functions (`is_replay_in_flight`, `last_summary`) whose body
+  is a single `return <field>` statement satisfy FR-2 with one test per
+  observable field state. For `is_replay_in_flight`: false (default) +
+  true (after field-set) is the full surface. For `last_summary`: null
+  (pre-flight) + populated (post-replay) is the full surface. No need to
+  contrive additional "edge cases" beyond the field's observable values.
+  This reinforces US-008's single-branch / stub-shape coverage rule.
+- When a public function is also exercised through a *signal handler*
+  (`_on_offline_elapsed_seconds → run_offline_replay`), the e2e tier's
+  signal-driven invocation path (TickSystem.offline_elapsed_seconds.emit →
+  handler → method call) IS additional behavioral evidence beyond the
+  direct-call unit tests. The audit predicate's "function appears in test
+  code with assert_*" can include indirect invocation through the documented
+  signal-source-dependencies wiring (per US-002's tier-acceptance rule).
+- For autoload methods marked "QA / debug / test-fixture" use only
+  (run_offline_replay's docstring: "Production callers do NOT use this"),
+  the test surface IS the production surface for this method — there's no
+  "real production code path" to mirror because the production trigger is
+  the signal handler. This pattern recurs for autoloads with signal-driven
+  primary entry points (TickSystem._on_app_paused → bg cycle, etc.); future
+  audits should accept signal-handler-only coverage as fully covering the
+  underlying method when the signal handler is the sole production caller.
+
+---
