@@ -222,3 +222,44 @@ Append-only log per EPIC.md FR-9. Format:
   whose only legitimate caller is the test harness itself.
 
 ---
+
+## 2026-05-10 — US-005 enemy_database.gd
+
+- Audited 2 public funcs: get_by_id, get_all_ids. Both have >=1 happy-path
+  + >=1 edge-case test with assert_* calls.
+- Coverage map (per-function):
+    * get_by_id:
+      tests/integration/enemy_database/enemy_database_autoload_test.gd
+        - test_enemy_database_get_by_id_returns_null_on_miss (edge: missing id, TR-enemy-db-022)
+        - test_enemy_database_get_by_id_empty_string_returns_null (edge: empty string)
+        - test_enemy_database_get_by_id_resolves_mvp_enemies (happy: id round-trip + tier/display_name invariants, AC H-01)
+        - test_enemy_database_get_by_id_returns_same_instance (happy: object-identity / cache consistency)
+    * get_all_ids:
+      tests/integration/enemy_database/enemy_database_autoload_test.gd
+        - test_enemy_database_get_all_ids_returns_sorted_array (happy: sorted alphabetically + size>=7 when MVP loaded; edge: empty when DataRegistry not READY)
+        - test_enemy_database_get_by_id_resolves_mvp_enemies (transitively asserts get_all_ids returns iterable Array[String])
+- Test result: tests/integration/enemy_database suite green —
+  7 cases / 0 errors / 0 failures / 41ms.
+- New tests added: 0 (FR-6: existing coverage at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-005 enemy_database | passes:true | new_tests_added:0 | notes:audit-only; both public funcs covered at integration tier per US-002 precedent. Coverage tier acceptable since EPIC.md FR-2 specifies *behavioral coverage exists*, not tier-must-match-story.
+
+**Learnings for future iterations:**
+- The graceful-degrade pattern in enemy_database_autoload_test.gd
+  (push_warning + return when DataRegistry is not READY) is correct for
+  integration tests but produces tests that *trivially pass* without
+  assertions in environments where the DataRegistry has 0 enemy .tres
+  files. For this epic's audit predicate ("happy + edge with assert_*
+  within 5 lines"), the asserted branches (READY-state + sorted + tier
+  invariants + identity) ARE the happy/edge surface. The push_warning
+  branches are documented graceful-degrade fallbacks and don't need
+  separate happy-path coverage.
+- Thin typed-accessor wrappers (`get_by_id` = single-line DataRegistry
+  resolve cast; `get_all_ids` = filter-and-sort over get_all_by_type) are
+  a recurring pattern across rank-5 autoloads (EnemyDatabase,
+  HeroClassDatabase, BiomeDungeonDatabase). Their coverage bar is met by
+  asserting the *cast/filter behavior* (returns null/empty on miss; returns
+  typed result + sort order on hit), not by re-asserting DataRegistry's
+  own contracts.
+
+---
