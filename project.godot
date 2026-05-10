@@ -37,6 +37,7 @@ Recruitment="*res://src/core/recruitment/recruitment.gd"
 DungeonRunOrchestrator="*res://src/core/dungeon_run_orchestrator/dungeon_run_orchestrator.gd"
 OfflineProgressionEngine="*res://src/core/offline_progression_engine/offline_progression_engine.gd"
 AudioRouter="*res://src/core/audio_router/audio_router.gd"
+TelemetrySink="*res://src/core/telemetry_sink/telemetry_sink.gd"
 
 [audio]
 
