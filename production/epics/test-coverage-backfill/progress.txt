@@ -1,0 +1,63 @@
+# Test Coverage Backfill — Ralph Progress Log
+
+Append-only log per EPIC.md FR-9. Format:
+  <US-NNN> <basename> | <passes_status> | <new_tests_added> | <notes>
+
+## Codebase Patterns
+
+- Test runner invocation (macOS, Godot mono build):
+    /Applications/Godot_mono.app/Contents/MacOS/Godot --headless \
+      -s addons/gdUnit4/bin/GdUnitCmdTool.gd --ignoreHeadlessMode \
+      -a tests/unit/<dir-or-file>
+  The wrapper `tests/gdunit4_runner.gd` exists but the direct CmdTool form is
+  what CI uses. `--ignoreHeadlessMode` is REQUIRED — without it the runner
+  exits 103 (headless-mode unsupported guard).
+- Audit predicate (per EPIC technical considerations):
+    grep -nE "^func [a-z]" src/core/<system>/<file>.gd   # public funcs
+    grep -rn "<func_name>" tests/                         # references
+- Pre-existing baseline failures observed (NOT regressions, do not let them
+  block US-NNN closure if your file is unaffected):
+    * tests/unit/audio_router/audio_router_signal_handlers_test.gd ::
+      test_prestige_completed_handler_fires_play_sfx_with_volume_1_point_2
+      (2 fail count — single test, recorded twice; investigation deferred,
+      not in scope for test-coverage-backfill epic per FR-8 reading).
+- Test naming convention in this directory permits both `test_<system>_<...>`
+  and `test_<func>_<scenario>_<expected>`. See
+  tests/unit/audio_router/volume_persistence_round_trip_test.gd for the
+  function-prefixed style which matches stop_music_test.gd.
+
+---
+
+## Iteration log
+
+## 2026-05-10 — US-001 audio_router.gd
+
+- Audited 13 public funcs (set/get_master/music/sfx_volume_db,
+  set_master_muted, is_master_muted, play_sfx, play_music, stop_music,
+  get_save_data, load_save_data). All 13 had ≥1 test reference.
+- Gap found: stop_music had only `does_not_crash` smoke check; no assertion
+  on documented side effects (clearing _current_ambient_player /
+  _current_ambient_id; no-op when no bed playing).
+- Added tests/unit/audio_router/stop_music_test.gd with 3 tests:
+    * test_stop_music_after_play_music_clears_current_ambient_id (happy)
+    * test_stop_music_after_play_music_clears_current_ambient_player (happy)
+    * test_stop_music_with_no_bed_playing_leaves_state_clean (edge)
+- Test result: 3/3 passed; full audio_router/ suite shows 1 pre-existing
+  failure (test_prestige_completed_handler_*) confirmed to exist on baseline
+  (verified via git stash). No new failures introduced.
+- Files changed: tests/unit/audio_router/stop_music_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt (new).
+- Status: US-001 audio_router | passes:true | new_tests_added:3 | notes:filled stop_music side-effect coverage gap; volume getters/setters/muted/play_sfx/play_music/save_load already covered.
+
+**Learnings for future iterations:**
+- The `_get_ar()` accessor + `_reset_ambient_state()` hygiene barrier in
+  stop_music_test.gd is a reusable pattern for audio_router-touching tests.
+- Run a single test file FIRST (`-a tests/unit/<dir>/<file>_test.gd`) to
+  validate green, then run the directory for regression check. If the
+  directory shows failures absent from your single-file run, those are
+  pre-existing — confirm via `git stash -u && rerun && stash pop`.
+- The pre-existing prestige-completed test failure does NOT affect any
+  US-NNN whose subject file isn't audio_router signal_handlers internals.
+  US-001 closes as-is; flag for separate triage outside this epic.
+
+---
