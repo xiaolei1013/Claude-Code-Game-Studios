@@ -102,3 +102,65 @@ Append-only log per EPIC.md FR-9. Format:
   SaveLoadSystem) in later iterations.
 
 ---
+
+## 2026-05-10 — US-003 dungeon_run_orchestrator.gd
+
+- Audited 17 public funcs: report_offline_replay_error,
+  mark_floor_invalid_for_offline_replay, set_combat_resolver,
+  set_matchup_resolver, set_error_logger, set_floor_unlock, dispatch,
+  attribute_kill_gold, attribute_kill_xp, flush_offline_signals,
+  compute_offline_total_xp, xp_per_kill, xp_per_floor_clear,
+  get_last_dispatch_intent, resolve_floor_by_snapshot_id, get_save_data,
+  load_save_data. All 17 have >=1 happy-path + >=1 edge-case test with
+  assert_* calls.
+- Coverage map (per-function reference test):
+    * report_offline_replay_error / mark_floor_invalid_for_offline_replay:
+      tests/integration/dungeon_run_orchestrator/offline_error_and_floor_validity_test.gd
+      (TR-029/TR-031 happy + zero-partial-gold + null-snapshot edge cases).
+    * set_combat/matchup/error_resolver, set_floor_unlock: autoload_skeleton_and_di_test.gd
+      (replaces_internal_field happy + survives_ready_call edge — DI invariant).
+    * dispatch: 42 test files; deeply covered.
+    * attribute_kill_gold/xp: tests/unit/dungeon_run_orchestrator/class_synergy_formula_test.gd
+      (steel_wall vs bruiser/skirmisher, triple_threat unconditional, arcane_elite XP,
+      no_synergy baseline — 11 assertion-bearing tests).
+    * flush_offline_signals: 8 files (replay-completion side-effects covered).
+    * compute_offline_total_xp / xp_per_kill / xp_per_floor_clear:
+      offline_xp_batch_test.gd + stub_xp_grant_test.gd (tier-scaling happy paths +
+      clamp-to-zero edge for negative/zero floor index).
+    * get_last_dispatch_intent: last_dispatch_intent_test.gd
+      (initial-empty + after-success-populated + deep-copy-isolation).
+    * resolve_floor_by_snapshot_id: snapshot_and_matchup_cache_test.gd
+      (returns_null_for_unknown_id + returns_null_for_empty_id — covers BOTH
+      branches of current implementation; "floors" is NOT in
+      DataRegistry.ORDERED_CATEGORIES so non-null returns are not currently
+      reachable, leaving the empty-id and unknown-id null returns as the only
+      observable behaviors).
+    * get_save_data / load_save_data: 16/18 files (round-trip + corrupt-payload
+      coverage via save_load_system + autoload_persist suites).
+- Test result: tests/unit/dungeon_run_orchestrator suite green —
+  209 cases / 0 errors / 0 failures / 3s 21ms.
+- New tests added: 0 (FR-6: existing coverage at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-003 dungeon_run_orchestrator | passes:true | new_tests_added:0 | notes:audit-only; orchestrator is heaviest-tested file in project (42 dispatch-touching test files). All 17 public funcs covered with happy+edge across unit + integration tiers.
+
+**Learnings for future iterations:**
+- For accessor-style functions (`set_*` DI seams) the canonical happy+edge pair
+  is "replaces_internal_field" (happy) + "survives_ready_call" (edge —
+  injection-before-_ready survives the lazy-default branch). When auditing
+  other autoloads' DI seams (TickSystem, SaveLoadSystem, SceneManager), look
+  for this paired pattern in autoload_skeleton_*.gd files and accept it as
+  full coverage.
+- For functions with implementation branches gated by data-registry state
+  (e.g., `resolve_floor_by_snapshot_id` only returns non-null if "floors" were
+  a registered category — it isn't), BOTH observable-behavior branches (empty
+  + unknown) ARE the full coverage surface. A "happy path" doesn't have to
+  return a non-null/non-error value; it just has to assert the documented
+  return shape. This is consistent with FR-2 ("documented return shape /
+  behavior").
+- Heavy-coverage files like dungeon_run_orchestrator (42 test files) only
+  need an audit pass — searching `grep -rn "<func_name>" tests/` and
+  spot-checking the assertion shape suffices. Don't be tempted to "improve"
+  test names or refactor existing tests; that's out of scope per FR-8 spirit
+  ("non-regression in baseline" implies "don't touch passing tests").
+
+---
