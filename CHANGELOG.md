@@ -2,10 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.0.6] - 2026-05-10
+## [0.0.0.7] - 2026-05-10
 
 ### Added
-- **Telemetry Events V1.0 taxonomy + privacy spec** — Authored `production/live-ops/telemetry-events-v1.md` closing Sprint 20 S20-N3 (which Sprint 21 had referenced as "committed" but was never actually authored). Defines the 5-event opt-in local-sink layer (first_launch, recruit_purchased, run_dispatched, run_completed, prestige_completed) for answering 4 designer questions: cozy escalation curve adoption, offline progression honesty, balance bounds verification, first-session funnel. Cozy-register principles enumerate what we will NOT track (no FOMO bait, no session-length optimization, no fingerprinting, no PII). Opt-in defaults OFF; local-only sink in MVP; remote sink and a "delete diagnostic data" button explicitly deferred to V1.0+. Includes Stage 2 implementation phasing for the follow-up TelemetrySink autoload PR.
+- **Telemetry Events V1.0 Stage 2 — TelemetrySink autoload** — New `TelemetrySink` autoload (rank 19) implements the 5-event opt-in local-sink layer per the V1 taxonomy spec. Subscribes to gameplay signals (`SaveLoadSystem.first_launch`, `HeroRoster.hero_recruited`, `HeroRoster.prestige_completed_signal`, `DungeonRunOrchestrator.state_changed` filtered to DISPATCHING/RUN_ENDED). Each handler short-circuits when opt-in is OFF (the cozy-register default). When opted in, events are wrapped in the §D envelope (schema_version, timestamp_unix, ephemeral session_id, event_type, payload) and appended to `user://telemetry/events-YYYY-MM-DD.jsonl` with daily rotation. Save-consumer surface persists the opt-in toggle for future Settings UI wiring (consumer registration deferred to that PR; Stage 2 ships the autoload + signal infrastructure only).
 
 ## [0.0.0.5] - 2026-05-10
 
