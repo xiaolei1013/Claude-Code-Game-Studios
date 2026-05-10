@@ -263,3 +263,80 @@ Append-only log per EPIC.md FR-9. Format:
   own contracts.
 
 ---
+
+## 2026-05-10 — US-006 floor_unlock_system.gd
+
+- Audited 13 public funcs: set_warning_logger, set_error_logger, is_unlocked,
+  is_unlocked_in_biome, is_biome_available, is_biome_completed,
+  get_available_biomes, get_highest_cleared, get_floor_state, get_save_data,
+  load_save_data, debug_set_highest_cleared, debug_reset.
+- Coverage map (per-function):
+    * set_warning_logger / set_error_logger: biome_floor_count_and_di_loggers_test.gd
+      (TR-021 setter-replaces-default + injected-routing happy + fresh-instance
+      default-invokable edge — 4 explicit DI-setter tests).
+    * is_unlocked: floor_unlock_system_test.gd Group E
+      (accessible/locked/sentinel/cleared — 4 tests covering true+false+R10).
+    * is_unlocked_in_biome: floor_unlock_system_test.gd Group E2
+      (matches-1-arg-form happy + unavailable-biome edge + R10/over-range edge).
+    * is_biome_available / is_biome_completed / get_available_biomes:
+      biome_availability_and_completeness_test.gd (TR-023/TR-024 — active/empty/
+      unknown/multi-biome happy + fictional/empty-string/floor-count-zero/
+      below-count/stale-biome edges).
+    * get_highest_cleared: floor_unlock_system_test.gd Group C (fresh-save
+      default = 0 happy + planned-biome-default = 0 edge); also exercised as
+      assertion target across signal-handler/save-load/debug groups.
+    * get_floor_state: floor_unlock_system_test.gd Group D (UNAVAILABLE/LOCKED/
+      ACCESSIBLE/CLEARED matrix, 6 tests covering all 4 states + R10 sentinel +
+      over-range + below-highest + at-frontier branches).
+    * get_save_data: floor_unlock_system_test.gd Group G (canonical-schema
+      happy + payload-independence edge — guards external-mutation leak).
+    * load_save_data: floor_unlock_system_test.gd Group G + offline_replay_parity
+      integration suite (round-trip happy + missing-key/under-range/over-range/
+      non-numeric-tampered/lossy-float edges — 6 tests covering GDD §E
+      6-step processing order).
+    * debug_set_highest_cleared: GAP — only `has_method` existence test +
+      consumed by victory_moment integration suite as setup. No direct
+      happy/edge coverage.
+    * debug_reset: GAP — only `has_method` existence test. Zero behavioral
+      coverage despite being mutator (clear + reseed).
+- Gap closed: tests/unit/floor_unlock_system/debug_helpers_test.gd (7 new tests):
+    * test_debug_set_highest_cleared_writes_value_to_unlock_state (happy)
+    * test_debug_set_highest_cleared_overwrites_existing_value (edge: bypasses
+      monotone R4 invariant — debug helper is raw setter, can decrease)
+    * test_debug_set_highest_cleared_accepts_unknown_biome_and_creates_entry
+      (edge: no biome-availability validation on debug write — UI consumers
+      filter via is_biome_available)
+    * test_debug_set_highest_cleared_accepts_value_above_floor_count
+      (edge: bypasses load_save_data's over-range clamp)
+    * test_debug_reset_clears_existing_state_and_seeds_fresh_save_default (happy)
+    * test_debug_reset_on_already_empty_state_seeds_fresh_save_default
+      (edge: idempotent re-reset)
+    * test_debug_reset_drops_stale_biome_entries (edge: removed-biome cleanup)
+- Test result: tests/unit/floor_unlock_system suite green —
+  73 cases / 0 errors / 0 failures / 1s 1ms (was 66; +7 from new file).
+- New tests added: 7.
+- Files changed: tests/unit/floor_unlock_system/debug_helpers_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-006 floor_unlock_system | passes:true | new_tests_added:7 | notes:closed debug_set_highest_cleared + debug_reset behavioral-coverage gaps; all other 11 public funcs already at-or-above bar via existing floor_unlock_system suites.
+
+**Learnings for future iterations:**
+- The `OS.is_debug_build()` guard branch on debug helpers is NOT directly
+  testable in gdunit4 (the test runner IS a debug build by definition; no
+  hook lets us simulate `OS.is_debug_build() == false` without source-level
+  refactor). Document the production-blocked branch as covered-by-construction
+  and focus tests on the in-debug-build mutating path.
+- When auditing autoloads with debug/test API surface (`debug_*` methods),
+  expect them to be consumed as integration-test setup but NOT to have direct
+  unit-test coverage. Future US-NNN audits for autoloads with debug helpers
+  (HeroRoster.debug_*, FormationAssignment.debug_*, Recruitment.debug_*) will
+  likely surface the same gap shape — reuse the helper-test file pattern from
+  debug_helpers_test.gd.
+- Mutator helpers (debug_*) need **paired happy + bypass-edge** tests:
+  happy = "writes value, accessor reflects" (the contract);
+  edge1 = "bypasses an invariant the production path enforces" (e.g., monotone
+    R4 → debug can decrease; over-range clamp → debug accepts 999 unclamped);
+  edge2 = "skips a validation the production path requires" (e.g., biome
+    availability check → debug accepts unknown biome).
+  This shape captures WHY the helper is dangerous in production code-paths.
+
+---
