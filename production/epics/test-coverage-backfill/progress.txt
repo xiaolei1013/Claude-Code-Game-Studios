@@ -1195,3 +1195,82 @@ Append-only log per EPIC.md FR-9. Format:
   and not accept skeleton-tier coverage alone.
 
 ---
+
+## 2026-05-10 — US-016 tick_system.gd
+
+- Audited 8 public funcs: now_ms, current_tick, get_last_persist_ts,
+  get_session_high_water, set_last_persist_ts, set_session_high_water,
+  set_ui_paused, bootstrap_offline_replay. Story note also calls out
+  _read_wall_clock_unix_time (private) for singleton-call-site invariant.
+- Coverage map (per-function):
+    * now_ms: process_delta_forbidden_wall_clock_single_call_site_test.gd
+        - test_now_ms_returns_zero_before_wall_clock_read (edge / cold-start)
+        - test_now_ms_returns_last_wall_ts_times_1000_after_read (happy)
+        - tick_system_autoload_skeleton_test.gd::test_tick_system_now_ms_returns_zero
+          (structural smoke)
+    * current_tick: 14 test files. integer_accumulator_tick_fired_emission_test.gd
+      asserts post-process non-zero increment (happy); skeleton zero-state (edge);
+      heartbeat_accumulator_test.gd asserts ticks-suppressed-but-heartbeat-fires
+      under set_ui_paused(true) (boundary).
+    * get_last_persist_ts: skeleton zero-state + Group A round-trip via this
+      iteration's new test (post-set returns the written value).
+    * get_session_high_water: skeleton zero-state + Group B round-trip via this
+      iteration's new test.
+    * set_last_persist_ts: skeleton "no-error smoke" + new round-trip + overwrite
+      + boundary-zero-after-nonzero edges.
+    * set_session_high_water: skeleton "no-error smoke" + new round-trip +
+      no-max-applied invariant (smaller-overwrites-larger; doc comment L327-329
+      pins this as caller-responsibility) + boundary-zero edge.
+    * set_ui_paused: heartbeat_accumulator_test.gd::test_*_paused (happy: heartbeat
+      continues, ticks suppressed); platform_notifications integration test
+      pause/unpause cycle (edge: residual preservation across pause window).
+    * bootstrap_offline_replay: offline_elapsed_formula_d2_clamp_rewind_overflow_test.gd
+      Test 7 first-launch happy + Test 8 process-scoped one-shot edge.
+    * _read_wall_clock_unix_time: process_delta_forbidden_wall_clock_single_call_site_test.gd
+      Test 2 (happy: returns plausible epoch + caches) + Test 3 (edge: successive
+      calls non-decreasing). Single-call-site invariant covered by INV-1 grep
+      guard at the source-file head + the test-file's namespace-discipline test.
+- Gap closed: tests/unit/tick_system/persist_ts_accessors_round_trip_test.gd (8 new tests):
+    * test_set_last_persist_ts_then_get_returns_same_value (happy)
+    * test_set_last_persist_ts_overwrites_previous_value_no_accumulation (last-writer)
+    * test_set_last_persist_ts_to_zero_after_nonzero_returns_zero (boundary)
+    * test_set_session_high_water_then_get_returns_same_value (happy)
+    * test_set_session_high_water_does_not_apply_max_smaller_overwrites_larger (invariant)
+    * test_set_session_high_water_to_zero_after_nonzero_returns_zero (boundary)
+    * test_set_last_persist_ts_does_not_affect_session_high_water (independence)
+    * test_set_session_high_water_does_not_affect_last_persist_ts (independence)
+- Test result: tests/unit/tick_system suite green —
+  63 cases / 0 errors / 0 failures / 640ms (was 55; +8 from new file).
+- New tests added: 8.
+- Files changed: tests/unit/tick_system/persist_ts_accessors_round_trip_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-016 tick_system | passes:true | new_tests_added:8 | notes:closed setter→getter round-trip + no-max-applied invariant gap on the persist-timestamp accessors. Skeleton's "no-error smoke" is necessary but insufficient evidence per FR-2.
+
+**Learnings for future iterations:**
+- Skeleton autoload test files (tick_system_autoload_skeleton_test.gd,
+  economy_autoload_skeleton_test.gd, etc.) commonly assert "completes
+  without error" for setters and "returns zero" for getters. That's
+  STRUCTURAL coverage — necessary to confirm the stub body doesn't
+  raise + the cold-start invariant — but per FR-2 ("happy-path test
+  asserting the documented return shape / behavior"), it does NOT
+  satisfy happy-path coverage on its own. For each setter/getter
+  pair on autoloads, future audits should ALSO look for a round-trip
+  test that asserts `set(X) → get() == X`. If only the skeleton tier
+  exists, that's a gap closeable with ~8-10 lines of new test.
+- Pinning a "negative invariant" (e.g., set_session_high_water DOES
+  NOT apply max(); set_last_persist_ts DOES NOT accumulate) in test
+  form is high-leverage. The doc comment can drift; the test fails
+  loudly and forces the comment update in the same patch. This is
+  the "test pins the invariant, doc comment annotates the why"
+  pattern — reuse for any caller-responsibility seam where the
+  body of the function is intentionally minimal.
+- Integration tests that read a private field (e.g.
+  platform_notifications test reads `ts._last_persist_unix` directly
+  rather than calling `ts.get_last_persist_ts()`) do NOT count as
+  public-getter coverage per FR-2. The audit predicate is "function
+  appears in test code with assert_* within ~5 lines" but the spirit
+  is "the public API surface is exercised". When a getter is bypassed
+  in favor of the private field, write a separate accessor test —
+  even 1-2 lines suffices to close the audit gap.
+
+---
