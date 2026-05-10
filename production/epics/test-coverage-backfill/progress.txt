@@ -885,3 +885,113 @@ Append-only log per EPIC.md FR-9. Format:
   no signal beyond the existing graceful-degrade documentation.
 
 ---
+
+## 2026-05-10 — US-013 save_load_system.gd
+
+- Audited 8 public funcs: get_state, request_full_persist,
+  request_heartbeat_persist, request_full_load, acknowledge_corrupt_both_begin,
+  acknowledge_tamper_modal_yes, get_tamper_suspicious_count,
+  get_pending_flags_bit0_tamper. All 8 have >=1 happy-path + >=1 edge-case
+  test with assert_* calls.
+- Coverage map (per-function reference test):
+    * get_state: 5 files (autoload_skeleton_test.gd, schema_migration_test.gd,
+      tests/integration/save_load/{save_persist_roundtrip,tamper_detection,
+      schema_migration_e2e}_test.gd). Initial-state happy
+      (initial_state_is_unloaded), full state-machine path
+      (UNLOADED→LOADING→READY→PERSISTING→READY in autoload_skeleton Group D),
+      and edge cases for terminal CORRUPT (tamper / garbage payload load
+      paths in roundtrip + e2e suites).
+    * request_full_persist: 8 files including dedicated
+      tests/unit/save_load/request_full_persist_test.gd. Happy path:
+      autoload_skeleton::test_transition_to_valid_full_path_unloaded_to_ready
+      via state-machine drive. Edge paths: rejects-when-state-unloaded,
+      rejects-when-state-loading, coalesces-when-state-persisting (each its
+      own test in request_full_persist_test.gd), plus method-existence guard
+      and signal-declaration assertions.
+    * request_heartbeat_persist: 3 files. Happy path:
+      tests/unit/save_load/persist_wrappers_test.gd::
+      test_request_heartbeat_persist_forwards_to_full_persist_with_reason_heartbeat.
+      Edge paths: empty-time_fields dict, coalesces-when-persisting, method
+      existence. Integration: heartbeat_accumulator_test.gd exercises the
+      TickSystem→SaveLoadSystem heartbeat trigger; offline_replay_parity
+      exercises it post-replay.
+    * request_full_load: 5 files. Happy path:
+      save_persist_roundtrip_test.gd::test_request_full_load (UNLOADED →
+      READY transition via canonical envelope). Edge paths:
+      rejects-when-state-is-ready, tamper-load → CORRUPT, garbage-load →
+      CORRUPT, schema-migration-e2e v0/v99/v1 forged-payload paths
+      (3 dedicated tests in schema_migration_e2e_test.gd lines 186/220/244),
+      mainroot_boot_wiring exercises boot-time invocation.
+    * acknowledge_corrupt_both_begin: 1 file (tamper_detection_test.gd) with
+      3 dedicated tests:
+        - test_acknowledge_corrupt_both_begin_runs_first_launch_bootstrap
+          (happy: CORRUPT → first-launch boot reset)
+        - test_acknowledge_corrupt_both_begin_resets_meta_to_first_launch_defaults
+          (happy: meta-state cleared)
+        - test_acknowledge_corrupt_both_begin_ignored_when_state_not_corrupt
+          (edge: defensive guard against non-CORRUPT calls)
+    * acknowledge_tamper_modal_yes: 2 files. Happy path:
+      tamper_counter_and_constants_test.gd::
+      test_acknowledge_tamper_modal_yes_increments_counter_AND_sets_pending_flags_bit0.
+      Edge paths: idempotent_on_repeated_taps (3-tap → counter==3,
+      stuck-double-tap design comment), counter-saturation at
+      MAX_TAMPER_SUSPICIOUS_COUNT, plus integration tier
+      (tamper_detection_test.gd::test_acknowledge_tamper_modal_yes_persists
+      _flags_bit0_set_in_envelope_header) for round-trip persistence.
+    * get_tamper_suspicious_count: 1 file
+      (tamper_counter_and_constants_test.gd) with 5+ assertions covering
+      initial-zero (happy), post-acknowledge increment (happy), saturation
+      at MAX_* (edge), monotone-across-3-taps (edge).
+    * get_pending_flags_bit0_tamper: 2 files
+      (tamper_counter_and_constants_test.gd + tamper_detection_test.gd).
+      Happy: post-acknowledge returns true. Edge: initial false, false-after-
+      persist-clears-flag (envelope round-trip), still-true-on-pending-state.
+- Test result: tests/unit/save_load suite green —
+  129 cases / 0 errors / 0 failures / 1s 20ms across 9 suites
+  (autoload_skeleton, envelope_layout, hmac_rfc4231,
+  integrity_tag_derivation, persist_wrappers, request_full_persist,
+  schema_migration, tamper_counter_and_constants, xor_mask_derivation).
+- New tests added: 0 (FR-6: existing coverage at-or-above bar — file is
+  among the most heavily tested in the project, with dedicated unit
+  suites per public-method group plus integration tier coverage for
+  request_full_load + tamper-detection round-trips).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-013 save_load_system | passes:true | new_tests_added:0 | notes:audit-only; 8 public funcs covered with happy+edge across 9 unit suites + 4 integration suites. State-machine surface (get_state + request_full_persist/load coalescing/rejection) heavily covered in autoload_skeleton + dedicated request_full_persist_test. Tamper surface (counter + flag-bit0 + acknowledge_tamper_modal_yes + acknowledge_corrupt_both_begin) covered by tamper_counter_and_constants + tamper_detection integration suites.
+
+**Learnings for future iterations:**
+- For state-machine autoloads with reject/coalesce semantics on entry-point
+  methods (request_full_persist, request_full_load), the canonical coverage
+  shape is: happy = legal-transition path; edge1 = rejected-when-state-X
+  (one test per illegal entry state); edge2 = coalesced-when-state-Y (the
+  in-flight idempotency contract). request_full_persist_test.gd:122/140/153
+  is the exemplar — three dedicated tests covering UNLOADED-reject,
+  LOADING-reject, PERSISTING-coalesce. Future audits of state-machine
+  autoloads (e.g., DungeonRunOrchestrator FSM future expansion) should
+  expect this triple-coverage shape and not accept a single "happy +
+  one-rejection" pair as full coverage.
+- For UI-entry-point methods (acknowledge_*), the ATTACK SURFACE pattern is
+  always: happy = single-tap effect, edge1 = stuck-double-tap idempotency
+  (3+ rapid taps), edge2 = saturation/clamp at numeric bound, edge3 =
+  defensive guard against wrong-state invocation. tamper_counter_and_
+  constants_test.gd lines 113/143 cover the double-tap and saturation
+  edges; tamper_detection integration covers the wrong-state guard via
+  test_acknowledge_corrupt_both_begin_ignored_when_state_not_corrupt.
+  Reuse this 4-test shape for any future "user dismisses modal" methods.
+- File-per-public-method test organization (request_full_persist_test.gd,
+  persist_wrappers_test.gd, tamper_counter_and_constants_test.gd) scales
+  better than monolithic skeleton_test.gd for autoloads with 6+ public
+  funcs. The autoload_skeleton_test.gd here covers ONLY the state-machine
+  + signal-declaration invariants; the per-method unit tests cover the
+  actual call-site behaviors. Future heavy-surface autoloads (HeroRoster
+  has 22 funcs but uses split files like add_hero_and_signals_test.gd /
+  prestige_v1_test.gd) should follow this split-file pattern rather than
+  growing a single skeleton suite past ~20 tests.
+- Signal-handler coverage pattern: `acknowledge_*` methods that emit
+  signals (corrupt_both_acknowledged, tamper_detected_on_load) need
+  separate tests for (a) the method's state-machine effect and (b) the
+  signal emission with correct payload. Don't conflate — a single test
+  asserting method-call-and-signal-emission can pass even if the signal
+  fires from the wrong code path. Mirrors the §D ordering invariant
+  from US-007 formation_assignment commit_test.gd.
+
+---
