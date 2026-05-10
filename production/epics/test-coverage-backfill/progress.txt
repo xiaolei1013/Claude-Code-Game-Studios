@@ -1483,3 +1483,56 @@ Append-only log per EPIC.md FR-9. Format:
   handles it cleanly via FR-7.
 
 ---
+
+## 2026-05-10 — US-021 combat/combat_resolver.gd
+
+- Audited public-function surface: `grep -nE "^func " src/core/combat/combat_resolver.gd`
+  returns ZERO matches. The file is a deliberate "interface by convention" base
+  class (Godot 4 lacks `@abstract` on RefCounted per file-header doc-comment);
+  zero `func`, zero `var`, zero `signal` declarations. Concrete subclasses
+  (DefaultCombatResolver in Story 003, test spies) override the two virtual
+  entry points (`emit_events_in_range`, `compute_offline_batch`).
+- Per FR-7 the file is EXEMPT (no testable public surface), BUT the structural
+  contract IS load-bearing (TR-combat-001 + TR-027: stateless invariant; TR-030:
+  no signal emission — orchestrator owns emission). That contract is
+  comprehensively covered by:
+    * tests/unit/combat_resolution/value_types_and_equals_test.gd Group A —
+      5 cases:
+        - test_combat_resolver_can_be_instantiated_via_new (happy: RefCounted.new())
+        - test_combat_resolver_is_refcounted_not_resource (RefCounted-not-Resource invariant)
+        - test_combat_resolver_class_name_resolves (class_name binding)
+        - test_combat_resolver_source_has_zero_class_scope_vars (TR-001/027 stateless)
+        - test_combat_resolver_source_has_zero_signal_declarations (TR-030 no-signal)
+    * Concrete subclass tests (DefaultCombatResolver) cover the two virtual
+      entry points: dps_and_hp_formulas_test.gd (21 references), cooldown_formula_test.gd, etc.
+- Test result: tests/unit/combat_resolution/value_types_and_equals_test.gd suite
+  green — 28 cases / 0 errors / 0 failures / 193ms.
+- New tests added: 0 (FR-7 exemption + FR-6 existing structural-invariant coverage above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-021 combat_resolver | passes:true | new_tests_added:0 | notes:audit-only; zero-public-surface "interface by convention" base (FR-7 exemption); structural invariants (RefCounted, stateless, no-signal) covered by 5 dedicated Group A cases in value_types_and_equals_test.gd + virtual entry points covered transitively via DefaultCombatResolver tests. EPIC's expectation ("Likely abstract base — may mark `passes: true` with 'covered via DefaultCombatResolver tests'") confirmed.
+
+**Learnings for future iterations:**
+- US-021 is the SECOND zero-public-function story in a row (after US-020
+  main_root.gd), but with a different shape: main_root has private lifecycle
+  methods (`_ready` etc.); combat_resolver has LITERALLY ZERO `func`
+  declarations of any kind. The file is "interface by convention" — Godot 4
+  doesn't support `@abstract` on RefCounted, so the abstract-base contract is
+  enforced via (a) doc-comments, (b) structural CI lint pattern (Story 010 of
+  combat-resolution epic), and (c) source-content assertion tests that re-read
+  the file and grep for `var ` / `signal ` lines.
+- The "source-content assertion test" pattern
+  (test_combat_resolver_source_has_zero_class_scope_vars) is a reusable
+  technique for any file where the contract is structural (no var, no signal,
+  no super() call, etc.) rather than behavioral. It uses FileAccess.open()
+  + line-by-line trim + .begins_with() check. Future audits of similar
+  abstract-base interfaces (US-023 matchup_resolver/matchup_resolver.gd is
+  the next likely candidate) should expect the same pattern and accept it as
+  full coverage of the structural contract.
+- The audit predicate `grep -nE "^func "` (no character class) is broader
+  than `grep -nE "^func [a-z]"` (public-only) — for files that legitimately
+  have zero functions of ANY kind, the broader predicate confirms the
+  zero-surface state more decisively. Use the broader form when initial
+  audit returns zero matches, to distinguish "all-private file with no
+  public API" from "literally-zero-function abstract base".
+
+---
