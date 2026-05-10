@@ -502,3 +502,105 @@ Append-only log per EPIC.md FR-9. Format:
   to force-load fixtures; the graceful-degrade IS the design.
 
 ---
+
+## 2026-05-10 — US-009 hero_roster.gd
+
+- Audited 22 public funcs: max_roster_size, formation_size, level_cap,
+  add_hero, remove_hero, is_prestige_eligible, prestige_hero,
+  get_prestige_multiplier, get_retired_hero_records, get_prestige_count,
+  set_hero_level, xp_threshold, add_xp, set_formation_slot,
+  get_formation_strength, get_formation_heroes, get_formation_slot,
+  get_copies_owned, get_all_heroes, seed_first_launch_state, get_save_data,
+  load_save_data.
+- Coverage map (per-function reference test):
+    * max_roster_size / formation_size / level_cap: 26/35/55 refs across
+      hero_roster_autoload_skeleton_test.gd + roster_config_test.gd
+      (constant-table happy + fallback-when-config-null edge).
+    * add_hero: 60 refs; add_hero_and_signals_test.gd is the canonical
+      surface (happy + signal-emit + capacity-rejection edge cases).
+    * remove_hero: 17 refs; mutation_api_test.gd + add_hero_and_signals_test
+      cover happy (single + last hero) + edge (unknown id false).
+    * is_prestige_eligible / prestige_hero / get_prestige_multiplier: 14/16/16
+      refs across prestige_v1_test.gd + prestige_v1_story3_logic_test.gd
+      (AC-PR-01..16 happy + ineligible-hero + last-hero-protection edges).
+    * get_retired_hero_records: GAP — 0 direct refs. Exercised only via
+      direct field access (_retired_hero_records) from prestige_v1_test.gd;
+      the public getter (deep-copy contract) had no happy/edge coverage.
+    * get_prestige_count: GAP — 0 direct refs. Field _prestige_count
+      heavily exercised across prestige_v1_test, prestige_perkill_wiring,
+      hall_button_visibility, telemetry_sink_signal_handlers, but the
+      public getter never under assertion.
+    * set_hero_level / xp_threshold / add_xp: 21/5/18 refs; add_xp_test.gd
+      covers happy (level-up + signal emit) + edge (clamp-to-cap, unknown id,
+      negative amount).
+    * set_formation_slot / get_formation_strength / get_formation_heroes /
+      get_formation_slot: 35/10/10/14 refs; formation_strength_and_accessors
+      _test.gd covers happy + edge (out-of-range slot, hero_id=0 sentinel).
+    * get_copies_owned: 26 refs; get_copies_owned_test.gd covers happy +
+      edge (zero-copies, unknown class_id).
+    * get_all_heroes: 24 refs; formation_strength_and_accessors_test +
+      add_hero_and_signals cover SortMode.BY_CLASS / BY_LEVEL / BY_NAME
+      paths plus empty-roster edge.
+    * seed_first_launch_state: 19 refs; first_launch_seed_test.gd is the
+      canonical happy + idempotent-rerun + post-load-no-overwrite edges.
+    * get_save_data / load_save_data: 95/131 refs; save_load_round_trip_test
+      (integration) + autoload_skeleton + 14 other consumer suites cover
+      round-trip + schema_version_mismatch + corrupt-payload edges.
+- Gap closed: tests/unit/hero_roster/get_retired_records_and_prestige_count_test.gd
+  (10 new tests):
+    * Group A — get_retired_hero_records:
+        - test_get_retired_hero_records_initial_returns_empty_array (happy)
+        - test_get_retired_hero_records_after_prestige_returns_one_record (happy)
+        - test_get_retired_hero_records_returns_deep_copy_outer_array_isolated
+          (edge: consumer .clear()/.append() does not contaminate persisted state)
+        - test_get_retired_hero_records_returns_deep_copy_inner_dict_isolated
+          (edge: per-record dict mutation does not leak — duplicate(true) deep
+          copy contract; mirrors UI renderer adding transient "selected" key)
+        - test_get_retired_hero_records_after_multiple_prestiges_returns_all
+          (happy: 3 prestiges return 3-element array with prestige_index 1..3)
+    * Group B — get_prestige_count:
+        - test_get_prestige_count_initial_returns_zero (happy)
+        - test_get_prestige_count_after_one_prestige_returns_one (happy)
+        - test_get_prestige_count_monotone_across_three_prestiges
+          (happy: live-read 0->1->2->3 across sequential prestige_hero calls)
+        - test_get_prestige_count_does_not_mutate_state
+          (edge: pure-accessor invariant; 10 reads do not advance count)
+        - test_get_prestige_count_reflects_direct_field_writes
+          (edge: live-read invariant; getter is not cached snapshot —
+          load_save_data field writes are immediately visible)
+- Test result: tests/unit/hero_roster suite green —
+  194 cases / 0 errors / 0 failures / 2s 393ms (was 184; +10 from new file).
+  New file alone: 10/10 passed in 131ms.
+- New tests added: 10.
+- Files changed: tests/unit/hero_roster/get_retired_records_and_prestige_count_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-009 hero_roster | passes:true | new_tests_added:10 | notes:closed get_retired_hero_records (deep-copy isolation) + get_prestige_count (pure accessor) gaps; all other 20 public funcs already at-or-above bar via 12 existing hero_roster suites + integration suites.
+
+**Learnings for future iterations:**
+- The "field heavily exercised but public getter never called" pattern (US-004
+  refinement) recurs for HeroRoster — same shape as Economy's get_config gap.
+  When auditing autoloads, check BOTH `grep -rn "<func_name>" tests/` (which
+  catches direct calls under assertion) AND `grep -rn "_<field_name>" tests/`
+  (which catches field-access exercises). If field refs >> getter refs, the
+  getter is likely an audit gap even though "behavior is exercised".
+- Deep-copy isolation contracts have TWO observable layers that must be
+  tested separately: (1) outer array structure (consumer .clear()/.append()
+  doesn't reach the source), (2) inner element mutation (per-record dict
+  changes don't leak). A single test conflating both would pass even if
+  duplicate(true) became a shallow `.duplicate()` — the inner-dict assertion
+  is what locks in the deep semantics. This generalises to any Array[Dict]
+  / Array[Resource] return type with documented duplicate(true) contract.
+- Pure-accessor invariants (no state mutation on read) are best tested via
+  loop-of-10 reads + post-loop field-equality assertion. A single read can't
+  detect off-by-one auto-increment bugs (count would go 7 -> 8 once but a
+  single before/after compare wouldn't fire); the loop forces the bug to
+  amplify into a clear delta. Cheap and fast (under 1ms) — worth including
+  on every pure-getter test going forward.
+- The `_make_roster()` + warm-TickSystem-cache pattern from prestige_v1_test
+  is required for ANY test that calls prestige_hero (retirement_unix_ts
+  capture routes through TickSystem.now_ms() per ADR-0005). Without warming
+  the wall-clock cache, the assertion `rec.retirement_unix_ts > 0` fires
+  silently. Reuse this helper verbatim across prestige-touching tests; do
+  NOT skip the TickSystem warming step.
+
+---
