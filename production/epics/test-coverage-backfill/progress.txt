@@ -1274,3 +1274,55 @@ Append-only log per EPIC.md FR-9. Format:
   even 1-2 lines suffices to close the audit gap.
 
 ---
+
+## 2026-05-10 — US-017 boot_namespace.gd
+
+- Audited 2 public funcs: get_namespace_bytes, get_boot_prefix_a. Both are
+  pure getters returning `duplicate()` of class-level `static var`
+  PackedByteArrays.
+- Coverage map BEFORE this iteration:
+    * Function names appeared only as ASCII reference comments in
+      tests/unit/save_load/xor_mask_derivation_test.gd:26 and
+      tests/unit/save_load/integrity_tag_derivation_test.gd:26.
+      Neither file calls the getter — they hand-construct the byte arrays
+      independently as reference paths. Per FR-2 ("function appears in test
+      code with an assert_* call within ~5 lines"), this is NOT coverage of
+      the public API surface; the SaveLoadSystem suites assert the byte
+      content via their own constants, not via a call to the getter.
+    * No prior tests/unit/boot_namespace/ directory existed.
+- Gap closed: tests/unit/boot_namespace/boot_namespace_test.gd (4 new tests):
+    * test_get_namespace_bytes_returns_documented_16_byte_ascii_salt (happy)
+    * test_get_namespace_bytes_returns_copy_so_mutation_does_not_poison_subsequent_calls (edge — duplicate invariant)
+    * test_get_boot_prefix_a_returns_documented_16_byte_ascii_fragment (happy)
+    * test_get_boot_prefix_a_returns_copy_so_mutation_does_not_poison_subsequent_calls (edge — duplicate invariant)
+- Test result: tests/unit/boot_namespace suite green —
+  4 cases / 0 errors / 0 failures / 22ms.
+- New tests added: 4.
+- Files changed: tests/unit/boot_namespace/boot_namespace_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-017 boot_namespace | passes:true | new_tests_added:4 | notes:closed full public-API gap; both 16-byte getters now have happy + duplicate-invariant edge coverage. Mutation-poisoning edge is the load-bearing one — without it, a future regression that drops the `.duplicate()` would silently let consumers mutate the shared static.
+
+**Learnings for future iterations:**
+- `const _NAME: PackedByteArray = PackedByteArray([...])` does NOT compile —
+  GDScript rejects `PackedByteArray(...)` constructor calls in constant
+  expressions (same restriction as the production `static var _GAME_NAMESPACE_BYTES`
+  in src/core/boot_namespace/boot_namespace.gd). Use `static var` in tests
+  too. The xor_mask_derivation_test.gd file also uses `static var` for the
+  same reason — that's the canonical precedent.
+- "Reference comments inside another test file" do NOT satisfy FR-2's audit
+  predicate. A pure getter still needs its own assert_*-bearing test, even
+  if downstream consumers' reference paths reproduce the byte content. This
+  is the first US-NNN where the gap was "audited as covered by adjacent
+  comment text but actually not covered at all" — the audit predicate is
+  "assert_* within 5 lines of the function NAME APPEARING IN TEST CODE",
+  not "the byte content shows up somewhere".
+- The `duplicate()` invariant is the single load-bearing invariant of
+  these getters. Without the edge-case "mutate result, re-call, confirm
+  unchanged" assertion, a refactor that drops `.duplicate()` would pass
+  the happy-path test (first call still returns correct bytes) but
+  silently let the next consumer poison the shared static. This pattern
+  generalizes to ANY pure getter that returns a mutable container
+  (PackedByteArray, Array, Dictionary, etc.) — assert the duplicate
+  invariant, not just the happy-path content.
+
+---
