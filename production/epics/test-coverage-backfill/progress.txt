@@ -1100,3 +1100,98 @@ Append-only log per EPIC.md FR-9. Format:
   "non-empty peer-stack stays-paused" assertion exists at integration tier.
 
 ---
+
+## 2026-05-10 — US-015 telemetry_sink.gd
+
+- Audited 4 public funcs: set_opt_in, is_opt_in, get_save_data,
+  load_save_data. All 4 have >=1 happy-path + >=1 edge-case test with
+  assert_* calls.
+- Coverage map (per-function reference test):
+    * set_opt_in:
+      tests/unit/telemetry_sink/telemetry_sink_skeleton_test.gd
+        - test_set_opt_in_true_flips_getter (happy)
+        - test_set_opt_in_false_resets_getter (happy — toggle-back path)
+        - test_opt_in_flip_takes_effect_without_reboot (Group E hot-flip
+          edge — confirms no autoload reboot required across off→on→off
+          cycle, the critical privacy-toggle UX invariant per taxonomy
+          doc §C.1).
+      tests/unit/telemetry_sink/telemetry_sink_signal_handlers_test.gd
+        (8 assertion-bearing handler tests use set_opt_in(true) to enable
+        emission paths — confirms set_opt_in is the universal gate for
+        every event handler short-circuit per taxonomy doc §C.1).
+      tests/integration/telemetry_sink/local_sink_round_trip_test.gd
+        (4 tests use set_opt_in(true)/(false) to drive the JSONL append
+        vs no-op branches — full integration tier opt-in branch coverage).
+    * is_opt_in:
+      tests/unit/telemetry_sink/telemetry_sink_skeleton_test.gd
+        - test_opt_in_default_is_false_per_cozy_register (happy +
+          taxonomy-spec-default invariant — covers the boot state)
+        - implicit happy/edge via every set_opt_in test (5+ assert
+          chains read is_opt_in() to verify the setter took effect).
+    * get_save_data:
+      tests/unit/telemetry_sink/telemetry_sink_skeleton_test.gd
+        - test_get_save_data_returns_telemetry_opt_in_field (happy —
+          asserts dict shape with telemetry_opt_in field present and
+          value matches set_opt_in(true) effect).
+        - test_save_load_round_trip_preserves_opt_in_state (happy +
+          serialization-stability edge — guards against silent shape
+          drift across the get→load round-trip).
+    * load_save_data:
+      tests/unit/telemetry_sink/telemetry_sink_skeleton_test.gd
+        - test_load_save_data_restores_opt_in_true (happy — explicit
+          field load).
+        - test_load_save_data_missing_field_defaults_false (edge —
+          pre-V1 save migration path; missing-field defaults to OFF
+          per taxonomy doc §C.1 opt-in-default-OFF invariant — the
+          load-bearing privacy guarantee).
+        - test_save_load_round_trip_preserves_opt_in_state (happy
+          round-trip via mutation).
+- Test result:
+    tests/unit/telemetry_sink green —
+      26 cases / 0 errors / 0 failures / 175ms across 2 suites
+      (telemetry_sink_signal_handlers, telemetry_sink_skeleton).
+    tests/integration/telemetry_sink green —
+      4 cases / 0 errors / 0 failures / 22ms across 1 suite
+      (local_sink_round_trip).
+- New tests added: 0 (FR-6: existing coverage at-or-above bar — file
+  shipped Sprint 21 S21-N3 Stage 2 with comprehensive skeleton + handler
+  + integration test suites already in place; PRD note "Likely
+  passes:true after audit" confirmed).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-015 telemetry_sink | passes:true | new_tests_added:0 | notes:audit-only; 4 public funcs covered with happy+edge across 2 unit suites + 1 integration suite. Privacy-default-OFF invariant (taxonomy doc §C.1) protected by test_load_save_data_missing_field_defaults_false (pre-V1 migration path) + test_opt_in_default_is_false_per_cozy_register (boot state) — both load-bearing and present.
+
+**Learnings for future iterations:**
+- For settings autoloads with a single load-bearing privacy-default
+  invariant (TelemetrySink: opt_in defaults FALSE per taxonomy doc §C.1),
+  the audit predicate must verify TWO independent tests cover the
+  default: (a) boot-state default (test_opt_in_default_is_false_per_*)
+  AND (b) pre-V1-save migration default
+  (test_load_save_data_missing_field_defaults_false). A single test
+  asserting "default is false" is INSUFFICIENT — the load_save_data path
+  is a separate code path that could regress (e.g., if d.get default
+  changes from false → true). Both tests must be present and named
+  distinctly. Future audits of any "privacy-default-OFF" or "secure-
+  default" settings autoloads (any future PII-toggle, telemetry-tier
+  toggle, third-party-share toggle) must verify both legs.
+- Skeleton-test "Group E — set_opt_in is hot, no reboot required" is the
+  canonical pattern for runtime-toggle settings that cannot tolerate
+  cache staleness. test_opt_in_flip_takes_effect_without_reboot (3-state
+  off→on→off cycle) is the exemplar; it asserts the in-memory flag is
+  re-read per-event rather than cached at autoload boot. Mirrors the
+  pattern from set_reduce_motion in US-014 (idempotent-on-same-value
+  edge) but with a different invariant: there the concern is no-op-
+  preservation, here the concern is hot-flip-takes-effect. Future audits
+  of runtime-toggle settings should verify BOTH (a) no-op-on-same-value
+  and (b) hot-flip-without-reboot, since these protect against different
+  classes of bug (redundant-write thrash vs cached-stale-read).
+- Cross-file coverage pattern observed: set_opt_in is exercised in 3
+  tiers (skeleton unit, signal-handlers unit, local-sink-round-trip
+  integration) and that's intentional, not redundant. Skeleton tier
+  asserts the setter contract; signal-handlers tier asserts every event
+  handler short-circuits when set_opt_in(false); integration tier
+  asserts the JSONL filesystem append happens only when set_opt_in(true).
+  Future audits of "kill-switch" methods (any flag whose false-state
+  must short-circuit downstream effects) should expect this 3-tier shape
+  and not accept skeleton-tier coverage alone.
+
+---
