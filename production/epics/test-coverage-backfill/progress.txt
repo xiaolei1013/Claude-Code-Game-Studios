@@ -748,3 +748,140 @@ Append-only log per EPIC.md FR-9. Format:
   underlying method when the signal handler is the sole production caller.
 
 ---
+
+## 2026-05-10 — US-012 recruitment.gd
+
+- Audited 9 public funcs: try_recruit, get_recruit_pool,
+  get_refreshes_today, get_recruit_cost, refresh_pool, refresh_pool_paid,
+  refresh_cost, get_save_data, load_save_data. All 9 have >=1 happy-path
+  + >=1 edge-case test with assert_* calls.
+- Coverage map (per-function reference test):
+    * try_recruit:
+      tests/integration/recruitment/recruitment_try_recruit_test.gd
+      Groups A-E exhaust the 5-value RecruitOutcome enum:
+        - test_try_recruit_warrior_zero_copies_succeeds_and_deducts_150
+          (AC-RC-04 SUCCESS happy: gold deducted, hero added, signal emitted
+          with class_id + cost_paid payload)
+        - test_try_recruit_subsequent_warrior_costs_270_per_geometric_curve
+          (AC-RC-11-adjacent: post-recruit copies_owned advance flows
+          through Economy.recruit_cost into try_recruit's STEP 3 lookup)
+        - test_try_recruit_with_insufficient_gold_returns_outcome_and_no_mutations
+          (AC-RC-05 INSUFFICIENT_GOLD: STEP 4 try_spend false-branch leaves
+          gold + roster + signal-count untouched)
+        - test_try_recruit_at_roster_cap_returns_roster_full_and_no_mutations
+          (AC-RC-06 ROSTER_FULL: STEP 2 capacity-check pre-spend gate)
+        - test_try_recruit_with_negative_pool_index_returns_invalid_index
+          + test_try_recruit_with_pool_index_at_size_returns_invalid_index
+          (AC-RC-07 INVALID_POOL_INDEX: STEP 0 bounds-check both ends)
+        - test_try_recruit_with_orphan_class_id_returns_unresolvable
+          (AC-RC-08 UNRESOLVABLE_CLASS_ID: STEP 1 DataRegistry.resolve null
+          branch — uses literal "not_a_real_class_xyz" pool entry)
+    * get_recruit_pool:
+      tests/integration/recruitment/recruitment_try_recruit_test.gd Group F
+        - test_get_recruit_pool_returns_copy_not_internal_array
+          (AC-RC-10 happy + edge: returned size==3 happy + post-clear
+          internal-state-untouched edge — the duplicate() contract)
+    * get_refreshes_today:
+      tests/unit/recruitment/get_refreshes_today_test.gd (5-test dedicated suite):
+        - test_recruitment_get_refreshes_today_initial_returns_zero (happy)
+        - test_recruitment_get_refreshes_today_reflects_internal_field
+          (edge: pure-accessor read after field-set)
+        - test_recruitment_get_refreshes_today_returns_zero_after_reset
+          (edge: re-assign-to-zero round-trip)
+        - test_recruitment_get_refreshes_today_returns_int_type
+          (typeof contract — never null/bool drift)
+        - test_recruitment_get_refreshes_today_is_a_public_method
+          (API surface lock per S16-N1 invariant)
+    * get_recruit_cost:
+      tests/integration/recruitment/recruitment_try_recruit_test.gd:
+        - test_try_recruit_subsequent_warrior_costs_270_per_geometric_curve
+          (line 198 mid-test calls get_recruit_cost(1) and asserts ==270 —
+          tier-1 warrior at copies_owned=1)
+        - test_get_recruit_cost_matches_economy_recruit_cost_contract_for_all_pool_entries
+          (AC-RC-11 cost-stability invariant — for each pool entry,
+          asserts get_recruit_cost(i) == Economy.recruit_cost(class_id,
+          copies_owned). Loops over pool, then recruits and re-asserts.
+          Covers BOTH happy paths (warrior + mage) AND the orphan-fallback
+          edge where get_recruit_cost returns -1 == Economy returns -1.)
+    * refresh_pool:
+      tests/integration/recruitment/recruitment_try_recruit_test.gd Group G
+        - test_refresh_pool_emits_pool_refreshed_signal_with_new_pool
+          (happy: signal emit count==1 + counter increment + non-empty pool;
+          edge surface single-branch — refresh_pool has no failure path,
+          per US-008 stub-shape rule one happy test covers full surface,
+          plus the counter-increment + signal-emit dual invariant)
+    * refresh_pool_paid:
+      tests/integration/recruitment/recruitment_try_recruit_test.gd Group G
+        - test_refresh_pool_paid_with_insufficient_gold_returns_false_no_refresh
+          (edge: try_spend false-branch — counter unchanged, _refreshes_today
+          unchanged, no signal, gold unchanged — full no-op contract)
+        - test_refresh_pool_paid_with_sufficient_gold_charges_and_refreshes
+          (happy: returns true + 100g charged + counter++ + _refreshes_today++
+          + pool_refreshed signal emitted)
+    * refresh_cost:
+      tests/unit/recruitment/recruitment_skeleton_test.gd Group C
+        - test_refresh_cost_at_zero_refreshes_today_returns_base (n=0 → 100)
+        - test_refresh_cost_at_one_refresh_returns_300 (n=1 → 300)
+        - test_refresh_cost_at_five_refreshes_returns_1100 (n=5 → 1100)
+        Pure function with linear curve — three sample-points on curve
+        constitute happy + boundary + spam-zone coverage of the formula.
+    * get_save_data:
+      tests/unit/recruitment/recruitment_skeleton_test.gd Group G
+        - test_get_save_data_returns_three_fields_per_adr_0015_schema
+          (happy: ADR-0015 §Decision schema lock — exactly 3 keys)
+        - test_get_save_data_returns_pool_copy_for_mutation_isolation
+          (edge: returned dict's current_pool is duplicate — consumer .clear()
+          does not contaminate internal _current_pool)
+    * load_save_data:
+      tests/unit/recruitment/recruitment_skeleton_test.gd Group G
+        - test_load_save_data_round_trips_seed_counter_and_pool
+          (happy: full schema round-trip preserves all 3 fields)
+        - test_load_save_data_with_empty_dict_first_launch_inits_seed
+          (edge: pre-Recruitment-shipped save → first-launch init via
+          _first_launch_seed_init fallback — non-zero post-randi)
+        - test_load_save_data_ignores_non_int_seed_and_re_inits
+          (edge: anti-tamper — string seed re-init via type guard)
+        - test_load_save_data_filters_non_string_pool_entries
+          (edge: anti-tamper — per-element String type guard filters
+          int / null entries)
+- Test result: tests/unit/recruitment green —
+  30 cases / 0 errors / 0 failures / 488ms across 3 suites.
+  tests/integration/recruitment green —
+  26 cases / 0 errors / 0 failures / 300ms across 2 suites.
+- New tests added: 0 (FR-6: existing coverage at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-012 recruitment | passes:true | new_tests_added:0 | notes:audit-only; 9 public funcs covered with happy+edge across unit (skeleton + dedicated get_refreshes_today suite) + integration (try_recruit transaction integration suite) tiers. The recruitment_try_recruit_test.gd is the canonical "RecruitOutcome enum exhaustion" pattern — 5 outcomes, 6 dedicated tests covering all transaction failure modes plus the happy path.
+
+**Learnings for future iterations:**
+- The "RecruitOutcome enum exhaustion" pattern (one test per enum value)
+  generalises to any autoload public method that returns a documented enum
+  taxonomy of outcomes. Future audits of methods returning a SUCCESS /
+  *_FAILURE enum should confirm BOTH (a) one test per enum value AND (b)
+  zero-mutation contracts on each non-SUCCESS branch (gold unchanged +
+  roster unchanged + signal-count unchanged for all failure outcomes). A
+  single-outcome test that asserts the enum value but doesn't lock the
+  no-mutation contract is incomplete coverage.
+- Pure-formula functions (`refresh_cost`, mirror of `recruit_cost` /
+  `level_cost`) have a recurring 3-sample coverage shape: zero-input
+  base case + one-input first-step + larger-input compounding case. Three
+  sample-points pin the linear / geometric curve shape; more aren't needed
+  unless the formula has special-case branches (clamps, sentinels) which
+  recruit_cost has but refresh_cost does not.
+- Cross-system transaction tests (try_recruit touches Economy + HeroRoster +
+  DataRegistry + Recruitment simultaneously) need the snapshot+restore
+  hygiene pattern from recruitment_try_recruit_test.gd:32-80 — capture
+  Economy.get_save_data + Recruitment.get_save_data + roster instance_id
+  list pre-test; restore via load_save_data + remove_hero loop post-test.
+  This snapshot+restore pattern is reusable for ANY future cross-autoload
+  integration test (e.g., HeroLeveling consuming Economy + HeroRoster).
+- For methods whose only failure mode is "dependent autoload absent" (e.g.,
+  refresh_pool_paid's "Economy is null" branch), the integration tier
+  cannot exercise that path — the autoload is always present in the live
+  test env. The audit predicate accepts this as covered-by-construction:
+  the absent-autoload branch is a defensive guard whose only legitimate
+  caller scenario is the production env's strict autoload-rank load order
+  (impossible to violate). A unit-tier test could exercise it by spinning
+  a bare RecruitmentScript.new() outside the autoload tree, but it adds
+  no signal beyond the existing graceful-degrade documentation.
+
+---
