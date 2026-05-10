@@ -1384,3 +1384,49 @@ Append-only log per EPIC.md FR-9. Format:
   look like coverage but aren't.
 
 ---
+
+## 2026-05-10 — US-019 runtime_locale_guard.gd
+
+- Audited 1 public func: get_locale_tail. Returns
+  `_LOCALE_TAIL.duplicate()` of a class-level static PackedByteArray.
+  Structurally identical to BootNamespace.get_namespace_bytes /
+  get_boot_prefix_a (US-017) and EngineBootstrap.get_boot_prefix_b (US-018).
+- Coverage map BEFORE this iteration:
+    * `RuntimeLocaleGuard` symbol referenced in only 1 location:
+      tests/unit/save_load/integrity_tag_derivation_test.gd:38 — and that's a
+      reference-comment ("PART_C from RuntimeLocaleGuard._LOCALE_TAIL") with no
+      method call and no assert_*. Per FR-2, that is NOT coverage of the
+      public API surface (third consecutive Foundation-autoload story where
+      the only mention is a reference-path duplication).
+    * No prior tests/unit/runtime_locale_guard/ directory existed.
+    * The getter name (get_locale_tail) appears ZERO times in tests/.
+- Gap closed: tests/unit/runtime_locale_guard/runtime_locale_guard_test.gd
+  (2 new tests):
+    * test_get_locale_tail_returns_documented_16_byte_ascii_fragment (happy)
+    * test_get_locale_tail_returns_copy_so_mutation_does_not_poison_subsequent_calls (edge — duplicate invariant)
+- Test result: tests/unit/runtime_locale_guard suite green —
+  2 cases / 0 errors / 0 failures / 8ms.
+- New tests added: 2.
+- Files changed: tests/unit/runtime_locale_guard/runtime_locale_guard_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-019 runtime_locale_guard | passes:true | new_tests_added:2 | notes:closed full public-API gap on the single getter; 16-byte length + ASCII content (RuntimeL/ocaleTlR) + duplicate-invariant edge all pinned. Per ADR-0004 §HMAC key derivation this fragment is the third input block in SaveLoadSystem's three-way integrity-tag assembly — the reference-path constant in integrity_tag_derivation_test.gd now has its source-of-truth assertion site.
+
+**Learnings for future iterations:**
+- US-017 → US-018 → US-019 form a structurally-identical Foundation-autoload
+  trio (BootNamespace, EngineBootstrap, RuntimeLocaleGuard), each consumed by
+  SaveLoadSystem's integrity-tag pipeline as the A/B/C three-way fragments.
+  The test-pattern transferred 1:1 across all three — `_get_<autoload>()`
+  accessor + `static var _EXPECTED_<NAME>: PackedByteArray = PackedByteArray([...])`
+  + group-A happy + duplicate-invariant edge. Future Foundation-autoload
+  audits with pure pure-getter shapes can reuse the same template verbatim.
+- Cumulative pattern across the trio: each autoload's class name appears
+  exactly once in the SaveLoadSystem reference suites as a comment
+  ("PART_<X> from <Autoload>._<CONST>"), but the getter call itself appears
+  ZERO times. SaveLoadSystem's downstream suites carry their own
+  hand-constructed reference paths, which is correct (decouples
+  derivation-path tests from autoload-state) but means the autoload's
+  public-API surface stays uncovered until a dedicated US-NNN closes it.
+  This is now confirmed across 3/3 of the integrity-tag-input autoloads —
+  generalize to ANY autoload-consumed-by-SaveLoadSystem audit going forward.
+
+---
