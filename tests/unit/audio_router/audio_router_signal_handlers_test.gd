@@ -41,6 +41,9 @@ func _reset_audio_router() -> void:
 	# Reset gold throttle clock so tests start from a clean state.
 	if "_gold_chime_last_played_ms" in ar:
 		ar._gold_chime_last_played_ms = 0
+	# Reset prestige throttle clock (Sprint 21+ silent-MVP wiring).
+	if "_prestige_completed_last_played_ms" in ar:
+		ar._prestige_completed_last_played_ms = 0
 
 
 func before_test() -> void:
@@ -424,3 +427,87 @@ func test_boss_killed_volume_mult_is_1_point_4() -> void:
 
 	var entry: Dictionary = _last_play(&"sfx_combat_boss_kill")
 	assert_float(float(entry.get("volume_mult", 0.0))).is_equal_approx(1.4, 0.001)
+
+
+# ===========================================================================
+# Prestige V1.0 (Sprint 21+ silent-MVP wiring) — completion fanfare handler
+# Per audio-system.md §J: warm sting on retirement action; throttled 2.0s.
+# ===========================================================================
+
+func test_prestige_completed_handler_fires_play_sfx_with_volume_1_point_2() -> void:
+	# Arrange
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+	var record: Dictionary = {
+		"display_name": "Theron",
+		"class_id": "warrior",
+		"level_at_retirement": 15,
+		"prestige_index": 1,
+	}
+
+	# Act
+	ar._on_prestige_completed(record, 1)
+
+	# Assert: play_sfx called with the prestige cue id and volume_mult 1.2
+	var entry: Dictionary = _last_play(&"sfx_prestige_completed")
+	assert_int(_count_plays(&"sfx_prestige_completed")).is_equal(1)
+	assert_float(float(entry.get("volume_mult", 0.0))).is_equal_approx(1.2, 0.001)
+
+
+func test_prestige_completed_throttle_drops_rapid_second_call() -> void:
+	# Defensive throttle: two emissions within 2.0s window → only the first plays.
+	# Per audio-system.md §J prestige_audio_suppress_window_seconds = 2.0.
+	# Arrange
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+	var record: Dictionary = {
+		"display_name": "Theron",
+		"class_id": "warrior",
+		"level_at_retirement": 15,
+		"prestige_index": 1,
+	}
+
+	# Act — two back-to-back emissions inside the throttle window.
+	ar._on_prestige_completed(record, 1)
+	ar._on_prestige_completed(record, 2)
+
+	# Assert: only one play_sfx entry was recorded.
+	assert_int(_count_plays(&"sfx_prestige_completed")).is_equal(1)
+
+
+func test_prestige_completed_throttle_releases_after_window() -> void:
+	# Two emissions separated by manually advancing the throttle clock past the
+	# window → both play. Verifies the throttle is window-based, not single-shot.
+	# Arrange
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+	var record: Dictionary = {
+		"display_name": "Mira",
+		"class_id": "mage",
+		"level_at_retirement": 15,
+		"prestige_index": 1,
+	}
+
+	# Act — first emission, then rewind the throttle clock past the 2s window.
+	ar._on_prestige_completed(record, 1)
+	# Move the clock back 3s so the next call is past the throttle window.
+	ar._prestige_completed_last_played_ms = Time.get_ticks_msec() - 3000
+	ar._on_prestige_completed(record, 2)
+
+	# Assert: both plays recorded.
+	assert_int(_count_plays(&"sfx_prestige_completed")).is_equal(2)
+
+
+func test_audio_router_subscribes_to_prestige_completed_signal_at_ready() -> void:
+	# Subscription contract: AudioRouter._ready() must connect HeroRoster's
+	# prestige_completed_signal → _on_prestige_completed handler so emissions
+	# from gameplay code reach the audio path without manual wiring.
+	# Arrange
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+	var roster: Node = get_tree().root.get_node_or_null("HeroRoster")
+	assert_object(roster).is_not_null()
+	assert_bool(roster.has_signal("prestige_completed_signal")).is_true()
+
+	# Assert: signal is connected to the handler.
+	assert_bool(roster.prestige_completed_signal.is_connected(ar._on_prestige_completed)).is_true()
