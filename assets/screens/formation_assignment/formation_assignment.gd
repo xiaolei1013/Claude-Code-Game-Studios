@@ -540,15 +540,38 @@ func _refresh_synergy_badge() -> void:
 ## [method FormationAssignment.detect_active_synergy] using the live
 ## HeroRoster slot map.
 ##
-## Uses the [code]instance_ids[/code] form per the GDD §D.1 production-path
-## contract. Slots with id 0 (empty) are passed through; the resolver
-## returns "" when any slot is empty per AC-CS-05.
+## Provides BOTH [code]instance_ids[/code] AND [code]heroes[/code] keys
+## matching the production pattern in
+## [code]DungeonRunOrchestrator.snapshot_formation_for_run[/code]. The
+## detection function checks the heroes path first; the instance_ids
+## path is the documented fallback (currently calls a non-existent
+## [code]HeroRoster.get_hero[/code] — providing heroes avoids that
+## dead-code path entirely).
+##
+## Slots with id 0 (empty) yield a hero dict with empty class_id; the
+## resolver returns "" when any slot's class_id is empty per AC-CS-05.
 func _build_formation_snapshot() -> Dictionary:
 	var instance_ids: Array[int] = []
+	var heroes: Array[Dictionary] = []
+
+	# Build instance_id → HeroInstance lookup from the live roster (same
+	# pattern as _refresh_formation_panel uses for display_name lookup).
+	var hero_map: Dictionary = {}
+	for hero: Variant in HeroRoster.get_all_heroes():
+		hero_map[hero.instance_id] = hero
+
 	var slot_count: int = HeroRoster.formation_size()
 	for i: int in range(slot_count):
-		instance_ids.append(HeroRoster.get_formation_slot(i))
-	return {"instance_ids": instance_ids}
+		var sid: int = HeroRoster.get_formation_slot(i)
+		instance_ids.append(sid)
+		var hero_dict: Dictionary = {"instance_id": sid}
+		if sid != 0 and hero_map.has(sid):
+			hero_dict["class_id"] = str(hero_map[sid].class_id)
+		else:
+			hero_dict["class_id"] = ""
+		heroes.append(hero_dict)
+
+	return {"instance_ids": instance_ids, "heroes": heroes}
 
 
 ## Reads [code]SceneManager.reduce_motion[/code] defensively. Test envs
