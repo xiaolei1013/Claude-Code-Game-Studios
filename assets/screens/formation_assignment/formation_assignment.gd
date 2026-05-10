@@ -43,6 +43,29 @@ var _selected_floor: int = 1
 ## Active toast tween (may be null). Killed on new toast to avoid overlap.
 var _toast_tween: Tween = null
 
+# Class Synergy V1.0 Story 4 — UI badge live-preview wiring.
+# Per `class-synergy-system.md` §C.4 + §G + AC-CS-17.
+
+## Glow tween duration when a synergy activates (default path; full-motion).
+## Per GDD §G `class_synergy_badge_glow_duration_seconds = 0.4` (range 0.1-1.0).
+## Reduce-motion path skips the tween entirely (AC-CS-17): badge appears at
+## modulate.a = 1.0 instantly with theme variation `class_synergy_badge_active_reduced_motion`.
+const SYNERGY_BADGE_GLOW_DURATION_SEC: float = 0.4
+
+## Theme variations per GDD §C.4 visual: animated default, reduce-motion alt.
+const SYNERGY_BADGE_VARIATION_ACTIVE: StringName = &"class_synergy_badge_active"
+const SYNERGY_BADGE_VARIATION_REDUCED_MOTION: StringName = &"class_synergy_badge_active_reduced_motion"
+
+## Currently-displayed synergy id. Tracks state across refreshes so the glow
+## tween + audio cue only re-fire when the synergy ACTUALLY changes (slot
+## edits within the same composition multiset don't re-trigger). The audio
+## subscriber's 2.0s throttle is a backstop, not the primary de-dup.
+var _current_synergy_id: String = ""
+
+## Active synergy badge glow tween (may be null). Killed on re-trigger or
+## on_exit to avoid modulating a freed Label.
+var _synergy_badge_tween: Tween = null
+
 # ---------------------------------------------------------------------------
 # @onready node references (wired to .tscn node names)
 # ---------------------------------------------------------------------------
@@ -54,6 +77,7 @@ var _toast_tween: Tween = null
 @onready var _floor_context_label: Label = $FloorSelectorPanel/FloorVBox/FloorContextLabel
 @onready var _dispatch_button: Button = $DispatchButton
 @onready var _toast_label: Label = $ToastLabel
+@onready var _synergy_badge: Label = $SynergyBadge
 
 # ---------------------------------------------------------------------------
 # Built-in lifecycle (_ready — tap-target enforcement)
@@ -160,6 +184,11 @@ func on_exit() -> void:
 		_toast_tween.kill()
 	_toast_tween = null
 
+	# Kill any in-flight synergy badge glow tween — same reason.
+	if _synergy_badge_tween != null and _synergy_badge_tween.is_valid():
+		_synergy_badge_tween.kill()
+	_synergy_badge_tween = null
+
 
 ## Called by SceneManager when a modal overlay opens on top of this screen.
 ## No per-screen animations to suspend for Sprint 8 VS.
@@ -261,6 +290,11 @@ func _refresh_formation_panel() -> void:
 			badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			badge.theme_type_variation = &"SelectedSlotButton"
 			btn.add_child(badge)
+
+	# Class Synergy V1.0 Story 4 — refresh the live-preview badge after every
+	# slot mutation. Pure read; safe to call on every refresh per AC-CS-20
+	# perf budget (detect_active_synergy is O(1)).
+	_refresh_synergy_badge()
 
 
 ## Thin adapter for [code]HeroRoster.get_formation_slot(slot_index)[/code].
@@ -433,3 +467,128 @@ func _dismiss_toast() -> void:
 	if _toast_tween != null and _toast_tween.is_valid():
 		_toast_tween.kill()
 	_toast_tween = null
+
+
+# ---------------------------------------------------------------------------
+# Class Synergy V1.0 Story 4 — UI badge live-preview wiring
+# Per `class-synergy-system.md` §C.4 visual + §C.2 detection-timing
+# + AC-CS-17 reduce-motion variant + AC-CS-15 localized strings.
+# ---------------------------------------------------------------------------
+
+## Re-evaluates the active synergy from the current formation composition,
+## updates the badge label + visibility, and (only when synergy CHANGES)
+## fires the audio chime signal + glow tween.
+##
+## Called from [method _refresh_formation_panel] after every slot mutation.
+## Pure read against [code]HeroRoster.get_formation_slot[/code]; the
+## detection function is O(1).
+##
+## State de-dup via [member _current_synergy_id]: rapid slot toggles within
+## the same composition multiset (e.g., swapping two warriors between slots
+## while a 3-warrior synergy is active) do NOT re-trigger the glow tween or
+## audio chime. The audio subscriber's 2.0s throttle is a backstop against
+## edge cases, not the primary de-dup.
+func _refresh_synergy_badge() -> void:
+	if _synergy_badge == null:
+		return
+
+	var snapshot: Dictionary = _build_formation_snapshot()
+	var synergy_id: String = FormationAssignment.detect_active_synergy(snapshot)
+
+	# State de-dup: only re-render + re-fire signal when synergy CHANGES.
+	if synergy_id == _current_synergy_id:
+		return
+	_current_synergy_id = synergy_id
+
+	# Hide path: synergy went away (composition no longer matches a synergy).
+	if synergy_id == "":
+		_kill_synergy_badge_tween()
+		_synergy_badge.visible = false
+		_synergy_badge.modulate.a = 1.0
+		return
+
+	# Show path: render localized "Display Name: Effect" text.
+	# Both keys exist in en.csv per Sprint 21 S21-S2 (AC-CS-15).
+	var display_name: String = tr("class_synergy_badge_" + synergy_id)
+	var effect_text: String = tr("class_synergy_effect_" + synergy_id)
+	_synergy_badge.text = "%s: %s" % [display_name, effect_text]
+
+	# Theme variation per AC-CS-17: animated default vs reduce-motion variant.
+	# Both variants render at modulate.a = 1.0 once visible; the difference
+	# is whether we tween the alpha from 0 → 1 (full motion) or jump to 1
+	# instantly (reduce motion).
+	_kill_synergy_badge_tween()
+	if _is_reduce_motion_enabled():
+		_synergy_badge.theme_type_variation = SYNERGY_BADGE_VARIATION_REDUCED_MOTION
+		_synergy_badge.modulate.a = 1.0
+		_synergy_badge.visible = true
+	else:
+		_synergy_badge.theme_type_variation = SYNERGY_BADGE_VARIATION_ACTIVE
+		_synergy_badge.modulate.a = 0.0
+		_synergy_badge.visible = true
+		_synergy_badge_tween = create_tween()
+		_synergy_badge_tween.tween_property(
+			_synergy_badge, "modulate:a", 1.0, SYNERGY_BADGE_GLOW_DURATION_SEC
+		)
+
+	# Notify the audio path. notify_synergy_detected is a no-op for "" so
+	# the empty-synergy path above never reaches this line.
+	FormationAssignment.notify_synergy_detected(synergy_id)
+
+
+## Builds the formation snapshot Dictionary for
+## [method FormationAssignment.detect_active_synergy] using the live
+## HeroRoster slot map.
+##
+## Provides BOTH [code]instance_ids[/code] AND [code]heroes[/code] keys
+## matching the production pattern in
+## [code]DungeonRunOrchestrator.snapshot_formation_for_run[/code]. The
+## detection function checks the heroes path first; the instance_ids
+## path is the documented fallback (currently calls a non-existent
+## [code]HeroRoster.get_hero[/code] — providing heroes avoids that
+## dead-code path entirely).
+##
+## Slots with id 0 (empty) yield a hero dict with empty class_id; the
+## resolver returns "" when any slot's class_id is empty per AC-CS-05.
+func _build_formation_snapshot() -> Dictionary:
+	var instance_ids: Array[int] = []
+	var heroes: Array[Dictionary] = []
+
+	# Build instance_id → HeroInstance lookup from the live roster (same
+	# pattern as _refresh_formation_panel uses for display_name lookup).
+	var hero_map: Dictionary = {}
+	for hero: Variant in HeroRoster.get_all_heroes():
+		hero_map[hero.instance_id] = hero
+
+	var slot_count: int = HeroRoster.formation_size()
+	for i: int in range(slot_count):
+		var sid: int = HeroRoster.get_formation_slot(i)
+		instance_ids.append(sid)
+		var hero_dict: Dictionary = {"instance_id": sid}
+		if sid != 0 and hero_map.has(sid):
+			hero_dict["class_id"] = str(hero_map[sid].class_id)
+		else:
+			hero_dict["class_id"] = ""
+		heroes.append(hero_dict)
+
+	return {"instance_ids": instance_ids, "heroes": heroes}
+
+
+## Reads [code]SceneManager.reduce_motion[/code] defensively. Test envs
+## without the SceneManager autoload registered get the false default
+## (full-motion). Mirrors the canonical pattern in
+## [code]hero_detail_modal.gd::_is_reduce_motion_enabled[/code].
+func _is_reduce_motion_enabled() -> bool:
+	var sm: Node = get_node_or_null("/root/SceneManager")
+	if sm == null:
+		return false
+	if not ("reduce_motion" in sm):
+		return false
+	return bool(sm.get("reduce_motion"))
+
+
+## Kills any in-flight synergy badge glow tween. Idempotent.
+func _kill_synergy_badge_tween() -> void:
+	if _synergy_badge_tween != null and _synergy_badge_tween.is_valid():
+		_synergy_badge_tween.kill()
+	_synergy_badge_tween = null

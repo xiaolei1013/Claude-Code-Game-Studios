@@ -18,7 +18,7 @@ Implements the V1.0 first-pass class synergy system per the APPROVED GDD: 3 comp
 | 1 | Detection logic + RunSnapshot.synergy_id field | Logic | Complete (2026-05-09; story file 2026-05-10) |
 | 2 | attribute_kill_gold + attribute_kill_xp synergy_multiplier wiring | Logic | Complete (2026-05-09; story file 2026-05-10) |
 | 3 | Audio cues + localization keys | Integration | Complete (2026-05-09 + 2026-05-10 audio; story file 2026-05-10) |
-| 4 | UI badge wiring on formation_assignment screen + reduce-motion variant | UI | Ready (not started) |
+| 4 | UI badge wiring on formation_assignment screen + reduce-motion variant | UI | Complete (2026-05-10 — see story-004) |
 
 ## Cross-references
 
