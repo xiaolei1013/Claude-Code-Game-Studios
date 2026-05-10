@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.8] - 2026-05-10
+
+### Fixed
+- **TelemetrySink opt-in toggle now persists across launches** — Stage 2 telemetry shipped without the SaveLoadSystem.CONSUMER_PATHS registration, which meant the opt-in field would have reset to `false` on every launch (defeating the toggle's purpose once the Settings UI lands). Added `/root/TelemetrySink` as the 8th consumer path; `get_save_data` / `load_save_data` now round-trip the field through the save envelope under the `"telemetry"` namespace. Updated 3 existing CONSUMER_PATHS test assertions (size 7→8 + canonical-order list + happy-path-deferred sentinel). Also corrected a misleading autoload-rank comment in `telemetry_sink.gd` (Stage 2 commentary said "rank 19" using project.godot position; correct ADR-0003 canonical rank is 17, after AudioRouter at rank 16).
+
 ## [0.0.0.7] - 2026-05-10
 
 ### Added
