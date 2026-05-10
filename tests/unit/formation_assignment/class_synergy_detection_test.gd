@@ -269,3 +269,82 @@ func test_run_snapshot_synergy_id_v15_unknown_id_round_trips_verbatim() -> void:
 	snap.from_dict(v15_dict)
 
 	assert_str(snap.synergy_id).is_equal("veteran_squad")
+
+
+# ===========================================================================
+# Group F — instance_ids-only fallback path (live HeroRoster autoload lookup)
+#
+# These tests lock in the contract that detect_active_synergy resolves
+# instance_ids through HeroRoster.get_all_heroes() when the heroes key is
+# absent. Pre-2026-05-10 the fallback called a non-existent
+# HeroRoster.get_hero(id) method and silently returned ""; CI surfaced this
+# during synergy_badge_test.gd Story 4 implementation. The fix uses the
+# canonical instance_id → HeroInstance lookup-map idiom (same pattern as
+# DungeonRunOrchestrator.snapshot_formation_for_run + the screen's
+# _refresh_formation_panel display_name lookup).
+# ===========================================================================
+
+const HeroInstanceScript = preload("res://src/core/hero_roster/hero_instance.gd")
+
+var _injected_hero_ids: Array[int] = []
+
+
+func _inject_hero_into_live_roster(id: int, class_id: String) -> void:
+	# Inject directly into HeroRoster._heroes so get_all_heroes() returns
+	# the test fixture. Cleanup in after_test.
+	var fake: RefCounted = HeroInstanceScript.new()
+	fake.instance_id = id
+	fake.class_id = class_id
+	fake.display_name = "TestHero%d" % id
+	fake.current_level = 1
+	fake.xp = 0
+	HeroRoster._heroes[id] = fake
+	_injected_hero_ids.append(id)
+
+
+func after_test() -> void:
+	for id: int in _injected_hero_ids:
+		HeroRoster._heroes.erase(id)
+	_injected_hero_ids.clear()
+
+
+func test_detect_active_synergy_instance_ids_only_resolves_via_live_roster() -> void:
+	# instance_ids-only snapshot (no heroes key) → fallback path resolves
+	# via HeroRoster.get_all_heroes() lookup map → returns the correct
+	# synergy id. This was a silent dead path pre-2026-05-10.
+	var fa: Node = _make_fa()
+	_inject_hero_into_live_roster(8901, "warrior")
+	_inject_hero_into_live_roster(8902, "warrior")
+	_inject_hero_into_live_roster(8903, "warrior")
+	var snapshot: Dictionary = {"instance_ids": [8901, 8902, 8903]}
+
+	var result: String = fa.detect_active_synergy(snapshot)
+
+	assert_str(result).is_equal("steel_wall")
+
+
+func test_detect_active_synergy_instance_ids_only_returns_empty_for_unknown_id() -> void:
+	# Defensive: if any instance_id is missing from the live roster, the
+	# fallback returns "" (not crash). Mirrors the behavior the heroes
+	# path has for empty class_id.
+	var fa: Node = _make_fa()
+	_inject_hero_into_live_roster(8911, "warrior")
+	_inject_hero_into_live_roster(8912, "warrior")
+	# 8913 NOT injected — third slot's id is unknown to HeroRoster.
+	var snapshot: Dictionary = {"instance_ids": [8911, 8912, 8913]}
+
+	var result: String = fa.detect_active_synergy(snapshot)
+
+	assert_str(result).is_equal("")
+
+
+func test_detect_active_synergy_instance_ids_only_returns_empty_for_zero_slot() -> void:
+	# Empty-slot guard mirrors AC-CS-05 for the heroes path.
+	var fa: Node = _make_fa()
+	_inject_hero_into_live_roster(8921, "warrior")
+	_inject_hero_into_live_roster(8922, "warrior")
+	var snapshot: Dictionary = {"instance_ids": [8921, 8922, 0]}
+
+	var result: String = fa.detect_active_synergy(snapshot)
+
+	assert_str(result).is_equal("")

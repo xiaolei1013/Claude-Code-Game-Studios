@@ -311,6 +311,11 @@ func detect_active_synergy(formation_snapshot: Dictionary) -> String:
 			class_ids.append(cid)
 	else:
 		# Path 2: instance_ids Array[int] resolved via HeroRoster autoload.
+		# Builds an instance_id → HeroInstance lookup map from
+		# [code]get_all_heroes()[/code] (HeroRoster has no single-hero-by-id
+		# getter; the lookup-map idiom is the canonical pattern, also used
+		# by [DungeonRunOrchestrator.snapshot_formation_for_run] and the
+		# formation_assignment screen's _refresh helpers).
 		var ids_v: Variant = formation_snapshot.get("instance_ids", [])
 		if not (ids_v is Array):
 			return ""
@@ -318,17 +323,20 @@ func detect_active_synergy(formation_snapshot: Dictionary) -> String:
 		if ids.is_empty():
 			return ""
 		var roster: Node = get_node_or_null("/root/HeroRoster")
-		if roster == null or not roster.has_method("get_hero"):
+		if roster == null or not roster.has_method("get_all_heroes"):
 			return ""
+		var hero_map: Dictionary = {}
+		for hero_v: Variant in roster.call("get_all_heroes"):
+			# HeroInstance is RefCounted with instance_id + class_id fields.
+			# Object.get works for property access on RefCounted instances.
+			hero_map[int(hero_v.get("instance_id"))] = hero_v
 		for instance_id_v: Variant in ids:
 			var instance_id: int = int(instance_id_v)
 			if instance_id == 0:
 				return ""
-			var hero: Object = roster.call("get_hero", instance_id)
-			if hero == null:
+			if not hero_map.has(instance_id):
 				return ""
-			# HeroInstance is RefCounted with class_id field. Use Object.get
-			# for property access (works on RefCounted + Resource instances).
+			var hero: Object = hero_map[instance_id]
 			var cid_v: Variant = hero.get("class_id")
 			if not (cid_v is String):
 				return ""
