@@ -18,17 +18,19 @@ const LoadResultScript = preload("res://src/core/save_load_system/load_result.gd
 # ---------------------------------------------------------------------------
 # Test Group 1 — TR-save-load-031 / TR-save-load-034: CONSUMER_PATHS list
 #
-# Verifies the exact 7-entry ordered PackedStringArray declared as a constant.
+# Verifies the exact 8-entry ordered PackedStringArray declared as a constant.
 # Fails if any path is reordered, added, or removed without a lockstep ADR edit.
 # AudioRouter (rank 16) registered post-S11-S3 for AC-AS-09 round-trip.
+# TelemetrySink (rank 17) registered S21-N3 Stage 2 follow-up for opt-in
+# toggle persistence per telemetry-events-v1.md §C.1.
 # ---------------------------------------------------------------------------
 
-func test_save_load_system_consumer_paths_has_exactly_7_entries() -> void:
+func test_save_load_system_consumer_paths_has_exactly_8_entries() -> void:
 	# Arrange / Act — constant; no instance needed
 	var paths: PackedStringArray = SaveLoadScript.CONSUMER_PATHS
 
 	# Assert
-	assert_int(paths.size()).is_equal(7)
+	assert_int(paths.size()).is_equal(8)
 
 
 func test_save_load_system_consumer_paths_first_entry_is_economy() -> void:
@@ -45,6 +47,7 @@ func test_save_load_system_consumer_paths_order_matches_canonical_spec() -> void
 		"/root/Recruitment",
 		"/root/DungeonRunOrchestrator",
 		"/root/AudioRouter",
+		"/root/TelemetrySink",
 	])
 	var actual: PackedStringArray = SaveLoadScript.CONSUMER_PATHS
 

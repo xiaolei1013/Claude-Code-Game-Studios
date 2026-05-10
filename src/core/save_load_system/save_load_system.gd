@@ -148,6 +148,7 @@ const CONSUMER_PATHS: PackedStringArray = [
 	"/root/Recruitment",
 	"/root/DungeonRunOrchestrator",
 	"/root/AudioRouter",  # S11-S3: registered post-Story-007a for AC-AS-09 round-trip
+	"/root/TelemetrySink",  # S21-N3 Stage 2 follow-up: opt_in toggle persistence per telemetry-events-v1.md §C.1
 ]
 
 # ---------------------------------------------------------------------------

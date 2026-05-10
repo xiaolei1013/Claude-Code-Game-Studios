@@ -1,9 +1,9 @@
 # Sprint 11 Story 007a: request_full_persist body — guard + signal-emission tests.
 #
-# Test scope is constrained by project state. CONSUMER_PATHS lists 7 autoloads:
+# Test scope is constrained by project state. CONSUMER_PATHS lists 8 autoloads:
 #   /root/Economy, /root/HeroRoster, /root/FloorUnlock,
 #   /root/FormationAssignment, /root/Recruitment, /root/DungeonRunOrchestrator,
-#   /root/AudioRouter
+#   /root/AudioRouter, /root/TelemetrySink
 #
 # Live as of 2026-05-05 (after S11-X10 Recruitment skeleton — consumer
 # ecosystem is now COMPLETE):
@@ -198,13 +198,13 @@ func test_save_load_system_save_failed_signal_declared() -> void:
 # ===========================================================================
 
 func test_happy_path_persist_coverage_intentionally_deferred_until_integration_test_authoring() -> void:
-	# CONSUMER_PATHS expects 7 autoloads at /root/{Economy, HeroRoster,
+	# CONSUMER_PATHS expects 8 autoloads at /root/{Economy, HeroRoster,
 	# FloorUnlock, FormationAssignment, Recruitment, DungeonRunOrchestrator,
-	# AudioRouter}.
+	# AudioRouter, TelemetrySink}.
 	#
-	# As of 2026-05-05 (post-S11-X10 Recruitment skeleton), 7 of 7 exist as
-	# live autoloads with get_save_data — the consumer-ecosystem gap that
-	# motivated this sentinel is now CLOSED.
+	# As of 2026-05-10 (post-S21-N3 Stage 2 Telemetry follow-up), 8 of 8
+	# exist as live autoloads with get_save_data — the consumer-ecosystem gap
+	# that motivated this sentinel is now CLOSED.
 	#
 	# The remaining gap is integration-test authoring: the happy-path round
 	# trip (envelope round-trip, atomic write semantics, TickSystem
@@ -214,14 +214,14 @@ func test_happy_path_persist_coverage_intentionally_deferred_until_integration_t
 	# S11-M4 lands, this sentinel should be DELETED + replaced with the
 	# real round-trip integration test.
 	#
-	# Until then, this test holds the line on "all 7 autoloads present + with
+	# Until then, this test holds the line on "all 8 autoloads present + with
 	# get_save_data" so any regression (e.g., accidentally removing one) is
 	# loudly surfaced in CI.
 	var sl: Node = get_tree().root.get_node_or_null("SaveLoadSystem")
-	assert_int(sl.CONSUMER_PATHS.size()).is_equal(7)
-	# Verify all 7 present.
+	assert_int(sl.CONSUMER_PATHS.size()).is_equal(8)
+	# Verify all 8 present.
 	var present: int = 0
 	for path: String in sl.CONSUMER_PATHS:
 		if get_tree().root.get_node_or_null(path) != null:
 			present += 1
-	assert_int(present).is_equal(7)
+	assert_int(present).is_equal(8)
