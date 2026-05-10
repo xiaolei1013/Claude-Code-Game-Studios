@@ -16,8 +16,9 @@
 ## memory note (same pattern as AudioRouter, FormationAssignment, etc.).
 ##
 ## Governing spec: production/live-ops/telemetry-events-v1.md
-## Autoload rank: 19 (after AudioRouter at rank 18; needs all gameplay-signal
-##   sources at our `_ready()` time).
+## Autoload rank: 17 in the ADR-0003 canonical numbering (registered after
+##   AudioRouter at rank 16); needs all gameplay-signal sources at our
+##   `_ready()` time.
 extends Node
 
 

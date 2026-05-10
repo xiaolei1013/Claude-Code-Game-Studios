@@ -186,9 +186,11 @@ func test_audio_router_is_registered_in_save_load_consumer_paths() -> void:
 	assert_bool(has_audio).is_true()
 
 
-func test_audio_router_is_last_in_consumer_paths_order() -> void:
-	# AudioRouter rank 16 = last autoload + last in CONSUMER_PATHS by
-	# convention. Adding it last preserves index-3 crash-point semantics
-	# for existing happy-path-deferral tests.
+func test_audio_router_is_second_to_last_in_consumer_paths_order() -> void:
+	# AudioRouter rank 16 was the last entry until S21-N3 Stage 2 follow-up
+	# appended TelemetrySink (rank 17) at the tail. AudioRouter is now the
+	# second-to-last entry; TelemetrySink is last. Both invariants are
+	# locked in here as a single test for clarity.
 	var paths: PackedStringArray = SaveLoadScript.CONSUMER_PATHS
-	assert_str(paths[paths.size() - 1]).is_equal("/root/AudioRouter")
+	assert_str(paths[paths.size() - 2]).is_equal("/root/AudioRouter")
+	assert_str(paths[paths.size() - 1]).is_equal("/root/TelemetrySink")
