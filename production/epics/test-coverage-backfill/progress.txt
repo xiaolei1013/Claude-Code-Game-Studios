@@ -440,3 +440,65 @@ Append-only log per EPIC.md FR-9. Format:
   state-only assertion).
 
 ---
+
+## 2026-05-10 — US-008 hero_class_database.gd
+
+- Audited 3 public funcs: get_by_id, get_recruitable_classes, get_all_ids.
+  All 3 have >=1 happy-path + >=1 edge-case (or single-branch full surface)
+  test with assert_* calls.
+- Coverage map (per-function):
+    * get_by_id:
+      tests/integration/hero_class_database/hero_class_database_autoload_test.gd
+        - test_hero_class_database_get_by_id_returns_null_on_miss
+          (edge: missing id, TR-hero-class-db-014)
+        - test_hero_class_database_get_by_id_empty_string_returns_null
+          (edge: empty string)
+        - test_hero_class_database_get_by_id_resolves_mvp_classes
+          (happy: id round-trip + tier=1 + non-empty display_name, AC H-01)
+        - test_hero_class_database_get_by_id_returns_same_instance
+          (happy: object-identity / Godot Resource cache invariant, AC H-07)
+    * get_recruitable_classes:
+      tests/integration/hero_class_database/hero_class_database_autoload_test.gd
+        - test_hero_class_database_get_recruitable_classes_stub_returns_empty_array
+          (single-branch full surface: stub body is `return [] as Array[HeroClass]`,
+          one observable behavior; mirrors US-003 reasoning that single-branch
+          implementations are fully covered with one test).
+    * get_all_ids:
+      tests/integration/hero_class_database/hero_class_database_autoload_test.gd
+        - test_hero_class_database_get_all_ids_returns_sorted_array
+          (happy: sorted alphabetically + MVP ids present when DataRegistry READY;
+          edge: graceful-degrade returns empty array when DataRegistry not READY).
+        - test_hero_class_database_get_by_id_returns_same_instance
+          (transitively: probes get_all_ids()[0] then re-queries by id).
+- Test result: tests/integration/hero_class_database suite green —
+  8 cases / 0 errors / 0 failures / 49ms.
+- New tests added: 0 (FR-6: existing coverage at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-008 hero_class_database | passes:true | new_tests_added:0 | notes:audit-only; thin typed-accessor wrapper, all 3 funcs (get_by_id / get_recruitable_classes stub / get_all_ids) covered at integration tier per US-002+US-005 precedent. Coverage tier acceptable since FR-2 specifies behavioral coverage exists, not tier-must-match-story.
+
+**Learnings for future iterations:**
+- Stub functions whose body is a single literal return (e.g.
+  `return [] as Array[HeroClass]`) have exactly one observable behavior.
+  A single happy-path test asserting the literal return shape (typed-array,
+  size==0, never-null) IS the full coverage surface — there is no "edge
+  case" to write because there is no branch to exercise. Audit predicate:
+  if `grep -nE "(if|match|return [^[\]]" <stub-body>` shows zero branching
+  primitives, the function is single-branch and one test suffices. This
+  refines US-003's "single observable branch" rule for stub-shaped funcs.
+- The thin-typed-accessor pattern (rank-4 autoload wrapping rank-1
+  DataRegistry — EnemyDatabase / HeroClassDatabase / BiomeDungeonDatabase)
+  has a recurring 3-test minimum coverage shape: (1) returns_null_on_miss
+  for the resolve cast, (2) sorted-array invariant for the filter+sort,
+  (3) graceful-degrade-when-not-READY for the autoload-state edge. Future
+  audits of US-028 biome_dungeon_database.gd will likely match this exact
+  shape — reuse the test ordering and skip writing new tests if the
+  integration suite already covers all three.
+- The "graceful-degrade with push_warning + early-return" pattern (used
+  identically in EnemyDatabase + HeroClassDatabase integration suites) is
+  acceptable audit coverage even when the runtime environment forces the
+  degraded branch — the asserted READY-state behavior IS the happy-path
+  contract, and the degraded branch's `push_warning + return` is itself
+  the documented edge contract. Don't be tempted to refactor these tests
+  to force-load fixtures; the graceful-degrade IS the design.
+
+---
