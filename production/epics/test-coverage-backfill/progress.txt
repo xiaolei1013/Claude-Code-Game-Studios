@@ -61,3 +61,44 @@ Append-only log per EPIC.md FR-9. Format:
   US-001 closes as-is; flag for separate triage outside this epic.
 
 ---
+
+## 2026-05-10 — US-002 data_registry.gd
+
+- Audited 4 public funcs (resolve, get_all_by_type, hot_reload, verify_integrity).
+  All 4 have >=1 happy-path + >=1 edge-case test with assert_* calls.
+- Coverage map:
+    * resolve: tests/unit/data_registry/resolve_api_and_typed_accessors_test.gd
+        - test_resolve_valid_id_returns_cached_resource_and_identity_equality (happy)
+        - test_resolve_missing_id_returns_null_with_warn_behavior (edge)
+        - test_resolve_unknown_content_type_returns_null_without_crash (edge)
+        - test_resolve_before_registry_ready_returns_null (edge)
+        - test_resolve_assert_behavior_returns_null_after_assert_fires (edge)
+        - test_resolve_rename_transparent_id_based_lookup (edge)
+        - tests/unit/data_registry/cross_type_dag_and_invariants_test.gd::test_ac_dls_06_post_error_resolve_returns_null_for_cyclic_resources (POST_ERROR edge)
+    * get_all_by_type: same resolve_api file
+        - test_get_all_by_type_returns_full_array_with_identity_equality (happy + unknown-category sub-assert)
+        - test_get_all_by_type_before_registry_ready_returns_empty_array (edge)
+    * hot_reload:
+        - tests/unit/data_registry/autoload_skeleton_and_state_machine_test.gd::test_data_registry_hot_reload_complete_signal_has_correct_arity_and_type (signal contract)
+        - tests/integration/data_registry/hot_reload_immutability_and_hydration_gate_test.gd::test_hot_reload_re_enumerates_target_category_only_and_emits_signal (happy + scope-isolation edge)
+    * verify_integrity:
+        - tests/integration/data_registry/hot_reload_immutability_and_hydration_gate_test.gd
+          (baseline returns no mismatches = happy; consumer-mutated resource surfaces mismatches = edge)
+- Test result: tests/unit/data_registry suite green — 41 cases / 0 errors / 0 failures / 337ms.
+- New tests added: 0 (FR-6: existing coverage at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-002 data_registry | passes:true | new_tests_added:0 | notes:audit-only; full happy+edge coverage already shipped via Story 004 resolve_api suite + hot-reload integration suite.
+
+**Learnings for future iterations:**
+- The `hot_reload` + `verify_integrity` happy-path coverage lives under
+  tests/integration/data_registry/, NOT tests/unit/. Per FR-2/FR-3 the audit
+  predicate ("function appears in test code with an assert_* call within ~5
+  lines") is satisfied at integration tier, because the epic's goal is
+  *behavioral coverage exists*, not *coverage tier matches story tier*.
+  Future audits should grep tests/ (not tests/unit/) and accept either tier.
+- `cross_type_dag_and_invariants_test.gd::test_ac_dls_06_post_error_resolve_returns_null_for_cyclic_resources`
+  is a load-bearing edge case for `resolve()` under POST_ERROR state — useful
+  precedent when auditing other autoload state-machine error paths (TickSystem,
+  SaveLoadSystem) in later iterations.
+
+---
