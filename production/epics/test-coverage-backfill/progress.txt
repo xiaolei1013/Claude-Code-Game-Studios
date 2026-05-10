@@ -995,3 +995,108 @@ Append-only log per EPIC.md FR-9. Format:
   from US-007 formation_assignment commit_test.gd.
 
 ---
+
+## 2026-05-10 — US-014 scene_manager.gd
+
+- Audited 6 public funcs: request_screen, push_overlay, pop_overlay,
+  show_modal, hide_modal, set_reduce_motion. All 6 have >=1 happy-path +
+  >=1 edge-case test with assert_* calls.
+- Coverage map (per-function reference test):
+    * request_screen:
+      tests/unit/scene_manager/scene_manager_autoload_skeleton_test.gd Group D
+      (UNINITIALIZED-queue happy + last-write-wins-while-uninitialized edge +
+       same-screen-noop-in-IDLE edge — three dedicated tests covering the
+       three documented behavior branches: queue when uninitialized, replace
+       queued when uninitialized, no-op when same screen in IDLE).
+      Integration tier additionally covers IDLE→cross-fade transitions
+      (crossfade_timing_test, request_screen_and_node_swap_test,
+      run_end_to_main_menu_transition_test, dungeon_run_view_screen_test,
+      formation_assignment_screen_test) — 30+ tests asserting the live
+      transition path with current_screen swap, signals, and state changes.
+    * push_overlay:
+      tests/unit/scene_manager/modal_overlay_counter_test.gd Group A
+      (adds_to_overlay_layer happy + does_not_change_current_screen invariant
+       + sets_state_to_paused happy + duplicate_push_does_not_double_increment
+       edge + nested_overlays_increment_counter happy + non_pausing_push
+       branch + on_pause_called_on_push_overlay callback). 7 tests on the
+       happy + edge surfaces of push_overlay.
+    * pop_overlay:
+      tests/unit/scene_manager/modal_overlay_counter_test.gd Group A
+      (restores_state_to_idle happy + unknown_id_warns_and_noops edge +
+       push_pop_cycle_returns_count_to_zero happy + pop_in_reverse_decrements
+       edge + stray_pop_does_not_go_negative defensive-clamp edge +
+       on_resume_called_on_last_pop callback +
+       on_resume_only_after_all_overlays_pop ordering invariant). 7 tests
+       on the happy + edge surfaces of pop_overlay.
+    * show_modal:
+      tests/integration/scene_manager/offline_replay_modal_coordination_test.gd
+      Group A+B
+      (adds_to_overlay_layer_and_pauses_state happy +
+       two_show_modals_both_hosted_on_overlay_layer stack edge +
+       show_modal_with_no_current_screen_does_not_crash defensive edge).
+      Additional happy-path coverage in
+      tests/integration/hero_detail/hero_detail_modal_contract_test.gd.
+    * hide_modal:
+      tests/integration/scene_manager/offline_replay_modal_coordination_test.gd
+      Group A+B
+      (frees_modal_and_returns_to_idle happy + untracked_modal_is_no_op
+       edge + stays_paused_when_push_overlay_stack_nonempty state-machine
+       guard edge — three dedicated tests covering the three documented
+       behavior branches).
+    * set_reduce_motion:
+      tests/integration/scene_manager/reduce_motion_clamp_test.gd
+      (idempotent_on_same_value happy + updates_in_memory_flag_immediately
+       happy + persists_to_configfile_and_reloads round-trip edge +
+       handles_missing_file_gracefully edge + clamps_all_four_getters_to_50ms
+       downstream-clamp invariant + override_per_screen_override interaction
+       edge + ceremony_falls_back_to_crossfade_at_50ms downstream invariant).
+       7 tests covering happy + edge + interaction surfaces.
+- Test result:
+    tests/unit/scene_manager green —
+      71 cases / 0 errors / 0 failures / 1s 697ms across 4 suites
+      (autoload_skeleton, modal_overlay_counter, screen_base_class,
+       tween_transitions).
+    tests/integration/scene_manager green —
+      122 cases / 0 errors / 0 failures / 14s 359ms across 11 suites.
+- New tests added: 0 (FR-6: existing coverage at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-014 scene_manager | passes:true | new_tests_added:0 | notes:audit-only; 6 public funcs covered with happy+edge across 4 unit suites + 11 integration suites. Modal/overlay surface (push/pop_overlay + show/hide_modal) has the densest dedicated coverage — 7 tests per overlay method + 3-4 tests per modal method covering all documented behavior branches. request_screen UNINITIALIZED-queueing branch is the only path covered solely at unit tier (Group D); IDLE→transition path has 30+ integration tests. set_reduce_motion uses the path-override pattern from feedback_test_isolation_user_configfile (canonical reduce_motion_clamp_test.gd).
+
+**Learnings for future iterations:**
+- For autoloads with a state-machine entry-point method (request_screen here,
+  request_full_persist in US-013), the happy-path branch matrix must enumerate
+  every documented state precondition: UNINITIALIZED-queue, IDLE-transition,
+  IDLE-noop-when-same-screen. A single happy + single edge pair is INSUFFICIENT
+  for these — confirm one test per documented branch before marking
+  passes:true. scene_manager_autoload_skeleton_test.gd Group D is the
+  exemplar for unit-tier branch enumeration; IDLE-transition is then
+  covered exhaustively at the integration tier where the current_screen
+  swap actually happens.
+- When a method has a callback contract (push_overlay → on_pause,
+  pop_overlay → on_resume) the audit predicate must verify that the callback
+  invocation has ITS OWN dedicated test, separate from the state-transition
+  test. modal_overlay_counter_test.gd:371/399/421 is the exemplar — three
+  tests for the on_resume contract: on_resume_called_on_last_pop_overlay,
+  on_resume_only_after_all_overlays_pop (ordering invariant — the FRAGILE
+  one), and the "callback fires only once per pause/resume cycle" assertion.
+  Future audits of methods with virtual-hook contracts (Screen.on_enter /
+  on_pause / on_resume / on_exit) should expect this 3-test shape and not
+  accept "callback was called" as standalone proof.
+- The `set_reduce_motion` coverage shape (idempotent + in-memory-flag +
+  ConfigFile-round-trip + missing-file-graceful + downstream-clamp +
+  per-screen-override + downstream-ceremony-fallback) is the canonical
+  shape for any "user toggles a runtime setting" method. Future audits of
+  similar settings (volume sliders, telemetry opt-in toggles, accessibility
+  flags) should expect this 7-test shape: 2 setter-state + 2 persistence +
+  3 downstream-effect tests. A simple "setter sets the flag" test alone is
+  incomplete coverage for ANY persisted runtime setting.
+- For modals/overlays whose hide/dismiss method must NOT transition state
+  when other overlays are still active (hide_modal stays_paused_when_push_
+  overlay_stack_nonempty), this "don't transition while peer-stack non-empty"
+  edge is a load-bearing guard that the unit-tier test misses (push_overlay
+  isn't in the unit-tier modal_overlay_counter; integration coverage is
+  required). Future audits of overlay-stack-aware methods (any future
+  pop_modal / dismiss_dialog / close_screen variants) need to verify the
+  "non-empty peer-stack stays-paused" assertion exists at integration tier.
+
+---
