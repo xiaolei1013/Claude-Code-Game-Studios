@@ -340,3 +340,103 @@ Append-only log per EPIC.md FR-9. Format:
   This shape captures WHY the helper is dangerous in production code-paths.
 
 ---
+
+## 2026-05-10 — US-007 formation_assignment.gd
+
+- Audited 8 public funcs: browse, commit, get_save_data, load_save_data,
+  set_target, get_target, detect_active_synergy, notify_synergy_detected.
+- Coverage map (per-function):
+    * browse: formation_assignment_skeleton_test.gd Group C
+      (test_browse_emits_browse_opened_signal_with_payload happy +
+      test_browse_is_idempotent_two_calls_emit_twice edge).
+    * commit: GAP — only `has_method` existence check + a static-grep
+      single-writer enforcement test (recruitment_single_writer_ci_grep_test.gd).
+      Zero behavioral coverage of write-then-emit ordering, length-validation
+      reject branch, or null-slot semantics. The skeleton test's top-level
+      docstring listed Groups D ("commit() emits AFTER writes"), E ("commit()
+      length validation"), F ("empty/null formation handling") but none of
+      those test functions were ever written.
+    * get_save_data: formation_assignment_skeleton_test.gd Group G
+      (test_get_save_data_returns_empty_dict_per_mvp_rule_10_deferral happy);
+      no edge cases — the function literally returns {} unconditionally per
+      §C.6 MVP Rule 10 deferral; matchup_target_test.gd::
+      test_formation_assignment_get_save_data_does_not_persist_matchup_target
+      provides session-only-state invariant edge.
+    * load_save_data: formation_assignment_skeleton_test.gd Group G
+      (test_load_save_data_with_empty_dict_is_noop happy +
+      test_load_save_data_with_non_empty_dict_is_noop_per_v1_0_reservation
+      edge); plus matchup_target_test.gd::
+      test_formation_assignment_load_save_data_does_not_clear_matchup_target
+      session-state-invariant edge.
+    * set_target: matchup_target_test.gd Groups B+C+D
+      (captures_biome_and_floor happy + rejects_empty_biome_id /
+      rejects_zero_floor_index / rejects_negative_floor_index defensive
+      edges + overwrites_prior_target last-write-wins).
+    * get_target: matchup_target_test.gd Groups A+B+E
+      (initial_returns_empty_dict happy + after_set_returns_populated_dict
+      happy + returns_deep_copy mutation-isolation edge).
+    * detect_active_synergy: class_synergy_detection_test.gd
+      (steel_wall/arcane_elite/triple_threat happy paths + 2W+1M no-synergy
+      + missing-class_id + 2-slot under-size + heroes-path-vs-instance_ids
+      branch coverage).
+    * notify_synergy_detected: tests/integration/audio_router/
+      class_synergy_audio_test.gd Group B (steel_wall/arcane_elite/
+      triple_threat emit happy + empty-string no-emit edge). Coverage tier
+      acceptable per US-002 precedent (FR-2 specifies behavioral coverage
+      exists, not tier-must-match-story).
+- Gap closed: tests/unit/formation_assignment/commit_test.gd (9 new tests):
+    * test_commit_with_three_heroes_writes_all_formation_slots (happy)
+    * test_commit_with_three_heroes_emits_reassignment_committed_signal (happy)
+    * test_commit_with_short_formation_does_not_emit_signal
+      (edge: length-mismatch reject branch)
+    * test_commit_with_short_formation_does_not_mutate_formation_slots
+      (edge: length-validation gate runs BEFORE write loop per §D)
+    * test_commit_with_oversized_formation_does_not_emit_signal
+      (edge: 4-element-formation reject)
+    * test_commit_with_all_null_formation_clears_all_slots
+      (edge: null entries → hero_id=0 sentinel write)
+    * test_commit_with_partial_null_formation_writes_real_and_clears_null
+      (edge: mixed real+null slot writes)
+    * test_commit_with_all_null_formation_still_emits_signal
+      (edge: empty-slot commit is a valid commit; signal fires)
+    * test_commit_emits_signal_after_writes_complete
+      (§D ordering invariant: subscriber sees post-mutation _formation_slots)
+- Test result: tests/unit/formation_assignment suite green —
+  60 cases / 0 errors / 0 failures / 810ms (was 51; +9 from new file).
+- New tests added: 9.
+- Files changed: tests/unit/formation_assignment/commit_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-007 formation_assignment | passes:true | new_tests_added:9 | notes:closed commit() write-then-emit ordering + length-validation reject + null-slot-semantics gaps; all other 7 public funcs already at-or-above bar via existing skeleton/matchup_target/class_synergy_detection suites.
+
+**Learnings for future iterations:**
+- The "skeleton test docstring promises Groups X/Y/Z but only Group A is
+  actually written" anti-pattern recurs. When auditing autoloads with
+  skeleton_test.gd files, do NOT trust the file's top-level Test Groups
+  comment — grep for the actual `func test_*` functions and confirm each
+  promised group has at least one assertion-bearing test. The `commit()`
+  gap was hiding behind a skeleton-test docstring that listed Groups D/E/F
+  but none of those tests existed.
+- For autoloads whose public methods mutate ANOTHER live autoload (here:
+  FormationAssignment.commit → HeroRoster._formation_slots), the canonical
+  test isolation pattern is:
+    1. Snapshot the target autoload's mutable field in before_test.
+    2. Inject synthetic state via `<Autoload>._private[id] = fake +
+       _injected_ids.append(id)`.
+    3. Restore snapshot + erase injected entries in after_test.
+  Mirrors prestige_button_visibility_test.gd:30 hero injection pattern but
+  generalised to formation slots. Subsequent US-NNN audits for
+  cross-autoload-mutation methods (Recruitment.recruit → HeroRoster, etc.)
+  should reuse this snapshot+inject+restore shape.
+- Signal-after-mutation invariants (§D ordering) are testable with a
+  capture-state-at-emit-time spy: subscribe a handler that copies the
+  target autoload's mutable field into a local Array; assert the local
+  Array reflects post-mutation state. This is more direct than relying on
+  signal-emission-count alone, which can't distinguish "emitted before
+  writes" from "emitted after writes".
+- Length-mismatch reject branches typically have TWO observable
+  consequences: (a) signal NOT emitted, (b) state NOT mutated. Test BOTH
+  separately — a single combined test conflates the two failure modes
+  (a code path that emits-then-bails would fail (a) but pass a
+  state-only assertion).
+
+---
