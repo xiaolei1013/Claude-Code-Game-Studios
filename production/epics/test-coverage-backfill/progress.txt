@@ -2567,3 +2567,81 @@ Append-only log per EPIC.md FR-9. Format:
   pattern.
 
 ---
+
+## 2026-05-11 — US-035 dungeon_run_orchestrator/run_snapshot.gd
+
+- Audited src/core/dungeon_run_orchestrator/run_snapshot.gd: 3 public funcs
+  per the FR-2 strict predicate `grep -nE "^func [a-z]"`:
+    1. to_dict() -> Dictionary               (12-key schema serializer)
+    2. from_dict(d: Dictionary) -> void      (defensive hydrator)
+    3. equals(other: RunSnapshot) -> bool    (12-field `and`-chain with
+       13 short-circuit branches: 1 null + 12 per-field)
+  EPIC.md US-035 predicted `passes: true` from existing
+  `run_snapshot_and_fsm_test.gd` coverage — REVERIFIED PARTIAL: to_dict/
+  from_dict round-trip + defaults are well covered, but the equals()
+  per-field inequality surface is mostly UNTESTED (only 1 of 12 field
+  branches has a dedicated inequality test). The cohort-prediction from
+  US-029/US-031/US-032/US-033 was correct: RunSnapshot is the 5th
+  inequality-cohort member.
+- Coverage map (pre-existing tests/unit/dungeon_run_orchestrator/
+  run_snapshot_and_fsm_test.gd Groups F + G, plus 2 equals-specific tests):
+    * to_dict 12-key schema + value-mapping + collection-deep-duplicate
+      (3 tests, Group F lines 320-373) — COVERED.
+    * from_dict round-trip + null edge + defaults + float-coercion +
+      no-alias (6 tests, Group G lines 380-453) — COVERED.
+    * equals() happy: implicitly via round-trip test (assert_bool(
+      dst.equals(src)).is_true()).
+    * equals() null edge: test_equals_returns_false_against_null — COVERED.
+    * equals() floor_id mismatch:
+      test_equals_returns_false_for_mismatched_floor_id — COVERED.
+  Gaps found vs. the 13-branch equals() surface (1 null + 12 per-field):
+  11 of 12 per-field false-return branches UNTESTED at the dedicated
+  inequality level (formation_snapshot, current_tick, last_emitted_tick,
+  losing_run, floor_clear_emitted, matchup_cache, kill_schedule,
+  loop_counter, kill_count, floor_was_valid, synergy_id).
+- Action: created tests/unit/dungeon_run_orchestrator/
+  run_snapshot_inequality_test.gd with 11 new tests, one per gap. Mirrors
+  US-029/US-031/US-032/US-033 inequality-test shape: each test constructs
+  two RunSnapshot instances differing on EXACTLY ONE field (other 11 fields
+  identical defaults), calls equals(), asserts false. Uses RunSnapshotScript
+  const preload — no autoload dependencies, no DataRegistry, no before_test
+  cleanup needed.
+- Test result: tests/unit/dungeon_run_orchestrator/
+  run_snapshot_inequality_test.gd = 11/11 passed; full
+  tests/unit/dungeon_run_orchestrator suite = 228/228 (was 217 + 11 new) /
+  0 errors / 0 failures / 0 flaky / 0 skipped / 0 orphans / 3s 203ms. No
+  regressions in pre-existing 16 test files.
+- New tests added: 11.
+- Files changed: tests/unit/dungeon_run_orchestrator/run_snapshot_inequality_test.gd
+  (new), production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-035 run_snapshot | passes:true | new_tests_added:11 | notes:filled equals per-field-inequality gap (11 of 12 field branches untested at the false-return). Fifth member of the inequality-test cohort (US-029, US-031, US-032, US-033, US-035). EPIC.md predicted passes:true via run_snapshot_and_fsm_test.gd — to_dict/from_dict were well covered but equals() per-field inequality branches were not. Closed under standard FR-2/FR-3 path with focused gap-fill.
+
+**Learnings for future iterations:**
+- The EPIC.md `passes: true` predictions remain unreliable for files with
+  multi-field equals() helpers. Five consecutive cohort forecasts (US-029,
+  US-031, US-032, US-033, US-035) have all required gap-fill work despite
+  upstream tests covering happy-path round-trip. The pattern: an existing
+  test asserting `dst.equals(src).is_true()` on the all-fields-match case
+  exercises the TRUE-return path of equals() but leaves the per-field
+  false-return branches (each `and` operand) as separate uncovered
+  short-circuit points. Future cohort members (likely US-042
+  matchup_result.gd, possibly US-037 enemy_data, US-038 hero_class,
+  US-040 name_pool, US-041 roster_config) should be expected to need
+  inequality gap-fill unless a per-file grep proves the equals() branches
+  are fully covered by dedicated mismatch tests.
+- RunSnapshot's equals() chain has 12 field branches — the longest cohort
+  member so far (CombatBatchResult had 7, CombatRunSnapshot had 5, KillEvent
+  had 5, CombatTickEvents had 7 incl. array branches). Floating field
+  inequality wasn't applicable here (no float fields on RunSnapshot — gold
+  is int, ticks are int, factor fields live on CombatRunSnapshot not
+  RunSnapshot). Dictionary/Array fields used direct `==` operator (deep
+  equality) rather than the size-check + per-element-walk pattern in
+  CombatTickEvents — so single-test-per-field coverage suffices.
+- The cohort is now 5-strong (US-029, US-031, US-032, US-033, US-035) with
+  consistent shape: enumerate equals() branches, grep tests/ for assertions
+  on each, write one focused test per untested branch in a sibling
+  *_inequality_test.gd file. The sibling file lives next to the canonical
+  *_and_fsm_test.gd / value_types_and_equals_test.gd file (NOT replacing
+  it) and uses const Script preload to stay zero-dependency.
+
+---
