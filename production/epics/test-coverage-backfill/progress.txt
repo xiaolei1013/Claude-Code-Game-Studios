@@ -1536,3 +1536,1112 @@ Append-only log per EPIC.md FR-9. Format:
   public API" from "literally-zero-function abstract base".
 
 ---
+
+## 2026-05-11 — US-022 combat/default_combat_resolver.gd
+
+- Audited 11 public funcs (is_stub, action_cooldown_ticks,
+  formation_dps_per_tick, formation_total_hp, hp_bonus_factor, survived,
+  effective_dps, ticks_to_kill, emit_events_in_range, compute_offline_batch,
+  build_matchup_cache). All 11 have ≥1 happy-path test + ≥1 edge-case test
+  with assert_* calls.
+- Coverage map (file → primary test home):
+    * is_stub → cooldown_formula_test.gd::test_is_stub_marker_contains_default_combat_resolver_substring
+      + 4 transitive refs in autoload_skeleton_and_di / snapshot tests.
+    * action_cooldown_ticks → cooldown_formula_test.gd 12 tests (boundary +
+      formula behavior + return type + always-in-range invariant + fallback path).
+    * formation_dps_per_tick → dps_and_hp_formulas_test.gd 5 tests (happy:
+      single hero stat-at-level, 3-hero sum, higher-level produces higher DPS;
+      edge: empty formation, unresolvable class_id silent skip, returns float)
+      + edge_cases_and_invariants_test.gd 6 tests (logger DI behavior,
+      no-logger silent skip, mixed-formation logger filter).
+    * formation_total_hp → dps_and_hp_formulas_test.gd 3 tests (happy: sums,
+      returns int; edge: empty) + edge_cases_and_invariants 2 tests
+      (all-unresolvable, logger invocation).
+    * hp_bonus_factor → dps_and_hp_formulas_test.gd 6 tests (happy: proportional;
+      edge: clamps at 1, zero attack, zero formation HP, output-range,
+      returns float).
+    * survived → dps_and_hp_formulas_test.gd 5 tests (happy: =1 returns true;
+      edge: boundary inclusive at 0.5, just-below-half false, zero false,
+      losing_run-not-survived derivation).
+    * effective_dps → kill_schedule_test.gd 4 tests (neutral, advantaged,
+      disadvantaged-partial, returns-float-type).
+    * ticks_to_kill → kill_schedule_test.gd 8 tests (basic, ceili, exact-1,
+      high-DPS floor; edge: zero-DPS sentinel, negative-DPS sentinel,
+      zero-HP returns-one, returns-int).
+    * emit_events_in_range → emit_events_in_range_test.gd 18 tests
+      (full-loop, half-open boundary inclusion/exclusion, consecutive-call
+      no-overlap, multi-loop, kill-event field shape, loop completion,
+      first-clear flag, descending-range warning, re-emission/rewind,
+      dispatched-at-tick anchor; edge: null/empty/zero-loops).
+    * compute_offline_batch → foreground_offline_parity_test.gd 10+ tests
+      (happy: full run populates 7 fields, budget truncates mid-loop,
+      first_clear gating at loops_per_run, losing-run derivation, parity
+      with emit_events_in_range, 100-call determinism; edge: null snapshot,
+      zero/negative budget, empty enemy_list) + edge_cases_and_invariants
+      smoke (empty-snapshot no-div-by-zero).
+    * build_matchup_cache → matchup_di_and_cache_test.gd 9 tests (happy:
+      one-call-per-distinct-archetype TR-012, returns-advantaged-true,
+      StringName keys, integrates-with-DefaultMatchupResolver; edge: dedup
+      duplicates, empty floor_archetypes zero calls, empty-archetype-strings
+      skipped, null resolver returns empty cache, lacking-method returns
+      empty cache).
+- Test results: tests/unit/combat_resolution = 135/135 passed;
+  tests/integration/combat_resolution = 32/32 passed. No new failures
+  introduced. No regressions in pre-existing suites.
+- Files changed: production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-022 default_combat_resolver | passes:true | new_tests_added:0 | notes:audit-only; this is the formula-heavy production resolver and is the second-heaviest tested file in the combat layer. All 11 public funcs have happy + edge coverage across 6 unit suites (combat_config, cooldown_formula, dps_and_hp_formulas, edge_cases_and_invariants, emit_events_in_range, kill_schedule) + 3 integration suites (foreground_offline_parity, matchup_di_and_cache, orchestrator_synchronous_invocation). The TR-combat-022 parity invariant (foreground+offline byte-equal aggregates) is itself a load-bearing coverage proof — its presence in foreground_offline_parity_test.gd confirms that emit_events_in_range and compute_offline_batch share _kill_schedule_for_loop as single source of truth (TR-combat-003).
+
+**Learnings for future iterations:**
+- For files with 10+ public functions, the audit predicate produces too
+  many test-reference hits to inspect individually. Use the per-function
+  `grep -rln "<fn>" tests/` → count files pattern as a fast coverage
+  spot-check; if every function has ≥3 test-file references AND there is a
+  dedicated `<fn>_test.gd` or `<fn>_and_*_test.gd` suite, the coverage is
+  almost certainly above the bar. Confirm with `grep -nE "^func test_"` to
+  enumerate the test names and visually verify happy+edge coverage.
+- The "parity invariant" test (foreground vs offline byte-equal aggregates)
+  is a higher-tier coverage proof than per-function happy+edge — it proves
+  TWO public functions share a private helper as single source of truth.
+  When auditing a file where multiple public funcs share an internal helper,
+  prefer counting parity-invariant tests over duplicating per-function tests.
+- US-022 is the FIRST audit-only story under the new dual-validation
+  workflow (unit + integration directory both run, even when zero new tests
+  added). The 135+32 = 167 test cases passed cleanly. Future audit-only
+  stories where the subject file is heavily-tested should follow this
+  pattern (unit + integration directory pass, not just unit).
+
+---
+
+## 2026-05-11 — US-023 matchup_resolver/matchup_resolver.gd
+
+- Audited src/core/matchup_resolver/matchup_resolver.gd: file is the abstract
+  base class for the matchup-resolver subsystem and is deliberately empty.
+  Audit predicate `grep -nE "^func [a-z]" src/core/matchup_resolver/matchup_resolver.gd`
+  returns ZERO matches — no public functions, no class-scope vars, no signals,
+  no static funcs. The file declares only `class_name MatchupResolver extends
+  RefCounted` plus doc-comments documenting the "interface by convention"
+  contract (since Godot 4 lacks `@abstract` on RefCounted).
+- Per FR-7 (data/abstract classes EXEMPT — "no testable public surface"), this
+  story closes as audit-only `passes: true`. Per EPIC US-023 note ("Likely
+  abstract base"), this is the anticipated outcome.
+- Existing structural coverage in tests/unit/matchup_resolver/matchup_resolver_base_and_result_test.gd
+  (13 test cases) already proves all invariants the base class can express:
+    * test_matchup_resolver_can_be_instantiated_via_new (TR-001 happy)
+    * test_matchup_resolver_is_refcounted_not_resource (TR-001 edge — NOT a Resource)
+    * test_matchup_resolver_class_name_resolves (TR-001 class_name registry)
+    * test_matchup_resolver_source_has_zero_class_scope_vars (TR-005/TR-030 source-lint)
+    * test_matchup_resolver_source_has_zero_signal_declarations (TR-030 source-lint)
+    * test_matchup_resolver_source_has_no_static_func_on_public_api (TR-002 source-lint)
+    * test_matchup_resolver_get_property_list_has_no_class_scope_data (TR-005 runtime-lint)
+  The 6 remaining tests in the file cover MatchupResult (separate story scope —
+  not part of US-023's contract per the file boundary).
+- Concrete-implementation coverage of `resolve_formation_matchup` and
+  `resolve_floor_matchup` (the convention-only abstract methods documented in
+  the source comments) is covered by US-024 (default_matchup_resolver.gd) via
+  tests/unit/matchup_resolver/default_resolver_formation_test.gd and
+  floor_matchup_and_guards_test.gd — out of US-023 scope.
+- Test results: tests/unit/matchup_resolver = 55/55 passed; 0 errors / 0
+  failures / 0 flaky / 0 skipped / 0 orphans. No regressions. The base-class
+  test file specifically ran clean at 13/13 in 83ms.
+- New tests added: 0 (FR-7 EXEMPT — abstract base with zero public surface).
+- Files changed: production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-023 matchup_resolver | passes:true | new_tests_added:0 | notes:FR-7 exempt; abstract base class with zero public funcs / vars / signals. Existing matchup_resolver_base_and_result_test.gd covers all source-level + runtime structural invariants (7 tests for the base class, 6 for MatchupResult). Convention-only abstract method bodies (resolve_formation_matchup, resolve_floor_matchup) are covered via the concrete DefaultMatchupResolver in US-024.
+
+**Learnings for future iterations:**
+- The "abstract base class" exemption pattern (FR-7 + EPIC's "Likely abstract
+  base" note for US-021/US-023) is best validated by the empty-grep predicate
+  `grep -nE "^func [a-z]" <file>` returning zero matches. When this fires AND
+  a structural-lint test file already asserts the zero-vars / zero-signals /
+  no-static-funcs invariants, the audit-only close is unambiguous.
+- The matchup_resolver subsystem follows a "source-lint test" pattern that's
+  reusable for any abstract base in the project: open the .gd file, walk
+  non-comment lines, assert no `var ` / `signal ` / `static func` prefixes.
+  See matchup_resolver_base_and_result_test.gd lines 47-101 for the canonical
+  three-test shape. Future stateless-RefCounted abstract bases should mirror
+  this lint pattern.
+- US-021 (combat_resolver) and US-023 (matchup_resolver) are sister stories —
+  both empty abstract bases, both audit-only closes, both rely on a
+  structural-lint test in the sister concrete-impl test directory. This
+  symmetry confirms the FR-7 + EPIC-anticipated outcome was correctly modeled
+  at PRD authoring time.
+
+---
+
+## 2026-05-11 — US-024 matchup_resolver/default_matchup_resolver.gd
+
+- Audited src/core/matchup_resolver/default_matchup_resolver.gd: 3 public funcs
+  (is_stub, resolve_formation_matchup, resolve_floor_matchup) — plus the
+  zero-arg `_init` constructor and the private `_is_class_counter` helper
+  (both correctly underscore-prefixed and OUT of scope per FR-2 "non-
+  underscore-prefixed `func`"). All 3 public funcs have ≥1 happy-path test
+  + ≥1 edge-case test with assert_* calls.
+- Coverage map (per-function):
+    * is_stub → tests/unit/matchup_resolver/default_resolver_formation_test.gd::
+      test_is_stub_marker_contains_default_matchup_resolver_substring
+      (asserts marker substring "DefaultMatchupResolver" — the orchestrator's
+      autoload_skeleton_and_di test relies on this for lazy-default detection).
+    * resolve_formation_matchup → 14 happy + edge tests across
+      default_resolver_formation_test.gd (happy: 2/3 + 3/3 warriors vs bruiser
+      advantaged; edge: 1/3 not-advantaged, zero counters, empty formation
+      → false+[], three-unresolvable-class_ids → empty-behavior, one-resolvable-
+      among-two-unresolvable advantaged, empty enemy_archetype → false+[]
+      via TR-018 push_error guard, uppercase-archetype case-sensitive miss
+      TR-020, matched_archetypes single-enemy dedup, repeated-call determinism
+      TR-021, formation array unmutated invariant) + 4 effectiveness_label
+      tests in effectiveness_label_test.gd (Strong/Weak/Even label aggregation
+      per S4-N1) + 1 source-content invariant
+      (matchup_resolver_source_has_zero_hero_roster_references — Pillar 3 TR-022).
+    * resolve_floor_matchup → 8 happy + edge tests in
+      floor_matchup_and_guards_test.gd (happy: any-archetype-majority advantaged,
+      alphabetical sort of matched_archetypes, multi-archetype alphabetical
+      sort dedup; edge: no-majority not-advantaged, empty-archetype-in-list
+      non-aborting forwarding, only-unknown-archetypes → false+[], empty
+      archetypes list → default {false,[]}, empty formation → default) +
+      4 effectiveness_label aggregate tests in effectiveness_label_test.gd
+      (any_strong → Strong, all_weak → Weak, mixed → Even, single-strong → Strong).
+- Cross-tier reinforcement coverage:
+    * Integration: tests/integration/matchup_resolver/orchestrator_di_test.gd
+      (DI invariants — orchestrator-injected resolver survives _ready, replaces
+      internal field) + offline_replay_invariants_test.gd (TR-021 determinism
+      under offline replay) — 26 tests total.
+    * Integration: tests/integration/combat_resolution/matchup_di_and_cache_test.gd
+      (build_matchup_cache TR-012 1-call-per-archetype invariant uses
+      DefaultMatchupResolver as the production-impl resolver).
+    * Perf: tests/perf/matchup_resolver_perf_test.gd (TR-014 budget invariant).
+- Test result: tests/unit/matchup_resolver = 55/55 passed; 0 errors / 0
+  failures / 0 flaky / 0 skipped / 0 orphans / 374ms. tests/integration/
+  matchup_resolver = 26/26 passed; 0 errors / 0 failures / 289ms. Combined
+  81/81 covering this file's public surface across unit + integration tiers.
+  No regressions in pre-existing suites.
+- New tests added: 0 (FR-6: existing coverage at-or-above bar across all 3
+  public funcs; the file is heavily-tested as the production-impl resolver for
+  Pillar 3 specialist-vs-generalist matchup advantage).
+- Files changed: production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-024 default_matchup_resolver | passes:true | new_tests_added:0 | notes:audit-only; 3 public funcs (is_stub, resolve_formation_matchup, resolve_floor_matchup) covered by 42+ happy+edge cases across 3 unit suites (default_resolver_formation, floor_matchup_and_guards, effectiveness_label) + 3 integration suites (orchestrator_di, offline_replay_invariants, matchup_di_and_cache) + perf suite. ADR-0009 strict-majority threshold (TR-011), case-sensitive counter rule (TR-020), empty-formation/empty-archetype guards (TR-016/018), alphabetical-sort dedup (TR-013), and effectiveness_label S4-N1 contract all proven.
+
+**Learnings for future iterations:**
+- US-024 is the SISTER STORY to US-022 (default_combat_resolver) — both are
+  concrete production-impl classes whose abstract-base sister (US-021/US-023)
+  closed as FR-7 EXEMPT. The expected pattern for this concrete-impl story
+  shape is: dedicated test directory (tests/unit/<resolver>/) with at least
+  3 test files — formation/floor/effectiveness — plus integration coverage
+  under tests/integration/<resolver>/. When this directory shape is present
+  AND the public-function count is small (≤5), expect audit-only close.
+- The "effectiveness_label" coverage tier (Strong/Weak/Even derived from
+  is_advantaged + counter_count) is a SECONDARY public-API contract layered
+  on top of the resolve_formation_matchup return. It deserves its own
+  test file (effectiveness_label_test.gd) per the S4-N1 quick-spec — a
+  reusable pattern for ANY public method whose return-value field has a
+  separately-derived secondary attribute. Future audits of methods with
+  derived-field outputs (e.g., MatchupResult.effectiveness_label, KillEvent
+  flag fields, CombatBatchResult.outcome) should look for or recommend a
+  dedicated derived-field test file.
+- Test-evidence completeness verified by `grep -c "^func test_"` per file:
+  default_resolver_formation_test=15, floor_matchup_and_guards_test=11,
+  effectiveness_label_test=16, base_and_result_test=13 (split across US-023
+  base + this story's MatchupResult invariants). Sum = 55 unit cases for the
+  matchup_resolver subsystem — the highest per-file unit-test density among
+  the abstract-interface stories closed so far. A useful baseline for
+  "production-impl is heavily covered" — if a future concrete-impl story
+  shows <30 unit tests in its dedicated test directory, that signals an
+  audit might find a real coverage gap.
+
+---
+
+## 2026-05-11 — US-025 biome_dungeon_database/biome.gd
+
+- Audited src/core/biome_dungeon_database/biome.gd: ZERO public functions
+  (`grep -nE "^func [a-z]" src/core/biome_dungeon_database/biome.gd` → empty).
+  Pure data Resource extending GameData (which is `@abstract`, declares only
+  inherited @export `id` and `display_name`). Biome adds 6 net-new @export
+  fields: primary_palette_key, dominant_archetypes, dungeons,
+  environmental_storytelling, flavor_text, status. No methods, no validators,
+  no to_dict / from_dict — read-only schema per ADR-0011 §Decision (also
+  documented in the file's class doc comment lines 10-12).
+- Per FR-7 ("Pure data classes (Resources, RefCounteds with no public methods
+  beyond field accessors) are EXEMPT — story marks `passes: true` with note
+  'no testable public surface'"), US-025 closes as EXEMPT.
+- Bonus: existing consumer/schema coverage already at-or-above bar:
+    * tests/unit/biome_dungeon_database/biome_dungeon_resource_test.gd
+      (13 cases / 0 failures / 84ms) covers Biome instantiation + GameData
+      lineage (test_biome_new_succeeds_without_args), schema enumeration of
+      all 6 net-new + 2 inherited @export fields
+      (test_biome_schema_has_all_eight_exported_properties), `status` default
+      "active" (test_biome_status_defaults_active), inherited id/display_name
+      defaulting "" (test_all_three_types_inherit_id_and_display_name_defaulting_empty),
+      nested-resource composition with Dungeon → Floor traversal
+      (test_biome_dungeon_floor_nested_access_returns_correct_instance), and
+      empty-dungeons-array edge (test_biome_dungeon_floor_empty_arrays_handled_gracefully).
+    * Cross-tier integration via tests/integration/biome_dungeon_database/
+      biome_dungeon_database_autoload_test.gd (Biome is the resource type
+      resolved by the autoload's get_biome lookup).
+    * Cross-feature consumer references: tests/unit/floor_unlock_system/
+      biome_floor_count_and_di_loggers_test.gd,
+      tests/unit/audio_router/audio_router_signal_handlers_test.gd,
+      tests/unit/data_registry/cross_type_dag_and_invariants_test.gd,
+      tests/unit/scene_manager/scene_manager_autoload_skeleton_test.gd,
+      tests/unit/hero_roster/hero_roster_autoload_skeleton_test.gd — all
+      exercise Biome resources transitively.
+- Test result: tests/unit/biome_dungeon_database = 13/13 passed; 0 errors /
+  0 failures / 0 flaky / 0 skipped / 0 orphans / 84ms. No regressions.
+- New tests added: 0 (FR-7 EXEMPT — zero testable public surface).
+- Files changed: production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-025 biome | passes:true | new_tests_added:0 | notes:FR-7 EXEMPT — zero public functions on Biome.gd (read-only data Resource per ADR-0011); existing biome_dungeon_resource_test.gd already provides 13 schema-shape + default-value + composition tests, plus integration + cross-feature consumer coverage. Audit-only close.
+
+**Learnings for future iterations:**
+- US-025 is the FIRST of the "data class" story cohort (US-025 through US-044
+  per EPIC.md §Data classes). The expected pattern for these stories: confirm
+  zero public functions via `grep -nE "^func [a-z]" <file>`, confirm the file
+  extends a base Resource (GameData / Resource / RefCounted), then close
+  EXEMPT per FR-7 with the existing consumer-test references as bonus
+  coverage. Should generally take ONE iteration each — no new test files,
+  just an audit + progress.txt entry. If `grep -nE "^func [a-z]"` returns
+  ANY public function, drop EXEMPT and audit per the standard FR-2/FR-3 path.
+- The `biome_dungeon_resource_test.gd` file is the canonical exemplar for the
+  next two stories (US-026 dungeon, US-027 floor) — same test file already
+  covers all three resources (test_dungeon_new_succeeds_without_args,
+  test_dungeon_schema_has_all_four_exported_properties,
+  test_floor_new_succeeds_without_args, test_floor_schema_has_all_seven_exported_properties,
+  test_floor_enemy_list_entry_has_exactly_enemy_id_and_count_keys,
+  test_floor_enemy_list_empty_is_valid_at_schema_level,
+  test_floor_is_boss_floor_defaults_false). Expect US-026 + US-027 to also
+  close audit-only via FR-7 EXEMPT pointing at this same file.
+- The `_get_export_names(resource)` helper using
+  `PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_SCRIPT_VARIABLE` flag composition
+  is a reusable Godot 4.6 idiom for any future schema-enumeration test on
+  GameData subclasses. If a later story needs to assert "field X is
+  @export-visible", mirror this pattern (file lines 18-25) rather than
+  reinventing PROPERTY_USAGE bit-mask handling.
+
+---
+
+## 2026-05-11 — US-026 biome_dungeon_database/dungeon.gd
+
+- Audited src/core/biome_dungeon_database/dungeon.gd: ZERO public functions
+  (`grep -nE "^func [a-z]" src/core/biome_dungeon_database/dungeon.gd` → empty).
+  Pure data Resource extending GameData (the @abstract base providing
+  inherited @export `id` and `display_name`). Dungeon adds 2 net-new @export
+  fields: `biome_id` (back-reference to parent Biome.id, default "") and
+  `floors` (typed `Array[Floor]`, default `[]`). No methods, no validators,
+  no to_dict / from_dict — read-only schema per ADR-0011 §Decision (also
+  documented in the file's class doc comment lines 10-18).
+- Per FR-7 ("Pure data classes (Resources, RefCounteds with no public methods
+  beyond field accessors) are EXEMPT — story marks `passes: true` with note
+  'no testable public surface'"), US-026 closes as EXEMPT. Matches the
+  expected pattern from US-025's learnings entry ("Expect US-026 + US-027 to
+  also close audit-only via FR-7 EXEMPT pointing at this same file").
+- Existing consumer/schema coverage already at-or-above bar:
+    * tests/unit/biome_dungeon_database/biome_dungeon_resource_test.gd
+      (13 cases / 0 failures / 84ms) covers Dungeon instantiation + GameData
+      lineage (test_dungeon_new_succeeds_without_args), schema enumeration of
+      all 4 @export fields (test_dungeon_schema_has_all_four_exported_properties
+      asserts id, display_name, biome_id, floors), inherited id/display_name
+      defaulting "" (test_all_three_types_inherit_id_and_display_name_defaulting_empty),
+      nested-resource composition with Biome → Dungeon → Floor traversal
+      (test_biome_dungeon_floor_nested_access_returns_correct_instance), and
+      empty-floors-array edge (test_biome_dungeon_floor_empty_arrays_handled_gracefully).
+    * Cross-tier integration via tests/integration/biome_dungeon_database/
+      biome_dungeon_database_autoload_test.gd (12 cases / 0 failures / 78ms)
+      exercises Dungeon resources as the intermediate node in the Biome →
+      Dungeon → Floor hierarchy the autoload resolves.
+    * Cross-feature consumer references: every floor_unlock_system test that
+      walks `biome.dungeons[i].floors[j]` exercises Dungeon transitively
+      (e.g., tests/unit/floor_unlock_system/biome_floor_count_and_di_loggers_test.gd).
+- Test result: tests/unit/biome_dungeon_database = 13/13 passed; 0 errors /
+  0 failures / 0 flaky / 0 skipped / 0 orphans / 84ms. tests/integration/
+  biome_dungeon_database = 12/12 passed; 0 errors / 0 failures / 78ms.
+  Combined 25/25 covering the Biome→Dungeon→Floor schema chain. No
+  regressions in pre-existing suites.
+- New tests added: 0 (FR-7 EXEMPT — zero testable public surface).
+- Files changed: production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-026 dungeon | passes:true | new_tests_added:0 | notes:FR-7 EXEMPT — zero public functions on Dungeon.gd (read-only data Resource per ADR-0011, sister story to US-025 biome). Existing biome_dungeon_resource_test.gd already provides schema-shape + default-value + composition + nested-traversal tests for Dungeon, plus integration autoload coverage. Audit-only close.
+
+**Learnings for future iterations:**
+- US-026 confirms the US-025 prediction: the `biome_dungeon_resource_test.gd`
+  file is the shared canonical coverage source for the entire Biome/Dungeon/
+  Floor data-class cohort. US-027 (floor.gd) is the natural next iteration
+  and should also close FR-7 EXEMPT against the SAME test file
+  (test_floor_new_succeeds_without_args, test_floor_schema_has_all_seven_exported_properties,
+  test_floor_enemy_list_entry_has_exactly_enemy_id_and_count_keys,
+  test_floor_enemy_list_empty_is_valid_at_schema_level,
+  test_floor_is_boss_floor_defaults_false — all 5 Floor-specific tests
+  already shipped). Expect US-027 to be the third audit-only close in this
+  cohort and the fastest iteration of the run.
+- The "test_<typeA>_<typeB>_<typeC>_nested_access_returns_correct_instance"
+  pattern (line 195 of biome_dungeon_resource_test.gd) is a canonical
+  integration-like-unit test for cross-Resource composition. It traverses
+  Biome.dungeons[0].floors[0] in one test, proving the entire chain holds.
+  Reusable pattern when auditing any future @export-Array-of-Resource type
+  where the parent and child are separate stories — one composition test
+  satisfies coverage for both ends.
+- Branch-base discipline: Ralph branches (`ralph/test-coverage-backfill-usNNN`)
+  must be cut from the PRIOR US branch, not from main, until the chain of
+  per-story commits gets merged. Cutting from main loses the progress.txt
+  history from intermediate stories. Verified 2026-05-11 when US-026 work
+  initially branched off main (missing US-022-025 progress.txt entries) and
+  had to be redone off ralph/test-coverage-backfill-us025. Future iterations:
+  ALWAYS `git checkout ralph/test-coverage-backfill-us<N-1>` then
+  `git checkout -b ralph/test-coverage-backfill-us<N>`.
+
+---
+
+## 2026-05-11 — US-027 biome_dungeon_database/floor.gd
+
+- Audited src/core/biome_dungeon_database/floor.gd: ZERO public functions
+  (`grep -nE "^func [a-z]" src/core/biome_dungeon_database/floor.gd` → empty).
+  Pure data Resource extending GameData (the @abstract base providing
+  inherited @export `id` and `display_name`). Floor adds 5 net-new @export
+  fields: `floor_index` (int, default 0), `enemy_list` (typed
+  `Array[Dictionary]` of `{enemy_id: String, count: int}` entries, default
+  `[]`), `expected_clear_time_seconds` (int, default 0), `is_boss_floor`
+  (bool, default false), and `flavor_text` (@export_multiline String, default
+  ""). No methods, no validators, no to_dict / from_dict — read-only schema
+  per ADR-0011 §Decision (also documented in the file's class doc comment
+  lines 10-15: "read-only at runtime — no mutation methods").
+- Per FR-7 ("Pure data classes (Resources, RefCounteds with no public methods
+  beyond field accessors) are EXEMPT — story marks `passes: true` with note
+  'no testable public surface'"), US-027 closes as EXEMPT. Confirms US-025
+  and US-026's predicted three-in-a-row Biome/Dungeon/Floor cohort pattern
+  (US-026 learnings: "US-027 (floor.gd) is the natural next iteration and
+  should also close FR-7 EXEMPT against the SAME test file").
+- Existing consumer/schema coverage already at-or-above bar — all 5
+  Floor-specific tests + 1 composition + 1 inheritance test shipped in
+  tests/unit/biome_dungeon_database/biome_dungeon_resource_test.gd:
+    * test_floor_new_succeeds_without_args (line 52) — Floor.new() constructor
+      happy path + `is Floor` lineage check.
+    * test_floor_schema_has_all_seven_exported_properties (line 124) — schema
+      enumeration of all 7 @export fields (5 net-new + id + display_name)
+      via PROPERTY_USAGE bit-mask filtering.
+    * test_floor_enemy_list_entry_has_exactly_enemy_id_and_count_keys
+      (line 154) — deterministic dict shape per ADR-0011 §Decision; happy
+      path covering enemy_id: String + count: int contract.
+    * test_floor_enemy_list_empty_is_valid_at_schema_level (line 182) — empty
+      enemy_list edge case (Story 004 content-validation is separate from
+      schema validity).
+    * test_floor_is_boss_floor_defaults_false (line 231) — default-value
+      edge case for the is_boss_floor bool.
+    * test_biome_dungeon_floor_nested_access_returns_correct_instance
+      (line 195) — composition test traversing Biome.dungeons[0].floors[0],
+      validates Floor as nested resource in the Biome → Dungeon → Floor chain.
+    * test_biome_dungeon_floor_empty_arrays_handled_gracefully (line 218) —
+      empty-floors-array edge for the parent Dungeon, transitively exercises
+      Floor's typed Array container invariant.
+    * test_all_three_types_inherit_id_and_display_name_defaulting_empty
+      (line 255) — Floor.id and Floor.display_name inherit default "" from
+      GameData, asserts shared inheritance invariant.
+    * Cross-tier integration via tests/integration/biome_dungeon_database/
+      biome_dungeon_database_autoload_test.gd (12 cases / 0 failures / 78ms)
+      exercises Floor resources as the leaf node in the autoload-resolved
+      Biome → Dungeon → Floor hierarchy.
+    * Cross-feature consumer references: tests/unit/floor_unlock_system/
+      biome_floor_count_and_di_loggers_test.gd walks `biome.dungeons[i].floors[j]`
+      and asserts floor counts per biome — exercises Floor transitively.
+- Test result: tests/unit/biome_dungeon_database = 13/13 passed; 0 errors /
+  0 failures / 0 flaky / 0 skipped / 0 orphans / 84ms (identical statistics
+  to US-025 and US-026 runs, confirming the suite is deterministic across
+  iterations). No regressions in pre-existing suites.
+- New tests added: 0 (FR-7 EXEMPT — zero testable public surface).
+- Files changed: production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-027 floor | passes:true | new_tests_added:0 | notes:FR-7 EXEMPT — zero public functions on Floor.gd (read-only data Resource per ADR-0011, third member of the Biome/Dungeon/Floor data-class cohort with US-025 + US-026). Existing biome_dungeon_resource_test.gd ships 5 Floor-specific tests (constructor, schema, enemy_list shape, enemy_list empty edge, is_boss_floor default) + composition + inheritance coverage, plus integration autoload + cross-feature floor_unlock_system consumer references. Audit-only close.
+
+**Learnings for future iterations:**
+- The Biome/Dungeon/Floor data-class cohort (US-025/026/027) closes in three
+  consecutive audit-only iterations with identical FR-7 EXEMPT structure and
+  identical test-suite statistics (13/13, 84ms). This is the canonical
+  template for the remaining data-class stories (US-028 through US-045).
+  For each: grep `^func [a-z]` → if zero, close EXEMPT and point at the
+  cohort's canonical test file. Expect this pattern to hold for at least
+  US-029 (combat_batch_result.gd), US-032 (combat_tick_events.gd),
+  US-033 (kill_event.gd), US-037 (enemy_data.gd), US-038 (hero_class.gd),
+  US-040 (name_pool.gd), US-042 (matchup_result.gd) — all of which are
+  named like data structs. Stories with `to_dict`/`from_dict`/`equals`
+  methods (US-031 combat_run_snapshot, US-035 run_snapshot) will NOT be
+  EXEMPT and need the full FR-2/FR-3 audit path.
+- US-028 (biome_dungeon_database.gd autoload) breaks the cohort pattern —
+  it's the autoload itself, not a data Resource, so it has a real public
+  surface (get_biome, get_dungeon, get_floor lookups) and falls under the
+  standard autoload audit pattern from US-001 through US-016. Expect
+  US-028 to follow the existing autoload exemplars (audio_router_signal_handlers_test.gd
+  shape) rather than the data-class EXEMPT template.
+- The `biome_dungeon_resource_test.gd` file covers ALL THREE Biome/Dungeon/
+  Floor types in a single suite with 13 tests. When tests cover multiple
+  story subjects in one file, the audit-only close is the correct call —
+  splitting tests by story-subject would inflate file count without
+  improving coverage. FR-2 requires "happy-path test asserting documented
+  return shape / behavior", not "one test file per source file".
+
+---
+
+## 2026-05-11 — US-028 biome_dungeon_database/biome_dungeon_database.gd
+
+- Audited src/core/biome_dungeon_database/biome_dungeon_database.gd: 6 public
+  funcs (`grep -nE "^func [a-z]"`):
+    1. get_biome_by_id(id: String) -> Biome
+    2. get_dungeon_by_id(id: String) -> Dungeon
+    3. get_floor_by_id(id: String) -> Floor
+    4. get_playable_biomes() -> Array[Biome]
+    5. get_all_biome_ids() -> Array[String]
+    6. get_floors_for_dungeon(dungeon_id: String) -> Array[Floor]
+  Plus `_init()` and `_ready()` virtuals (both no-op per ADR-0003 Amend #3 —
+  not in public-func count). As predicted in US-027 learnings, this story
+  breaks the US-025/026/027 cohort EXEMPT pattern — autoload has real public
+  surface and falls under the standard autoload audit path.
+- Coverage map (pre-existing tests/integration/biome_dungeon_database/
+  biome_dungeon_database_autoload_test.gd, 12 cases):
+    * get_biome_by_id: happy (resolves_forest_reach line 113 — asserts id,
+      status, display_name) + happy (returns_same_instance line 308 — cache
+      identity) + edge (returns_null_on_miss line 62) + edge (empty_string
+      line 90). FULL coverage.
+    * get_dungeon_by_id: edge (returns_null_on_miss line 70) + edge
+      (empty_string line 90). GAP: no direct happy-path assertion (used
+      transitively in get_floors_for_dungeon_returns_sorted_floors but
+      return value not directly asserted).
+    * get_floor_by_id: edge (returns_null_on_miss line 78) + edge
+      (empty_string line 90). GAP: no direct happy-path assertion.
+    * get_playable_biomes: happy (returns_typed_array line 157 — status
+      filter + sort assertions). FULL coverage.
+    * get_all_biome_ids: happy (returns_sorted_array line 199). FULL
+      coverage.
+    * get_floors_for_dungeon: happy (returns_sorted_floors line 249) + edge
+      (unknown_id_returns_empty line 240). FULL coverage.
+  Net: 4/6 with both happy+edge directly; 2/6 with edge only. Per FR-2
+  ("every public function ... at least one happy-path test asserting the
+  documented return shape / behavior") this fails the strict bar — gaps
+  must be filled.
+- Action: created tests/unit/biome_dungeon_database/
+  biome_dungeon_database_lookup_test.gd with 2 happy-path tests filling the
+  two gaps:
+    * test_get_dungeon_by_id_with_known_probe_id_returns_matching_dungeon
+      (probes DataRegistry.get_all_by_type("dungeons")[0] for first authored
+      Dungeon, calls get_dungeon_by_id(probe.id), asserts non-null + id
+      round-trip + `is Dungeon` lineage).
+    * test_get_floor_by_id_with_known_probe_id_returns_matching_floor
+      (walks Dungeon.floors[0] for first authored Floor, calls
+      get_floor_by_id(probe_floor.id), asserts non-null + id round-trip +
+      `is Floor` lineage; covers the cross-dungeon linear-scan happy path
+      documented at biome_dungeon_database.gd line 117-127).
+  Both use the probe-by-discovery pattern from the existing integration test
+  (avoids hardcoding S3-M7 ids that may evolve). Graceful-degrade on
+  DataRegistry != READY or empty content. Pattern matches the
+  AudioRouter stop_music_test.gd precedent: unit test reaches the live
+  autoload via `get_tree().root.get_node_or_null("BiomeDungeonDatabase")`.
+- Test result: tests/unit/biome_dungeon_database/
+  biome_dungeon_database_lookup_test.gd = 2/2 passed; tests/unit/
+  biome_dungeon_database + tests/integration/biome_dungeon_database combined
+  = 27/27 passed; 0 errors / 0 failures / 0 flaky / 0 skipped / 0 orphans /
+  180ms. Was 25/25 pre-US-028; +2 net from this iteration.
+- New tests added: 2 (1 happy-path per gap).
+- Files changed: tests/unit/biome_dungeon_database/
+  biome_dungeon_database_lookup_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-028 biome_dungeon_database | passes:true | new_tests_added:2 | notes:filled get_dungeon_by_id + get_floor_by_id happy-path gaps using probe-by-discovery pattern + live autoload reach; integration coverage was strong (12 cases) but missed direct happy-path assertion on 2 of 6 funcs.
+
+**Learnings for future iterations:**
+- The probe-by-discovery pattern (
+  `DataRegistry.get_all_by_type("category")[0]` → use its id) is the
+  canonical way to write happy-path tests for thin DataRegistry-wrapper
+  autoloads when the underlying .tres content may evolve. Avoids brittle
+  hardcoded id strings while still exercising the non-null return path.
+  Combine with `DataRegistry.state != READY` guard for graceful-degrade.
+- Unit tests CAN reach live autoloads via
+  `get_tree().root.get_node_or_null("AutoloadName")` — this is established
+  by AudioRouter stop_music_test.gd (US-001) and now reaffirmed for
+  BiomeDungeonDatabase. The unit/integration distinction here is not
+  "does it touch autoloads" but "does it test isolated logic vs.
+  cross-system integration". Happy-path coverage of a single autoload's
+  public-method contract is unit-tier even when the method delegates to
+  another autoload (DataRegistry).
+- Audit predicate refinement: "function name appears in test code with
+  assert_* within ~5 lines" (per EPIC technical considerations) is NOT
+  sufficient to count as happy-path coverage. The assertion must be on the
+  non-null/non-default return path AND directly tied to the function call
+  (not transitive via a wrapper function). US-028 found 2 gaps the simple
+  grep would have missed. Future iterations: explicitly classify each test
+  reference as happy/edge/transitive and only count direct happy + edge as
+  full coverage.
+- The Forest Reach data (`assets/data/biomes/forest_reach.tres` +
+  `assets/data/dungeons/forest_reach_dungeon_01.tres` with 5 Floor
+  sub-resources `forest_reach_f1..f5`) is now an unconditional fixture
+  available for any DataRegistry-dependent test. The graceful-degrade
+  pattern from earlier (when S3-M7 content was pending) still runs but
+  always falls through to the assert branch. Future tests can rely on
+  at-least-one Biome + Dungeon + Floor being resolvable post-boot.
+
+---
+
+## 2026-05-11 — US-029 combat/combat_batch_result.gd
+
+- Audited src/core/combat/combat_batch_result.gd: 2 public funcs
+  (`grep -nE "^func [a-z]"`):
+    1. equals(other: CombatBatchResult) -> bool   (instance, 7-field walk)
+    2. dict_equals(a: Dictionary, b: Dictionary) -> bool   (static helper)
+  US-027 cohort-template prediction (US-029 would be FR-7 EXEMPT) was
+  WRONG — CombatBatchResult has 2 public methods. Falls under the standard
+  FR-2/FR-3 audit path, NOT the Biome/Dungeon/Floor EXEMPT cohort.
+- Coverage map (pre-existing tests/unit/combat_resolution/
+  value_types_and_equals_test.gd Group D, 6 cases):
+    * equals — happy: test_combat_batch_result_equals_field_by_field
+      (line 212, all-7-fields-equal returns true).
+    * equals — edge (null): test_combat_batch_result_equals_returns_false_against_null
+      (line 263, other == null short-circuit at line 65-66).
+    * equals — edge (float within tolerance):
+      test_combat_batch_result_equals_uses_is_equal_approx_for_hp_bonus
+      (line 234, TR-017 is_equal_approx returns true within tolerance).
+    * dict_equals — happy: test_combat_batch_result_dict_equals_static_helper
+      (line 244, same content / different insertion order returns true).
+    * dict_equals — edge: test_combat_batch_result_dict_equals_returns_false_on_size_mismatch
+      (line 251, size short-circuit at line 95-96).
+    * dict_equals — edge: test_combat_batch_result_dict_equals_returns_false_on_value_mismatch
+      (line 257, value short-circuit at line 100-101).
+  Gaps found (vs. CombatRunSnapshot Group E parallel coverage shape in the
+  same file lines 302-320, which DOES exercise per-field inequality):
+    1. equals: 6 of 7 per-field inequality short-circuit branches not
+       directly tested (loops_completed, first_clear_tick, survived,
+       final_tick, hp_bonus_factor OUTSIDE tolerance, kills_by_archetype,
+       kills_by_tier). Existing tests cover happy + null + float-inside-
+       tolerance only; none exercise the false-return branch on a
+       single-field difference.
+    2. dict_equals: same-size-different-keys branch (line 98-99,
+       `if not b.has(k): return false`) is unreached. Existing size+value
+       mismatch tests exit before reaching it.
+- Action: created tests/unit/combat_resolution/
+  combat_batch_result_inequality_test.gd with 8 new tests:
+    * test_combat_batch_result_equals_returns_false_on_loops_completed_mismatch
+    * test_combat_batch_result_equals_returns_false_on_first_clear_tick_mismatch
+    * test_combat_batch_result_equals_returns_false_on_survived_mismatch
+    * test_combat_batch_result_equals_returns_false_on_final_tick_mismatch
+    * test_combat_batch_result_equals_returns_false_on_hp_bonus_factor_outside_tolerance
+    * test_combat_batch_result_equals_returns_false_on_kills_by_archetype_mismatch
+    * test_combat_batch_result_equals_returns_false_on_kills_by_tier_mismatch
+    * test_combat_batch_result_dict_equals_returns_false_when_key_not_present_in_other
+  Each test arranges two CombatBatchResult instances (or two raw dicts for
+  the static helper) differing on EXACTLY ONE field, calls equals/dict_equals,
+  asserts false. Mirrors the CombatRunSnapshot per-field-mismatch pattern at
+  lines 302-307 of value_types_and_equals_test.gd. Uses
+  CombatBatchResultScript const preload (same as Group D) — no autoload
+  dependencies, no DataRegistry, no @tool / before_test cleanup needed.
+- Test result: tests/unit/combat_resolution/combat_batch_result_inequality_test.gd
+  = 8/8 passed; full tests/unit/combat_resolution suite = 143/143 (was 135) /
+  0 errors / 0 failures / 0 flaky / 0 skipped / 0 orphans / 996ms. No
+  regressions in pre-existing 7 test files.
+- New tests added: 8.
+- Files changed: tests/unit/combat_resolution/combat_batch_result_inequality_test.gd
+  (new), production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-029 combat_batch_result | passes:true | new_tests_added:8 | notes:filled equals per-field-inequality gap (6 of 7 fields untested at the false-return branch) + dict_equals same-size-different-keys branch. Per US-027's cohort-template prediction, US-029 was forecast EXEMPT — that forecast was wrong because the file has 2 real public methods; closing under standard FR-2/FR-3 path with focused gap-fill instead.
+
+**Learnings for future iterations:**
+- The US-027 cohort-template prediction list for FR-7 EXEMPT (US-029, US-032,
+  US-033, US-037, US-038, US-040, US-042) should be REVERIFIED per-iteration
+  with `grep -nE "^func [a-z]"`. US-029 was forecast EXEMPT but has 2 public
+  methods. The "data-class struct" heuristic from US-025/026/027 is a hint,
+  not a contract — value types in this codebase often have equals/dict_equals
+  helpers (TR-016 forbids hash-based equality, so the author wrote explicit
+  helpers). Expect US-031 (combat_run_snapshot) and US-035 (run_snapshot) to
+  follow the SAME pattern as US-029 (real public surface, FR-2/FR-3 path), and
+  US-032/033/037/038/040/042 to be the genuine EXEMPT candidates pending
+  per-file grep verification.
+- When a source file's `equals` has N inequality short-circuit branches and
+  the existing coverage is "happy + null only", the canonical gap-fill is N
+  parameterless tests, one per field, each constructing two instances
+  differing on exactly that field and asserting `.equals()` returns false.
+  Mirror the CombatRunSnapshot Group E pattern at lines 302-315 of
+  value_types_and_equals_test.gd (test_*_returns_false_on_<field>_mismatch).
+  This is more diagnostic than a single multi-field test because a
+  failure tells you EXACTLY which field's short-circuit broke.
+- For `dict_equals`-style key-by-key walks, the four branch categories are
+  (1) size mismatch, (2) key-not-present-in-other-same-size, (3) value
+  mismatch, (4) all-equal happy. Full coverage = 4 tests. The
+  key-not-present branch is the one most often missed because the
+  size-mismatch test exits at line 95-96 before reaching the `if not b.has(k)`
+  short-circuit at line 98-99. When auditing other dict-equality helpers
+  (e.g., on RunSnapshot, MatchupResult, telemetry payload comparators),
+  check for this specific 4-branch coverage shape.
+- The float OUTSIDE-tolerance branch for equals() is distinct from the
+  INSIDE-tolerance branch — the existing
+  test_combat_batch_result_equals_uses_is_equal_approx_for_hp_bonus only
+  exercises INSIDE-tolerance (returns true). For full TR-017 coverage you
+  also need an OUTSIDE-tolerance test (returns false). Same audit-shape
+  applies to any other float field compared via is_equal_approx (e.g.,
+  CombatRunSnapshot.formation_dps_per_tick at Group E).
+
+---
+
+
+## 2026-05-11 — US-030 combat/combat_config.gd
+
+- Audited src/core/combat/combat_config.gd: ZERO public functions per the
+  FR-2 strict predicate `grep -nE "^func [a-z]" src/core/combat/combat_config.gd`
+  → empty. The file's only function is `_validate()` (line 91), which is
+  underscore-prefixed by Godot Resource virtual convention and therefore
+  EXCLUDED from the FR-2 public-surface enumeration. CombatConfig is a pure
+  data Resource extending GameData with 4 @export tuning fields (SPEED_BASE,
+  MATCHUP_THROUGHPUT_FACTOR_ADV, MATCHUP_THROUGHPUT_FACTOR_DIS,
+  LOSING_RUN_LOOT_FACTOR) per GDD §G; the only behavior is the ADR-0011
+  schema-validation hook implemented as the standard `_validate` virtual.
+- Per FR-7 ("Pure data classes (Resources, RefCounteds with no public methods
+  beyond field accessors) are EXEMPT"), US-030 closes as EXEMPT. The
+  US-029 learnings entry's prediction of which stories would be genuine
+  EXEMPT candidates (US-032/033/037/038/040/042) did NOT include US-030
+  because US-029's audit-shape grep was applied to combat_batch_result
+  (which has equals/dict_equals), not combat_config. Updating the cohort
+  prediction here: US-030 also belongs in the EXEMPT cohort.
+- Bonus coverage well above bar — even though _validate is excluded from the
+  FR-2 public surface, it is comprehensively covered by 11 existing tests in
+  tests/unit/combat_resolution/combat_config_test.gd:
+    Group A (5 tests): schema field defaults match GDD §G
+      * test_combat_config_default_speed_base_is_ten (line 19)
+      * test_combat_config_default_matchup_throughput_factor_adv_is_1_5 (line 24)
+      * test_combat_config_default_matchup_throughput_factor_dis_is_0_67 (line 29)
+      * test_combat_config_default_losing_run_loot_factor_is_0_5 (line 34)
+      * test_combat_config_extends_gamedata (line 39)
+    Group B (1 test): _validate happy path
+      * test_combat_config_default_instance_validates_clean (line 49)
+    Group C (5 tests): _validate constraint-rejection edges
+      * test_combat_config_validate_rejects_zero_speed_base (line 59)
+      * test_combat_config_validate_rejects_matchup_adv_below_one (line 68)
+      * test_combat_config_validate_rejects_matchup_dis_at_or_above_one (line 78)
+      * test_combat_config_validate_rejects_losing_run_loot_factor_above_one (line 90)
+      * test_combat_config_validate_rejects_losing_run_loot_factor_negative (line 99)
+    Group D (5 tests): combat_config.tres on-disk resource integrity
+      * test_combat_config_tres_resource_exists_at_expected_path (line 110)
+      * test_combat_config_tres_loads_and_is_combat_config (line 115)
+      * test_combat_config_tres_default_values_match_gdd (line 121)
+      * test_combat_config_tres_validates_clean (line 130)
+      * test_combat_config_tres_id_and_display_name_set (line 137)
+    Group E (1 test): TR-031 anti-hardcode source-grep lint
+      * test_no_hardcoded_combat_constants_in_resolver_source (line 149)
+  Cross-consumer tier: tests/unit/combat_resolution/cooldown_formula_test.gd
+  exercises SPEED_BASE via DefaultCombatResolver.action_cooldown_ticks();
+  tests/integration/matchup_resolver/economy_and_combat_consumer_test.gd
+  exercises MATCHUP_THROUGHPUT_FACTOR_ADV/DIS and LOSING_RUN_LOOT_FACTOR
+  through the kill-batch + loot pipeline.
+- Test result: tests/unit/combat_resolution/combat_config_test.gd = 17/17
+  passed; 0 errors / 0 failures / 0 flaky / 0 skipped / 0 orphans / 111ms.
+  Full tests/unit/combat_resolution suite = 143/143 (no change from US-029
+  baseline) / 0 errors / 0 failures / 0 flaky / 0 skipped / 0 orphans /
+  991ms. No regressions.
+- New tests added: 0 (FR-7 EXEMPT — zero public functions per strict
+  FR-2 predicate; bonus _validate coverage already at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-030 combat_config | passes:true | new_tests_added:0 | notes:FR-7 EXEMPT — zero public functions per strict FR-2 predicate (only function is underscore-prefixed `_validate` virtual). Existing tests/unit/combat_resolution/combat_config_test.gd already ships 17 tests across 5 groups (schema defaults, _validate happy + 5 constraint-rejection edges, .tres on-disk integrity, TR-031 anti-hardcode lint) plus cross-consumer coverage via cooldown_formula_test.gd and economy_and_combat_consumer_test.gd. Audit-only close.
+
+**Learnings for future iterations:**
+- FR-7 EXEMPT is the right classification when a file's ONLY function is
+  an underscore-prefixed Godot virtual (e.g., `_validate`, `_init`, `_ready`,
+  `_get`, `_set`, `_to_string`). The FR-2 predicate's "does NOT start with
+  `_`" exclusion is intentional — Godot virtuals are framework callbacks,
+  not user-callable public API. The right test-coverage question is "is
+  the documented behavior covered?" and for combat_config that's a
+  resounding yes (17 tests). Future stories with similar shape (a Resource
+  whose only method is `_validate`): grep first, confirm only underscore-
+  prefixed funcs exist, close FR-7 EXEMPT with bonus-coverage note.
+- The "underscore-virtual-only" cohort is a SECOND EXEMPT pattern distinct
+  from the US-025/026/027 "zero-functions-at-all" cohort. US-030 is the
+  first member of this cohort. Other expected members: scan for files
+  where `grep -nE "^func [a-z]"` returns empty but `grep -nE "^func "`
+  returns non-empty (e.g., to_be-confirmed: economy_config.gd US-036,
+  roster_config.gd US-041, scene_manager_config.gd US-044 — all likely
+  `_validate`-only Resources per ADR-0011 convention).
+- The combat_config_test.gd's 5-group layout (Group A defaults, Group B
+  _validate happy, Group C _validate constraints, Group D .tres integrity,
+  Group E TR-031 anti-hardcode lint) is a reusable test-file shape for ANY
+  GameData-extending tuning Resource. When auditing future config Resources
+  (EconomyConfig, RosterConfig, SceneManagerConfig), check that the
+  existing test file has parallel groups; gaps in any group should drop
+  the EXEMPT classification and trigger gap-fill on the standard FR-2/FR-3
+  path. The Group E source-grep anti-hardcode lint is especially valuable
+  because it catches a different class of regression (hardcoded constants
+  drifting back into resolver code) than the per-field _validate tests.
+
+---
+
+
+## 2026-05-11 — US-031 combat/combat_run_snapshot.gd
+
+- Audited src/core/combat/combat_run_snapshot.gd: 1 public func per the FR-2
+  strict predicate `grep -nE "^func [a-z]"`:
+    1. equals(other: CombatRunSnapshot) -> bool   (instance, 7-branch walk)
+  Matches US-029 prediction ("expect US-031 (combat_run_snapshot) and US-035
+  (run_snapshot) to follow the SAME pattern as US-029 — real public surface,
+  FR-2/FR-3 path"). CombatRunSnapshot is a RefCounted value type with 6
+  fields and a single equals() helper that walks them via dispatched_at_tick,
+  loops_per_run, formation_dps_per_tick (is_equal_approx), hp_bonus_factor
+  (is_equal_approx), enemy_list (size + per-element dict_equals), and
+  matchup_cache (dict_equals).
+- Coverage map (pre-existing tests/unit/combat_resolution/
+  value_types_and_equals_test.gd Group E, 5 cases at lines 269-320):
+    * happy: test_combat_run_snapshot_equals_field_by_field (all fields set,
+      both instances equal -> returns true; line 282).
+    * defaults: test_combat_run_snapshot_default_fields (line 272 — schema
+      coverage, not equals coverage but useful invariant).
+    * null edge: test_combat_run_snapshot_equals_returns_false_against_null
+      (line 318, other == null short-circuit at line 73-74).
+    * dispatched_at_tick mismatch:
+      test_combat_run_snapshot_equals_returns_false_on_dispatched_at_tick_mismatch
+      (line 302, short-circuit at line 75-76).
+    * matchup_cache mismatch:
+      test_combat_run_snapshot_equals_returns_false_on_matchup_cache_mismatch
+      (line 310, dict_equals short-circuit at line 92-93).
+  Gaps found vs. the 9-branch surface (1 null + 2 int + 2 float + 2 array +
+  1 dict + 1 happy = 9):
+    1. loops_per_run mismatch (line 77-78) — UNTESTED.
+    2. formation_dps_per_tick OUTSIDE is_equal_approx tolerance (line 79-80)
+       — UNTESTED (existing tests cover within-tolerance via the happy path
+       where both are 1.5 but never the false-return branch).
+    3. hp_bonus_factor OUTSIDE is_equal_approx tolerance (line 81-82) —
+       UNTESTED (same shape as gap 2).
+    4. enemy_list size mismatch (line 84-85) — UNTESTED.
+    5. enemy_list per-element dict_equals mismatch (line 86-90) — UNTESTED
+       (same-size arrays with at-least-one element-dict differing).
+- Action: created tests/unit/combat_resolution/
+  combat_run_snapshot_inequality_test.gd with 5 new tests, one per gap.
+  Mirrors US-029's combat_batch_result_inequality_test.gd shape: each test
+  constructs two instances differing on EXACTLY ONE field, calls equals(),
+  asserts false. Uses CombatRunSnapshotScript const preload — no autoload
+  dependencies, no DataRegistry, no before_test cleanup needed.
+- Test result: tests/unit/combat_resolution/combat_run_snapshot_inequality_test.gd
+  = 5/5 passed; full tests/unit/combat_resolution suite = 148/148
+  (was 143 + 5 new = 148) / 0 errors / 0 failures / 0 flaky / 0 skipped /
+  0 orphans / 1s 31ms. No regressions in pre-existing 8 test files.
+- New tests added: 5.
+- Files changed: tests/unit/combat_resolution/combat_run_snapshot_inequality_test.gd
+  (new), production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-031 combat_run_snapshot | passes:true | new_tests_added:5 | notes:filled equals per-field-inequality gap (5 of 8 branches untested at false-return: loops_per_run, formation_dps_per_tick outside-tolerance, hp_bonus_factor outside-tolerance, enemy_list size, enemy_list element). US-029 prediction confirmed: real public surface (not FR-7 EXEMPT); closed under standard FR-2/FR-3 path with focused gap-fill.
+
+**Learnings for future iterations:**
+- US-035 (run_snapshot.gd in dungeon_run_orchestrator/) is predicted by US-029
+  to follow the same pattern. PER US-003 audit notes, run_snapshot is already
+  covered by run_snapshot_and_fsm_test.gd — but the audit-shape question is
+  "does the test file exercise the false-return branch on EVERY field?". The
+  US-031 pattern (one new inequality test per untested field) is the
+  canonical gap-fill if the existing run_snapshot tests cover only happy +
+  null + a couple of fields. Apply the same shape: enumerate equals()
+  short-circuit branches, grep tests/ for assertions on each branch
+  returning false, gap-fill the missing branches in a separate
+  *_inequality_test.gd file.
+- The is_equal_approx OUTSIDE-tolerance branch is the canonical edge-case
+  miss in float-comparing equals() helpers. Existing tests typically cover
+  either "happy: both equal" (returns true) or "happy: both differ slightly
+  but within tolerance" (returns true). The false-return branch needs an
+  explicit OUTSIDE-tolerance test. For CombatRunSnapshot both float fields
+  (formation_dps_per_tick + hp_bonus_factor) had this gap; same applies to
+  any future struct with is_equal_approx-compared floats.
+- Array<Dictionary>-field equality has TWO branches that need direct
+  coverage: size mismatch AND per-element dict_equals failure. The size
+  short-circuit exits early so it doesn't double-cover the element-walk
+  branch. Both need separate tests. When auditing any struct with
+  array-of-dicts fields (e.g., CombatTickEvents.kill_schedule,
+  TelemetrySink event_buffer if it grows one), apply the same 2-test shape.
+
+---
+
+---
+
+
+## 2026-05-11 — US-032 combat/combat_tick_events.gd
+
+- Audited src/core/combat/combat_tick_events.gd: 1 public func per the FR-2
+  strict predicate `grep -nE "^func [a-z]"`:
+    1. equals(other: CombatTickEvents) -> bool   (instance, 5-branch walk)
+  Continues the cohort pattern from US-029 (combat_batch_result) and US-031
+  (combat_run_snapshot) — real public surface, FR-2/FR-3 path. The file is
+  a 3-field RefCounted (kills: Array[KillEvent], loop_completed_ticks:
+  Array[int], first_clear_in_range: bool) with a single equals() helper
+  whose 5 false-return short-circuits are: null other, first_clear_in_range
+  mismatch, loop_completed_ticks Array[int] != mismatch, kills size
+  mismatch, and per-element KillEvent.equals walk.
+- Coverage map (pre-existing tests/unit/combat_resolution/
+  value_types_and_equals_test.gd Group C, 4 cases at lines 144-194):
+    * happy: test_combat_tick_events_equals_with_matching_kills_array
+      (line 154 — reference-different but field-equal kills + matching
+      loop_completed_ticks + matching first_clear_in_range -> true).
+    * defaults: test_combat_tick_events_default_fields (line 147 — schema
+      coverage, not equals coverage but useful invariant).
+    * first_clear mismatch:
+      test_combat_tick_events_equals_returns_false_on_first_clear_mismatch
+      (line 175, short-circuit at line 47-48).
+    * kills size mismatch:
+      test_combat_tick_events_equals_returns_false_on_kills_size_mismatch
+      (line 183, short-circuit at line 51-52).
+    * null edge:
+      test_combat_tick_events_equals_returns_false_against_null
+      (line 192, short-circuit at line 45-46).
+  Gaps found vs. the 5-branch surface (1 null + 1 bool + 1 Array[int] +
+  1 array-size + 1 array-element = 5):
+    1. loop_completed_ticks mismatch (line 49-50, Array[int] != compare)
+       — UNTESTED. Existing tests cover loop_completed_ticks set to
+       matching values but never different values.
+    2. kills per-element KillEvent.equals mismatch (line 53-55) — UNTESTED.
+       Existing tests cover the size-mismatch short-circuit but not the
+       same-size element-walk where at least one element differs
+       structurally.
+- Action: created tests/unit/combat_resolution/
+  combat_tick_events_inequality_test.gd with 2 new tests, one per gap.
+  Mirrors US-029's combat_batch_result_inequality_test.gd and US-031's
+  combat_run_snapshot_inequality_test.gd shape: each test constructs two
+  instances differing on EXACTLY ONE field, calls equals(), asserts false.
+  Uses CombatTickEventsScript + KillEventScript const preloads — no
+  autoload dependencies, no DataRegistry, no before_test cleanup needed.
+- Test result: tests/unit/combat_resolution/combat_tick_events_inequality_test.gd
+  = 2/2 passed; full tests/unit/combat_resolution suite = 150/150
+  (was 148 + 2 new = 150) / 0 errors / 0 failures / 0 flaky / 0 skipped /
+  0 orphans / 1s 36ms. No regressions in pre-existing 9 test files.
+- New tests added: 2.
+- Files changed: tests/unit/combat_resolution/combat_tick_events_inequality_test.gd
+  (new), production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-032 combat_tick_events | passes:true | new_tests_added:2 | notes:filled equals per-field-inequality gap (2 of 5 branches untested at the false-return: loop_completed_ticks Array[int] mismatch + kills per-element KillEvent.equals mismatch). Third member of the inequality-test cohort (US-029 combat_batch_result, US-031 combat_run_snapshot, US-032 combat_tick_events). Closed under standard FR-2/FR-3 path with focused gap-fill.
+
+**Learnings for future iterations:**
+- US-035 (run_snapshot.gd in dungeon_run_orchestrator/) is the next
+  predicted member of this inequality-cohort — same pattern: per-field
+  equals() helper with N false-return short-circuits, existing tests
+  cover happy + null + a couple of fields, gap-fill missing branches in
+  a separate *_inequality_test.gd file. The cohort is now 3-strong
+  (US-029, US-031, US-032) with consistent shape: enumerate equals()
+  short-circuit branches, grep tests/ for assertions on each branch
+  returning false, write one focused test per untested branch.
+- The Array[int] != compare branch (loop_completed_ticks at line 49) is
+  structurally equivalent to GDScript 4's element-wise equality on typed
+  primitive arrays — single same-size-different-values test covers the
+  branch sufficiently; no need to ALSO test different-size since the !=
+  operator handles both internally. Contrast with the kills array which
+  uses an explicit size-check + element-walk pattern, where size and
+  element-walk are SEPARATE branches needing separate tests.
+- Cohort file layout convention: the *_inequality_test.gd file lives
+  next to value_types_and_equals_test.gd (NOT replacing it) and uses
+  the same const preload pattern (Script-level `const` of the .gd file
+  rather than autoload reference). This keeps the file zero-dependency
+  on autoloads/DataRegistry and avoids the before_test/after_test
+  cleanup ceremony entirely. Three sibling files now follow this shape.
+
+---
+
+## 2026-05-11 — US-033 combat/kill_event.gd
+
+- Audited src/core/combat/kill_event.gd: 1 public func per the FR-2 strict
+  predicate `grep -nE "^func [a-z]"`:
+    1. equals(other: KillEvent) -> bool   (instance, 5-field `and`-chain
+       with 6 false-return branches: null guard + 5 per-field mismatches)
+  Continues the cohort pattern from US-029 (combat_batch_result), US-031
+  (combat_run_snapshot), and US-032 (combat_tick_events) — real public
+  surface, FR-2/FR-3 path. KillEvent is a 5-field RefCounted (enemy_id,
+  archetype, tier, is_boss, kill_tick) with a single equals() helper.
+- Coverage map (pre-existing tests/unit/combat_resolution/
+  value_types_and_equals_test.gd Group B, 6 cases at lines 76-140):
+    * defaults: test_kill_event_default_fields (line 79 — schema
+      coverage, useful invariant).
+    * happy: test_kill_event_equals_field_by_field_match (line 88 — all
+      5 fields equal -> equals returns true).
+    * kill_tick mismatch:
+      test_kill_event_equals_returns_false_on_field_mismatch (line 106 —
+      short-circuit at line 65).
+    * null edge: test_kill_event_equals_returns_false_against_null
+      (line 118 — short-circuit at line 58-59).
+    * reference-vs-structural invariant:
+      test_kill_event_reference_different_field_equal_yields_equals_true
+      (line 123 — RefCounted == is reference-equality, equals() is structural).
+    * is_boss mismatch:
+      test_kill_event_is_boss_flag_propagates_regardless_of_position
+      (line 133 — short-circuit at line 64; TR-028 invariant).
+  Gaps found vs. the 6-branch surface (1 null + 5 field mismatches): 3 of
+  5 per-field false-return branches untested:
+    1. enemy_id mismatch (line 61) — UNTESTED.
+    2. archetype mismatch (line 62) — UNTESTED.
+    3. tier mismatch (line 63) — UNTESTED.
+- Action: created tests/unit/combat_resolution/kill_event_inequality_test.gd
+  with 3 new tests, one per gap. Mirrors US-029/US-031/US-032 inequality-test
+  shape: each test constructs two KillEvent instances differing on EXACTLY
+  ONE field (other 4 fields identical), calls equals(), asserts false.
+  Uses KillEventScript const preload — no autoload dependencies, no
+  DataRegistry, no before_test cleanup needed.
+- Test result: tests/unit/combat_resolution/kill_event_inequality_test.gd
+  = 3/3 passed; full tests/unit/combat_resolution suite = 153/153
+  (was 150 + 3 new) / 0 errors / 0 failures / 0 flaky / 0 skipped /
+  0 orphans / 1s 56ms. No regressions in pre-existing 10 test files.
+- New tests added: 3.
+- Files changed: tests/unit/combat_resolution/kill_event_inequality_test.gd
+  (new), production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-033 kill_event | passes:true | new_tests_added:3 | notes:filled equals per-field-inequality gap (3 of 5 field branches untested at the false-return: enemy_id, archetype, tier). Fourth member of the inequality-test cohort (US-029 combat_batch_result, US-031 combat_run_snapshot, US-032 combat_tick_events, US-033 kill_event). US-029 cohort-template prediction listed US-033 as FR-7 EXEMPT — REVERIFIED WRONG (file has 1 real public method per the same lesson learned in US-029). Closed under standard FR-2/FR-3 path with focused gap-fill.
+
+**Learnings for future iterations:**
+- The US-027 cohort-template "EXEMPT" prediction list has now been wrong
+  for 4 consecutive forecast members (US-029, US-031, US-032, US-033 all
+  had real public equals() surfaces requiring gap-fill, none were EXEMPT).
+  Strong evidence the heuristic "data-class struct = EXEMPT" is reliably
+  wrong for value types in src/core/combat/. The remaining cohort-template
+  EXEMPT forecasts (US-037 enemy_data, US-038 hero_class, US-040 name_pool,
+  US-042 matchup_result) should be assumed to have a real public surface
+  until per-file grep proves otherwise. Default expectation: standard
+  FR-2/FR-3 path with a small inequality-gap-fill cohort entry.
+- KillEvent's equals() is a single `and`-expression rather than the
+  short-circuit `if ... return false` pattern used by CombatBatchResult and
+  CombatTickEvents. Behaviorally equivalent at the false-return surface
+  (each `and` operand IS a short-circuit point), so the per-field
+  inequality-test cohort pattern still applies cleanly. No structural
+  difference for test coverage purposes.
+- The cohort is now 4-strong (US-029, US-031, US-032, US-033) with
+  consistent shape: enumerate equals() branches, grep tests/ for assertions
+  on each, write one focused test per untested branch in a sibling
+  *_inequality_test.gd file. US-035 (run_snapshot.gd in
+  dungeon_run_orchestrator/) remains the next predicted cohort member.
+
+## 2026-05-11 — US-034 dungeon_run_orchestrator/dungeon_run_state.gd
+
+- Audited src/core/dungeon_run_orchestrator/dungeon_run_state.gd: 1 public
+  static function per the FR-2 strict predicate expanded to `^(static )?func
+  [a-z]`:
+    1. validate_transition(from: int, trigger: String) -> int   (5x6 matrix
+       + unknown-trigger guard + unknown-from-state defensive guard)
+  Per-cohort precedent (US-003 audit treated `set_*` static accessors as
+  public despite the `^func [a-z]` pattern not matching `static func`), the
+  expanded predicate is the intended reading. validate_transition is the
+  single public surface; all other funcs are underscore-prefixed (`_invalid`,
+  `_state_name`, `_from_no_run`, `_from_dispatching`, `_from_active_foreground`,
+  `_from_active_offline_replay`, `_from_run_ended`).
+- Coverage map (pre-existing tests/unit/dungeon_run_orchestrator/
+  run_snapshot_and_fsm_test.gd Group C, 21 per-cell tests + 1 exhaustiveness
+  loop + 1 unknown-trigger test):
+    * Exhaustiveness loop (line 55-70):
+      test_every_state_trigger_cell_returns_a_valid_state — asserts all 30
+      cells return one of the 5 State enum ints. Catches invalid-State
+      regressions but NOT a "wrong-but-valid State" mutation (e.g., a cell
+      flipping from DISPATCHING to RUN_ENDED).
+    * Per-cell expected-return tests (21 of 30 cells):
+      Row 1 NO_RUN: 6/6 cells covered.
+      Row 2 DISPATCHING: 4/6 (run_ended, dispatch_pressed, formation_changed,
+        app_suspended). MISSING: app_resumed, offline_replay_complete.
+      Row 3 ACTIVE_FOREGROUND: 5/6 (app_suspended, formation_changed,
+        run_ended, app_resumed, dispatch_pressed). MISSING:
+        offline_replay_complete.
+      Row 4 ACTIVE_OFFLINE_REPLAY: 4/6 (offline_replay_complete,
+        formation_changed, run_ended, dispatch_pressed). MISSING:
+        app_suspended, app_resumed.
+      Row 5 RUN_ENDED: 4/6 (dispatch_pressed, run_ended, formation_changed,
+        app_suspended). MISSING: app_resumed, offline_replay_complete.
+    * Unknown trigger guard: tested for NO_RUN only
+      (test_validate_transition_rejects_unknown_trigger) — the
+      `not (trigger in ALL_TRIGGERS)` short-circuit at line 91-96 is
+      already exercised, so per-state replication is overkill.
+    * Unknown from-state defensive guard (line 109-113): UNTESTED.
+  Gaps found vs. the 32-branch surface (30 cells + unknown-trigger +
+  unknown-from-state): 7 specific cells + 1 defensive guard = 8 gaps.
+- Action: created tests/unit/dungeon_run_orchestrator/
+  dungeon_run_state_matrix_completeness_test.gd with 8 new tests, one per
+  gap. Each test calls validate_transition with the specific (from, trigger)
+  pair and asserts the documented expected-State return. Matches the
+  Row-1-NO_RUN test shape already in run_snapshot_and_fsm_test.gd. Uses
+  DungeonRunStateScript const preload — no autoload dependencies, no
+  DataRegistry, no before_test cleanup needed. Defensive-guard test uses
+  bogus_from = -1 to hit the line 109-113 push_error + return-unchanged
+  branch.
+- Test result: tests/unit/dungeon_run_orchestrator/
+  dungeon_run_state_matrix_completeness_test.gd = 8/8 passed; full
+  tests/unit/dungeon_run_orchestrator suite = 217/217 (was 209 + 8 new) /
+  0 errors / 0 failures / 0 flaky / 0 skipped / 0 orphans / 3s 101ms. No
+  regressions in pre-existing 15 test files.
+- New tests added: 8.
+- Files changed: tests/unit/dungeon_run_orchestrator/dungeon_run_state_matrix_completeness_test.gd
+  (new), production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-034 dungeon_run_state | passes:true | new_tests_added:8 | notes:filled per-cell expected-return gap (7 of 30 cells lacked specific-State assertion — Row 2 app_resumed + offline_replay_complete; Row 3 offline_replay_complete; Row 4 app_suspended + app_resumed; Row 5 app_resumed + offline_replay_complete) + unknown-from-state defensive guard (line 109-113). Pre-existing exhaustiveness loop catches invalid-State mutations; this suite catches wrong-but-valid-State mutations.
+
+**Learnings for future iterations:**
+- Static-func public surfaces require the EXPANDED audit predicate
+  `^(static )?func [a-z]` — the strict `^func [a-z]` predicate misses every
+  static helper. This is the second time the pattern has come up (first was
+  US-003 set_combat_resolver / set_matchup_resolver DI seams). When auditing
+  files with helper modules (FSM transition tables, formula evaluators,
+  pure-function utility classes), expand the predicate up-front.
+- Exhaustiveness loops that assert "returns one of the valid options" are
+  NECESSARY but NOT SUFFICIENT for matrix-style state machines. They catch
+  the "returns garbage" mutation class but not the "returns the wrong valid
+  option" class. Gap-fill per-cell tests are the canonical regression-net
+  for state-trigger matrices. Apply this lens to any future matrix-style
+  validator (matchup tables, archetype-vs-class advantage tables, recipe
+  lookup tables, etc.).
+- The defensive-guard branch (push_error + return-unchanged for unknown
+  from-state) is unreachable in production given the State enum, but a
+  test pinning the contract is cheap insurance against a future refactor
+  that re-orders the match block or drops the defensive `return from`. The
+  pattern is: pass a bogus int outside the enum range, assert the function
+  returns it unchanged. Works for any `match ... return from` defensive
+  pattern.
+
+---
+
+## 2026-05-11 — US-035 dungeon_run_orchestrator/run_snapshot.gd
+
+- Audited src/core/dungeon_run_orchestrator/run_snapshot.gd: 3 public funcs
+  per the FR-2 strict predicate `grep -nE "^func [a-z]"`:
+    1. to_dict() -> Dictionary               (12-key schema serializer)
+    2. from_dict(d: Dictionary) -> void      (defensive hydrator)
+    3. equals(other: RunSnapshot) -> bool    (12-field `and`-chain with
+       13 short-circuit branches: 1 null + 12 per-field)
+  EPIC.md US-035 predicted `passes: true` from existing
+  `run_snapshot_and_fsm_test.gd` coverage — REVERIFIED PARTIAL: to_dict/
+  from_dict round-trip + defaults are well covered, but the equals()
+  per-field inequality surface is mostly UNTESTED (only 1 of 12 field
+  branches has a dedicated inequality test). The cohort-prediction from
+  US-029/US-031/US-032/US-033 was correct: RunSnapshot is the 5th
+  inequality-cohort member.
+- Coverage map (pre-existing tests/unit/dungeon_run_orchestrator/
+  run_snapshot_and_fsm_test.gd Groups F + G, plus 2 equals-specific tests):
+    * to_dict 12-key schema + value-mapping + collection-deep-duplicate
+      (3 tests, Group F lines 320-373) — COVERED.
+    * from_dict round-trip + null edge + defaults + float-coercion +
+      no-alias (6 tests, Group G lines 380-453) — COVERED.
+    * equals() happy: implicitly via round-trip test (assert_bool(
+      dst.equals(src)).is_true()).
+    * equals() null edge: test_equals_returns_false_against_null — COVERED.
+    * equals() floor_id mismatch:
+      test_equals_returns_false_for_mismatched_floor_id — COVERED.
+  Gaps found vs. the 13-branch equals() surface (1 null + 12 per-field):
+  11 of 12 per-field false-return branches UNTESTED at the dedicated
+  inequality level (formation_snapshot, current_tick, last_emitted_tick,
+  losing_run, floor_clear_emitted, matchup_cache, kill_schedule,
+  loop_counter, kill_count, floor_was_valid, synergy_id).
+- Action: created tests/unit/dungeon_run_orchestrator/
+  run_snapshot_inequality_test.gd with 11 new tests, one per gap. Mirrors
+  US-029/US-031/US-032/US-033 inequality-test shape: each test constructs
+  two RunSnapshot instances differing on EXACTLY ONE field (other 11 fields
+  identical defaults), calls equals(), asserts false. Uses RunSnapshotScript
+  const preload — no autoload dependencies, no DataRegistry, no before_test
+  cleanup needed.
+- Test result: tests/unit/dungeon_run_orchestrator/
+  run_snapshot_inequality_test.gd = 11/11 passed; full
+  tests/unit/dungeon_run_orchestrator suite = 228/228 (was 217 + 11 new) /
+  0 errors / 0 failures / 0 flaky / 0 skipped / 0 orphans / 3s 203ms. No
+  regressions in pre-existing 16 test files.
+- New tests added: 11.
+- Files changed: tests/unit/dungeon_run_orchestrator/run_snapshot_inequality_test.gd
+  (new), production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-035 run_snapshot | passes:true | new_tests_added:11 | notes:filled equals per-field-inequality gap (11 of 12 field branches untested at the false-return). Fifth member of the inequality-test cohort (US-029, US-031, US-032, US-033, US-035). EPIC.md predicted passes:true via run_snapshot_and_fsm_test.gd — to_dict/from_dict were well covered but equals() per-field inequality branches were not. Closed under standard FR-2/FR-3 path with focused gap-fill.
+
+**Learnings for future iterations:**
+- The EPIC.md `passes: true` predictions remain unreliable for files with
+  multi-field equals() helpers. Five consecutive cohort forecasts (US-029,
+  US-031, US-032, US-033, US-035) have all required gap-fill work despite
+  upstream tests covering happy-path round-trip. The pattern: an existing
+  test asserting `dst.equals(src).is_true()` on the all-fields-match case
+  exercises the TRUE-return path of equals() but leaves the per-field
+  false-return branches (each `and` operand) as separate uncovered
+  short-circuit points. Future cohort members (likely US-042
+  matchup_result.gd, possibly US-037 enemy_data, US-038 hero_class,
+  US-040 name_pool, US-041 roster_config) should be expected to need
+  inequality gap-fill unless a per-file grep proves the equals() branches
+  are fully covered by dedicated mismatch tests.
+- RunSnapshot's equals() chain has 12 field branches — the longest cohort
+  member so far (CombatBatchResult had 7, CombatRunSnapshot had 5, KillEvent
+  had 5, CombatTickEvents had 7 incl. array branches). Floating field
+  inequality wasn't applicable here (no float fields on RunSnapshot — gold
+  is int, ticks are int, factor fields live on CombatRunSnapshot not
+  RunSnapshot). Dictionary/Array fields used direct `==` operator (deep
+  equality) rather than the size-check + per-element-walk pattern in
+  CombatTickEvents — so single-test-per-field coverage suffices.
+- The cohort is now 5-strong (US-029, US-031, US-032, US-033, US-035) with
+  consistent shape: enumerate equals() branches, grep tests/ for assertions
+  on each, write one focused test per untested branch in a sibling
+  *_inequality_test.gd file. The sibling file lives next to the canonical
+  *_and_fsm_test.gd / value_types_and_equals_test.gd file (NOT replacing
+  it) and uses const Script preload to stay zero-dependency.
+
+---
