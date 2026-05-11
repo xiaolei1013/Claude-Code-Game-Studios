@@ -2484,3 +2484,86 @@ Append-only log per EPIC.md FR-9. Format:
   on each, write one focused test per untested branch in a sibling
   *_inequality_test.gd file. US-035 (run_snapshot.gd in
   dungeon_run_orchestrator/) remains the next predicted cohort member.
+
+## 2026-05-11 — US-034 dungeon_run_orchestrator/dungeon_run_state.gd
+
+- Audited src/core/dungeon_run_orchestrator/dungeon_run_state.gd: 1 public
+  static function per the FR-2 strict predicate expanded to `^(static )?func
+  [a-z]`:
+    1. validate_transition(from: int, trigger: String) -> int   (5x6 matrix
+       + unknown-trigger guard + unknown-from-state defensive guard)
+  Per-cohort precedent (US-003 audit treated `set_*` static accessors as
+  public despite the `^func [a-z]` pattern not matching `static func`), the
+  expanded predicate is the intended reading. validate_transition is the
+  single public surface; all other funcs are underscore-prefixed (`_invalid`,
+  `_state_name`, `_from_no_run`, `_from_dispatching`, `_from_active_foreground`,
+  `_from_active_offline_replay`, `_from_run_ended`).
+- Coverage map (pre-existing tests/unit/dungeon_run_orchestrator/
+  run_snapshot_and_fsm_test.gd Group C, 21 per-cell tests + 1 exhaustiveness
+  loop + 1 unknown-trigger test):
+    * Exhaustiveness loop (line 55-70):
+      test_every_state_trigger_cell_returns_a_valid_state — asserts all 30
+      cells return one of the 5 State enum ints. Catches invalid-State
+      regressions but NOT a "wrong-but-valid State" mutation (e.g., a cell
+      flipping from DISPATCHING to RUN_ENDED).
+    * Per-cell expected-return tests (21 of 30 cells):
+      Row 1 NO_RUN: 6/6 cells covered.
+      Row 2 DISPATCHING: 4/6 (run_ended, dispatch_pressed, formation_changed,
+        app_suspended). MISSING: app_resumed, offline_replay_complete.
+      Row 3 ACTIVE_FOREGROUND: 5/6 (app_suspended, formation_changed,
+        run_ended, app_resumed, dispatch_pressed). MISSING:
+        offline_replay_complete.
+      Row 4 ACTIVE_OFFLINE_REPLAY: 4/6 (offline_replay_complete,
+        formation_changed, run_ended, dispatch_pressed). MISSING:
+        app_suspended, app_resumed.
+      Row 5 RUN_ENDED: 4/6 (dispatch_pressed, run_ended, formation_changed,
+        app_suspended). MISSING: app_resumed, offline_replay_complete.
+    * Unknown trigger guard: tested for NO_RUN only
+      (test_validate_transition_rejects_unknown_trigger) — the
+      `not (trigger in ALL_TRIGGERS)` short-circuit at line 91-96 is
+      already exercised, so per-state replication is overkill.
+    * Unknown from-state defensive guard (line 109-113): UNTESTED.
+  Gaps found vs. the 32-branch surface (30 cells + unknown-trigger +
+  unknown-from-state): 7 specific cells + 1 defensive guard = 8 gaps.
+- Action: created tests/unit/dungeon_run_orchestrator/
+  dungeon_run_state_matrix_completeness_test.gd with 8 new tests, one per
+  gap. Each test calls validate_transition with the specific (from, trigger)
+  pair and asserts the documented expected-State return. Matches the
+  Row-1-NO_RUN test shape already in run_snapshot_and_fsm_test.gd. Uses
+  DungeonRunStateScript const preload — no autoload dependencies, no
+  DataRegistry, no before_test cleanup needed. Defensive-guard test uses
+  bogus_from = -1 to hit the line 109-113 push_error + return-unchanged
+  branch.
+- Test result: tests/unit/dungeon_run_orchestrator/
+  dungeon_run_state_matrix_completeness_test.gd = 8/8 passed; full
+  tests/unit/dungeon_run_orchestrator suite = 217/217 (was 209 + 8 new) /
+  0 errors / 0 failures / 0 flaky / 0 skipped / 0 orphans / 3s 101ms. No
+  regressions in pre-existing 15 test files.
+- New tests added: 8.
+- Files changed: tests/unit/dungeon_run_orchestrator/dungeon_run_state_matrix_completeness_test.gd
+  (new), production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-034 dungeon_run_state | passes:true | new_tests_added:8 | notes:filled per-cell expected-return gap (7 of 30 cells lacked specific-State assertion — Row 2 app_resumed + offline_replay_complete; Row 3 offline_replay_complete; Row 4 app_suspended + app_resumed; Row 5 app_resumed + offline_replay_complete) + unknown-from-state defensive guard (line 109-113). Pre-existing exhaustiveness loop catches invalid-State mutations; this suite catches wrong-but-valid-State mutations.
+
+**Learnings for future iterations:**
+- Static-func public surfaces require the EXPANDED audit predicate
+  `^(static )?func [a-z]` — the strict `^func [a-z]` predicate misses every
+  static helper. This is the second time the pattern has come up (first was
+  US-003 set_combat_resolver / set_matchup_resolver DI seams). When auditing
+  files with helper modules (FSM transition tables, formula evaluators,
+  pure-function utility classes), expand the predicate up-front.
+- Exhaustiveness loops that assert "returns one of the valid options" are
+  NECESSARY but NOT SUFFICIENT for matrix-style state machines. They catch
+  the "returns garbage" mutation class but not the "returns the wrong valid
+  option" class. Gap-fill per-cell tests are the canonical regression-net
+  for state-trigger matrices. Apply this lens to any future matrix-style
+  validator (matchup tables, archetype-vs-class advantage tables, recipe
+  lookup tables, etc.).
+- The defensive-guard branch (push_error + return-unchanged for unknown
+  from-state) is unreachable in production given the State enum, but a
+  test pinning the contract is cheap insurance against a future refactor
+  that re-orders the match block or drops the defensive `return from`. The
+  pattern is: pass a bogus int outside the enum range, assert the function
+  returns it unchanged. Works for any `match ... return from` defensive
+  pattern.
+
+---
