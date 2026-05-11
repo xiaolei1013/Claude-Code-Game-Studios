@@ -5,7 +5,7 @@
 > **Architecture Module**: `TickSystem` (autoload rank 0)
 > **Control Manifest Version**: 2026-04-24
 > **Status**: Complete (all 11 stories shipped — Status field updated 2026-05-09 to reflect long-standing audit-cascade closure. Story 005's autoload-side surface is shipped + tested; production-side MainRoot trigger wiring is a follow-up Sprint-level concern (suggested story-005b). Test evidence under `tests/{unit,integration}/tick_system/`. See systems-index Implementation Status #1.)
-> **Stories**: 11 defined (all Complete)
+> **Stories**: 12 defined (all Complete; story-005b added 2026-05-09 to close production-side MainRoot trigger wiring flagged as deferred in story-005)
 
 ## Overview
 
