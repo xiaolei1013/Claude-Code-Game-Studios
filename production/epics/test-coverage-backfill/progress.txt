@@ -1747,3 +1747,70 @@ Append-only log per EPIC.md FR-9. Format:
   audit might find a real coverage gap.
 
 ---
+
+## 2026-05-11 — US-025 biome_dungeon_database/biome.gd
+
+- Audited src/core/biome_dungeon_database/biome.gd: ZERO public functions
+  (`grep -nE "^func [a-z]" src/core/biome_dungeon_database/biome.gd` → empty).
+  Pure data Resource extending GameData (which is `@abstract`, declares only
+  inherited @export `id` and `display_name`). Biome adds 6 net-new @export
+  fields: primary_palette_key, dominant_archetypes, dungeons,
+  environmental_storytelling, flavor_text, status. No methods, no validators,
+  no to_dict / from_dict — read-only schema per ADR-0011 §Decision (also
+  documented in the file's class doc comment lines 10-12).
+- Per FR-7 ("Pure data classes (Resources, RefCounteds with no public methods
+  beyond field accessors) are EXEMPT — story marks `passes: true` with note
+  'no testable public surface'"), US-025 closes as EXEMPT.
+- Bonus: existing consumer/schema coverage already at-or-above bar:
+    * tests/unit/biome_dungeon_database/biome_dungeon_resource_test.gd
+      (13 cases / 0 failures / 84ms) covers Biome instantiation + GameData
+      lineage (test_biome_new_succeeds_without_args), schema enumeration of
+      all 6 net-new + 2 inherited @export fields
+      (test_biome_schema_has_all_eight_exported_properties), `status` default
+      "active" (test_biome_status_defaults_active), inherited id/display_name
+      defaulting "" (test_all_three_types_inherit_id_and_display_name_defaulting_empty),
+      nested-resource composition with Dungeon → Floor traversal
+      (test_biome_dungeon_floor_nested_access_returns_correct_instance), and
+      empty-dungeons-array edge (test_biome_dungeon_floor_empty_arrays_handled_gracefully).
+    * Cross-tier integration via tests/integration/biome_dungeon_database/
+      biome_dungeon_database_autoload_test.gd (Biome is the resource type
+      resolved by the autoload's get_biome lookup).
+    * Cross-feature consumer references: tests/unit/floor_unlock_system/
+      biome_floor_count_and_di_loggers_test.gd,
+      tests/unit/audio_router/audio_router_signal_handlers_test.gd,
+      tests/unit/data_registry/cross_type_dag_and_invariants_test.gd,
+      tests/unit/scene_manager/scene_manager_autoload_skeleton_test.gd,
+      tests/unit/hero_roster/hero_roster_autoload_skeleton_test.gd — all
+      exercise Biome resources transitively.
+- Test result: tests/unit/biome_dungeon_database = 13/13 passed; 0 errors /
+  0 failures / 0 flaky / 0 skipped / 0 orphans / 84ms. No regressions.
+- New tests added: 0 (FR-7 EXEMPT — zero testable public surface).
+- Files changed: production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-025 biome | passes:true | new_tests_added:0 | notes:FR-7 EXEMPT — zero public functions on Biome.gd (read-only data Resource per ADR-0011); existing biome_dungeon_resource_test.gd already provides 13 schema-shape + default-value + composition tests, plus integration + cross-feature consumer coverage. Audit-only close.
+
+**Learnings for future iterations:**
+- US-025 is the FIRST of the "data class" story cohort (US-025 through US-044
+  per EPIC.md §Data classes). The expected pattern for these stories: confirm
+  zero public functions via `grep -nE "^func [a-z]" <file>`, confirm the file
+  extends a base Resource (GameData / Resource / RefCounted), then close
+  EXEMPT per FR-7 with the existing consumer-test references as bonus
+  coverage. Should generally take ONE iteration each — no new test files,
+  just an audit + progress.txt entry. If `grep -nE "^func [a-z]"` returns
+  ANY public function, drop EXEMPT and audit per the standard FR-2/FR-3 path.
+- The `biome_dungeon_resource_test.gd` file is the canonical exemplar for the
+  next two stories (US-026 dungeon, US-027 floor) — same test file already
+  covers all three resources (test_dungeon_new_succeeds_without_args,
+  test_dungeon_schema_has_all_four_exported_properties,
+  test_floor_new_succeeds_without_args, test_floor_schema_has_all_seven_exported_properties,
+  test_floor_enemy_list_entry_has_exactly_enemy_id_and_count_keys,
+  test_floor_enemy_list_empty_is_valid_at_schema_level,
+  test_floor_is_boss_floor_defaults_false). Expect US-026 + US-027 to also
+  close audit-only via FR-7 EXEMPT pointing at this same file.
+- The `_get_export_names(resource)` helper using
+  `PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_SCRIPT_VARIABLE` flag composition
+  is a reusable Godot 4.6 idiom for any future schema-enumeration test on
+  GameData subclasses. If a later story needs to assert "field X is
+  @export-visible", mirror this pattern (file lines 18-25) rather than
+  reinventing PROPERTY_USAGE bit-mask handling.
+
+---
