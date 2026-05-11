@@ -2,7 +2,7 @@
 #
 # Closes the original Story-016 happy-path-deferral (request_full_persist_test
 # Group D sentinel will be deleted in this commit). Exercises the live
-# autoload chain — all 7 CONSUMER_PATHS autoloads must be present + have
+# autoload chain — all 8 CONSUMER_PATHS autoloads must be present + have
 # get_save_data + load_save_data methods (post-S11-X10 ecosystem closure).
 #
 # Test groups:
@@ -174,7 +174,7 @@ func test_full_envelope_round_trip_preserves_all_consumer_state() -> void:
 
 	# Snapshot before persist.
 	var snapshot_before: Dictionary = _capture_consumer_snapshots()
-	assert_int(snapshot_before.size()).is_equal(7)
+	assert_int(snapshot_before.size()).is_equal(8)
 
 	# Persist.
 	sl.request_full_persist("roundtrip_persist")
