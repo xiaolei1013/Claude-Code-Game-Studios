@@ -2413,3 +2413,74 @@ Append-only log per EPIC.md FR-9. Format:
   rather than autoload reference). This keeps the file zero-dependency
   on autoloads/DataRegistry and avoids the before_test/after_test
   cleanup ceremony entirely. Three sibling files now follow this shape.
+
+---
+
+## 2026-05-11 — US-033 combat/kill_event.gd
+
+- Audited src/core/combat/kill_event.gd: 1 public func per the FR-2 strict
+  predicate `grep -nE "^func [a-z]"`:
+    1. equals(other: KillEvent) -> bool   (instance, 5-field `and`-chain
+       with 6 false-return branches: null guard + 5 per-field mismatches)
+  Continues the cohort pattern from US-029 (combat_batch_result), US-031
+  (combat_run_snapshot), and US-032 (combat_tick_events) — real public
+  surface, FR-2/FR-3 path. KillEvent is a 5-field RefCounted (enemy_id,
+  archetype, tier, is_boss, kill_tick) with a single equals() helper.
+- Coverage map (pre-existing tests/unit/combat_resolution/
+  value_types_and_equals_test.gd Group B, 6 cases at lines 76-140):
+    * defaults: test_kill_event_default_fields (line 79 — schema
+      coverage, useful invariant).
+    * happy: test_kill_event_equals_field_by_field_match (line 88 — all
+      5 fields equal -> equals returns true).
+    * kill_tick mismatch:
+      test_kill_event_equals_returns_false_on_field_mismatch (line 106 —
+      short-circuit at line 65).
+    * null edge: test_kill_event_equals_returns_false_against_null
+      (line 118 — short-circuit at line 58-59).
+    * reference-vs-structural invariant:
+      test_kill_event_reference_different_field_equal_yields_equals_true
+      (line 123 — RefCounted == is reference-equality, equals() is structural).
+    * is_boss mismatch:
+      test_kill_event_is_boss_flag_propagates_regardless_of_position
+      (line 133 — short-circuit at line 64; TR-028 invariant).
+  Gaps found vs. the 6-branch surface (1 null + 5 field mismatches): 3 of
+  5 per-field false-return branches untested:
+    1. enemy_id mismatch (line 61) — UNTESTED.
+    2. archetype mismatch (line 62) — UNTESTED.
+    3. tier mismatch (line 63) — UNTESTED.
+- Action: created tests/unit/combat_resolution/kill_event_inequality_test.gd
+  with 3 new tests, one per gap. Mirrors US-029/US-031/US-032 inequality-test
+  shape: each test constructs two KillEvent instances differing on EXACTLY
+  ONE field (other 4 fields identical), calls equals(), asserts false.
+  Uses KillEventScript const preload — no autoload dependencies, no
+  DataRegistry, no before_test cleanup needed.
+- Test result: tests/unit/combat_resolution/kill_event_inequality_test.gd
+  = 3/3 passed; full tests/unit/combat_resolution suite = 153/153
+  (was 150 + 3 new) / 0 errors / 0 failures / 0 flaky / 0 skipped /
+  0 orphans / 1s 56ms. No regressions in pre-existing 10 test files.
+- New tests added: 3.
+- Files changed: tests/unit/combat_resolution/kill_event_inequality_test.gd
+  (new), production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-033 kill_event | passes:true | new_tests_added:3 | notes:filled equals per-field-inequality gap (3 of 5 field branches untested at the false-return: enemy_id, archetype, tier). Fourth member of the inequality-test cohort (US-029 combat_batch_result, US-031 combat_run_snapshot, US-032 combat_tick_events, US-033 kill_event). US-029 cohort-template prediction listed US-033 as FR-7 EXEMPT — REVERIFIED WRONG (file has 1 real public method per the same lesson learned in US-029). Closed under standard FR-2/FR-3 path with focused gap-fill.
+
+**Learnings for future iterations:**
+- The US-027 cohort-template "EXEMPT" prediction list has now been wrong
+  for 4 consecutive forecast members (US-029, US-031, US-032, US-033 all
+  had real public equals() surfaces requiring gap-fill, none were EXEMPT).
+  Strong evidence the heuristic "data-class struct = EXEMPT" is reliably
+  wrong for value types in src/core/combat/. The remaining cohort-template
+  EXEMPT forecasts (US-037 enemy_data, US-038 hero_class, US-040 name_pool,
+  US-042 matchup_result) should be assumed to have a real public surface
+  until per-file grep proves otherwise. Default expectation: standard
+  FR-2/FR-3 path with a small inequality-gap-fill cohort entry.
+- KillEvent's equals() is a single `and`-expression rather than the
+  short-circuit `if ... return false` pattern used by CombatBatchResult and
+  CombatTickEvents. Behaviorally equivalent at the false-return surface
+  (each `and` operand IS a short-circuit point), so the per-field
+  inequality-test cohort pattern still applies cleanly. No structural
+  difference for test coverage purposes.
+- The cohort is now 4-strong (US-029, US-031, US-032, US-033) with
+  consistent shape: enumerate equals() branches, grep tests/ for assertions
+  on each, write one focused test per untested branch in a sibling
+  *_inequality_test.gd file. US-035 (run_snapshot.gd in
+  dungeon_run_orchestrator/) remains the next predicted cohort member.
