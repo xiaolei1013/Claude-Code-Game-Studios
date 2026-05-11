@@ -1814,3 +1814,73 @@ Append-only log per EPIC.md FR-9. Format:
   reinventing PROPERTY_USAGE bit-mask handling.
 
 ---
+
+## 2026-05-11 — US-026 biome_dungeon_database/dungeon.gd
+
+- Audited src/core/biome_dungeon_database/dungeon.gd: ZERO public functions
+  (`grep -nE "^func [a-z]" src/core/biome_dungeon_database/dungeon.gd` → empty).
+  Pure data Resource extending GameData (the @abstract base providing
+  inherited @export `id` and `display_name`). Dungeon adds 2 net-new @export
+  fields: `biome_id` (back-reference to parent Biome.id, default "") and
+  `floors` (typed `Array[Floor]`, default `[]`). No methods, no validators,
+  no to_dict / from_dict — read-only schema per ADR-0011 §Decision (also
+  documented in the file's class doc comment lines 10-18).
+- Per FR-7 ("Pure data classes (Resources, RefCounteds with no public methods
+  beyond field accessors) are EXEMPT — story marks `passes: true` with note
+  'no testable public surface'"), US-026 closes as EXEMPT. Matches the
+  expected pattern from US-025's learnings entry ("Expect US-026 + US-027 to
+  also close audit-only via FR-7 EXEMPT pointing at this same file").
+- Existing consumer/schema coverage already at-or-above bar:
+    * tests/unit/biome_dungeon_database/biome_dungeon_resource_test.gd
+      (13 cases / 0 failures / 84ms) covers Dungeon instantiation + GameData
+      lineage (test_dungeon_new_succeeds_without_args), schema enumeration of
+      all 4 @export fields (test_dungeon_schema_has_all_four_exported_properties
+      asserts id, display_name, biome_id, floors), inherited id/display_name
+      defaulting "" (test_all_three_types_inherit_id_and_display_name_defaulting_empty),
+      nested-resource composition with Biome → Dungeon → Floor traversal
+      (test_biome_dungeon_floor_nested_access_returns_correct_instance), and
+      empty-floors-array edge (test_biome_dungeon_floor_empty_arrays_handled_gracefully).
+    * Cross-tier integration via tests/integration/biome_dungeon_database/
+      biome_dungeon_database_autoload_test.gd (12 cases / 0 failures / 78ms)
+      exercises Dungeon resources as the intermediate node in the Biome →
+      Dungeon → Floor hierarchy the autoload resolves.
+    * Cross-feature consumer references: every floor_unlock_system test that
+      walks `biome.dungeons[i].floors[j]` exercises Dungeon transitively
+      (e.g., tests/unit/floor_unlock_system/biome_floor_count_and_di_loggers_test.gd).
+- Test result: tests/unit/biome_dungeon_database = 13/13 passed; 0 errors /
+  0 failures / 0 flaky / 0 skipped / 0 orphans / 84ms. tests/integration/
+  biome_dungeon_database = 12/12 passed; 0 errors / 0 failures / 78ms.
+  Combined 25/25 covering the Biome→Dungeon→Floor schema chain. No
+  regressions in pre-existing suites.
+- New tests added: 0 (FR-7 EXEMPT — zero testable public surface).
+- Files changed: production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-026 dungeon | passes:true | new_tests_added:0 | notes:FR-7 EXEMPT — zero public functions on Dungeon.gd (read-only data Resource per ADR-0011, sister story to US-025 biome). Existing biome_dungeon_resource_test.gd already provides schema-shape + default-value + composition + nested-traversal tests for Dungeon, plus integration autoload coverage. Audit-only close.
+
+**Learnings for future iterations:**
+- US-026 confirms the US-025 prediction: the `biome_dungeon_resource_test.gd`
+  file is the shared canonical coverage source for the entire Biome/Dungeon/
+  Floor data-class cohort. US-027 (floor.gd) is the natural next iteration
+  and should also close FR-7 EXEMPT against the SAME test file
+  (test_floor_new_succeeds_without_args, test_floor_schema_has_all_seven_exported_properties,
+  test_floor_enemy_list_entry_has_exactly_enemy_id_and_count_keys,
+  test_floor_enemy_list_empty_is_valid_at_schema_level,
+  test_floor_is_boss_floor_defaults_false — all 5 Floor-specific tests
+  already shipped). Expect US-027 to be the third audit-only close in this
+  cohort and the fastest iteration of the run.
+- The "test_<typeA>_<typeB>_<typeC>_nested_access_returns_correct_instance"
+  pattern (line 195 of biome_dungeon_resource_test.gd) is a canonical
+  integration-like-unit test for cross-Resource composition. It traverses
+  Biome.dungeons[0].floors[0] in one test, proving the entire chain holds.
+  Reusable pattern when auditing any future @export-Array-of-Resource type
+  where the parent and child are separate stories — one composition test
+  satisfies coverage for both ends.
+- Branch-base discipline: Ralph branches (`ralph/test-coverage-backfill-usNNN`)
+  must be cut from the PRIOR US branch, not from main, until the chain of
+  per-story commits gets merged. Cutting from main loses the progress.txt
+  history from intermediate stories. Verified 2026-05-11 when US-026 work
+  initially branched off main (missing US-022-025 progress.txt entries) and
+  had to be redone off ralph/test-coverage-backfill-us025. Future iterations:
+  ALWAYS `git checkout ralph/test-coverage-backfill-us<N-1>` then
+  `git checkout -b ralph/test-coverage-backfill-us<N>`.
+
+---
