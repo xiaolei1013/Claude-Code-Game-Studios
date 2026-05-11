@@ -2334,3 +2334,82 @@ Append-only log per EPIC.md FR-9. Format:
   TelemetrySink event_buffer if it grows one), apply the same 2-test shape.
 
 ---
+
+---
+
+
+## 2026-05-11 — US-032 combat/combat_tick_events.gd
+
+- Audited src/core/combat/combat_tick_events.gd: 1 public func per the FR-2
+  strict predicate `grep -nE "^func [a-z]"`:
+    1. equals(other: CombatTickEvents) -> bool   (instance, 5-branch walk)
+  Continues the cohort pattern from US-029 (combat_batch_result) and US-031
+  (combat_run_snapshot) — real public surface, FR-2/FR-3 path. The file is
+  a 3-field RefCounted (kills: Array[KillEvent], loop_completed_ticks:
+  Array[int], first_clear_in_range: bool) with a single equals() helper
+  whose 5 false-return short-circuits are: null other, first_clear_in_range
+  mismatch, loop_completed_ticks Array[int] != mismatch, kills size
+  mismatch, and per-element KillEvent.equals walk.
+- Coverage map (pre-existing tests/unit/combat_resolution/
+  value_types_and_equals_test.gd Group C, 4 cases at lines 144-194):
+    * happy: test_combat_tick_events_equals_with_matching_kills_array
+      (line 154 — reference-different but field-equal kills + matching
+      loop_completed_ticks + matching first_clear_in_range -> true).
+    * defaults: test_combat_tick_events_default_fields (line 147 — schema
+      coverage, not equals coverage but useful invariant).
+    * first_clear mismatch:
+      test_combat_tick_events_equals_returns_false_on_first_clear_mismatch
+      (line 175, short-circuit at line 47-48).
+    * kills size mismatch:
+      test_combat_tick_events_equals_returns_false_on_kills_size_mismatch
+      (line 183, short-circuit at line 51-52).
+    * null edge:
+      test_combat_tick_events_equals_returns_false_against_null
+      (line 192, short-circuit at line 45-46).
+  Gaps found vs. the 5-branch surface (1 null + 1 bool + 1 Array[int] +
+  1 array-size + 1 array-element = 5):
+    1. loop_completed_ticks mismatch (line 49-50, Array[int] != compare)
+       — UNTESTED. Existing tests cover loop_completed_ticks set to
+       matching values but never different values.
+    2. kills per-element KillEvent.equals mismatch (line 53-55) — UNTESTED.
+       Existing tests cover the size-mismatch short-circuit but not the
+       same-size element-walk where at least one element differs
+       structurally.
+- Action: created tests/unit/combat_resolution/
+  combat_tick_events_inequality_test.gd with 2 new tests, one per gap.
+  Mirrors US-029's combat_batch_result_inequality_test.gd and US-031's
+  combat_run_snapshot_inequality_test.gd shape: each test constructs two
+  instances differing on EXACTLY ONE field, calls equals(), asserts false.
+  Uses CombatTickEventsScript + KillEventScript const preloads — no
+  autoload dependencies, no DataRegistry, no before_test cleanup needed.
+- Test result: tests/unit/combat_resolution/combat_tick_events_inequality_test.gd
+  = 2/2 passed; full tests/unit/combat_resolution suite = 150/150
+  (was 148 + 2 new = 150) / 0 errors / 0 failures / 0 flaky / 0 skipped /
+  0 orphans / 1s 36ms. No regressions in pre-existing 9 test files.
+- New tests added: 2.
+- Files changed: tests/unit/combat_resolution/combat_tick_events_inequality_test.gd
+  (new), production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-032 combat_tick_events | passes:true | new_tests_added:2 | notes:filled equals per-field-inequality gap (2 of 5 branches untested at the false-return: loop_completed_ticks Array[int] mismatch + kills per-element KillEvent.equals mismatch). Third member of the inequality-test cohort (US-029 combat_batch_result, US-031 combat_run_snapshot, US-032 combat_tick_events). Closed under standard FR-2/FR-3 path with focused gap-fill.
+
+**Learnings for future iterations:**
+- US-035 (run_snapshot.gd in dungeon_run_orchestrator/) is the next
+  predicted member of this inequality-cohort — same pattern: per-field
+  equals() helper with N false-return short-circuits, existing tests
+  cover happy + null + a couple of fields, gap-fill missing branches in
+  a separate *_inequality_test.gd file. The cohort is now 3-strong
+  (US-029, US-031, US-032) with consistent shape: enumerate equals()
+  short-circuit branches, grep tests/ for assertions on each branch
+  returning false, write one focused test per untested branch.
+- The Array[int] != compare branch (loop_completed_ticks at line 49) is
+  structurally equivalent to GDScript 4's element-wise equality on typed
+  primitive arrays — single same-size-different-values test covers the
+  branch sufficiently; no need to ALSO test different-size since the !=
+  operator handles both internally. Contrast with the kills array which
+  uses an explicit size-check + element-walk pattern, where size and
+  element-walk are SEPARATE branches needing separate tests.
+- Cohort file layout convention: the *_inequality_test.gd file lives
+  next to value_types_and_equals_test.gd (NOT replacing it) and uses
+  the same const preload pattern (Script-level `const` of the .gd file
+  rather than autoload reference). This keeps the file zero-dependency
+  on autoloads/DataRegistry and avoids the before_test/after_test
+  cleanup ceremony entirely. Three sibling files now follow this shape.
