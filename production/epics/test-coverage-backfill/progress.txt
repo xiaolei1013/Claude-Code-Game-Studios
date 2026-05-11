@@ -2069,3 +2069,100 @@ Append-only log per EPIC.md FR-9. Format:
 
 ---
 
+## 2026-05-11 — US-029 combat/combat_batch_result.gd
+
+- Audited src/core/combat/combat_batch_result.gd: 2 public funcs
+  (`grep -nE "^func [a-z]"`):
+    1. equals(other: CombatBatchResult) -> bool   (instance, 7-field walk)
+    2. dict_equals(a: Dictionary, b: Dictionary) -> bool   (static helper)
+  US-027 cohort-template prediction (US-029 would be FR-7 EXEMPT) was
+  WRONG — CombatBatchResult has 2 public methods. Falls under the standard
+  FR-2/FR-3 audit path, NOT the Biome/Dungeon/Floor EXEMPT cohort.
+- Coverage map (pre-existing tests/unit/combat_resolution/
+  value_types_and_equals_test.gd Group D, 6 cases):
+    * equals — happy: test_combat_batch_result_equals_field_by_field
+      (line 212, all-7-fields-equal returns true).
+    * equals — edge (null): test_combat_batch_result_equals_returns_false_against_null
+      (line 263, other == null short-circuit at line 65-66).
+    * equals — edge (float within tolerance):
+      test_combat_batch_result_equals_uses_is_equal_approx_for_hp_bonus
+      (line 234, TR-017 is_equal_approx returns true within tolerance).
+    * dict_equals — happy: test_combat_batch_result_dict_equals_static_helper
+      (line 244, same content / different insertion order returns true).
+    * dict_equals — edge: test_combat_batch_result_dict_equals_returns_false_on_size_mismatch
+      (line 251, size short-circuit at line 95-96).
+    * dict_equals — edge: test_combat_batch_result_dict_equals_returns_false_on_value_mismatch
+      (line 257, value short-circuit at line 100-101).
+  Gaps found (vs. CombatRunSnapshot Group E parallel coverage shape in the
+  same file lines 302-320, which DOES exercise per-field inequality):
+    1. equals: 6 of 7 per-field inequality short-circuit branches not
+       directly tested (loops_completed, first_clear_tick, survived,
+       final_tick, hp_bonus_factor OUTSIDE tolerance, kills_by_archetype,
+       kills_by_tier). Existing tests cover happy + null + float-inside-
+       tolerance only; none exercise the false-return branch on a
+       single-field difference.
+    2. dict_equals: same-size-different-keys branch (line 98-99,
+       `if not b.has(k): return false`) is unreached. Existing size+value
+       mismatch tests exit before reaching it.
+- Action: created tests/unit/combat_resolution/
+  combat_batch_result_inequality_test.gd with 8 new tests:
+    * test_combat_batch_result_equals_returns_false_on_loops_completed_mismatch
+    * test_combat_batch_result_equals_returns_false_on_first_clear_tick_mismatch
+    * test_combat_batch_result_equals_returns_false_on_survived_mismatch
+    * test_combat_batch_result_equals_returns_false_on_final_tick_mismatch
+    * test_combat_batch_result_equals_returns_false_on_hp_bonus_factor_outside_tolerance
+    * test_combat_batch_result_equals_returns_false_on_kills_by_archetype_mismatch
+    * test_combat_batch_result_equals_returns_false_on_kills_by_tier_mismatch
+    * test_combat_batch_result_dict_equals_returns_false_when_key_not_present_in_other
+  Each test arranges two CombatBatchResult instances (or two raw dicts for
+  the static helper) differing on EXACTLY ONE field, calls equals/dict_equals,
+  asserts false. Mirrors the CombatRunSnapshot per-field-mismatch pattern at
+  lines 302-307 of value_types_and_equals_test.gd. Uses
+  CombatBatchResultScript const preload (same as Group D) — no autoload
+  dependencies, no DataRegistry, no @tool / before_test cleanup needed.
+- Test result: tests/unit/combat_resolution/combat_batch_result_inequality_test.gd
+  = 8/8 passed; full tests/unit/combat_resolution suite = 143/143 (was 135) /
+  0 errors / 0 failures / 0 flaky / 0 skipped / 0 orphans / 996ms. No
+  regressions in pre-existing 7 test files.
+- New tests added: 8.
+- Files changed: tests/unit/combat_resolution/combat_batch_result_inequality_test.gd
+  (new), production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-029 combat_batch_result | passes:true | new_tests_added:8 | notes:filled equals per-field-inequality gap (6 of 7 fields untested at the false-return branch) + dict_equals same-size-different-keys branch. Per US-027's cohort-template prediction, US-029 was forecast EXEMPT — that forecast was wrong because the file has 2 real public methods; closing under standard FR-2/FR-3 path with focused gap-fill instead.
+
+**Learnings for future iterations:**
+- The US-027 cohort-template prediction list for FR-7 EXEMPT (US-029, US-032,
+  US-033, US-037, US-038, US-040, US-042) should be REVERIFIED per-iteration
+  with `grep -nE "^func [a-z]"`. US-029 was forecast EXEMPT but has 2 public
+  methods. The "data-class struct" heuristic from US-025/026/027 is a hint,
+  not a contract — value types in this codebase often have equals/dict_equals
+  helpers (TR-016 forbids hash-based equality, so the author wrote explicit
+  helpers). Expect US-031 (combat_run_snapshot) and US-035 (run_snapshot) to
+  follow the SAME pattern as US-029 (real public surface, FR-2/FR-3 path), and
+  US-032/033/037/038/040/042 to be the genuine EXEMPT candidates pending
+  per-file grep verification.
+- When a source file's `equals` has N inequality short-circuit branches and
+  the existing coverage is "happy + null only", the canonical gap-fill is N
+  parameterless tests, one per field, each constructing two instances
+  differing on exactly that field and asserting `.equals()` returns false.
+  Mirror the CombatRunSnapshot Group E pattern at lines 302-315 of
+  value_types_and_equals_test.gd (test_*_returns_false_on_<field>_mismatch).
+  This is more diagnostic than a single multi-field test because a
+  failure tells you EXACTLY which field's short-circuit broke.
+- For `dict_equals`-style key-by-key walks, the four branch categories are
+  (1) size mismatch, (2) key-not-present-in-other-same-size, (3) value
+  mismatch, (4) all-equal happy. Full coverage = 4 tests. The
+  key-not-present branch is the one most often missed because the
+  size-mismatch test exits at line 95-96 before reaching the `if not b.has(k)`
+  short-circuit at line 98-99. When auditing other dict-equality helpers
+  (e.g., on RunSnapshot, MatchupResult, telemetry payload comparators),
+  check for this specific 4-branch coverage shape.
+- The float OUTSIDE-tolerance branch for equals() is distinct from the
+  INSIDE-tolerance branch — the existing
+  test_combat_batch_result_equals_uses_is_equal_approx_for_hp_bonus only
+  exercises INSIDE-tolerance (returns true). For full TR-017 coverage you
+  also need an OUTSIDE-tolerance test (returns false). Same audit-shape
+  applies to any other float field compared via is_equal_approx (e.g.,
+  CombatRunSnapshot.formation_dps_per_tick at Group E).
+
+---
+
