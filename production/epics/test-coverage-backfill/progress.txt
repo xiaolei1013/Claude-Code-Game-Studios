@@ -1971,3 +1971,101 @@ Append-only log per EPIC.md FR-9. Format:
   return shape / behavior", not "one test file per source file".
 
 ---
+
+## 2026-05-11 — US-028 biome_dungeon_database/biome_dungeon_database.gd
+
+- Audited src/core/biome_dungeon_database/biome_dungeon_database.gd: 6 public
+  funcs (`grep -nE "^func [a-z]"`):
+    1. get_biome_by_id(id: String) -> Biome
+    2. get_dungeon_by_id(id: String) -> Dungeon
+    3. get_floor_by_id(id: String) -> Floor
+    4. get_playable_biomes() -> Array[Biome]
+    5. get_all_biome_ids() -> Array[String]
+    6. get_floors_for_dungeon(dungeon_id: String) -> Array[Floor]
+  Plus `_init()` and `_ready()` virtuals (both no-op per ADR-0003 Amend #3 —
+  not in public-func count). As predicted in US-027 learnings, this story
+  breaks the US-025/026/027 cohort EXEMPT pattern — autoload has real public
+  surface and falls under the standard autoload audit path.
+- Coverage map (pre-existing tests/integration/biome_dungeon_database/
+  biome_dungeon_database_autoload_test.gd, 12 cases):
+    * get_biome_by_id: happy (resolves_forest_reach line 113 — asserts id,
+      status, display_name) + happy (returns_same_instance line 308 — cache
+      identity) + edge (returns_null_on_miss line 62) + edge (empty_string
+      line 90). FULL coverage.
+    * get_dungeon_by_id: edge (returns_null_on_miss line 70) + edge
+      (empty_string line 90). GAP: no direct happy-path assertion (used
+      transitively in get_floors_for_dungeon_returns_sorted_floors but
+      return value not directly asserted).
+    * get_floor_by_id: edge (returns_null_on_miss line 78) + edge
+      (empty_string line 90). GAP: no direct happy-path assertion.
+    * get_playable_biomes: happy (returns_typed_array line 157 — status
+      filter + sort assertions). FULL coverage.
+    * get_all_biome_ids: happy (returns_sorted_array line 199). FULL
+      coverage.
+    * get_floors_for_dungeon: happy (returns_sorted_floors line 249) + edge
+      (unknown_id_returns_empty line 240). FULL coverage.
+  Net: 4/6 with both happy+edge directly; 2/6 with edge only. Per FR-2
+  ("every public function ... at least one happy-path test asserting the
+  documented return shape / behavior") this fails the strict bar — gaps
+  must be filled.
+- Action: created tests/unit/biome_dungeon_database/
+  biome_dungeon_database_lookup_test.gd with 2 happy-path tests filling the
+  two gaps:
+    * test_get_dungeon_by_id_with_known_probe_id_returns_matching_dungeon
+      (probes DataRegistry.get_all_by_type("dungeons")[0] for first authored
+      Dungeon, calls get_dungeon_by_id(probe.id), asserts non-null + id
+      round-trip + `is Dungeon` lineage).
+    * test_get_floor_by_id_with_known_probe_id_returns_matching_floor
+      (walks Dungeon.floors[0] for first authored Floor, calls
+      get_floor_by_id(probe_floor.id), asserts non-null + id round-trip +
+      `is Floor` lineage; covers the cross-dungeon linear-scan happy path
+      documented at biome_dungeon_database.gd line 117-127).
+  Both use the probe-by-discovery pattern from the existing integration test
+  (avoids hardcoding S3-M7 ids that may evolve). Graceful-degrade on
+  DataRegistry != READY or empty content. Pattern matches the
+  AudioRouter stop_music_test.gd precedent: unit test reaches the live
+  autoload via `get_tree().root.get_node_or_null("BiomeDungeonDatabase")`.
+- Test result: tests/unit/biome_dungeon_database/
+  biome_dungeon_database_lookup_test.gd = 2/2 passed; tests/unit/
+  biome_dungeon_database + tests/integration/biome_dungeon_database combined
+  = 27/27 passed; 0 errors / 0 failures / 0 flaky / 0 skipped / 0 orphans /
+  180ms. Was 25/25 pre-US-028; +2 net from this iteration.
+- New tests added: 2 (1 happy-path per gap).
+- Files changed: tests/unit/biome_dungeon_database/
+  biome_dungeon_database_lookup_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-028 biome_dungeon_database | passes:true | new_tests_added:2 | notes:filled get_dungeon_by_id + get_floor_by_id happy-path gaps using probe-by-discovery pattern + live autoload reach; integration coverage was strong (12 cases) but missed direct happy-path assertion on 2 of 6 funcs.
+
+**Learnings for future iterations:**
+- The probe-by-discovery pattern (
+  `DataRegistry.get_all_by_type("category")[0]` → use its id) is the
+  canonical way to write happy-path tests for thin DataRegistry-wrapper
+  autoloads when the underlying .tres content may evolve. Avoids brittle
+  hardcoded id strings while still exercising the non-null return path.
+  Combine with `DataRegistry.state != READY` guard for graceful-degrade.
+- Unit tests CAN reach live autoloads via
+  `get_tree().root.get_node_or_null("AutoloadName")` — this is established
+  by AudioRouter stop_music_test.gd (US-001) and now reaffirmed for
+  BiomeDungeonDatabase. The unit/integration distinction here is not
+  "does it touch autoloads" but "does it test isolated logic vs.
+  cross-system integration". Happy-path coverage of a single autoload's
+  public-method contract is unit-tier even when the method delegates to
+  another autoload (DataRegistry).
+- Audit predicate refinement: "function name appears in test code with
+  assert_* within ~5 lines" (per EPIC technical considerations) is NOT
+  sufficient to count as happy-path coverage. The assertion must be on the
+  non-null/non-default return path AND directly tied to the function call
+  (not transitive via a wrapper function). US-028 found 2 gaps the simple
+  grep would have missed. Future iterations: explicitly classify each test
+  reference as happy/edge/transitive and only count direct happy + edge as
+  full coverage.
+- The Forest Reach data (`assets/data/biomes/forest_reach.tres` +
+  `assets/data/dungeons/forest_reach_dungeon_01.tres` with 5 Floor
+  sub-resources `forest_reach_f1..f5`) is now an unconditional fixture
+  available for any DataRegistry-dependent test. The graceful-degrade
+  pattern from earlier (when S3-M7 content was pending) still runs but
+  always falls through to the assert branch. Future tests can rely on
+  at-least-one Biome + Dungeon + Floor being resolvable post-boot.
+
+---
+
