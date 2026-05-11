@@ -2254,3 +2254,83 @@ Append-only log per EPIC.md FR-9. Format:
   drifting back into resolver code) than the per-field _validate tests.
 
 ---
+
+
+## 2026-05-11 — US-031 combat/combat_run_snapshot.gd
+
+- Audited src/core/combat/combat_run_snapshot.gd: 1 public func per the FR-2
+  strict predicate `grep -nE "^func [a-z]"`:
+    1. equals(other: CombatRunSnapshot) -> bool   (instance, 7-branch walk)
+  Matches US-029 prediction ("expect US-031 (combat_run_snapshot) and US-035
+  (run_snapshot) to follow the SAME pattern as US-029 — real public surface,
+  FR-2/FR-3 path"). CombatRunSnapshot is a RefCounted value type with 6
+  fields and a single equals() helper that walks them via dispatched_at_tick,
+  loops_per_run, formation_dps_per_tick (is_equal_approx), hp_bonus_factor
+  (is_equal_approx), enemy_list (size + per-element dict_equals), and
+  matchup_cache (dict_equals).
+- Coverage map (pre-existing tests/unit/combat_resolution/
+  value_types_and_equals_test.gd Group E, 5 cases at lines 269-320):
+    * happy: test_combat_run_snapshot_equals_field_by_field (all fields set,
+      both instances equal -> returns true; line 282).
+    * defaults: test_combat_run_snapshot_default_fields (line 272 — schema
+      coverage, not equals coverage but useful invariant).
+    * null edge: test_combat_run_snapshot_equals_returns_false_against_null
+      (line 318, other == null short-circuit at line 73-74).
+    * dispatched_at_tick mismatch:
+      test_combat_run_snapshot_equals_returns_false_on_dispatched_at_tick_mismatch
+      (line 302, short-circuit at line 75-76).
+    * matchup_cache mismatch:
+      test_combat_run_snapshot_equals_returns_false_on_matchup_cache_mismatch
+      (line 310, dict_equals short-circuit at line 92-93).
+  Gaps found vs. the 9-branch surface (1 null + 2 int + 2 float + 2 array +
+  1 dict + 1 happy = 9):
+    1. loops_per_run mismatch (line 77-78) — UNTESTED.
+    2. formation_dps_per_tick OUTSIDE is_equal_approx tolerance (line 79-80)
+       — UNTESTED (existing tests cover within-tolerance via the happy path
+       where both are 1.5 but never the false-return branch).
+    3. hp_bonus_factor OUTSIDE is_equal_approx tolerance (line 81-82) —
+       UNTESTED (same shape as gap 2).
+    4. enemy_list size mismatch (line 84-85) — UNTESTED.
+    5. enemy_list per-element dict_equals mismatch (line 86-90) — UNTESTED
+       (same-size arrays with at-least-one element-dict differing).
+- Action: created tests/unit/combat_resolution/
+  combat_run_snapshot_inequality_test.gd with 5 new tests, one per gap.
+  Mirrors US-029's combat_batch_result_inequality_test.gd shape: each test
+  constructs two instances differing on EXACTLY ONE field, calls equals(),
+  asserts false. Uses CombatRunSnapshotScript const preload — no autoload
+  dependencies, no DataRegistry, no before_test cleanup needed.
+- Test result: tests/unit/combat_resolution/combat_run_snapshot_inequality_test.gd
+  = 5/5 passed; full tests/unit/combat_resolution suite = 148/148
+  (was 143 + 5 new = 148) / 0 errors / 0 failures / 0 flaky / 0 skipped /
+  0 orphans / 1s 31ms. No regressions in pre-existing 8 test files.
+- New tests added: 5.
+- Files changed: tests/unit/combat_resolution/combat_run_snapshot_inequality_test.gd
+  (new), production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-031 combat_run_snapshot | passes:true | new_tests_added:5 | notes:filled equals per-field-inequality gap (5 of 8 branches untested at false-return: loops_per_run, formation_dps_per_tick outside-tolerance, hp_bonus_factor outside-tolerance, enemy_list size, enemy_list element). US-029 prediction confirmed: real public surface (not FR-7 EXEMPT); closed under standard FR-2/FR-3 path with focused gap-fill.
+
+**Learnings for future iterations:**
+- US-035 (run_snapshot.gd in dungeon_run_orchestrator/) is predicted by US-029
+  to follow the same pattern. PER US-003 audit notes, run_snapshot is already
+  covered by run_snapshot_and_fsm_test.gd — but the audit-shape question is
+  "does the test file exercise the false-return branch on EVERY field?". The
+  US-031 pattern (one new inequality test per untested field) is the
+  canonical gap-fill if the existing run_snapshot tests cover only happy +
+  null + a couple of fields. Apply the same shape: enumerate equals()
+  short-circuit branches, grep tests/ for assertions on each branch
+  returning false, gap-fill the missing branches in a separate
+  *_inequality_test.gd file.
+- The is_equal_approx OUTSIDE-tolerance branch is the canonical edge-case
+  miss in float-comparing equals() helpers. Existing tests typically cover
+  either "happy: both equal" (returns true) or "happy: both differ slightly
+  but within tolerance" (returns true). The false-return branch needs an
+  explicit OUTSIDE-tolerance test. For CombatRunSnapshot both float fields
+  (formation_dps_per_tick + hp_bonus_factor) had this gap; same applies to
+  any future struct with is_equal_approx-compared floats.
+- Array<Dictionary>-field equality has TWO branches that need direct
+  coverage: size mismatch AND per-element dict_equals failure. The size
+  short-circuit exits early so it doesn't double-cover the element-walk
+  branch. Both need separate tests. When auditing any struct with
+  array-of-dicts fields (e.g., CombatTickEvents.kill_schedule,
+  TelemetrySink event_buffer if it grows one), apply the same 2-test shape.
+
+---
