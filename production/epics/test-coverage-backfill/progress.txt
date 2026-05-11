@@ -1536,3 +1536,78 @@ Append-only log per EPIC.md FR-9. Format:
   public API" from "literally-zero-function abstract base".
 
 ---
+
+## 2026-05-11 — US-022 combat/default_combat_resolver.gd
+
+- Audited 11 public funcs (is_stub, action_cooldown_ticks,
+  formation_dps_per_tick, formation_total_hp, hp_bonus_factor, survived,
+  effective_dps, ticks_to_kill, emit_events_in_range, compute_offline_batch,
+  build_matchup_cache). All 11 have ≥1 happy-path test + ≥1 edge-case test
+  with assert_* calls.
+- Coverage map (file → primary test home):
+    * is_stub → cooldown_formula_test.gd::test_is_stub_marker_contains_default_combat_resolver_substring
+      + 4 transitive refs in autoload_skeleton_and_di / snapshot tests.
+    * action_cooldown_ticks → cooldown_formula_test.gd 12 tests (boundary +
+      formula behavior + return type + always-in-range invariant + fallback path).
+    * formation_dps_per_tick → dps_and_hp_formulas_test.gd 5 tests (happy:
+      single hero stat-at-level, 3-hero sum, higher-level produces higher DPS;
+      edge: empty formation, unresolvable class_id silent skip, returns float)
+      + edge_cases_and_invariants_test.gd 6 tests (logger DI behavior,
+      no-logger silent skip, mixed-formation logger filter).
+    * formation_total_hp → dps_and_hp_formulas_test.gd 3 tests (happy: sums,
+      returns int; edge: empty) + edge_cases_and_invariants 2 tests
+      (all-unresolvable, logger invocation).
+    * hp_bonus_factor → dps_and_hp_formulas_test.gd 6 tests (happy: proportional;
+      edge: clamps at 1, zero attack, zero formation HP, output-range,
+      returns float).
+    * survived → dps_and_hp_formulas_test.gd 5 tests (happy: =1 returns true;
+      edge: boundary inclusive at 0.5, just-below-half false, zero false,
+      losing_run-not-survived derivation).
+    * effective_dps → kill_schedule_test.gd 4 tests (neutral, advantaged,
+      disadvantaged-partial, returns-float-type).
+    * ticks_to_kill → kill_schedule_test.gd 8 tests (basic, ceili, exact-1,
+      high-DPS floor; edge: zero-DPS sentinel, negative-DPS sentinel,
+      zero-HP returns-one, returns-int).
+    * emit_events_in_range → emit_events_in_range_test.gd 18 tests
+      (full-loop, half-open boundary inclusion/exclusion, consecutive-call
+      no-overlap, multi-loop, kill-event field shape, loop completion,
+      first-clear flag, descending-range warning, re-emission/rewind,
+      dispatched-at-tick anchor; edge: null/empty/zero-loops).
+    * compute_offline_batch → foreground_offline_parity_test.gd 10+ tests
+      (happy: full run populates 7 fields, budget truncates mid-loop,
+      first_clear gating at loops_per_run, losing-run derivation, parity
+      with emit_events_in_range, 100-call determinism; edge: null snapshot,
+      zero/negative budget, empty enemy_list) + edge_cases_and_invariants
+      smoke (empty-snapshot no-div-by-zero).
+    * build_matchup_cache → matchup_di_and_cache_test.gd 9 tests (happy:
+      one-call-per-distinct-archetype TR-012, returns-advantaged-true,
+      StringName keys, integrates-with-DefaultMatchupResolver; edge: dedup
+      duplicates, empty floor_archetypes zero calls, empty-archetype-strings
+      skipped, null resolver returns empty cache, lacking-method returns
+      empty cache).
+- Test results: tests/unit/combat_resolution = 135/135 passed;
+  tests/integration/combat_resolution = 32/32 passed. No new failures
+  introduced. No regressions in pre-existing suites.
+- Files changed: production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-022 default_combat_resolver | passes:true | new_tests_added:0 | notes:audit-only; this is the formula-heavy production resolver and is the second-heaviest tested file in the combat layer. All 11 public funcs have happy + edge coverage across 6 unit suites (combat_config, cooldown_formula, dps_and_hp_formulas, edge_cases_and_invariants, emit_events_in_range, kill_schedule) + 3 integration suites (foreground_offline_parity, matchup_di_and_cache, orchestrator_synchronous_invocation). The TR-combat-022 parity invariant (foreground+offline byte-equal aggregates) is itself a load-bearing coverage proof — its presence in foreground_offline_parity_test.gd confirms that emit_events_in_range and compute_offline_batch share _kill_schedule_for_loop as single source of truth (TR-combat-003).
+
+**Learnings for future iterations:**
+- For files with 10+ public functions, the audit predicate produces too
+  many test-reference hits to inspect individually. Use the per-function
+  `grep -rln "<fn>" tests/` → count files pattern as a fast coverage
+  spot-check; if every function has ≥3 test-file references AND there is a
+  dedicated `<fn>_test.gd` or `<fn>_and_*_test.gd` suite, the coverage is
+  almost certainly above the bar. Confirm with `grep -nE "^func test_"` to
+  enumerate the test names and visually verify happy+edge coverage.
+- The "parity invariant" test (foreground vs offline byte-equal aggregates)
+  is a higher-tier coverage proof than per-function happy+edge — it proves
+  TWO public functions share a private helper as single source of truth.
+  When auditing a file where multiple public funcs share an internal helper,
+  prefer counting parity-invariant tests over duplicating per-function tests.
+- US-022 is the FIRST audit-only story under the new dual-validation
+  workflow (unit + integration directory both run, even when zero new tests
+  added). The 135+32 = 167 test cases passed cleanly. Future audit-only
+  stories where the subject file is heavily-tested should follow this
+  pattern (unit + integration directory pass, not just unit).
+
+---
