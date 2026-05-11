@@ -1884,3 +1884,90 @@ Append-only log per EPIC.md FR-9. Format:
   `git checkout -b ralph/test-coverage-backfill-us<N>`.
 
 ---
+
+## 2026-05-11 — US-027 biome_dungeon_database/floor.gd
+
+- Audited src/core/biome_dungeon_database/floor.gd: ZERO public functions
+  (`grep -nE "^func [a-z]" src/core/biome_dungeon_database/floor.gd` → empty).
+  Pure data Resource extending GameData (the @abstract base providing
+  inherited @export `id` and `display_name`). Floor adds 5 net-new @export
+  fields: `floor_index` (int, default 0), `enemy_list` (typed
+  `Array[Dictionary]` of `{enemy_id: String, count: int}` entries, default
+  `[]`), `expected_clear_time_seconds` (int, default 0), `is_boss_floor`
+  (bool, default false), and `flavor_text` (@export_multiline String, default
+  ""). No methods, no validators, no to_dict / from_dict — read-only schema
+  per ADR-0011 §Decision (also documented in the file's class doc comment
+  lines 10-15: "read-only at runtime — no mutation methods").
+- Per FR-7 ("Pure data classes (Resources, RefCounteds with no public methods
+  beyond field accessors) are EXEMPT — story marks `passes: true` with note
+  'no testable public surface'"), US-027 closes as EXEMPT. Confirms US-025
+  and US-026's predicted three-in-a-row Biome/Dungeon/Floor cohort pattern
+  (US-026 learnings: "US-027 (floor.gd) is the natural next iteration and
+  should also close FR-7 EXEMPT against the SAME test file").
+- Existing consumer/schema coverage already at-or-above bar — all 5
+  Floor-specific tests + 1 composition + 1 inheritance test shipped in
+  tests/unit/biome_dungeon_database/biome_dungeon_resource_test.gd:
+    * test_floor_new_succeeds_without_args (line 52) — Floor.new() constructor
+      happy path + `is Floor` lineage check.
+    * test_floor_schema_has_all_seven_exported_properties (line 124) — schema
+      enumeration of all 7 @export fields (5 net-new + id + display_name)
+      via PROPERTY_USAGE bit-mask filtering.
+    * test_floor_enemy_list_entry_has_exactly_enemy_id_and_count_keys
+      (line 154) — deterministic dict shape per ADR-0011 §Decision; happy
+      path covering enemy_id: String + count: int contract.
+    * test_floor_enemy_list_empty_is_valid_at_schema_level (line 182) — empty
+      enemy_list edge case (Story 004 content-validation is separate from
+      schema validity).
+    * test_floor_is_boss_floor_defaults_false (line 231) — default-value
+      edge case for the is_boss_floor bool.
+    * test_biome_dungeon_floor_nested_access_returns_correct_instance
+      (line 195) — composition test traversing Biome.dungeons[0].floors[0],
+      validates Floor as nested resource in the Biome → Dungeon → Floor chain.
+    * test_biome_dungeon_floor_empty_arrays_handled_gracefully (line 218) —
+      empty-floors-array edge for the parent Dungeon, transitively exercises
+      Floor's typed Array container invariant.
+    * test_all_three_types_inherit_id_and_display_name_defaulting_empty
+      (line 255) — Floor.id and Floor.display_name inherit default "" from
+      GameData, asserts shared inheritance invariant.
+    * Cross-tier integration via tests/integration/biome_dungeon_database/
+      biome_dungeon_database_autoload_test.gd (12 cases / 0 failures / 78ms)
+      exercises Floor resources as the leaf node in the autoload-resolved
+      Biome → Dungeon → Floor hierarchy.
+    * Cross-feature consumer references: tests/unit/floor_unlock_system/
+      biome_floor_count_and_di_loggers_test.gd walks `biome.dungeons[i].floors[j]`
+      and asserts floor counts per biome — exercises Floor transitively.
+- Test result: tests/unit/biome_dungeon_database = 13/13 passed; 0 errors /
+  0 failures / 0 flaky / 0 skipped / 0 orphans / 84ms (identical statistics
+  to US-025 and US-026 runs, confirming the suite is deterministic across
+  iterations). No regressions in pre-existing suites.
+- New tests added: 0 (FR-7 EXEMPT — zero testable public surface).
+- Files changed: production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-027 floor | passes:true | new_tests_added:0 | notes:FR-7 EXEMPT — zero public functions on Floor.gd (read-only data Resource per ADR-0011, third member of the Biome/Dungeon/Floor data-class cohort with US-025 + US-026). Existing biome_dungeon_resource_test.gd ships 5 Floor-specific tests (constructor, schema, enemy_list shape, enemy_list empty edge, is_boss_floor default) + composition + inheritance coverage, plus integration autoload + cross-feature floor_unlock_system consumer references. Audit-only close.
+
+**Learnings for future iterations:**
+- The Biome/Dungeon/Floor data-class cohort (US-025/026/027) closes in three
+  consecutive audit-only iterations with identical FR-7 EXEMPT structure and
+  identical test-suite statistics (13/13, 84ms). This is the canonical
+  template for the remaining data-class stories (US-028 through US-045).
+  For each: grep `^func [a-z]` → if zero, close EXEMPT and point at the
+  cohort's canonical test file. Expect this pattern to hold for at least
+  US-029 (combat_batch_result.gd), US-032 (combat_tick_events.gd),
+  US-033 (kill_event.gd), US-037 (enemy_data.gd), US-038 (hero_class.gd),
+  US-040 (name_pool.gd), US-042 (matchup_result.gd) — all of which are
+  named like data structs. Stories with `to_dict`/`from_dict`/`equals`
+  methods (US-031 combat_run_snapshot, US-035 run_snapshot) will NOT be
+  EXEMPT and need the full FR-2/FR-3 audit path.
+- US-028 (biome_dungeon_database.gd autoload) breaks the cohort pattern —
+  it's the autoload itself, not a data Resource, so it has a real public
+  surface (get_biome, get_dungeon, get_floor lookups) and falls under the
+  standard autoload audit pattern from US-001 through US-016. Expect
+  US-028 to follow the existing autoload exemplars (audio_router_signal_handlers_test.gd
+  shape) rather than the data-class EXEMPT template.
+- The `biome_dungeon_resource_test.gd` file covers ALL THREE Biome/Dungeon/
+  Floor types in a single suite with 13 tests. When tests cover multiple
+  story subjects in one file, the audit-only close is the correct call —
+  splitting tests by story-subject would inflate file count without
+  improving coverage. FR-2 requires "happy-path test asserting documented
+  return shape / behavior", not "one test file per source file".
+
+---
