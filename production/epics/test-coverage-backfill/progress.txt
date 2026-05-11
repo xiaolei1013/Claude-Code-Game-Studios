@@ -1611,3 +1611,58 @@ Append-only log per EPIC.md FR-9. Format:
   pattern (unit + integration directory pass, not just unit).
 
 ---
+
+## 2026-05-11 — US-023 matchup_resolver/matchup_resolver.gd
+
+- Audited src/core/matchup_resolver/matchup_resolver.gd: file is the abstract
+  base class for the matchup-resolver subsystem and is deliberately empty.
+  Audit predicate `grep -nE "^func [a-z]" src/core/matchup_resolver/matchup_resolver.gd`
+  returns ZERO matches — no public functions, no class-scope vars, no signals,
+  no static funcs. The file declares only `class_name MatchupResolver extends
+  RefCounted` plus doc-comments documenting the "interface by convention"
+  contract (since Godot 4 lacks `@abstract` on RefCounted).
+- Per FR-7 (data/abstract classes EXEMPT — "no testable public surface"), this
+  story closes as audit-only `passes: true`. Per EPIC US-023 note ("Likely
+  abstract base"), this is the anticipated outcome.
+- Existing structural coverage in tests/unit/matchup_resolver/matchup_resolver_base_and_result_test.gd
+  (13 test cases) already proves all invariants the base class can express:
+    * test_matchup_resolver_can_be_instantiated_via_new (TR-001 happy)
+    * test_matchup_resolver_is_refcounted_not_resource (TR-001 edge — NOT a Resource)
+    * test_matchup_resolver_class_name_resolves (TR-001 class_name registry)
+    * test_matchup_resolver_source_has_zero_class_scope_vars (TR-005/TR-030 source-lint)
+    * test_matchup_resolver_source_has_zero_signal_declarations (TR-030 source-lint)
+    * test_matchup_resolver_source_has_no_static_func_on_public_api (TR-002 source-lint)
+    * test_matchup_resolver_get_property_list_has_no_class_scope_data (TR-005 runtime-lint)
+  The 6 remaining tests in the file cover MatchupResult (separate story scope —
+  not part of US-023's contract per the file boundary).
+- Concrete-implementation coverage of `resolve_formation_matchup` and
+  `resolve_floor_matchup` (the convention-only abstract methods documented in
+  the source comments) is covered by US-024 (default_matchup_resolver.gd) via
+  tests/unit/matchup_resolver/default_resolver_formation_test.gd and
+  floor_matchup_and_guards_test.gd — out of US-023 scope.
+- Test results: tests/unit/matchup_resolver = 55/55 passed; 0 errors / 0
+  failures / 0 flaky / 0 skipped / 0 orphans. No regressions. The base-class
+  test file specifically ran clean at 13/13 in 83ms.
+- New tests added: 0 (FR-7 EXEMPT — abstract base with zero public surface).
+- Files changed: production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-023 matchup_resolver | passes:true | new_tests_added:0 | notes:FR-7 exempt; abstract base class with zero public funcs / vars / signals. Existing matchup_resolver_base_and_result_test.gd covers all source-level + runtime structural invariants (7 tests for the base class, 6 for MatchupResult). Convention-only abstract method bodies (resolve_formation_matchup, resolve_floor_matchup) are covered via the concrete DefaultMatchupResolver in US-024.
+
+**Learnings for future iterations:**
+- The "abstract base class" exemption pattern (FR-7 + EPIC's "Likely abstract
+  base" note for US-021/US-023) is best validated by the empty-grep predicate
+  `grep -nE "^func [a-z]" <file>` returning zero matches. When this fires AND
+  a structural-lint test file already asserts the zero-vars / zero-signals /
+  no-static-funcs invariants, the audit-only close is unambiguous.
+- The matchup_resolver subsystem follows a "source-lint test" pattern that's
+  reusable for any abstract base in the project: open the .gd file, walk
+  non-comment lines, assert no `var ` / `signal ` / `static func` prefixes.
+  See matchup_resolver_base_and_result_test.gd lines 47-101 for the canonical
+  three-test shape. Future stateless-RefCounted abstract bases should mirror
+  this lint pattern.
+- US-021 (combat_resolver) and US-023 (matchup_resolver) are sister stories —
+  both empty abstract bases, both audit-only closes, both rely on a
+  structural-lint test in the sister concrete-impl test directory. This
+  symmetry confirms the FR-7 + EPIC-anticipated outcome was correctly modeled
+  at PRD authoring time.
+
+---
