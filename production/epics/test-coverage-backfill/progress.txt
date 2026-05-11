@@ -1666,3 +1666,84 @@ Append-only log per EPIC.md FR-9. Format:
   at PRD authoring time.
 
 ---
+
+## 2026-05-11 — US-024 matchup_resolver/default_matchup_resolver.gd
+
+- Audited src/core/matchup_resolver/default_matchup_resolver.gd: 3 public funcs
+  (is_stub, resolve_formation_matchup, resolve_floor_matchup) — plus the
+  zero-arg `_init` constructor and the private `_is_class_counter` helper
+  (both correctly underscore-prefixed and OUT of scope per FR-2 "non-
+  underscore-prefixed `func`"). All 3 public funcs have ≥1 happy-path test
+  + ≥1 edge-case test with assert_* calls.
+- Coverage map (per-function):
+    * is_stub → tests/unit/matchup_resolver/default_resolver_formation_test.gd::
+      test_is_stub_marker_contains_default_matchup_resolver_substring
+      (asserts marker substring "DefaultMatchupResolver" — the orchestrator's
+      autoload_skeleton_and_di test relies on this for lazy-default detection).
+    * resolve_formation_matchup → 14 happy + edge tests across
+      default_resolver_formation_test.gd (happy: 2/3 + 3/3 warriors vs bruiser
+      advantaged; edge: 1/3 not-advantaged, zero counters, empty formation
+      → false+[], three-unresolvable-class_ids → empty-behavior, one-resolvable-
+      among-two-unresolvable advantaged, empty enemy_archetype → false+[]
+      via TR-018 push_error guard, uppercase-archetype case-sensitive miss
+      TR-020, matched_archetypes single-enemy dedup, repeated-call determinism
+      TR-021, formation array unmutated invariant) + 4 effectiveness_label
+      tests in effectiveness_label_test.gd (Strong/Weak/Even label aggregation
+      per S4-N1) + 1 source-content invariant
+      (matchup_resolver_source_has_zero_hero_roster_references — Pillar 3 TR-022).
+    * resolve_floor_matchup → 8 happy + edge tests in
+      floor_matchup_and_guards_test.gd (happy: any-archetype-majority advantaged,
+      alphabetical sort of matched_archetypes, multi-archetype alphabetical
+      sort dedup; edge: no-majority not-advantaged, empty-archetype-in-list
+      non-aborting forwarding, only-unknown-archetypes → false+[], empty
+      archetypes list → default {false,[]}, empty formation → default) +
+      4 effectiveness_label aggregate tests in effectiveness_label_test.gd
+      (any_strong → Strong, all_weak → Weak, mixed → Even, single-strong → Strong).
+- Cross-tier reinforcement coverage:
+    * Integration: tests/integration/matchup_resolver/orchestrator_di_test.gd
+      (DI invariants — orchestrator-injected resolver survives _ready, replaces
+      internal field) + offline_replay_invariants_test.gd (TR-021 determinism
+      under offline replay) — 26 tests total.
+    * Integration: tests/integration/combat_resolution/matchup_di_and_cache_test.gd
+      (build_matchup_cache TR-012 1-call-per-archetype invariant uses
+      DefaultMatchupResolver as the production-impl resolver).
+    * Perf: tests/perf/matchup_resolver_perf_test.gd (TR-014 budget invariant).
+- Test result: tests/unit/matchup_resolver = 55/55 passed; 0 errors / 0
+  failures / 0 flaky / 0 skipped / 0 orphans / 374ms. tests/integration/
+  matchup_resolver = 26/26 passed; 0 errors / 0 failures / 289ms. Combined
+  81/81 covering this file's public surface across unit + integration tiers.
+  No regressions in pre-existing suites.
+- New tests added: 0 (FR-6: existing coverage at-or-above bar across all 3
+  public funcs; the file is heavily-tested as the production-impl resolver for
+  Pillar 3 specialist-vs-generalist matchup advantage).
+- Files changed: production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-024 default_matchup_resolver | passes:true | new_tests_added:0 | notes:audit-only; 3 public funcs (is_stub, resolve_formation_matchup, resolve_floor_matchup) covered by 42+ happy+edge cases across 3 unit suites (default_resolver_formation, floor_matchup_and_guards, effectiveness_label) + 3 integration suites (orchestrator_di, offline_replay_invariants, matchup_di_and_cache) + perf suite. ADR-0009 strict-majority threshold (TR-011), case-sensitive counter rule (TR-020), empty-formation/empty-archetype guards (TR-016/018), alphabetical-sort dedup (TR-013), and effectiveness_label S4-N1 contract all proven.
+
+**Learnings for future iterations:**
+- US-024 is the SISTER STORY to US-022 (default_combat_resolver) — both are
+  concrete production-impl classes whose abstract-base sister (US-021/US-023)
+  closed as FR-7 EXEMPT. The expected pattern for this concrete-impl story
+  shape is: dedicated test directory (tests/unit/<resolver>/) with at least
+  3 test files — formation/floor/effectiveness — plus integration coverage
+  under tests/integration/<resolver>/. When this directory shape is present
+  AND the public-function count is small (≤5), expect audit-only close.
+- The "effectiveness_label" coverage tier (Strong/Weak/Even derived from
+  is_advantaged + counter_count) is a SECONDARY public-API contract layered
+  on top of the resolve_formation_matchup return. It deserves its own
+  test file (effectiveness_label_test.gd) per the S4-N1 quick-spec — a
+  reusable pattern for ANY public method whose return-value field has a
+  separately-derived secondary attribute. Future audits of methods with
+  derived-field outputs (e.g., MatchupResult.effectiveness_label, KillEvent
+  flag fields, CombatBatchResult.outcome) should look for or recommend a
+  dedicated derived-field test file.
+- Test-evidence completeness verified by `grep -c "^func test_"` per file:
+  default_resolver_formation_test=15, floor_matchup_and_guards_test=11,
+  effectiveness_label_test=16, base_and_result_test=13 (split across US-023
+  base + this story's MatchupResult invariants). Sum = 55 unit cases for the
+  matchup_resolver subsystem — the highest per-file unit-test density among
+  the abstract-interface stories closed so far. A useful baseline for
+  "production-impl is heavily covered" — if a future concrete-impl story
+  shows <30 unit tests in its dedicated test directory, that signals an
+  audit might find a real coverage gap.
+
+---
