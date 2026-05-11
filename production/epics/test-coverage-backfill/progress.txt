@@ -2166,3 +2166,91 @@ Append-only log per EPIC.md FR-9. Format:
 
 ---
 
+
+## 2026-05-11 — US-030 combat/combat_config.gd
+
+- Audited src/core/combat/combat_config.gd: ZERO public functions per the
+  FR-2 strict predicate `grep -nE "^func [a-z]" src/core/combat/combat_config.gd`
+  → empty. The file's only function is `_validate()` (line 91), which is
+  underscore-prefixed by Godot Resource virtual convention and therefore
+  EXCLUDED from the FR-2 public-surface enumeration. CombatConfig is a pure
+  data Resource extending GameData with 4 @export tuning fields (SPEED_BASE,
+  MATCHUP_THROUGHPUT_FACTOR_ADV, MATCHUP_THROUGHPUT_FACTOR_DIS,
+  LOSING_RUN_LOOT_FACTOR) per GDD §G; the only behavior is the ADR-0011
+  schema-validation hook implemented as the standard `_validate` virtual.
+- Per FR-7 ("Pure data classes (Resources, RefCounteds with no public methods
+  beyond field accessors) are EXEMPT"), US-030 closes as EXEMPT. The
+  US-029 learnings entry's prediction of which stories would be genuine
+  EXEMPT candidates (US-032/033/037/038/040/042) did NOT include US-030
+  because US-029's audit-shape grep was applied to combat_batch_result
+  (which has equals/dict_equals), not combat_config. Updating the cohort
+  prediction here: US-030 also belongs in the EXEMPT cohort.
+- Bonus coverage well above bar — even though _validate is excluded from the
+  FR-2 public surface, it is comprehensively covered by 11 existing tests in
+  tests/unit/combat_resolution/combat_config_test.gd:
+    Group A (5 tests): schema field defaults match GDD §G
+      * test_combat_config_default_speed_base_is_ten (line 19)
+      * test_combat_config_default_matchup_throughput_factor_adv_is_1_5 (line 24)
+      * test_combat_config_default_matchup_throughput_factor_dis_is_0_67 (line 29)
+      * test_combat_config_default_losing_run_loot_factor_is_0_5 (line 34)
+      * test_combat_config_extends_gamedata (line 39)
+    Group B (1 test): _validate happy path
+      * test_combat_config_default_instance_validates_clean (line 49)
+    Group C (5 tests): _validate constraint-rejection edges
+      * test_combat_config_validate_rejects_zero_speed_base (line 59)
+      * test_combat_config_validate_rejects_matchup_adv_below_one (line 68)
+      * test_combat_config_validate_rejects_matchup_dis_at_or_above_one (line 78)
+      * test_combat_config_validate_rejects_losing_run_loot_factor_above_one (line 90)
+      * test_combat_config_validate_rejects_losing_run_loot_factor_negative (line 99)
+    Group D (5 tests): combat_config.tres on-disk resource integrity
+      * test_combat_config_tres_resource_exists_at_expected_path (line 110)
+      * test_combat_config_tres_loads_and_is_combat_config (line 115)
+      * test_combat_config_tres_default_values_match_gdd (line 121)
+      * test_combat_config_tres_validates_clean (line 130)
+      * test_combat_config_tres_id_and_display_name_set (line 137)
+    Group E (1 test): TR-031 anti-hardcode source-grep lint
+      * test_no_hardcoded_combat_constants_in_resolver_source (line 149)
+  Cross-consumer tier: tests/unit/combat_resolution/cooldown_formula_test.gd
+  exercises SPEED_BASE via DefaultCombatResolver.action_cooldown_ticks();
+  tests/integration/matchup_resolver/economy_and_combat_consumer_test.gd
+  exercises MATCHUP_THROUGHPUT_FACTOR_ADV/DIS and LOSING_RUN_LOOT_FACTOR
+  through the kill-batch + loot pipeline.
+- Test result: tests/unit/combat_resolution/combat_config_test.gd = 17/17
+  passed; 0 errors / 0 failures / 0 flaky / 0 skipped / 0 orphans / 111ms.
+  Full tests/unit/combat_resolution suite = 143/143 (no change from US-029
+  baseline) / 0 errors / 0 failures / 0 flaky / 0 skipped / 0 orphans /
+  991ms. No regressions.
+- New tests added: 0 (FR-7 EXEMPT — zero public functions per strict
+  FR-2 predicate; bonus _validate coverage already at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt (append).
+- Status: US-030 combat_config | passes:true | new_tests_added:0 | notes:FR-7 EXEMPT — zero public functions per strict FR-2 predicate (only function is underscore-prefixed `_validate` virtual). Existing tests/unit/combat_resolution/combat_config_test.gd already ships 17 tests across 5 groups (schema defaults, _validate happy + 5 constraint-rejection edges, .tres on-disk integrity, TR-031 anti-hardcode lint) plus cross-consumer coverage via cooldown_formula_test.gd and economy_and_combat_consumer_test.gd. Audit-only close.
+
+**Learnings for future iterations:**
+- FR-7 EXEMPT is the right classification when a file's ONLY function is
+  an underscore-prefixed Godot virtual (e.g., `_validate`, `_init`, `_ready`,
+  `_get`, `_set`, `_to_string`). The FR-2 predicate's "does NOT start with
+  `_`" exclusion is intentional — Godot virtuals are framework callbacks,
+  not user-callable public API. The right test-coverage question is "is
+  the documented behavior covered?" and for combat_config that's a
+  resounding yes (17 tests). Future stories with similar shape (a Resource
+  whose only method is `_validate`): grep first, confirm only underscore-
+  prefixed funcs exist, close FR-7 EXEMPT with bonus-coverage note.
+- The "underscore-virtual-only" cohort is a SECOND EXEMPT pattern distinct
+  from the US-025/026/027 "zero-functions-at-all" cohort. US-030 is the
+  first member of this cohort. Other expected members: scan for files
+  where `grep -nE "^func [a-z]"` returns empty but `grep -nE "^func "`
+  returns non-empty (e.g., to_be-confirmed: economy_config.gd US-036,
+  roster_config.gd US-041, scene_manager_config.gd US-044 — all likely
+  `_validate`-only Resources per ADR-0011 convention).
+- The combat_config_test.gd's 5-group layout (Group A defaults, Group B
+  _validate happy, Group C _validate constraints, Group D .tres integrity,
+  Group E TR-031 anti-hardcode lint) is a reusable test-file shape for ANY
+  GameData-extending tuning Resource. When auditing future config Resources
+  (EconomyConfig, RosterConfig, SceneManagerConfig), check that the
+  existing test file has parallel groups; gaps in any group should drop
+  the EXEMPT classification and trigger gap-fill on the standard FR-2/FR-3
+  path. The Group E source-grep anti-hardcode lint is especially valuable
+  because it catches a different class of regression (hardcoded constants
+  drifting back into resolver code) than the per-field _validate tests.
+
+---
