@@ -73,13 +73,13 @@ stories:
 
   - id: "S10-S1"
     name: "Story 014 — orchestrator state advancement during SceneManager TRANSITIONING (architectural cleanup)"
-    file: "production/sprints/sprint-10.md"
+    file: "production/epics/dungeon-run-orchestrator/story-013-orchestrator-state-during-scene-transition.md"
     priority: should-have
-    status: deferred-to-sprint-11
+    status: done
     owner: ""
     estimate_days: 1.0
-    blocker: "Larger scope than 1.0d budget allows; requires orchestrator + Screen base class refactor. Carry-forward to Sprint 11."
-    completed: ""
+    blocker: ""
+    completed: "2026-05-08 (closed via /story-done — implementation pre-existed in source; sprint-plan label 'Story 014' resolves to orchestrator epic's local sequence 013 per story file frontmatter)"
 
   - id: "S10-S2"
     name: "TD-008 — ADR-0007 architecture diagram MainRoot Node→Control amendment (Sprint 5 origin)"

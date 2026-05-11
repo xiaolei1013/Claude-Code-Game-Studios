@@ -3,8 +3,8 @@
 > **Layer**: Core
 > **GDD**: design/gdd/hero-class-database.md
 > **Architecture Module**: `HeroClassDatabase` (autoload rank 4) — `docs/architecture/architecture.md` §Core Layer
-> **Status**: Ready
-> **Stories**: 10 (all Ready) — see Stories table below
+> **Status**: In Progress (9/10 stories Complete; story-010 — Unique silhouette sign-off, Type: Visual/Feel — gated on lead review per coding-standards.md Visual/Feel evidence rule. Status field updated 2026-05-11 to reflect long-standing audit-cascade closure. Test evidence under `tests/{unit,integration}/hero_class_database/`. See systems-index Implementation Status #6.)
+> **Stories**: 10 defined (9 Complete; 1 Ready)
 
 ## Overview
 

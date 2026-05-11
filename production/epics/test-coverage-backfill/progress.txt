@@ -1,0 +1,1538 @@
+# Test Coverage Backfill — Ralph Progress Log
+
+Append-only log per EPIC.md FR-9. Format:
+  <US-NNN> <basename> | <passes_status> | <new_tests_added> | <notes>
+
+## Codebase Patterns
+
+- Test runner invocation (macOS, Godot mono build):
+    /Applications/Godot_mono.app/Contents/MacOS/Godot --headless \
+      -s addons/gdUnit4/bin/GdUnitCmdTool.gd --ignoreHeadlessMode \
+      -a tests/unit/<dir-or-file>
+  The wrapper `tests/gdunit4_runner.gd` exists but the direct CmdTool form is
+  what CI uses. `--ignoreHeadlessMode` is REQUIRED — without it the runner
+  exits 103 (headless-mode unsupported guard).
+- Audit predicate (per EPIC technical considerations):
+    grep -nE "^func [a-z]" src/core/<system>/<file>.gd   # public funcs
+    grep -rn "<func_name>" tests/                         # references
+- Pre-existing baseline failures observed (NOT regressions, do not let them
+  block US-NNN closure if your file is unaffected):
+    * tests/unit/audio_router/audio_router_signal_handlers_test.gd ::
+      test_prestige_completed_handler_fires_play_sfx_with_volume_1_point_2
+      (2 fail count — single test, recorded twice; investigation deferred,
+      not in scope for test-coverage-backfill epic per FR-8 reading).
+- Test naming convention in this directory permits both `test_<system>_<...>`
+  and `test_<func>_<scenario>_<expected>`. See
+  tests/unit/audio_router/volume_persistence_round_trip_test.gd for the
+  function-prefixed style which matches stop_music_test.gd.
+
+---
+
+## Iteration log
+
+## 2026-05-10 — US-001 audio_router.gd
+
+- Audited 13 public funcs (set/get_master/music/sfx_volume_db,
+  set_master_muted, is_master_muted, play_sfx, play_music, stop_music,
+  get_save_data, load_save_data). All 13 had ≥1 test reference.
+- Gap found: stop_music had only `does_not_crash` smoke check; no assertion
+  on documented side effects (clearing _current_ambient_player /
+  _current_ambient_id; no-op when no bed playing).
+- Added tests/unit/audio_router/stop_music_test.gd with 3 tests:
+    * test_stop_music_after_play_music_clears_current_ambient_id (happy)
+    * test_stop_music_after_play_music_clears_current_ambient_player (happy)
+    * test_stop_music_with_no_bed_playing_leaves_state_clean (edge)
+- Test result: 3/3 passed; full audio_router/ suite shows 1 pre-existing
+  failure (test_prestige_completed_handler_*) confirmed to exist on baseline
+  (verified via git stash). No new failures introduced.
+- Files changed: tests/unit/audio_router/stop_music_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt (new).
+- Status: US-001 audio_router | passes:true | new_tests_added:3 | notes:filled stop_music side-effect coverage gap; volume getters/setters/muted/play_sfx/play_music/save_load already covered.
+
+**Learnings for future iterations:**
+- The `_get_ar()` accessor + `_reset_ambient_state()` hygiene barrier in
+  stop_music_test.gd is a reusable pattern for audio_router-touching tests.
+- Run a single test file FIRST (`-a tests/unit/<dir>/<file>_test.gd`) to
+  validate green, then run the directory for regression check. If the
+  directory shows failures absent from your single-file run, those are
+  pre-existing — confirm via `git stash -u && rerun && stash pop`.
+- The pre-existing prestige-completed test failure does NOT affect any
+  US-NNN whose subject file isn't audio_router signal_handlers internals.
+  US-001 closes as-is; flag for separate triage outside this epic.
+
+---
+
+## 2026-05-10 — US-002 data_registry.gd
+
+- Audited 4 public funcs (resolve, get_all_by_type, hot_reload, verify_integrity).
+  All 4 have >=1 happy-path + >=1 edge-case test with assert_* calls.
+- Coverage map:
+    * resolve: tests/unit/data_registry/resolve_api_and_typed_accessors_test.gd
+        - test_resolve_valid_id_returns_cached_resource_and_identity_equality (happy)
+        - test_resolve_missing_id_returns_null_with_warn_behavior (edge)
+        - test_resolve_unknown_content_type_returns_null_without_crash (edge)
+        - test_resolve_before_registry_ready_returns_null (edge)
+        - test_resolve_assert_behavior_returns_null_after_assert_fires (edge)
+        - test_resolve_rename_transparent_id_based_lookup (edge)
+        - tests/unit/data_registry/cross_type_dag_and_invariants_test.gd::test_ac_dls_06_post_error_resolve_returns_null_for_cyclic_resources (POST_ERROR edge)
+    * get_all_by_type: same resolve_api file
+        - test_get_all_by_type_returns_full_array_with_identity_equality (happy + unknown-category sub-assert)
+        - test_get_all_by_type_before_registry_ready_returns_empty_array (edge)
+    * hot_reload:
+        - tests/unit/data_registry/autoload_skeleton_and_state_machine_test.gd::test_data_registry_hot_reload_complete_signal_has_correct_arity_and_type (signal contract)
+        - tests/integration/data_registry/hot_reload_immutability_and_hydration_gate_test.gd::test_hot_reload_re_enumerates_target_category_only_and_emits_signal (happy + scope-isolation edge)
+    * verify_integrity:
+        - tests/integration/data_registry/hot_reload_immutability_and_hydration_gate_test.gd
+          (baseline returns no mismatches = happy; consumer-mutated resource surfaces mismatches = edge)
+- Test result: tests/unit/data_registry suite green — 41 cases / 0 errors / 0 failures / 337ms.
+- New tests added: 0 (FR-6: existing coverage at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-002 data_registry | passes:true | new_tests_added:0 | notes:audit-only; full happy+edge coverage already shipped via Story 004 resolve_api suite + hot-reload integration suite.
+
+**Learnings for future iterations:**
+- The `hot_reload` + `verify_integrity` happy-path coverage lives under
+  tests/integration/data_registry/, NOT tests/unit/. Per FR-2/FR-3 the audit
+  predicate ("function appears in test code with an assert_* call within ~5
+  lines") is satisfied at integration tier, because the epic's goal is
+  *behavioral coverage exists*, not *coverage tier matches story tier*.
+  Future audits should grep tests/ (not tests/unit/) and accept either tier.
+- `cross_type_dag_and_invariants_test.gd::test_ac_dls_06_post_error_resolve_returns_null_for_cyclic_resources`
+  is a load-bearing edge case for `resolve()` under POST_ERROR state — useful
+  precedent when auditing other autoload state-machine error paths (TickSystem,
+  SaveLoadSystem) in later iterations.
+
+---
+
+## 2026-05-10 — US-003 dungeon_run_orchestrator.gd
+
+- Audited 17 public funcs: report_offline_replay_error,
+  mark_floor_invalid_for_offline_replay, set_combat_resolver,
+  set_matchup_resolver, set_error_logger, set_floor_unlock, dispatch,
+  attribute_kill_gold, attribute_kill_xp, flush_offline_signals,
+  compute_offline_total_xp, xp_per_kill, xp_per_floor_clear,
+  get_last_dispatch_intent, resolve_floor_by_snapshot_id, get_save_data,
+  load_save_data. All 17 have >=1 happy-path + >=1 edge-case test with
+  assert_* calls.
+- Coverage map (per-function reference test):
+    * report_offline_replay_error / mark_floor_invalid_for_offline_replay:
+      tests/integration/dungeon_run_orchestrator/offline_error_and_floor_validity_test.gd
+      (TR-029/TR-031 happy + zero-partial-gold + null-snapshot edge cases).
+    * set_combat/matchup/error_resolver, set_floor_unlock: autoload_skeleton_and_di_test.gd
+      (replaces_internal_field happy + survives_ready_call edge — DI invariant).
+    * dispatch: 42 test files; deeply covered.
+    * attribute_kill_gold/xp: tests/unit/dungeon_run_orchestrator/class_synergy_formula_test.gd
+      (steel_wall vs bruiser/skirmisher, triple_threat unconditional, arcane_elite XP,
+      no_synergy baseline — 11 assertion-bearing tests).
+    * flush_offline_signals: 8 files (replay-completion side-effects covered).
+    * compute_offline_total_xp / xp_per_kill / xp_per_floor_clear:
+      offline_xp_batch_test.gd + stub_xp_grant_test.gd (tier-scaling happy paths +
+      clamp-to-zero edge for negative/zero floor index).
+    * get_last_dispatch_intent: last_dispatch_intent_test.gd
+      (initial-empty + after-success-populated + deep-copy-isolation).
+    * resolve_floor_by_snapshot_id: snapshot_and_matchup_cache_test.gd
+      (returns_null_for_unknown_id + returns_null_for_empty_id — covers BOTH
+      branches of current implementation; "floors" is NOT in
+      DataRegistry.ORDERED_CATEGORIES so non-null returns are not currently
+      reachable, leaving the empty-id and unknown-id null returns as the only
+      observable behaviors).
+    * get_save_data / load_save_data: 16/18 files (round-trip + corrupt-payload
+      coverage via save_load_system + autoload_persist suites).
+- Test result: tests/unit/dungeon_run_orchestrator suite green —
+  209 cases / 0 errors / 0 failures / 3s 21ms.
+- New tests added: 0 (FR-6: existing coverage at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-003 dungeon_run_orchestrator | passes:true | new_tests_added:0 | notes:audit-only; orchestrator is heaviest-tested file in project (42 dispatch-touching test files). All 17 public funcs covered with happy+edge across unit + integration tiers.
+
+**Learnings for future iterations:**
+- For accessor-style functions (`set_*` DI seams) the canonical happy+edge pair
+  is "replaces_internal_field" (happy) + "survives_ready_call" (edge —
+  injection-before-_ready survives the lazy-default branch). When auditing
+  other autoloads' DI seams (TickSystem, SaveLoadSystem, SceneManager), look
+  for this paired pattern in autoload_skeleton_*.gd files and accept it as
+  full coverage.
+- For functions with implementation branches gated by data-registry state
+  (e.g., `resolve_floor_by_snapshot_id` only returns non-null if "floors" were
+  a registered category — it isn't), BOTH observable-behavior branches (empty
+  + unknown) ARE the full coverage surface. A "happy path" doesn't have to
+  return a non-null/non-error value; it just has to assert the documented
+  return shape. This is consistent with FR-2 ("documented return shape /
+  behavior").
+- Heavy-coverage files like dungeon_run_orchestrator (42 test files) only
+  need an audit pass — searching `grep -rn "<func_name>" tests/` and
+  spot-checking the assertion shape suffices. Don't be tempted to "improve"
+  test names or refactor existing tests; that's out of scope per FR-8 spirit
+  ("non-regression in baseline" implies "don't touch passing tests").
+
+---
+
+## 2026-05-10 — US-004 economy.gd
+
+- Audited 14 public funcs: add_gold, try_spend, try_award_floor_clear,
+  compute_offline_batch, set_offline_replay_inputs, flush_offline_signals,
+  get_save_data, load_save_data, get_gold_balance, get_lifetime_gold_earned,
+  is_first_clear_awarded, get_config, recruit_cost, level_cost.
+- Coverage map (per-function):
+    * add_gold: economy_add_gold_test.gd (happy + clamp edge + zero/negative-amount edges)
+    * try_spend: economy_try_spend_test.gd (sufficient-balance happy + zero/negative/insufficient edges)
+    * try_award_floor_clear: economy_try_award_floor_clear_test.gd (first-clear happy + monotonic-credit + repeat-WIN/LOSING-after-WIN edges)
+    * compute_offline_batch + set_offline_replay_inputs:
+      tests/integration/economy/economy_offline_batch_determinism_test.gd
+      (closed-form drip happy + 100-iteration determinism + zero-tick + negative-tick + 1M-tick no-overflow edges).
+      set_offline_replay_inputs is exercised in EVERY happy/edge test of compute_offline_batch as the input-injection seam — covered transitively.
+    * flush_offline_signals: tests/unit/economy/flush_offline_signals_test.gd (per-replay flush happy + double-flush + no-pending-state edges)
+    * get_save_data / load_save_data: tests/integration/economy/economy_save_load_round_trip_test.gd (round-trip happy + schema_version_mismatch edge + malformed-payload edge)
+    * get_gold_balance / get_lifetime_gold_earned: 14 / 6 references each (happy via post-add_gold + post-try_spend; edge via fresh-instance == 0)
+    * is_first_clear_awarded: economy_autoload_skeleton_test.gd::test_economy_is_first_clear_awarded_returns_false_for_uncredited_floor (uncredited-floor edge); credited-floor happy via try_award_floor_clear_test sub-asserts.
+    * recruit_cost / level_cost: economy_recruit_cost_test.gd + economy_level_cost_test.gd (tier-1 happy at multiple copies_owned + sentinel paths: negative, orphan class_id, null _config, tier-not-in-BASE)
+    * get_config: GAP — no direct test until this iteration. Other funcs hit `_config` indirectly but the accessor itself had no happy + null-state coverage.
+- Gap closed: tests/unit/economy/economy_get_config_test.gd (6 new tests):
+    * test_get_config_after_ready_returns_registered_economy_config_instance (happy)
+    * test_get_config_returns_same_instance_on_repeat_calls (identity invariant)
+    * test_get_config_before_ready_returns_null_without_raising (pre-_ready edge)
+    * test_get_config_after_explicit_null_override_returns_null (DataRegistry-miss edge)
+    * test_get_config_does_not_mutate_gold_balance_or_lifetime (pure-accessor invariant)
+    * test_get_config_returns_handed_seeded_config_via_field_override (DI-seed pattern)
+- Test result: tests/unit/economy suite green —
+  132 cases / 0 errors / 0 failures / 1s 92ms (was 126; +6 from new file).
+- New tests added: 6.
+- Files changed: tests/unit/economy/economy_get_config_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-004 economy | passes:true | new_tests_added:6 | notes:closed get_config() accessor gap; all other 13 public funcs already at-or-above bar via existing economy/ unit + integration suites.
+
+**Learnings for future iterations:**
+- For trivial accessor funcs (`get_config`, future `get_*` getters) the
+  canonical happy+edge surface is: live-autoload happy (returns registered
+  instance with populated content) + pre-_ready null edge (bare .new()) +
+  explicit-null edge (post-_ready field reset, simulating registry-miss
+  branch) + identity invariant (repeat calls return same instance) + pure-
+  accessor invariant (no state mutation). Mirrors the
+  `recruit_cost_null_config_returns_minus_one` add_child + null-override
+  pattern from economy_recruit_cost_test.gd.
+- Audit predicate refinement: when a public func has 0 direct test
+  references (`grep -rn "<func_name>" tests/` returns nothing matching the
+  call site), it's an unambiguous gap regardless of how heavily its return
+  value is consumed elsewhere. The existing economy/ suite extensively
+  exercised `_config` via recruit_cost/level_cost/compute_offline_batch but
+  never `economy.get_config()` itself — pure accessor public surface still
+  needs at least one direct call site under assertion.
+- `set_offline_replay_inputs` is a test-only DI seam (per its docstring
+  "Production callers MUST NOT set this"); coverage via every
+  compute_offline_batch happy test counts because the seam IS the input
+  channel for those tests. Don't add a separate dedicated test for DI seams
+  whose only legitimate caller is the test harness itself.
+
+---
+
+## 2026-05-10 — US-005 enemy_database.gd
+
+- Audited 2 public funcs: get_by_id, get_all_ids. Both have >=1 happy-path
+  + >=1 edge-case test with assert_* calls.
+- Coverage map (per-function):
+    * get_by_id:
+      tests/integration/enemy_database/enemy_database_autoload_test.gd
+        - test_enemy_database_get_by_id_returns_null_on_miss (edge: missing id, TR-enemy-db-022)
+        - test_enemy_database_get_by_id_empty_string_returns_null (edge: empty string)
+        - test_enemy_database_get_by_id_resolves_mvp_enemies (happy: id round-trip + tier/display_name invariants, AC H-01)
+        - test_enemy_database_get_by_id_returns_same_instance (happy: object-identity / cache consistency)
+    * get_all_ids:
+      tests/integration/enemy_database/enemy_database_autoload_test.gd
+        - test_enemy_database_get_all_ids_returns_sorted_array (happy: sorted alphabetically + size>=7 when MVP loaded; edge: empty when DataRegistry not READY)
+        - test_enemy_database_get_by_id_resolves_mvp_enemies (transitively asserts get_all_ids returns iterable Array[String])
+- Test result: tests/integration/enemy_database suite green —
+  7 cases / 0 errors / 0 failures / 41ms.
+- New tests added: 0 (FR-6: existing coverage at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-005 enemy_database | passes:true | new_tests_added:0 | notes:audit-only; both public funcs covered at integration tier per US-002 precedent. Coverage tier acceptable since EPIC.md FR-2 specifies *behavioral coverage exists*, not tier-must-match-story.
+
+**Learnings for future iterations:**
+- The graceful-degrade pattern in enemy_database_autoload_test.gd
+  (push_warning + return when DataRegistry is not READY) is correct for
+  integration tests but produces tests that *trivially pass* without
+  assertions in environments where the DataRegistry has 0 enemy .tres
+  files. For this epic's audit predicate ("happy + edge with assert_*
+  within 5 lines"), the asserted branches (READY-state + sorted + tier
+  invariants + identity) ARE the happy/edge surface. The push_warning
+  branches are documented graceful-degrade fallbacks and don't need
+  separate happy-path coverage.
+- Thin typed-accessor wrappers (`get_by_id` = single-line DataRegistry
+  resolve cast; `get_all_ids` = filter-and-sort over get_all_by_type) are
+  a recurring pattern across rank-5 autoloads (EnemyDatabase,
+  HeroClassDatabase, BiomeDungeonDatabase). Their coverage bar is met by
+  asserting the *cast/filter behavior* (returns null/empty on miss; returns
+  typed result + sort order on hit), not by re-asserting DataRegistry's
+  own contracts.
+
+---
+
+## 2026-05-10 — US-006 floor_unlock_system.gd
+
+- Audited 13 public funcs: set_warning_logger, set_error_logger, is_unlocked,
+  is_unlocked_in_biome, is_biome_available, is_biome_completed,
+  get_available_biomes, get_highest_cleared, get_floor_state, get_save_data,
+  load_save_data, debug_set_highest_cleared, debug_reset.
+- Coverage map (per-function):
+    * set_warning_logger / set_error_logger: biome_floor_count_and_di_loggers_test.gd
+      (TR-021 setter-replaces-default + injected-routing happy + fresh-instance
+      default-invokable edge — 4 explicit DI-setter tests).
+    * is_unlocked: floor_unlock_system_test.gd Group E
+      (accessible/locked/sentinel/cleared — 4 tests covering true+false+R10).
+    * is_unlocked_in_biome: floor_unlock_system_test.gd Group E2
+      (matches-1-arg-form happy + unavailable-biome edge + R10/over-range edge).
+    * is_biome_available / is_biome_completed / get_available_biomes:
+      biome_availability_and_completeness_test.gd (TR-023/TR-024 — active/empty/
+      unknown/multi-biome happy + fictional/empty-string/floor-count-zero/
+      below-count/stale-biome edges).
+    * get_highest_cleared: floor_unlock_system_test.gd Group C (fresh-save
+      default = 0 happy + planned-biome-default = 0 edge); also exercised as
+      assertion target across signal-handler/save-load/debug groups.
+    * get_floor_state: floor_unlock_system_test.gd Group D (UNAVAILABLE/LOCKED/
+      ACCESSIBLE/CLEARED matrix, 6 tests covering all 4 states + R10 sentinel +
+      over-range + below-highest + at-frontier branches).
+    * get_save_data: floor_unlock_system_test.gd Group G (canonical-schema
+      happy + payload-independence edge — guards external-mutation leak).
+    * load_save_data: floor_unlock_system_test.gd Group G + offline_replay_parity
+      integration suite (round-trip happy + missing-key/under-range/over-range/
+      non-numeric-tampered/lossy-float edges — 6 tests covering GDD §E
+      6-step processing order).
+    * debug_set_highest_cleared: GAP — only `has_method` existence test +
+      consumed by victory_moment integration suite as setup. No direct
+      happy/edge coverage.
+    * debug_reset: GAP — only `has_method` existence test. Zero behavioral
+      coverage despite being mutator (clear + reseed).
+- Gap closed: tests/unit/floor_unlock_system/debug_helpers_test.gd (7 new tests):
+    * test_debug_set_highest_cleared_writes_value_to_unlock_state (happy)
+    * test_debug_set_highest_cleared_overwrites_existing_value (edge: bypasses
+      monotone R4 invariant — debug helper is raw setter, can decrease)
+    * test_debug_set_highest_cleared_accepts_unknown_biome_and_creates_entry
+      (edge: no biome-availability validation on debug write — UI consumers
+      filter via is_biome_available)
+    * test_debug_set_highest_cleared_accepts_value_above_floor_count
+      (edge: bypasses load_save_data's over-range clamp)
+    * test_debug_reset_clears_existing_state_and_seeds_fresh_save_default (happy)
+    * test_debug_reset_on_already_empty_state_seeds_fresh_save_default
+      (edge: idempotent re-reset)
+    * test_debug_reset_drops_stale_biome_entries (edge: removed-biome cleanup)
+- Test result: tests/unit/floor_unlock_system suite green —
+  73 cases / 0 errors / 0 failures / 1s 1ms (was 66; +7 from new file).
+- New tests added: 7.
+- Files changed: tests/unit/floor_unlock_system/debug_helpers_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-006 floor_unlock_system | passes:true | new_tests_added:7 | notes:closed debug_set_highest_cleared + debug_reset behavioral-coverage gaps; all other 11 public funcs already at-or-above bar via existing floor_unlock_system suites.
+
+**Learnings for future iterations:**
+- The `OS.is_debug_build()` guard branch on debug helpers is NOT directly
+  testable in gdunit4 (the test runner IS a debug build by definition; no
+  hook lets us simulate `OS.is_debug_build() == false` without source-level
+  refactor). Document the production-blocked branch as covered-by-construction
+  and focus tests on the in-debug-build mutating path.
+- When auditing autoloads with debug/test API surface (`debug_*` methods),
+  expect them to be consumed as integration-test setup but NOT to have direct
+  unit-test coverage. Future US-NNN audits for autoloads with debug helpers
+  (HeroRoster.debug_*, FormationAssignment.debug_*, Recruitment.debug_*) will
+  likely surface the same gap shape — reuse the helper-test file pattern from
+  debug_helpers_test.gd.
+- Mutator helpers (debug_*) need **paired happy + bypass-edge** tests:
+  happy = "writes value, accessor reflects" (the contract);
+  edge1 = "bypasses an invariant the production path enforces" (e.g., monotone
+    R4 → debug can decrease; over-range clamp → debug accepts 999 unclamped);
+  edge2 = "skips a validation the production path requires" (e.g., biome
+    availability check → debug accepts unknown biome).
+  This shape captures WHY the helper is dangerous in production code-paths.
+
+---
+
+## 2026-05-10 — US-007 formation_assignment.gd
+
+- Audited 8 public funcs: browse, commit, get_save_data, load_save_data,
+  set_target, get_target, detect_active_synergy, notify_synergy_detected.
+- Coverage map (per-function):
+    * browse: formation_assignment_skeleton_test.gd Group C
+      (test_browse_emits_browse_opened_signal_with_payload happy +
+      test_browse_is_idempotent_two_calls_emit_twice edge).
+    * commit: GAP — only `has_method` existence check + a static-grep
+      single-writer enforcement test (recruitment_single_writer_ci_grep_test.gd).
+      Zero behavioral coverage of write-then-emit ordering, length-validation
+      reject branch, or null-slot semantics. The skeleton test's top-level
+      docstring listed Groups D ("commit() emits AFTER writes"), E ("commit()
+      length validation"), F ("empty/null formation handling") but none of
+      those test functions were ever written.
+    * get_save_data: formation_assignment_skeleton_test.gd Group G
+      (test_get_save_data_returns_empty_dict_per_mvp_rule_10_deferral happy);
+      no edge cases — the function literally returns {} unconditionally per
+      §C.6 MVP Rule 10 deferral; matchup_target_test.gd::
+      test_formation_assignment_get_save_data_does_not_persist_matchup_target
+      provides session-only-state invariant edge.
+    * load_save_data: formation_assignment_skeleton_test.gd Group G
+      (test_load_save_data_with_empty_dict_is_noop happy +
+      test_load_save_data_with_non_empty_dict_is_noop_per_v1_0_reservation
+      edge); plus matchup_target_test.gd::
+      test_formation_assignment_load_save_data_does_not_clear_matchup_target
+      session-state-invariant edge.
+    * set_target: matchup_target_test.gd Groups B+C+D
+      (captures_biome_and_floor happy + rejects_empty_biome_id /
+      rejects_zero_floor_index / rejects_negative_floor_index defensive
+      edges + overwrites_prior_target last-write-wins).
+    * get_target: matchup_target_test.gd Groups A+B+E
+      (initial_returns_empty_dict happy + after_set_returns_populated_dict
+      happy + returns_deep_copy mutation-isolation edge).
+    * detect_active_synergy: class_synergy_detection_test.gd
+      (steel_wall/arcane_elite/triple_threat happy paths + 2W+1M no-synergy
+      + missing-class_id + 2-slot under-size + heroes-path-vs-instance_ids
+      branch coverage).
+    * notify_synergy_detected: tests/integration/audio_router/
+      class_synergy_audio_test.gd Group B (steel_wall/arcane_elite/
+      triple_threat emit happy + empty-string no-emit edge). Coverage tier
+      acceptable per US-002 precedent (FR-2 specifies behavioral coverage
+      exists, not tier-must-match-story).
+- Gap closed: tests/unit/formation_assignment/commit_test.gd (9 new tests):
+    * test_commit_with_three_heroes_writes_all_formation_slots (happy)
+    * test_commit_with_three_heroes_emits_reassignment_committed_signal (happy)
+    * test_commit_with_short_formation_does_not_emit_signal
+      (edge: length-mismatch reject branch)
+    * test_commit_with_short_formation_does_not_mutate_formation_slots
+      (edge: length-validation gate runs BEFORE write loop per §D)
+    * test_commit_with_oversized_formation_does_not_emit_signal
+      (edge: 4-element-formation reject)
+    * test_commit_with_all_null_formation_clears_all_slots
+      (edge: null entries → hero_id=0 sentinel write)
+    * test_commit_with_partial_null_formation_writes_real_and_clears_null
+      (edge: mixed real+null slot writes)
+    * test_commit_with_all_null_formation_still_emits_signal
+      (edge: empty-slot commit is a valid commit; signal fires)
+    * test_commit_emits_signal_after_writes_complete
+      (§D ordering invariant: subscriber sees post-mutation _formation_slots)
+- Test result: tests/unit/formation_assignment suite green —
+  60 cases / 0 errors / 0 failures / 810ms (was 51; +9 from new file).
+- New tests added: 9.
+- Files changed: tests/unit/formation_assignment/commit_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-007 formation_assignment | passes:true | new_tests_added:9 | notes:closed commit() write-then-emit ordering + length-validation reject + null-slot-semantics gaps; all other 7 public funcs already at-or-above bar via existing skeleton/matchup_target/class_synergy_detection suites.
+
+**Learnings for future iterations:**
+- The "skeleton test docstring promises Groups X/Y/Z but only Group A is
+  actually written" anti-pattern recurs. When auditing autoloads with
+  skeleton_test.gd files, do NOT trust the file's top-level Test Groups
+  comment — grep for the actual `func test_*` functions and confirm each
+  promised group has at least one assertion-bearing test. The `commit()`
+  gap was hiding behind a skeleton-test docstring that listed Groups D/E/F
+  but none of those tests existed.
+- For autoloads whose public methods mutate ANOTHER live autoload (here:
+  FormationAssignment.commit → HeroRoster._formation_slots), the canonical
+  test isolation pattern is:
+    1. Snapshot the target autoload's mutable field in before_test.
+    2. Inject synthetic state via `<Autoload>._private[id] = fake +
+       _injected_ids.append(id)`.
+    3. Restore snapshot + erase injected entries in after_test.
+  Mirrors prestige_button_visibility_test.gd:30 hero injection pattern but
+  generalised to formation slots. Subsequent US-NNN audits for
+  cross-autoload-mutation methods (Recruitment.recruit → HeroRoster, etc.)
+  should reuse this snapshot+inject+restore shape.
+- Signal-after-mutation invariants (§D ordering) are testable with a
+  capture-state-at-emit-time spy: subscribe a handler that copies the
+  target autoload's mutable field into a local Array; assert the local
+  Array reflects post-mutation state. This is more direct than relying on
+  signal-emission-count alone, which can't distinguish "emitted before
+  writes" from "emitted after writes".
+- Length-mismatch reject branches typically have TWO observable
+  consequences: (a) signal NOT emitted, (b) state NOT mutated. Test BOTH
+  separately — a single combined test conflates the two failure modes
+  (a code path that emits-then-bails would fail (a) but pass a
+  state-only assertion).
+
+---
+
+## 2026-05-10 — US-008 hero_class_database.gd
+
+- Audited 3 public funcs: get_by_id, get_recruitable_classes, get_all_ids.
+  All 3 have >=1 happy-path + >=1 edge-case (or single-branch full surface)
+  test with assert_* calls.
+- Coverage map (per-function):
+    * get_by_id:
+      tests/integration/hero_class_database/hero_class_database_autoload_test.gd
+        - test_hero_class_database_get_by_id_returns_null_on_miss
+          (edge: missing id, TR-hero-class-db-014)
+        - test_hero_class_database_get_by_id_empty_string_returns_null
+          (edge: empty string)
+        - test_hero_class_database_get_by_id_resolves_mvp_classes
+          (happy: id round-trip + tier=1 + non-empty display_name, AC H-01)
+        - test_hero_class_database_get_by_id_returns_same_instance
+          (happy: object-identity / Godot Resource cache invariant, AC H-07)
+    * get_recruitable_classes:
+      tests/integration/hero_class_database/hero_class_database_autoload_test.gd
+        - test_hero_class_database_get_recruitable_classes_stub_returns_empty_array
+          (single-branch full surface: stub body is `return [] as Array[HeroClass]`,
+          one observable behavior; mirrors US-003 reasoning that single-branch
+          implementations are fully covered with one test).
+    * get_all_ids:
+      tests/integration/hero_class_database/hero_class_database_autoload_test.gd
+        - test_hero_class_database_get_all_ids_returns_sorted_array
+          (happy: sorted alphabetically + MVP ids present when DataRegistry READY;
+          edge: graceful-degrade returns empty array when DataRegistry not READY).
+        - test_hero_class_database_get_by_id_returns_same_instance
+          (transitively: probes get_all_ids()[0] then re-queries by id).
+- Test result: tests/integration/hero_class_database suite green —
+  8 cases / 0 errors / 0 failures / 49ms.
+- New tests added: 0 (FR-6: existing coverage at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-008 hero_class_database | passes:true | new_tests_added:0 | notes:audit-only; thin typed-accessor wrapper, all 3 funcs (get_by_id / get_recruitable_classes stub / get_all_ids) covered at integration tier per US-002+US-005 precedent. Coverage tier acceptable since FR-2 specifies behavioral coverage exists, not tier-must-match-story.
+
+**Learnings for future iterations:**
+- Stub functions whose body is a single literal return (e.g.
+  `return [] as Array[HeroClass]`) have exactly one observable behavior.
+  A single happy-path test asserting the literal return shape (typed-array,
+  size==0, never-null) IS the full coverage surface — there is no "edge
+  case" to write because there is no branch to exercise. Audit predicate:
+  if `grep -nE "(if|match|return [^[\]]" <stub-body>` shows zero branching
+  primitives, the function is single-branch and one test suffices. This
+  refines US-003's "single observable branch" rule for stub-shaped funcs.
+- The thin-typed-accessor pattern (rank-4 autoload wrapping rank-1
+  DataRegistry — EnemyDatabase / HeroClassDatabase / BiomeDungeonDatabase)
+  has a recurring 3-test minimum coverage shape: (1) returns_null_on_miss
+  for the resolve cast, (2) sorted-array invariant for the filter+sort,
+  (3) graceful-degrade-when-not-READY for the autoload-state edge. Future
+  audits of US-028 biome_dungeon_database.gd will likely match this exact
+  shape — reuse the test ordering and skip writing new tests if the
+  integration suite already covers all three.
+- The "graceful-degrade with push_warning + early-return" pattern (used
+  identically in EnemyDatabase + HeroClassDatabase integration suites) is
+  acceptable audit coverage even when the runtime environment forces the
+  degraded branch — the asserted READY-state behavior IS the happy-path
+  contract, and the degraded branch's `push_warning + return` is itself
+  the documented edge contract. Don't be tempted to refactor these tests
+  to force-load fixtures; the graceful-degrade IS the design.
+
+---
+
+## 2026-05-10 — US-009 hero_roster.gd
+
+- Audited 22 public funcs: max_roster_size, formation_size, level_cap,
+  add_hero, remove_hero, is_prestige_eligible, prestige_hero,
+  get_prestige_multiplier, get_retired_hero_records, get_prestige_count,
+  set_hero_level, xp_threshold, add_xp, set_formation_slot,
+  get_formation_strength, get_formation_heroes, get_formation_slot,
+  get_copies_owned, get_all_heroes, seed_first_launch_state, get_save_data,
+  load_save_data.
+- Coverage map (per-function reference test):
+    * max_roster_size / formation_size / level_cap: 26/35/55 refs across
+      hero_roster_autoload_skeleton_test.gd + roster_config_test.gd
+      (constant-table happy + fallback-when-config-null edge).
+    * add_hero: 60 refs; add_hero_and_signals_test.gd is the canonical
+      surface (happy + signal-emit + capacity-rejection edge cases).
+    * remove_hero: 17 refs; mutation_api_test.gd + add_hero_and_signals_test
+      cover happy (single + last hero) + edge (unknown id false).
+    * is_prestige_eligible / prestige_hero / get_prestige_multiplier: 14/16/16
+      refs across prestige_v1_test.gd + prestige_v1_story3_logic_test.gd
+      (AC-PR-01..16 happy + ineligible-hero + last-hero-protection edges).
+    * get_retired_hero_records: GAP — 0 direct refs. Exercised only via
+      direct field access (_retired_hero_records) from prestige_v1_test.gd;
+      the public getter (deep-copy contract) had no happy/edge coverage.
+    * get_prestige_count: GAP — 0 direct refs. Field _prestige_count
+      heavily exercised across prestige_v1_test, prestige_perkill_wiring,
+      hall_button_visibility, telemetry_sink_signal_handlers, but the
+      public getter never under assertion.
+    * set_hero_level / xp_threshold / add_xp: 21/5/18 refs; add_xp_test.gd
+      covers happy (level-up + signal emit) + edge (clamp-to-cap, unknown id,
+      negative amount).
+    * set_formation_slot / get_formation_strength / get_formation_heroes /
+      get_formation_slot: 35/10/10/14 refs; formation_strength_and_accessors
+      _test.gd covers happy + edge (out-of-range slot, hero_id=0 sentinel).
+    * get_copies_owned: 26 refs; get_copies_owned_test.gd covers happy +
+      edge (zero-copies, unknown class_id).
+    * get_all_heroes: 24 refs; formation_strength_and_accessors_test +
+      add_hero_and_signals cover SortMode.BY_CLASS / BY_LEVEL / BY_NAME
+      paths plus empty-roster edge.
+    * seed_first_launch_state: 19 refs; first_launch_seed_test.gd is the
+      canonical happy + idempotent-rerun + post-load-no-overwrite edges.
+    * get_save_data / load_save_data: 95/131 refs; save_load_round_trip_test
+      (integration) + autoload_skeleton + 14 other consumer suites cover
+      round-trip + schema_version_mismatch + corrupt-payload edges.
+- Gap closed: tests/unit/hero_roster/get_retired_records_and_prestige_count_test.gd
+  (10 new tests):
+    * Group A — get_retired_hero_records:
+        - test_get_retired_hero_records_initial_returns_empty_array (happy)
+        - test_get_retired_hero_records_after_prestige_returns_one_record (happy)
+        - test_get_retired_hero_records_returns_deep_copy_outer_array_isolated
+          (edge: consumer .clear()/.append() does not contaminate persisted state)
+        - test_get_retired_hero_records_returns_deep_copy_inner_dict_isolated
+          (edge: per-record dict mutation does not leak — duplicate(true) deep
+          copy contract; mirrors UI renderer adding transient "selected" key)
+        - test_get_retired_hero_records_after_multiple_prestiges_returns_all
+          (happy: 3 prestiges return 3-element array with prestige_index 1..3)
+    * Group B — get_prestige_count:
+        - test_get_prestige_count_initial_returns_zero (happy)
+        - test_get_prestige_count_after_one_prestige_returns_one (happy)
+        - test_get_prestige_count_monotone_across_three_prestiges
+          (happy: live-read 0->1->2->3 across sequential prestige_hero calls)
+        - test_get_prestige_count_does_not_mutate_state
+          (edge: pure-accessor invariant; 10 reads do not advance count)
+        - test_get_prestige_count_reflects_direct_field_writes
+          (edge: live-read invariant; getter is not cached snapshot —
+          load_save_data field writes are immediately visible)
+- Test result: tests/unit/hero_roster suite green —
+  194 cases / 0 errors / 0 failures / 2s 393ms (was 184; +10 from new file).
+  New file alone: 10/10 passed in 131ms.
+- New tests added: 10.
+- Files changed: tests/unit/hero_roster/get_retired_records_and_prestige_count_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-009 hero_roster | passes:true | new_tests_added:10 | notes:closed get_retired_hero_records (deep-copy isolation) + get_prestige_count (pure accessor) gaps; all other 20 public funcs already at-or-above bar via 12 existing hero_roster suites + integration suites.
+
+**Learnings for future iterations:**
+- The "field heavily exercised but public getter never called" pattern (US-004
+  refinement) recurs for HeroRoster — same shape as Economy's get_config gap.
+  When auditing autoloads, check BOTH `grep -rn "<func_name>" tests/` (which
+  catches direct calls under assertion) AND `grep -rn "_<field_name>" tests/`
+  (which catches field-access exercises). If field refs >> getter refs, the
+  getter is likely an audit gap even though "behavior is exercised".
+- Deep-copy isolation contracts have TWO observable layers that must be
+  tested separately: (1) outer array structure (consumer .clear()/.append()
+  doesn't reach the source), (2) inner element mutation (per-record dict
+  changes don't leak). A single test conflating both would pass even if
+  duplicate(true) became a shallow `.duplicate()` — the inner-dict assertion
+  is what locks in the deep semantics. This generalises to any Array[Dict]
+  / Array[Resource] return type with documented duplicate(true) contract.
+- Pure-accessor invariants (no state mutation on read) are best tested via
+  loop-of-10 reads + post-loop field-equality assertion. A single read can't
+  detect off-by-one auto-increment bugs (count would go 7 -> 8 once but a
+  single before/after compare wouldn't fire); the loop forces the bug to
+  amplify into a clear delta. Cheap and fast (under 1ms) — worth including
+  on every pure-getter test going forward.
+- The `_make_roster()` + warm-TickSystem-cache pattern from prestige_v1_test
+  is required for ANY test that calls prestige_hero (retirement_unix_ts
+  capture routes through TickSystem.now_ms() per ADR-0005). Without warming
+  the wall-clock cache, the assertion `rec.retirement_unix_ts > 0` fires
+  silently. Reuse this helper verbatim across prestige-touching tests; do
+  NOT skip the TickSystem warming step.
+
+---
+
+## 2026-05-10 — US-010 locale_loader.gd
+
+- Audited `src/core/locale_loader/locale_loader.gd`. Public-function predicate
+  (`grep -nE "^func [a-z]"`) returns ZERO matches: only `_ready` (Godot
+  lifecycle) and `_load_csv_file` (private helper) are present, both
+  underscore-prefixed.
+- Per FR-2 strict reading: vacuously satisfied (no public functions = no
+  uncovered public functions).
+- However, the autoload's BOOT BEHAVIOR is observable + load-bearing
+  (registers Translation per locale column with TranslationServer; sets
+  TranslationServer.locale to DEFAULT_LOCALE). Prior to this iteration NO
+  dedicated unit test existed — only transitive references in
+  formation_assignment_screen_test.gd:630 + class_synergy_audio_test.gd:196
+  that exercise tr() for unrelated assertions, plus a defensive probe in
+  prestige_v1_story3_logic_test.gd:281. None of those lock in the
+  LocaleLoader contract directly.
+- Gap closed: tests/unit/locale_loader/locale_loader_test.gd (9 new tests):
+    * Group A — Constant table:
+        - test_locale_loader_locale_dir_path_is_res_assets_locale (happy)
+        - test_locale_loader_default_locale_is_en (happy)
+        - test_locale_loader_supported_locale_files_contains_en_csv (happy)
+        - test_locale_loader_supported_locale_files_size_matches_canonical_one
+          (lockstep guard against drift)
+        - test_locale_loader_supported_locale_files_all_exist_on_disk
+          (CSV-vs-disk consistency — catches typos in SUPPORTED_LOCALE_FILES)
+    * Group B — Autoload registration:
+        - test_locale_loader_autoload_resolves_at_root (happy)
+        - test_locale_loader_autoload_uses_locale_loader_script
+          (script-identity guard; mirror of audio_router_skeleton_test.gd:54)
+    * Group C — Boot side effects:
+        - test_locale_loader_boot_registers_en_in_translation_server_loaded_locales
+          (happy: TranslationServer.get_loaded_locales() includes "en")
+        - test_locale_loader_boot_makes_tr_resolve_known_en_key
+          (end-to-end: tr("formation_assignment_instructional_header") →
+          "Send your guild to:"; key chosen because it's already
+          load-bearing in formation_assignment_screen_test.gd:630)
+- Test result: tests/unit/locale_loader suite green —
+  9 cases / 0 errors / 0 failures / 56ms.
+  Full tests/unit run after addition: 1442/1442 pass / 0 errors / 0 failures
+  / 16s 835ms across 105 suites. No regressions; pre-existing prestige_completed
+  signal-handler flake (noted on US-001) did NOT appear in this run.
+- New tests added: 9.
+- Files changed: tests/unit/locale_loader/locale_loader_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-010 locale_loader | passes:true | new_tests_added:9 | notes:audit predicate vacuously satisfied (zero public funcs); added boot-behavior coverage spanning constant table + autoload identity + TranslationServer side-effect (loaded_locales + tr-resolve probe).
+
+**Learnings for future iterations:**
+- "Vacuous-satisfaction with zero public funcs" is NOT the same as "skip
+  this story". The audit predicate is grep-based, but the spirit of the
+  epic is "no behavioral gaps survive". When a file's only public-shape
+  functions are `_ready` (autoload boot) or `_init` (resource ctor), look
+  for OBSERVABLE side effects (singleton registrations, autoload
+  identity, TranslationServer / AudioServer state, signal subscriptions)
+  and lock those in. Recipe: constants → autoload identity → boot side
+  effect via consumer-grade probe (not implementation reflection).
+- For TranslationServer-touching tests, `get_loaded_locales()` is the
+  stable observable signal — it accumulates across the boot lifetime and
+  is NOT mutated by `set_locale()`. Asserting on the active locale via
+  `get_locale()` is fragile because any earlier test that calls
+  `TranslationServer.set_locale("xx")` for transient-coverage reasons
+  poisons the state. Pair `get_loaded_locales().has("en")` (registration
+  proof) with `tr("known_key")` end-to-end (resolution proof) for the
+  cleanest two-anchor lock.
+- When picking a probe key for a `tr()`-based boot-coverage test, choose
+  one that's already load-bearing in another suite (here:
+  formation_assignment_screen_test.gd:630 anchors
+  "formation_assignment_instructional_header"). That way a CSV-content
+  drift breaks both tests in lockstep, surfacing the regression at TWO
+  call sites instead of orphaning the audit-only test on its own.
+- File-existence probes (`FileAccess.file_exists`) for asset constants
+  are cheap (sub-ms), deterministic, and catch the silent-warn class of
+  bug where `_load_csv_file` `push_warning`s and continues — without an
+  on-disk check, the boot proceeds with empty translations and only
+  visual-tier UI tests catch it. Worth adopting for any constant-table
+  that lists asset paths.
+
+---
+
+## 2026-05-10 — US-011 offline_progression_engine.gd
+
+- Audited 3 public funcs: run_offline_replay, is_replay_in_flight, last_summary.
+  All 3 have >=1 happy-path + >=1 edge-case test with assert_* calls.
+- Coverage map (per-function):
+    * run_offline_replay: extensively covered across 3 test files.
+        Unit (skeleton_test.gd):
+          - test_run_offline_replay_under_cap_does_not_emit_cap_reached (happy: under cap)
+          - test_run_offline_replay_at_exactly_cap_does_not_emit_cap_reached (edge: boundary)
+          - test_run_offline_replay_above_cap_emits_cap_reached_with_clipped_delta (edge: cap clipping)
+          - test_re_entrant_run_offline_replay_is_dropped_with_warning (edge: in-flight guard)
+          - test_run_offline_replay_with_zero_elapsed_emits_nothing (edge: cold launch)
+          - test_run_offline_replay_with_negative_elapsed_emits_nothing (edge: negative defensive)
+        Integration (offline_batch_chunking_test.gd): 30+ refs covering chunking,
+        adaptive sizing, signal-suppression, flush-ordering, and replay-in-flight
+        guard branches.
+        E2E (end_to_end_offline_replay_test.gd): full pipeline test_e2e_*
+        coverage including TickSystem-trigger, summary identity, AC-OE-12 8h
+        budget, AC-OE-13 per-chunk budget proxy, cap clipping, zero-elapsed
+        silent path, replay-in-flight pipeline guard.
+    * is_replay_in_flight: skeleton_test.gd::
+        test_is_replay_in_flight_reflects_internal_state (happy: default false +
+        edge: returns true after _replay_in_flight = true). Pure-accessor
+        contract — single observable behavior per US-008's stub-shape rule
+        (the function literally `return _replay_in_flight` with zero branching).
+    * last_summary: end_to_end_offline_replay_test.gd::
+        test_e2e_summary_cached_for_late_subscriber_via_last_summary
+          (happy: pre-flight null + post-replay populated + identity-equal to
+          emitted summary — covers BOTH branches of `return _last_summary`)
+        test_e2e_zero_elapsed_silent_no_summary_no_cache_no_route
+          (edge: cache stays null after zero-elapsed no-op replay)
+- Test result: tests/unit/offline_progression_engine green —
+  16 cases / 0 errors / 0 failures / 386ms (skeleton 16 + grep-CI 10 = 26
+  across 2 suites, all green).
+  tests/integration/offline_progression_engine green —
+  30 cases / 0 errors / 0 failures / 1s 309ms (2 suites: e2e + batch chunking).
+- New tests added: 0 (FR-6: existing coverage at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-011 offline_progression_engine | passes:true | new_tests_added:0 | notes:audit-only; engine has minimal public surface (3 funcs) with comprehensive happy+edge coverage across unit + integration + e2e tiers. run_offline_replay alone has 30+ test references locking cap/zero/negative/in-flight/chunking/flush-ordering branches.
+
+**Learnings for future iterations:**
+- Pure-accessor functions (`is_replay_in_flight`, `last_summary`) whose body
+  is a single `return <field>` statement satisfy FR-2 with one test per
+  observable field state. For `is_replay_in_flight`: false (default) +
+  true (after field-set) is the full surface. For `last_summary`: null
+  (pre-flight) + populated (post-replay) is the full surface. No need to
+  contrive additional "edge cases" beyond the field's observable values.
+  This reinforces US-008's single-branch / stub-shape coverage rule.
+- When a public function is also exercised through a *signal handler*
+  (`_on_offline_elapsed_seconds → run_offline_replay`), the e2e tier's
+  signal-driven invocation path (TickSystem.offline_elapsed_seconds.emit →
+  handler → method call) IS additional behavioral evidence beyond the
+  direct-call unit tests. The audit predicate's "function appears in test
+  code with assert_*" can include indirect invocation through the documented
+  signal-source-dependencies wiring (per US-002's tier-acceptance rule).
+- For autoload methods marked "QA / debug / test-fixture" use only
+  (run_offline_replay's docstring: "Production callers do NOT use this"),
+  the test surface IS the production surface for this method — there's no
+  "real production code path" to mirror because the production trigger is
+  the signal handler. This pattern recurs for autoloads with signal-driven
+  primary entry points (TickSystem._on_app_paused → bg cycle, etc.); future
+  audits should accept signal-handler-only coverage as fully covering the
+  underlying method when the signal handler is the sole production caller.
+
+---
+
+## 2026-05-10 — US-012 recruitment.gd
+
+- Audited 9 public funcs: try_recruit, get_recruit_pool,
+  get_refreshes_today, get_recruit_cost, refresh_pool, refresh_pool_paid,
+  refresh_cost, get_save_data, load_save_data. All 9 have >=1 happy-path
+  + >=1 edge-case test with assert_* calls.
+- Coverage map (per-function reference test):
+    * try_recruit:
+      tests/integration/recruitment/recruitment_try_recruit_test.gd
+      Groups A-E exhaust the 5-value RecruitOutcome enum:
+        - test_try_recruit_warrior_zero_copies_succeeds_and_deducts_150
+          (AC-RC-04 SUCCESS happy: gold deducted, hero added, signal emitted
+          with class_id + cost_paid payload)
+        - test_try_recruit_subsequent_warrior_costs_270_per_geometric_curve
+          (AC-RC-11-adjacent: post-recruit copies_owned advance flows
+          through Economy.recruit_cost into try_recruit's STEP 3 lookup)
+        - test_try_recruit_with_insufficient_gold_returns_outcome_and_no_mutations
+          (AC-RC-05 INSUFFICIENT_GOLD: STEP 4 try_spend false-branch leaves
+          gold + roster + signal-count untouched)
+        - test_try_recruit_at_roster_cap_returns_roster_full_and_no_mutations
+          (AC-RC-06 ROSTER_FULL: STEP 2 capacity-check pre-spend gate)
+        - test_try_recruit_with_negative_pool_index_returns_invalid_index
+          + test_try_recruit_with_pool_index_at_size_returns_invalid_index
+          (AC-RC-07 INVALID_POOL_INDEX: STEP 0 bounds-check both ends)
+        - test_try_recruit_with_orphan_class_id_returns_unresolvable
+          (AC-RC-08 UNRESOLVABLE_CLASS_ID: STEP 1 DataRegistry.resolve null
+          branch — uses literal "not_a_real_class_xyz" pool entry)
+    * get_recruit_pool:
+      tests/integration/recruitment/recruitment_try_recruit_test.gd Group F
+        - test_get_recruit_pool_returns_copy_not_internal_array
+          (AC-RC-10 happy + edge: returned size==3 happy + post-clear
+          internal-state-untouched edge — the duplicate() contract)
+    * get_refreshes_today:
+      tests/unit/recruitment/get_refreshes_today_test.gd (5-test dedicated suite):
+        - test_recruitment_get_refreshes_today_initial_returns_zero (happy)
+        - test_recruitment_get_refreshes_today_reflects_internal_field
+          (edge: pure-accessor read after field-set)
+        - test_recruitment_get_refreshes_today_returns_zero_after_reset
+          (edge: re-assign-to-zero round-trip)
+        - test_recruitment_get_refreshes_today_returns_int_type
+          (typeof contract — never null/bool drift)
+        - test_recruitment_get_refreshes_today_is_a_public_method
+          (API surface lock per S16-N1 invariant)
+    * get_recruit_cost:
+      tests/integration/recruitment/recruitment_try_recruit_test.gd:
+        - test_try_recruit_subsequent_warrior_costs_270_per_geometric_curve
+          (line 198 mid-test calls get_recruit_cost(1) and asserts ==270 —
+          tier-1 warrior at copies_owned=1)
+        - test_get_recruit_cost_matches_economy_recruit_cost_contract_for_all_pool_entries
+          (AC-RC-11 cost-stability invariant — for each pool entry,
+          asserts get_recruit_cost(i) == Economy.recruit_cost(class_id,
+          copies_owned). Loops over pool, then recruits and re-asserts.
+          Covers BOTH happy paths (warrior + mage) AND the orphan-fallback
+          edge where get_recruit_cost returns -1 == Economy returns -1.)
+    * refresh_pool:
+      tests/integration/recruitment/recruitment_try_recruit_test.gd Group G
+        - test_refresh_pool_emits_pool_refreshed_signal_with_new_pool
+          (happy: signal emit count==1 + counter increment + non-empty pool;
+          edge surface single-branch — refresh_pool has no failure path,
+          per US-008 stub-shape rule one happy test covers full surface,
+          plus the counter-increment + signal-emit dual invariant)
+    * refresh_pool_paid:
+      tests/integration/recruitment/recruitment_try_recruit_test.gd Group G
+        - test_refresh_pool_paid_with_insufficient_gold_returns_false_no_refresh
+          (edge: try_spend false-branch — counter unchanged, _refreshes_today
+          unchanged, no signal, gold unchanged — full no-op contract)
+        - test_refresh_pool_paid_with_sufficient_gold_charges_and_refreshes
+          (happy: returns true + 100g charged + counter++ + _refreshes_today++
+          + pool_refreshed signal emitted)
+    * refresh_cost:
+      tests/unit/recruitment/recruitment_skeleton_test.gd Group C
+        - test_refresh_cost_at_zero_refreshes_today_returns_base (n=0 → 100)
+        - test_refresh_cost_at_one_refresh_returns_300 (n=1 → 300)
+        - test_refresh_cost_at_five_refreshes_returns_1100 (n=5 → 1100)
+        Pure function with linear curve — three sample-points on curve
+        constitute happy + boundary + spam-zone coverage of the formula.
+    * get_save_data:
+      tests/unit/recruitment/recruitment_skeleton_test.gd Group G
+        - test_get_save_data_returns_three_fields_per_adr_0015_schema
+          (happy: ADR-0015 §Decision schema lock — exactly 3 keys)
+        - test_get_save_data_returns_pool_copy_for_mutation_isolation
+          (edge: returned dict's current_pool is duplicate — consumer .clear()
+          does not contaminate internal _current_pool)
+    * load_save_data:
+      tests/unit/recruitment/recruitment_skeleton_test.gd Group G
+        - test_load_save_data_round_trips_seed_counter_and_pool
+          (happy: full schema round-trip preserves all 3 fields)
+        - test_load_save_data_with_empty_dict_first_launch_inits_seed
+          (edge: pre-Recruitment-shipped save → first-launch init via
+          _first_launch_seed_init fallback — non-zero post-randi)
+        - test_load_save_data_ignores_non_int_seed_and_re_inits
+          (edge: anti-tamper — string seed re-init via type guard)
+        - test_load_save_data_filters_non_string_pool_entries
+          (edge: anti-tamper — per-element String type guard filters
+          int / null entries)
+- Test result: tests/unit/recruitment green —
+  30 cases / 0 errors / 0 failures / 488ms across 3 suites.
+  tests/integration/recruitment green —
+  26 cases / 0 errors / 0 failures / 300ms across 2 suites.
+- New tests added: 0 (FR-6: existing coverage at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-012 recruitment | passes:true | new_tests_added:0 | notes:audit-only; 9 public funcs covered with happy+edge across unit (skeleton + dedicated get_refreshes_today suite) + integration (try_recruit transaction integration suite) tiers. The recruitment_try_recruit_test.gd is the canonical "RecruitOutcome enum exhaustion" pattern — 5 outcomes, 6 dedicated tests covering all transaction failure modes plus the happy path.
+
+**Learnings for future iterations:**
+- The "RecruitOutcome enum exhaustion" pattern (one test per enum value)
+  generalises to any autoload public method that returns a documented enum
+  taxonomy of outcomes. Future audits of methods returning a SUCCESS /
+  *_FAILURE enum should confirm BOTH (a) one test per enum value AND (b)
+  zero-mutation contracts on each non-SUCCESS branch (gold unchanged +
+  roster unchanged + signal-count unchanged for all failure outcomes). A
+  single-outcome test that asserts the enum value but doesn't lock the
+  no-mutation contract is incomplete coverage.
+- Pure-formula functions (`refresh_cost`, mirror of `recruit_cost` /
+  `level_cost`) have a recurring 3-sample coverage shape: zero-input
+  base case + one-input first-step + larger-input compounding case. Three
+  sample-points pin the linear / geometric curve shape; more aren't needed
+  unless the formula has special-case branches (clamps, sentinels) which
+  recruit_cost has but refresh_cost does not.
+- Cross-system transaction tests (try_recruit touches Economy + HeroRoster +
+  DataRegistry + Recruitment simultaneously) need the snapshot+restore
+  hygiene pattern from recruitment_try_recruit_test.gd:32-80 — capture
+  Economy.get_save_data + Recruitment.get_save_data + roster instance_id
+  list pre-test; restore via load_save_data + remove_hero loop post-test.
+  This snapshot+restore pattern is reusable for ANY future cross-autoload
+  integration test (e.g., HeroLeveling consuming Economy + HeroRoster).
+- For methods whose only failure mode is "dependent autoload absent" (e.g.,
+  refresh_pool_paid's "Economy is null" branch), the integration tier
+  cannot exercise that path — the autoload is always present in the live
+  test env. The audit predicate accepts this as covered-by-construction:
+  the absent-autoload branch is a defensive guard whose only legitimate
+  caller scenario is the production env's strict autoload-rank load order
+  (impossible to violate). A unit-tier test could exercise it by spinning
+  a bare RecruitmentScript.new() outside the autoload tree, but it adds
+  no signal beyond the existing graceful-degrade documentation.
+
+---
+
+## 2026-05-10 — US-013 save_load_system.gd
+
+- Audited 8 public funcs: get_state, request_full_persist,
+  request_heartbeat_persist, request_full_load, acknowledge_corrupt_both_begin,
+  acknowledge_tamper_modal_yes, get_tamper_suspicious_count,
+  get_pending_flags_bit0_tamper. All 8 have >=1 happy-path + >=1 edge-case
+  test with assert_* calls.
+- Coverage map (per-function reference test):
+    * get_state: 5 files (autoload_skeleton_test.gd, schema_migration_test.gd,
+      tests/integration/save_load/{save_persist_roundtrip,tamper_detection,
+      schema_migration_e2e}_test.gd). Initial-state happy
+      (initial_state_is_unloaded), full state-machine path
+      (UNLOADED→LOADING→READY→PERSISTING→READY in autoload_skeleton Group D),
+      and edge cases for terminal CORRUPT (tamper / garbage payload load
+      paths in roundtrip + e2e suites).
+    * request_full_persist: 8 files including dedicated
+      tests/unit/save_load/request_full_persist_test.gd. Happy path:
+      autoload_skeleton::test_transition_to_valid_full_path_unloaded_to_ready
+      via state-machine drive. Edge paths: rejects-when-state-unloaded,
+      rejects-when-state-loading, coalesces-when-state-persisting (each its
+      own test in request_full_persist_test.gd), plus method-existence guard
+      and signal-declaration assertions.
+    * request_heartbeat_persist: 3 files. Happy path:
+      tests/unit/save_load/persist_wrappers_test.gd::
+      test_request_heartbeat_persist_forwards_to_full_persist_with_reason_heartbeat.
+      Edge paths: empty-time_fields dict, coalesces-when-persisting, method
+      existence. Integration: heartbeat_accumulator_test.gd exercises the
+      TickSystem→SaveLoadSystem heartbeat trigger; offline_replay_parity
+      exercises it post-replay.
+    * request_full_load: 5 files. Happy path:
+      save_persist_roundtrip_test.gd::test_request_full_load (UNLOADED →
+      READY transition via canonical envelope). Edge paths:
+      rejects-when-state-is-ready, tamper-load → CORRUPT, garbage-load →
+      CORRUPT, schema-migration-e2e v0/v99/v1 forged-payload paths
+      (3 dedicated tests in schema_migration_e2e_test.gd lines 186/220/244),
+      mainroot_boot_wiring exercises boot-time invocation.
+    * acknowledge_corrupt_both_begin: 1 file (tamper_detection_test.gd) with
+      3 dedicated tests:
+        - test_acknowledge_corrupt_both_begin_runs_first_launch_bootstrap
+          (happy: CORRUPT → first-launch boot reset)
+        - test_acknowledge_corrupt_both_begin_resets_meta_to_first_launch_defaults
+          (happy: meta-state cleared)
+        - test_acknowledge_corrupt_both_begin_ignored_when_state_not_corrupt
+          (edge: defensive guard against non-CORRUPT calls)
+    * acknowledge_tamper_modal_yes: 2 files. Happy path:
+      tamper_counter_and_constants_test.gd::
+      test_acknowledge_tamper_modal_yes_increments_counter_AND_sets_pending_flags_bit0.
+      Edge paths: idempotent_on_repeated_taps (3-tap → counter==3,
+      stuck-double-tap design comment), counter-saturation at
+      MAX_TAMPER_SUSPICIOUS_COUNT, plus integration tier
+      (tamper_detection_test.gd::test_acknowledge_tamper_modal_yes_persists
+      _flags_bit0_set_in_envelope_header) for round-trip persistence.
+    * get_tamper_suspicious_count: 1 file
+      (tamper_counter_and_constants_test.gd) with 5+ assertions covering
+      initial-zero (happy), post-acknowledge increment (happy), saturation
+      at MAX_* (edge), monotone-across-3-taps (edge).
+    * get_pending_flags_bit0_tamper: 2 files
+      (tamper_counter_and_constants_test.gd + tamper_detection_test.gd).
+      Happy: post-acknowledge returns true. Edge: initial false, false-after-
+      persist-clears-flag (envelope round-trip), still-true-on-pending-state.
+- Test result: tests/unit/save_load suite green —
+  129 cases / 0 errors / 0 failures / 1s 20ms across 9 suites
+  (autoload_skeleton, envelope_layout, hmac_rfc4231,
+  integrity_tag_derivation, persist_wrappers, request_full_persist,
+  schema_migration, tamper_counter_and_constants, xor_mask_derivation).
+- New tests added: 0 (FR-6: existing coverage at-or-above bar — file is
+  among the most heavily tested in the project, with dedicated unit
+  suites per public-method group plus integration tier coverage for
+  request_full_load + tamper-detection round-trips).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-013 save_load_system | passes:true | new_tests_added:0 | notes:audit-only; 8 public funcs covered with happy+edge across 9 unit suites + 4 integration suites. State-machine surface (get_state + request_full_persist/load coalescing/rejection) heavily covered in autoload_skeleton + dedicated request_full_persist_test. Tamper surface (counter + flag-bit0 + acknowledge_tamper_modal_yes + acknowledge_corrupt_both_begin) covered by tamper_counter_and_constants + tamper_detection integration suites.
+
+**Learnings for future iterations:**
+- For state-machine autoloads with reject/coalesce semantics on entry-point
+  methods (request_full_persist, request_full_load), the canonical coverage
+  shape is: happy = legal-transition path; edge1 = rejected-when-state-X
+  (one test per illegal entry state); edge2 = coalesced-when-state-Y (the
+  in-flight idempotency contract). request_full_persist_test.gd:122/140/153
+  is the exemplar — three dedicated tests covering UNLOADED-reject,
+  LOADING-reject, PERSISTING-coalesce. Future audits of state-machine
+  autoloads (e.g., DungeonRunOrchestrator FSM future expansion) should
+  expect this triple-coverage shape and not accept a single "happy +
+  one-rejection" pair as full coverage.
+- For UI-entry-point methods (acknowledge_*), the ATTACK SURFACE pattern is
+  always: happy = single-tap effect, edge1 = stuck-double-tap idempotency
+  (3+ rapid taps), edge2 = saturation/clamp at numeric bound, edge3 =
+  defensive guard against wrong-state invocation. tamper_counter_and_
+  constants_test.gd lines 113/143 cover the double-tap and saturation
+  edges; tamper_detection integration covers the wrong-state guard via
+  test_acknowledge_corrupt_both_begin_ignored_when_state_not_corrupt.
+  Reuse this 4-test shape for any future "user dismisses modal" methods.
+- File-per-public-method test organization (request_full_persist_test.gd,
+  persist_wrappers_test.gd, tamper_counter_and_constants_test.gd) scales
+  better than monolithic skeleton_test.gd for autoloads with 6+ public
+  funcs. The autoload_skeleton_test.gd here covers ONLY the state-machine
+  + signal-declaration invariants; the per-method unit tests cover the
+  actual call-site behaviors. Future heavy-surface autoloads (HeroRoster
+  has 22 funcs but uses split files like add_hero_and_signals_test.gd /
+  prestige_v1_test.gd) should follow this split-file pattern rather than
+  growing a single skeleton suite past ~20 tests.
+- Signal-handler coverage pattern: `acknowledge_*` methods that emit
+  signals (corrupt_both_acknowledged, tamper_detected_on_load) need
+  separate tests for (a) the method's state-machine effect and (b) the
+  signal emission with correct payload. Don't conflate — a single test
+  asserting method-call-and-signal-emission can pass even if the signal
+  fires from the wrong code path. Mirrors the §D ordering invariant
+  from US-007 formation_assignment commit_test.gd.
+
+---
+
+## 2026-05-10 — US-014 scene_manager.gd
+
+- Audited 6 public funcs: request_screen, push_overlay, pop_overlay,
+  show_modal, hide_modal, set_reduce_motion. All 6 have >=1 happy-path +
+  >=1 edge-case test with assert_* calls.
+- Coverage map (per-function reference test):
+    * request_screen:
+      tests/unit/scene_manager/scene_manager_autoload_skeleton_test.gd Group D
+      (UNINITIALIZED-queue happy + last-write-wins-while-uninitialized edge +
+       same-screen-noop-in-IDLE edge — three dedicated tests covering the
+       three documented behavior branches: queue when uninitialized, replace
+       queued when uninitialized, no-op when same screen in IDLE).
+      Integration tier additionally covers IDLE→cross-fade transitions
+      (crossfade_timing_test, request_screen_and_node_swap_test,
+      run_end_to_main_menu_transition_test, dungeon_run_view_screen_test,
+      formation_assignment_screen_test) — 30+ tests asserting the live
+      transition path with current_screen swap, signals, and state changes.
+    * push_overlay:
+      tests/unit/scene_manager/modal_overlay_counter_test.gd Group A
+      (adds_to_overlay_layer happy + does_not_change_current_screen invariant
+       + sets_state_to_paused happy + duplicate_push_does_not_double_increment
+       edge + nested_overlays_increment_counter happy + non_pausing_push
+       branch + on_pause_called_on_push_overlay callback). 7 tests on the
+       happy + edge surfaces of push_overlay.
+    * pop_overlay:
+      tests/unit/scene_manager/modal_overlay_counter_test.gd Group A
+      (restores_state_to_idle happy + unknown_id_warns_and_noops edge +
+       push_pop_cycle_returns_count_to_zero happy + pop_in_reverse_decrements
+       edge + stray_pop_does_not_go_negative defensive-clamp edge +
+       on_resume_called_on_last_pop callback +
+       on_resume_only_after_all_overlays_pop ordering invariant). 7 tests
+       on the happy + edge surfaces of pop_overlay.
+    * show_modal:
+      tests/integration/scene_manager/offline_replay_modal_coordination_test.gd
+      Group A+B
+      (adds_to_overlay_layer_and_pauses_state happy +
+       two_show_modals_both_hosted_on_overlay_layer stack edge +
+       show_modal_with_no_current_screen_does_not_crash defensive edge).
+      Additional happy-path coverage in
+      tests/integration/hero_detail/hero_detail_modal_contract_test.gd.
+    * hide_modal:
+      tests/integration/scene_manager/offline_replay_modal_coordination_test.gd
+      Group A+B
+      (frees_modal_and_returns_to_idle happy + untracked_modal_is_no_op
+       edge + stays_paused_when_push_overlay_stack_nonempty state-machine
+       guard edge — three dedicated tests covering the three documented
+       behavior branches).
+    * set_reduce_motion:
+      tests/integration/scene_manager/reduce_motion_clamp_test.gd
+      (idempotent_on_same_value happy + updates_in_memory_flag_immediately
+       happy + persists_to_configfile_and_reloads round-trip edge +
+       handles_missing_file_gracefully edge + clamps_all_four_getters_to_50ms
+       downstream-clamp invariant + override_per_screen_override interaction
+       edge + ceremony_falls_back_to_crossfade_at_50ms downstream invariant).
+       7 tests covering happy + edge + interaction surfaces.
+- Test result:
+    tests/unit/scene_manager green —
+      71 cases / 0 errors / 0 failures / 1s 697ms across 4 suites
+      (autoload_skeleton, modal_overlay_counter, screen_base_class,
+       tween_transitions).
+    tests/integration/scene_manager green —
+      122 cases / 0 errors / 0 failures / 14s 359ms across 11 suites.
+- New tests added: 0 (FR-6: existing coverage at-or-above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-014 scene_manager | passes:true | new_tests_added:0 | notes:audit-only; 6 public funcs covered with happy+edge across 4 unit suites + 11 integration suites. Modal/overlay surface (push/pop_overlay + show/hide_modal) has the densest dedicated coverage — 7 tests per overlay method + 3-4 tests per modal method covering all documented behavior branches. request_screen UNINITIALIZED-queueing branch is the only path covered solely at unit tier (Group D); IDLE→transition path has 30+ integration tests. set_reduce_motion uses the path-override pattern from feedback_test_isolation_user_configfile (canonical reduce_motion_clamp_test.gd).
+
+**Learnings for future iterations:**
+- For autoloads with a state-machine entry-point method (request_screen here,
+  request_full_persist in US-013), the happy-path branch matrix must enumerate
+  every documented state precondition: UNINITIALIZED-queue, IDLE-transition,
+  IDLE-noop-when-same-screen. A single happy + single edge pair is INSUFFICIENT
+  for these — confirm one test per documented branch before marking
+  passes:true. scene_manager_autoload_skeleton_test.gd Group D is the
+  exemplar for unit-tier branch enumeration; IDLE-transition is then
+  covered exhaustively at the integration tier where the current_screen
+  swap actually happens.
+- When a method has a callback contract (push_overlay → on_pause,
+  pop_overlay → on_resume) the audit predicate must verify that the callback
+  invocation has ITS OWN dedicated test, separate from the state-transition
+  test. modal_overlay_counter_test.gd:371/399/421 is the exemplar — three
+  tests for the on_resume contract: on_resume_called_on_last_pop_overlay,
+  on_resume_only_after_all_overlays_pop (ordering invariant — the FRAGILE
+  one), and the "callback fires only once per pause/resume cycle" assertion.
+  Future audits of methods with virtual-hook contracts (Screen.on_enter /
+  on_pause / on_resume / on_exit) should expect this 3-test shape and not
+  accept "callback was called" as standalone proof.
+- The `set_reduce_motion` coverage shape (idempotent + in-memory-flag +
+  ConfigFile-round-trip + missing-file-graceful + downstream-clamp +
+  per-screen-override + downstream-ceremony-fallback) is the canonical
+  shape for any "user toggles a runtime setting" method. Future audits of
+  similar settings (volume sliders, telemetry opt-in toggles, accessibility
+  flags) should expect this 7-test shape: 2 setter-state + 2 persistence +
+  3 downstream-effect tests. A simple "setter sets the flag" test alone is
+  incomplete coverage for ANY persisted runtime setting.
+- For modals/overlays whose hide/dismiss method must NOT transition state
+  when other overlays are still active (hide_modal stays_paused_when_push_
+  overlay_stack_nonempty), this "don't transition while peer-stack non-empty"
+  edge is a load-bearing guard that the unit-tier test misses (push_overlay
+  isn't in the unit-tier modal_overlay_counter; integration coverage is
+  required). Future audits of overlay-stack-aware methods (any future
+  pop_modal / dismiss_dialog / close_screen variants) need to verify the
+  "non-empty peer-stack stays-paused" assertion exists at integration tier.
+
+---
+
+## 2026-05-10 — US-015 telemetry_sink.gd
+
+- Audited 4 public funcs: set_opt_in, is_opt_in, get_save_data,
+  load_save_data. All 4 have >=1 happy-path + >=1 edge-case test with
+  assert_* calls.
+- Coverage map (per-function reference test):
+    * set_opt_in:
+      tests/unit/telemetry_sink/telemetry_sink_skeleton_test.gd
+        - test_set_opt_in_true_flips_getter (happy)
+        - test_set_opt_in_false_resets_getter (happy — toggle-back path)
+        - test_opt_in_flip_takes_effect_without_reboot (Group E hot-flip
+          edge — confirms no autoload reboot required across off→on→off
+          cycle, the critical privacy-toggle UX invariant per taxonomy
+          doc §C.1).
+      tests/unit/telemetry_sink/telemetry_sink_signal_handlers_test.gd
+        (8 assertion-bearing handler tests use set_opt_in(true) to enable
+        emission paths — confirms set_opt_in is the universal gate for
+        every event handler short-circuit per taxonomy doc §C.1).
+      tests/integration/telemetry_sink/local_sink_round_trip_test.gd
+        (4 tests use set_opt_in(true)/(false) to drive the JSONL append
+        vs no-op branches — full integration tier opt-in branch coverage).
+    * is_opt_in:
+      tests/unit/telemetry_sink/telemetry_sink_skeleton_test.gd
+        - test_opt_in_default_is_false_per_cozy_register (happy +
+          taxonomy-spec-default invariant — covers the boot state)
+        - implicit happy/edge via every set_opt_in test (5+ assert
+          chains read is_opt_in() to verify the setter took effect).
+    * get_save_data:
+      tests/unit/telemetry_sink/telemetry_sink_skeleton_test.gd
+        - test_get_save_data_returns_telemetry_opt_in_field (happy —
+          asserts dict shape with telemetry_opt_in field present and
+          value matches set_opt_in(true) effect).
+        - test_save_load_round_trip_preserves_opt_in_state (happy +
+          serialization-stability edge — guards against silent shape
+          drift across the get→load round-trip).
+    * load_save_data:
+      tests/unit/telemetry_sink/telemetry_sink_skeleton_test.gd
+        - test_load_save_data_restores_opt_in_true (happy — explicit
+          field load).
+        - test_load_save_data_missing_field_defaults_false (edge —
+          pre-V1 save migration path; missing-field defaults to OFF
+          per taxonomy doc §C.1 opt-in-default-OFF invariant — the
+          load-bearing privacy guarantee).
+        - test_save_load_round_trip_preserves_opt_in_state (happy
+          round-trip via mutation).
+- Test result:
+    tests/unit/telemetry_sink green —
+      26 cases / 0 errors / 0 failures / 175ms across 2 suites
+      (telemetry_sink_signal_handlers, telemetry_sink_skeleton).
+    tests/integration/telemetry_sink green —
+      4 cases / 0 errors / 0 failures / 22ms across 1 suite
+      (local_sink_round_trip).
+- New tests added: 0 (FR-6: existing coverage at-or-above bar — file
+  shipped Sprint 21 S21-N3 Stage 2 with comprehensive skeleton + handler
+  + integration test suites already in place; PRD note "Likely
+  passes:true after audit" confirmed).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-015 telemetry_sink | passes:true | new_tests_added:0 | notes:audit-only; 4 public funcs covered with happy+edge across 2 unit suites + 1 integration suite. Privacy-default-OFF invariant (taxonomy doc §C.1) protected by test_load_save_data_missing_field_defaults_false (pre-V1 migration path) + test_opt_in_default_is_false_per_cozy_register (boot state) — both load-bearing and present.
+
+**Learnings for future iterations:**
+- For settings autoloads with a single load-bearing privacy-default
+  invariant (TelemetrySink: opt_in defaults FALSE per taxonomy doc §C.1),
+  the audit predicate must verify TWO independent tests cover the
+  default: (a) boot-state default (test_opt_in_default_is_false_per_*)
+  AND (b) pre-V1-save migration default
+  (test_load_save_data_missing_field_defaults_false). A single test
+  asserting "default is false" is INSUFFICIENT — the load_save_data path
+  is a separate code path that could regress (e.g., if d.get default
+  changes from false → true). Both tests must be present and named
+  distinctly. Future audits of any "privacy-default-OFF" or "secure-
+  default" settings autoloads (any future PII-toggle, telemetry-tier
+  toggle, third-party-share toggle) must verify both legs.
+- Skeleton-test "Group E — set_opt_in is hot, no reboot required" is the
+  canonical pattern for runtime-toggle settings that cannot tolerate
+  cache staleness. test_opt_in_flip_takes_effect_without_reboot (3-state
+  off→on→off cycle) is the exemplar; it asserts the in-memory flag is
+  re-read per-event rather than cached at autoload boot. Mirrors the
+  pattern from set_reduce_motion in US-014 (idempotent-on-same-value
+  edge) but with a different invariant: there the concern is no-op-
+  preservation, here the concern is hot-flip-takes-effect. Future audits
+  of runtime-toggle settings should verify BOTH (a) no-op-on-same-value
+  and (b) hot-flip-without-reboot, since these protect against different
+  classes of bug (redundant-write thrash vs cached-stale-read).
+- Cross-file coverage pattern observed: set_opt_in is exercised in 3
+  tiers (skeleton unit, signal-handlers unit, local-sink-round-trip
+  integration) and that's intentional, not redundant. Skeleton tier
+  asserts the setter contract; signal-handlers tier asserts every event
+  handler short-circuits when set_opt_in(false); integration tier
+  asserts the JSONL filesystem append happens only when set_opt_in(true).
+  Future audits of "kill-switch" methods (any flag whose false-state
+  must short-circuit downstream effects) should expect this 3-tier shape
+  and not accept skeleton-tier coverage alone.
+
+---
+
+## 2026-05-10 — US-016 tick_system.gd
+
+- Audited 8 public funcs: now_ms, current_tick, get_last_persist_ts,
+  get_session_high_water, set_last_persist_ts, set_session_high_water,
+  set_ui_paused, bootstrap_offline_replay. Story note also calls out
+  _read_wall_clock_unix_time (private) for singleton-call-site invariant.
+- Coverage map (per-function):
+    * now_ms: process_delta_forbidden_wall_clock_single_call_site_test.gd
+        - test_now_ms_returns_zero_before_wall_clock_read (edge / cold-start)
+        - test_now_ms_returns_last_wall_ts_times_1000_after_read (happy)
+        - tick_system_autoload_skeleton_test.gd::test_tick_system_now_ms_returns_zero
+          (structural smoke)
+    * current_tick: 14 test files. integer_accumulator_tick_fired_emission_test.gd
+      asserts post-process non-zero increment (happy); skeleton zero-state (edge);
+      heartbeat_accumulator_test.gd asserts ticks-suppressed-but-heartbeat-fires
+      under set_ui_paused(true) (boundary).
+    * get_last_persist_ts: skeleton zero-state + Group A round-trip via this
+      iteration's new test (post-set returns the written value).
+    * get_session_high_water: skeleton zero-state + Group B round-trip via this
+      iteration's new test.
+    * set_last_persist_ts: skeleton "no-error smoke" + new round-trip + overwrite
+      + boundary-zero-after-nonzero edges.
+    * set_session_high_water: skeleton "no-error smoke" + new round-trip +
+      no-max-applied invariant (smaller-overwrites-larger; doc comment L327-329
+      pins this as caller-responsibility) + boundary-zero edge.
+    * set_ui_paused: heartbeat_accumulator_test.gd::test_*_paused (happy: heartbeat
+      continues, ticks suppressed); platform_notifications integration test
+      pause/unpause cycle (edge: residual preservation across pause window).
+    * bootstrap_offline_replay: offline_elapsed_formula_d2_clamp_rewind_overflow_test.gd
+      Test 7 first-launch happy + Test 8 process-scoped one-shot edge.
+    * _read_wall_clock_unix_time: process_delta_forbidden_wall_clock_single_call_site_test.gd
+      Test 2 (happy: returns plausible epoch + caches) + Test 3 (edge: successive
+      calls non-decreasing). Single-call-site invariant covered by INV-1 grep
+      guard at the source-file head + the test-file's namespace-discipline test.
+- Gap closed: tests/unit/tick_system/persist_ts_accessors_round_trip_test.gd (8 new tests):
+    * test_set_last_persist_ts_then_get_returns_same_value (happy)
+    * test_set_last_persist_ts_overwrites_previous_value_no_accumulation (last-writer)
+    * test_set_last_persist_ts_to_zero_after_nonzero_returns_zero (boundary)
+    * test_set_session_high_water_then_get_returns_same_value (happy)
+    * test_set_session_high_water_does_not_apply_max_smaller_overwrites_larger (invariant)
+    * test_set_session_high_water_to_zero_after_nonzero_returns_zero (boundary)
+    * test_set_last_persist_ts_does_not_affect_session_high_water (independence)
+    * test_set_session_high_water_does_not_affect_last_persist_ts (independence)
+- Test result: tests/unit/tick_system suite green —
+  63 cases / 0 errors / 0 failures / 640ms (was 55; +8 from new file).
+- New tests added: 8.
+- Files changed: tests/unit/tick_system/persist_ts_accessors_round_trip_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-016 tick_system | passes:true | new_tests_added:8 | notes:closed setter→getter round-trip + no-max-applied invariant gap on the persist-timestamp accessors. Skeleton's "no-error smoke" is necessary but insufficient evidence per FR-2.
+
+**Learnings for future iterations:**
+- Skeleton autoload test files (tick_system_autoload_skeleton_test.gd,
+  economy_autoload_skeleton_test.gd, etc.) commonly assert "completes
+  without error" for setters and "returns zero" for getters. That's
+  STRUCTURAL coverage — necessary to confirm the stub body doesn't
+  raise + the cold-start invariant — but per FR-2 ("happy-path test
+  asserting the documented return shape / behavior"), it does NOT
+  satisfy happy-path coverage on its own. For each setter/getter
+  pair on autoloads, future audits should ALSO look for a round-trip
+  test that asserts `set(X) → get() == X`. If only the skeleton tier
+  exists, that's a gap closeable with ~8-10 lines of new test.
+- Pinning a "negative invariant" (e.g., set_session_high_water DOES
+  NOT apply max(); set_last_persist_ts DOES NOT accumulate) in test
+  form is high-leverage. The doc comment can drift; the test fails
+  loudly and forces the comment update in the same patch. This is
+  the "test pins the invariant, doc comment annotates the why"
+  pattern — reuse for any caller-responsibility seam where the
+  body of the function is intentionally minimal.
+- Integration tests that read a private field (e.g.
+  platform_notifications test reads `ts._last_persist_unix` directly
+  rather than calling `ts.get_last_persist_ts()`) do NOT count as
+  public-getter coverage per FR-2. The audit predicate is "function
+  appears in test code with assert_* within ~5 lines" but the spirit
+  is "the public API surface is exercised". When a getter is bypassed
+  in favor of the private field, write a separate accessor test —
+  even 1-2 lines suffices to close the audit gap.
+
+---
+
+## 2026-05-10 — US-017 boot_namespace.gd
+
+- Audited 2 public funcs: get_namespace_bytes, get_boot_prefix_a. Both are
+  pure getters returning `duplicate()` of class-level `static var`
+  PackedByteArrays.
+- Coverage map BEFORE this iteration:
+    * Function names appeared only as ASCII reference comments in
+      tests/unit/save_load/xor_mask_derivation_test.gd:26 and
+      tests/unit/save_load/integrity_tag_derivation_test.gd:26.
+      Neither file calls the getter — they hand-construct the byte arrays
+      independently as reference paths. Per FR-2 ("function appears in test
+      code with an assert_* call within ~5 lines"), this is NOT coverage of
+      the public API surface; the SaveLoadSystem suites assert the byte
+      content via their own constants, not via a call to the getter.
+    * No prior tests/unit/boot_namespace/ directory existed.
+- Gap closed: tests/unit/boot_namespace/boot_namespace_test.gd (4 new tests):
+    * test_get_namespace_bytes_returns_documented_16_byte_ascii_salt (happy)
+    * test_get_namespace_bytes_returns_copy_so_mutation_does_not_poison_subsequent_calls (edge — duplicate invariant)
+    * test_get_boot_prefix_a_returns_documented_16_byte_ascii_fragment (happy)
+    * test_get_boot_prefix_a_returns_copy_so_mutation_does_not_poison_subsequent_calls (edge — duplicate invariant)
+- Test result: tests/unit/boot_namespace suite green —
+  4 cases / 0 errors / 0 failures / 22ms.
+- New tests added: 4.
+- Files changed: tests/unit/boot_namespace/boot_namespace_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-017 boot_namespace | passes:true | new_tests_added:4 | notes:closed full public-API gap; both 16-byte getters now have happy + duplicate-invariant edge coverage. Mutation-poisoning edge is the load-bearing one — without it, a future regression that drops the `.duplicate()` would silently let consumers mutate the shared static.
+
+**Learnings for future iterations:**
+- `const _NAME: PackedByteArray = PackedByteArray([...])` does NOT compile —
+  GDScript rejects `PackedByteArray(...)` constructor calls in constant
+  expressions (same restriction as the production `static var _GAME_NAMESPACE_BYTES`
+  in src/core/boot_namespace/boot_namespace.gd). Use `static var` in tests
+  too. The xor_mask_derivation_test.gd file also uses `static var` for the
+  same reason — that's the canonical precedent.
+- "Reference comments inside another test file" do NOT satisfy FR-2's audit
+  predicate. A pure getter still needs its own assert_*-bearing test, even
+  if downstream consumers' reference paths reproduce the byte content. This
+  is the first US-NNN where the gap was "audited as covered by adjacent
+  comment text but actually not covered at all" — the audit predicate is
+  "assert_* within 5 lines of the function NAME APPEARING IN TEST CODE",
+  not "the byte content shows up somewhere".
+- The `duplicate()` invariant is the single load-bearing invariant of
+  these getters. Without the edge-case "mutate result, re-call, confirm
+  unchanged" assertion, a refactor that drops `.duplicate()` would pass
+  the happy-path test (first call still returns correct bytes) but
+  silently let the next consumer poison the shared static. This pattern
+  generalizes to ANY pure getter that returns a mutable container
+  (PackedByteArray, Array, Dictionary, etc.) — assert the duplicate
+  invariant, not just the happy-path content.
+
+---
+
+## 2026-05-10 — US-018 engine_bootstrap.gd
+
+- Audited 3 public funcs: get_boot_prefix_b, get_current_build_version_string,
+  get_prior_build_version_string. Two are pure-const String getters; one
+  returns `_BOOT_PREFIX_B.duplicate()` of a class-level static
+  PackedByteArray (parallel shape to BootNamespace per US-017).
+- Coverage map BEFORE this iteration:
+    * `EngineBootstrap` symbol referenced in only 1 location:
+      tests/unit/save_load/integrity_tag_derivation_test.gd:32 — and that's a
+      reference-comment ("PART_B from EngineBootstrap._BOOT_PREFIX_B") with no
+      method call and no assert_*. Per FR-2, that is NOT coverage of the
+      public API surface.
+    * No prior tests/unit/engine_bootstrap/ directory existed.
+    * The 3 getter names (get_boot_prefix_b, get_current_build_version_string,
+      get_prior_build_version_string) appear ZERO times in tests/.
+- Gap closed: tests/unit/engine_bootstrap/engine_bootstrap_test.gd (6 new tests):
+    * test_get_boot_prefix_b_returns_documented_16_byte_ascii_fragment (happy)
+    * test_get_boot_prefix_b_returns_copy_so_mutation_does_not_poison_subsequent_calls (edge — duplicate invariant)
+    * test_get_current_build_version_string_returns_documented_compile_time_const (happy)
+    * test_get_current_build_version_string_is_non_empty_and_matches_const_table (edge — non-empty + idempotency)
+    * test_get_prior_build_version_string_returns_documented_compile_time_const (happy)
+    * test_get_prior_build_version_string_is_non_empty_and_matches_const_table (edge — non-empty + idempotency)
+- Test result: tests/unit/engine_bootstrap suite green —
+  6 cases / 0 errors / 0 failures / 35ms.
+- New tests added: 6.
+- Files changed: tests/unit/engine_bootstrap/engine_bootstrap_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-018 engine_bootstrap | passes:true | new_tests_added:6 | notes:closed full public-API gap on all 3 getters; PackedByteArray getter has duplicate-invariant edge; both String getters have non-empty + idempotent edges. Per ADR-0004 §Forbidden Patterns the version strings MUST stay compile-time const — these tests pin the documented values so any drift surfaces in CI.
+
+**Learnings for future iterations:**
+- `EngineBootstrap` (US-018) and `BootNamespace` (US-017) are structurally
+  identical Foundation autoloads — both expose pure getters of class-level
+  static `PackedByteArray` plus (in EngineBootstrap's case) two const String
+  getters. The test-pattern transferred 1:1 from boot_namespace_test.gd:
+  parallel `_get_<autoload>()` accessor → group-A happy + duplicate-invariant
+  edge → optional groups for any extra getters. Reusable template for any
+  future pure-getter autoload audit.
+- For pure-const String getters (return CONST_NAME), the load-bearing edge
+  case is "non-empty + idempotent across calls" rather than "negative
+  invariant" or "boundary value". The function body has no branches —
+  what we're really pinning is "the documented const value still matches
+  the const declaration" so a refactor that swaps in a runtime-overridable
+  source (which would violate ADR-0004 §Forbidden Patterns) gets caught.
+  Two-call idempotency suffices: a runtime-mutable source would diverge
+  between calls within a single test.
+- Reference-comment-only mentions of an autoload class name (e.g.,
+  "EngineBootstrap._BOOT_PREFIX_B" inside a reference-path constants block
+  in another suite) do NOT count as coverage even if the byte values match.
+  The audit predicate is "function NAME appears in test code with assert_*
+  within 5 lines", not "the autoload's class name shows up". This is the
+  same pattern as US-017 (BootNamespace had reference comments in
+  xor_mask_derivation_test.gd:26 / integrity_tag_derivation_test.gd:26
+  with no actual call) — Foundation autoloads consumed by SaveLoadSystem
+  tend to ship with reference-path duplications in downstream suites that
+  look like coverage but aren't.
+
+---
+
+## 2026-05-10 — US-019 runtime_locale_guard.gd
+
+- Audited 1 public func: get_locale_tail. Returns
+  `_LOCALE_TAIL.duplicate()` of a class-level static PackedByteArray.
+  Structurally identical to BootNamespace.get_namespace_bytes /
+  get_boot_prefix_a (US-017) and EngineBootstrap.get_boot_prefix_b (US-018).
+- Coverage map BEFORE this iteration:
+    * `RuntimeLocaleGuard` symbol referenced in only 1 location:
+      tests/unit/save_load/integrity_tag_derivation_test.gd:38 — and that's a
+      reference-comment ("PART_C from RuntimeLocaleGuard._LOCALE_TAIL") with no
+      method call and no assert_*. Per FR-2, that is NOT coverage of the
+      public API surface (third consecutive Foundation-autoload story where
+      the only mention is a reference-path duplication).
+    * No prior tests/unit/runtime_locale_guard/ directory existed.
+    * The getter name (get_locale_tail) appears ZERO times in tests/.
+- Gap closed: tests/unit/runtime_locale_guard/runtime_locale_guard_test.gd
+  (2 new tests):
+    * test_get_locale_tail_returns_documented_16_byte_ascii_fragment (happy)
+    * test_get_locale_tail_returns_copy_so_mutation_does_not_poison_subsequent_calls (edge — duplicate invariant)
+- Test result: tests/unit/runtime_locale_guard suite green —
+  2 cases / 0 errors / 0 failures / 8ms.
+- New tests added: 2.
+- Files changed: tests/unit/runtime_locale_guard/runtime_locale_guard_test.gd (new),
+  production/epics/test-coverage-backfill/progress.txt.
+- Status: US-019 runtime_locale_guard | passes:true | new_tests_added:2 | notes:closed full public-API gap on the single getter; 16-byte length + ASCII content (RuntimeL/ocaleTlR) + duplicate-invariant edge all pinned. Per ADR-0004 §HMAC key derivation this fragment is the third input block in SaveLoadSystem's three-way integrity-tag assembly — the reference-path constant in integrity_tag_derivation_test.gd now has its source-of-truth assertion site.
+
+**Learnings for future iterations:**
+- US-017 → US-018 → US-019 form a structurally-identical Foundation-autoload
+  trio (BootNamespace, EngineBootstrap, RuntimeLocaleGuard), each consumed by
+  SaveLoadSystem's integrity-tag pipeline as the A/B/C three-way fragments.
+  The test-pattern transferred 1:1 across all three — `_get_<autoload>()`
+  accessor + `static var _EXPECTED_<NAME>: PackedByteArray = PackedByteArray([...])`
+  + group-A happy + duplicate-invariant edge. Future Foundation-autoload
+  audits with pure pure-getter shapes can reuse the same template verbatim.
+- Cumulative pattern across the trio: each autoload's class name appears
+  exactly once in the SaveLoadSystem reference suites as a comment
+  ("PART_<X> from <Autoload>._<CONST>"), but the getter call itself appears
+  ZERO times. SaveLoadSystem's downstream suites carry their own
+  hand-constructed reference paths, which is correct (decouples
+  derivation-path tests from autoload-state) but means the autoload's
+  public-API surface stays uncovered until a dedicated US-NNN closes it.
+  This is now confirmed across 3/3 of the integrity-tag-input autoloads —
+  generalize to ANY autoload-consumed-by-SaveLoadSystem audit going forward.
+
+---
+
+## 2026-05-10 — US-020 scene_manager/main_root.gd
+
+- Audited public-function surface: `grep -nE "^func [a-z]" src/core/scene_manager/main_root.gd`
+  returns ZERO matches. Both methods (`_ready`, `_bootstrap_save_load_and_offline_replay`)
+  are underscore-prefixed (lifecycle / private helper). Per FR-1 audit predicate,
+  there is no public-method surface to cover.
+- Per FR-7 the file would be EXEMPT ("no testable public surface"), BUT the
+  file's _ready() lifecycle carries load-bearing behavior (Story 005b boot
+  wiring: SaveLoadSystem.request_full_load("boot") → TickSystem.bootstrap_offline_replay()
+  in locked order, with parent-pointer test-fixture isolation guard). That
+  behavior is already comprehensively covered by:
+    * tests/integration/scene_manager/mainroot_boot_wiring_test.gd — 5 cases:
+        - test_mainroot_under_test_parent_skips_boot_wiring (edge: parent != /root guard)
+        - test_mainroot_under_root_invokes_request_full_load_then_bootstrap_offline_replay (happy: production path)
+        - test_mainroot_under_root_first_launch_emits_full_signal_sequence (happy: cold-launch signal chain)
+        - test_mainroot_under_root_call_order_load_before_bootstrap_offline_replay (happy: locked ordering invariant)
+        - test_mainroot_under_root_double_ready_is_safe_idempotent (edge: idempotency under double-_ready)
+    * tests/integration/scene_manager/mainroot_scene_composition_test.gd — 18 cases
+      covering canvas-layer ordering, process-mode invariants, theme loading,
+      and project.godot main_scene wiring.
+- Test result: tests/integration/scene_manager/mainroot_boot_wiring_test.gd
+  green — 5 cases / 0 errors / 0 failures / 107ms.
+- New tests added: 0 (FR-7 exemption + FR-6 existing coverage above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-020 main_root | passes:true | new_tests_added:0 | notes:audit-only; zero public-method surface (FR-7 exemption), but lifecycle _ready() boot-wiring and scene composition fully covered by existing 5+18=23 integration tests. EPIC's expectation ("existing mainroot_boot_wiring_test.gd covers this; expect passes:true") confirmed.
+
+**Learnings for future iterations:**
+- US-020 is the first story in the epic where the source file has ZERO public
+  functions but DOES have load-bearing lifecycle behavior. The audit predicate
+  `^func [a-z]` correctly returns zero matches → FR-7 exemption applies on
+  paper, but the conscientious read is "lifecycle behavior is the file's
+  contract, even though it lives in `_ready()`". Future audits of similar
+  scene-script files (any .gd with only `_ready` / `_process` / `_input` / etc.)
+  should still verify integration coverage exists for the lifecycle behavior
+  before closing as `passes:true` — the exemption is technically correct but
+  the spirit of the epic is "behavioral coverage exists".
+- The double-_ready idempotency test
+  (test_mainroot_under_root_double_ready_is_safe_idempotent) emits a documented
+  push_warning ("state=2 not UNLOADED — load trigger ignored") because
+  SaveLoadSystem rejects re-loads after the first cold-boot. That warning is
+  EXPECTED — the test is exercising the documented "subsequent invocations
+  are no-ops" contract from main_root.gd:53. Future test runs that surface
+  this warning in the integration/scene_manager suite should NOT treat it as
+  a regression.
+- Distinct from US-017/018/019 (Foundation autoloads with pure getters): those
+  three needed dedicated test files because the autoload's getter API was the
+  contract. MainRoot is a Control-extending scene root with no API — its
+  contract IS the lifecycle method, which by Godot convention starts with `_`.
+  This is the natural shape for any scene-root .gd file and the FR-1 predicate
+  handles it cleanly via FR-7.
+
+---
+
+## 2026-05-10 — US-021 combat/combat_resolver.gd
+
+- Audited public-function surface: `grep -nE "^func " src/core/combat/combat_resolver.gd`
+  returns ZERO matches. The file is a deliberate "interface by convention" base
+  class (Godot 4 lacks `@abstract` on RefCounted per file-header doc-comment);
+  zero `func`, zero `var`, zero `signal` declarations. Concrete subclasses
+  (DefaultCombatResolver in Story 003, test spies) override the two virtual
+  entry points (`emit_events_in_range`, `compute_offline_batch`).
+- Per FR-7 the file is EXEMPT (no testable public surface), BUT the structural
+  contract IS load-bearing (TR-combat-001 + TR-027: stateless invariant; TR-030:
+  no signal emission — orchestrator owns emission). That contract is
+  comprehensively covered by:
+    * tests/unit/combat_resolution/value_types_and_equals_test.gd Group A —
+      5 cases:
+        - test_combat_resolver_can_be_instantiated_via_new (happy: RefCounted.new())
+        - test_combat_resolver_is_refcounted_not_resource (RefCounted-not-Resource invariant)
+        - test_combat_resolver_class_name_resolves (class_name binding)
+        - test_combat_resolver_source_has_zero_class_scope_vars (TR-001/027 stateless)
+        - test_combat_resolver_source_has_zero_signal_declarations (TR-030 no-signal)
+    * Concrete subclass tests (DefaultCombatResolver) cover the two virtual
+      entry points: dps_and_hp_formulas_test.gd (21 references), cooldown_formula_test.gd, etc.
+- Test result: tests/unit/combat_resolution/value_types_and_equals_test.gd suite
+  green — 28 cases / 0 errors / 0 failures / 193ms.
+- New tests added: 0 (FR-7 exemption + FR-6 existing structural-invariant coverage above bar).
+- Files changed: production/epics/test-coverage-backfill/progress.txt only.
+- Status: US-021 combat_resolver | passes:true | new_tests_added:0 | notes:audit-only; zero-public-surface "interface by convention" base (FR-7 exemption); structural invariants (RefCounted, stateless, no-signal) covered by 5 dedicated Group A cases in value_types_and_equals_test.gd + virtual entry points covered transitively via DefaultCombatResolver tests. EPIC's expectation ("Likely abstract base — may mark `passes: true` with 'covered via DefaultCombatResolver tests'") confirmed.
+
+**Learnings for future iterations:**
+- US-021 is the SECOND zero-public-function story in a row (after US-020
+  main_root.gd), but with a different shape: main_root has private lifecycle
+  methods (`_ready` etc.); combat_resolver has LITERALLY ZERO `func`
+  declarations of any kind. The file is "interface by convention" — Godot 4
+  doesn't support `@abstract` on RefCounted, so the abstract-base contract is
+  enforced via (a) doc-comments, (b) structural CI lint pattern (Story 010 of
+  combat-resolution epic), and (c) source-content assertion tests that re-read
+  the file and grep for `var ` / `signal ` lines.
+- The "source-content assertion test" pattern
+  (test_combat_resolver_source_has_zero_class_scope_vars) is a reusable
+  technique for any file where the contract is structural (no var, no signal,
+  no super() call, etc.) rather than behavioral. It uses FileAccess.open()
+  + line-by-line trim + .begins_with() check. Future audits of similar
+  abstract-base interfaces (US-023 matchup_resolver/matchup_resolver.gd is
+  the next likely candidate) should expect the same pattern and accept it as
+  full coverage of the structural contract.
+- The audit predicate `grep -nE "^func "` (no character class) is broader
+  than `grep -nE "^func [a-z]"` (public-only) — for files that legitimately
+  have zero functions of ANY kind, the broader predicate confirms the
+  zero-surface state more decisively. Use the broader form when initial
+  audit returns zero matches, to distinguish "all-private file with no
+  public API" from "literally-zero-function abstract base".
+
+---
