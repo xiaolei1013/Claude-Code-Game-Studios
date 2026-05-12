@@ -120,14 +120,21 @@ func commit(new_formation: Array[HeroInstance]) -> void:
 		return
 
 	# Step 2: write to HeroRoster.set_formation_slot per slot index.
-	# Single-writer enforcement per §C.5: this is the ONLY production caller
-	# of HeroRoster.set_formation_slot outside HeroRoster's own internal use.
+	# Single-writer enforcement per §C.5. AC-FA-08: abort on first
+	# set_formation_slot false return (unknown hero_id); leaves HeroRoster
+	# in a partial-write state for the screen to re-query.
 	for slot_index: int in range(formation_size):
 		var hero: HeroInstance = new_formation[slot_index]
 		var hero_id: int = 0  # 0 = empty slot per HeroRoster._formation_slots convention
 		if hero != null:
 			hero_id = hero.instance_id
-		roster.call("set_formation_slot", slot_index, hero_id)
+		var ok: bool = roster.call("set_formation_slot", slot_index, hero_id)
+		if not ok:
+			push_error(
+				"FormationAssignment.commit: set_formation_slot rejected slot %d hero_id %d — aborting; no further writes; no signal emit"
+				% [slot_index, hero_id]
+			)
+			return
 
 	# Step 3: emit the write-intent signal AFTER all writes complete.
 	# Subscribers see HeroRoster in its post-mutation state.
