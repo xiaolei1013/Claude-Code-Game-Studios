@@ -170,10 +170,11 @@ func test_run_end_to_main_menu_transition_routes_on_run_ended() -> void:
 	while SceneManager._queued_request.is_empty() and Time.get_ticks_msec() < poll_deadline_ms:
 		await get_tree().process_frame
 
-	# Assert (b): request_screen queued "main_menu" with CROSS_FADE.
-	# This is direct proof that request_screen was called with the right arguments.
+	# Assert (b): request_screen queued "victory_moment" with CROSS_FADE —
+	# the AC is "auto-route on RUN_ENDED to the post-run screen"; the file
+	# name keeps "main_menu" for git-history continuity.
 	assert_bool(SceneManager._queued_request.is_empty()).is_false()
-	assert_str(SceneManager._queued_request.get("screen_id", "")).is_equal("main_menu")
+	assert_str(SceneManager._queued_request.get("screen_id", "")).is_equal("victory_moment")
 	assert_int(SceneManager._queued_request.get("transition", -1)).is_equal(
 		SceneManager.TransitionType.CROSS_FADE
 	)
@@ -238,7 +239,7 @@ func test_run_end_to_main_menu_transition_idempotent_on_repeated_run_ended() -> 
 	# _routed is checked BEFORE request_screen, the second emission returns early and
 	# _queued_request is set exactly once. Verify it still holds "main_menu".
 	assert_bool(SceneManager._queued_request.is_empty()).is_false()
-	assert_str(SceneManager._queued_request.get("screen_id", "")).is_equal("main_menu")
+	assert_str(SceneManager._queued_request.get("screen_id", "")).is_equal("victory_moment")
 
 	# Cleanup
 	if screen.has_method("on_exit"):
