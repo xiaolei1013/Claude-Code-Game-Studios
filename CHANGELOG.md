@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.10] - 2026-05-13
+
+### Changed
+- **Sprint 13 audit + scaffold archival** — Sprint 13 (real-time-authored 2026-05-13) Day 0 audit found 5 of 12 stories already shipped pre-emptively during the 2026-05-06 → 2026-05-09 autonomous-execution window: S13-M1 (audio sourcing decision via ADR-0016 silent-MVP), S13-M2 (Return-to-App Screen 282-line implementation + integration test + locale + OfflineProgressionEngine routing), S13-S1 (OE Story 10 E2E budget verification test, 411 lines), S13-S3 (HeroLeveling real XP curve via HeroRoster.add_xp + Orchestrator.xp_per_floor_clear / xp_per_kill data-driven from EconomyConfig), S13-N2 (tests/PATTERNS.md, 460 lines). Sprint plan + sprint-status.yaml updated to reflect these as DONE pre-emptive. S13-M4 (Hero Detail overlay) and S13-S2 (Settings overlay) deferred to Sprint 14 pending UX pass — both have placeholder overlay files at the SceneManager-registered paths plus pre-emptive real implementations that aren't wired to player-reachable surfaces yet. S13-M3 (Story 016 AC-9 close-reload manual smoke) remains the one outstanding human-gated Must Have.
+- **Sprint 14-21 pre-emptive scaffolds archived** to `production/sprints/archive/` per S13-S4. The `PRE-EMPTIVE-CADENCE-RETIRED.md` README at the sprints root (authored 2026-05-09 by Sprint 21 S21-S3 retirement work) documents the cadence retirement decision and the lessons that motivated it. Sprint 14+ planning uses real-time `/sprint-plan` invocation exclusively.
+
+### Notes
+- **Audit lesson captured** — Future real-time sprint planning should run a "what's already shipped" sweep against the proposed scope before finalizing Must Haves. The 2026-05-13 Sprint 13 plan was authored against the written spec, not the current code state — 5 of 12 stories turned out to be already-done. Pattern is the inverse mirror of the previously-captured `project_feature_exists_never_wired.md` memory: in this case, features exist AND are wired, but the planner didn't realize during scoping.
+- **Sprint 13 effective state**: 9 of 12 stories closed (M1, M2, M3 skipped pending human session, S1, S2 deferred, S3, S4, M4 deferred, N1 gated, N2, N3 gated, N4 end-of-sprint). The substantive autonomous-doable work is complete; the remaining 3 are human-gated or blocked on UX passes.
+
 ## [0.0.0.9] - 2026-05-13
 
 ### Added
