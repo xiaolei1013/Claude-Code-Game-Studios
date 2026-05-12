@@ -68,6 +68,9 @@ func _seed_run_snapshot(
 	var snap: RunSnapshot = RunSnapshotScript.new()
 	snap.kill_count = kill_count
 	snap.pre_dispatch_gold = pre_gold
+	# floor_id format must match orchestrator.gd's _build_run_snapshot —
+	# Victory Moment parses it back out to get floor_index + biome_id.
+	snap.floor_id = "%s_floor_%d" % [biome_id, floor_index]
 	snap.formation_snapshot = {
 		"instance_ids": [],
 		"heroes": formation_heroes,

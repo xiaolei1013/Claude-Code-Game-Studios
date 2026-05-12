@@ -92,6 +92,11 @@ const LEVEL_UP_TOAST_FADE_START_SEC: float = 2.4
 ## Live kill count label — value updated per tick in _on_tick_fired.
 @onready var _kill_count_label: Label = $StatsPanel/KillCountRow/KillCountLabel
 
+## Hidden when the run-end overlay is shown — both panels are anchored at
+## center 50% so without hiding, the live tick/kill labels render through
+## the overlay's transparent PanelContainer background.
+@onready var _stats_panel: VBoxContainer = $StatsPanel
+
 ## Run-end overlay container. Hidden by default; shown when state → RUN_ENDED.
 @onready var _run_end_overlay: Control = $RunEndOverlay
 
@@ -304,8 +309,7 @@ func _on_state_changed(new_state: int, _old_state: int) -> void:
 	if RUN_END_DWELL_MS > 0:
 		await get_tree().create_timer(RUN_END_DWELL_MS / 1000.0).timeout
 
-	# AC-1 / AC-7 Story 013: sole screen-change call — request_screen API only.
-	SceneManager.request_screen("main_menu", SceneManager.TransitionType.CROSS_FADE)
+	SceneManager.request_screen("victory_moment", SceneManager.TransitionType.CROSS_FADE)
 
 
 # ---------------------------------------------------------------------------
@@ -412,4 +416,6 @@ func _show_run_end_overlay(final_kill_count: int) -> void:
 	_run_end_label.text = UIFrameworkScript.format_localized(
 		"run_complete_kill_count_format", [final_kill_count]
 	)
+	if _stats_panel != null:
+		_stats_panel.visible = false
 	_run_end_overlay.visible = true

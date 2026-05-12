@@ -224,7 +224,34 @@ func _ready() -> void:
 	if _config == null:
 		push_error("Economy._ready: failed to resolve EconomyConfig from DataRegistry. " +
 			"DataRegistry should already be in ERROR state if config is missing.")
+	# First-launch gold seed wiring per Onboarding GDD #29 §C.1 + §D.1 +
+	# AC-29-03. Cross-autoload subscription is safe at _ready() per ADR-0003
+	# §Signal Subscription rule. On returning-launch, load_save_data runs
+	# before first_launch fires, so the persisted balance is preserved.
+	if has_node("/root/SaveLoadSystem"):
+		var sl: Node = get_node("/root/SaveLoadSystem")
+		if sl.has_signal("first_launch") and not sl.first_launch.is_connected(_on_first_launch):
+			sl.first_launch.connect(_on_first_launch)
 	# Tick subscription lands in Story 006.
+
+
+## Seeds [member _gold_balance] to [member EconomyConfig.STARTING_GOLD] on
+## first-launch. Wired by [method _ready] subscribing to
+## [signal SaveLoadSystem.first_launch]. Per Onboarding GDD #29 §C.1 + §D.1 +
+## AC-29-03. Lifetime gold stays at 0 — the starting gift is not "earned".
+func _on_first_launch() -> void:
+	if _config == null:
+		push_error(
+			"Economy._on_first_launch: _config is null — cannot seed STARTING_GOLD. "
+			+ "DataRegistry should already be in ERROR state."
+		)
+		return
+	_gold_balance = _config.STARTING_GOLD
+	# Guard required by tests/unit/offline_progression_engine/offline_forbidden_patterns_ci_grep_test.gd —
+	# semantically unreachable since first_launch and offline replay are
+	# mutually exclusive, but the CI grep enforces uniform emit guarding.
+	if not _is_offline_replay:
+		gold_changed.emit(_gold_balance, _config.STARTING_GOLD, "first_launch_seed")
 
 # ---------------------------------------------------------------------------
 # Public API — write methods

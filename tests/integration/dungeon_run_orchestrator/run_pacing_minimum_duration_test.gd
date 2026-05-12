@@ -210,7 +210,7 @@ func test_run_pacing_total_wall_clock_at_least_1500ms_with_dwell() -> void:
 
 	# Assert — the queue contains "main_menu" (the dwell did its job, then routed).
 	assert_bool(SceneManager._queued_request.is_empty()).is_false()
-	assert_str(SceneManager._queued_request.get("screen_id", "")).is_equal("main_menu")
+	assert_str(SceneManager._queued_request.get("screen_id", "")).is_equal("victory_moment")
 
 	# Cleanup
 	if screen.has_method("on_exit"):
@@ -313,7 +313,7 @@ func test_run_pacing_idempotency_holds_during_dwell_window() -> void:
 	# push_warning from SceneManager's queue-overwrite guard (queue depth max 1).
 	# The queue should hold "main_menu" (the first call's target).
 	assert_bool(SceneManager._queued_request.is_empty()).is_false()
-	assert_str(SceneManager._queued_request.get("screen_id", "")).is_equal("main_menu")
+	assert_str(SceneManager._queued_request.get("screen_id", "")).is_equal("victory_moment")
 	assert_int(SceneManager._queued_request.get("transition", -1)).is_equal(
 		SceneManager.TransitionType.CROSS_FADE
 	)
@@ -423,7 +423,7 @@ func test_run_pacing_fast_path_dwell_holds_when_run_ended_at_on_enter() -> void:
 
 	# Assert — the queue contains "main_menu" (route fired after the dwell).
 	assert_bool(SceneManager._queued_request.is_empty()).is_false()
-	assert_str(SceneManager._queued_request.get("screen_id", "")).is_equal("main_menu")
+	assert_str(SceneManager._queued_request.get("screen_id", "")).is_equal("victory_moment")
 
 	# Cleanup
 	if screen.has_method("on_exit"):

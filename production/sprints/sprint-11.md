@@ -780,3 +780,60 @@ The original Sprint 11 Must Have. Pre-flight investigation found that **`SaveLoa
 **Sprint 11 progress after S11-M4**: 23 commits this session (this commit). Sprint 11: **4/4 Must Haves DONE** + 2/5 Should Haves + 13 bonus stories. Story 016 status flips from BLOCKED → COMPLETE-WITH-NOTES (AC-1/3/5/6 + tamper covered; AC-2 superseded; AC-4/7/8/9 deferred to Sprint 11 S11-S5 + Sprint 12+ Story 015 per scope handoff above).
 
 **The original Sprint 11 sprint goal is met**: a player can dispatch → clear floor 1 → close the game → reopen and resume with the same hero levels + gold + run state. The integration test exercises exactly this round-trip via the JSON.stringify(get_save_data()) byte-equality check across all 7 consumers. Manual-build verification (S11-S5 re-playtest) remains as the last live-confirm step.
+
+---
+
+## Status Update — 2026-05-12 (via `/sprint-plan update`)
+
+**Sprint 11 effectively closed.** Sprint window opens 2026-05-16 nominal but the entire Must-Have scope and most of the planned Should-Have scope was executed pre-emptively on 2026-05-05 via autonomous-execution session. This update captures the final disposition of every Sprint 11 task so `production/sprint-status.yaml` flips to Sprint 11 and Sprint 12 has a clean handoff.
+
+### Final task dispositions
+
+| ID | Task | Status | Notes |
+|----|------|--------|-------|
+| S11-M1 | Story 008 — `scene_boundary_persist` emission | **DONE** 2026-05-05 | Closure note above (line 126) |
+| S11-M2 | Story 011 — TickSystem heartbeat accumulator | **DONE** 2026-05-05 (split into M2a + M2b) | Closure notes (lines 151, 251) |
+| S11-M3 | Story 012 — `_on_scene_boundary_persist` body | **DONE** 2026-05-05 (incl. M3b doc clarification, M3c orchestrator consumer surface) | Closure notes (lines 260, 280, 286) |
+| S11-M4 | Story 016 — end-to-end save-persist pipeline + integration test | **DONE WITH NOTES** 2026-05-05 | Closure note (line 738); AC-2 superseded, AC-4/7/8/9 deferred to S11-S5 + Sprint 12 Story 015 per scope handoff |
+| S11-S1 | Story 009 — reduce_motion + offline-replay modal | **CARRY-FORWARD** | Re-scoped as Sprint 12 **S12-S2** |
+| S11-S2 | AudioRouter autoload skeleton + bus layout + ADR-0003 amendment | **DONE** 2026-05-05 | Closure note (line 177) |
+| S11-S3 | (Original scope: Volume API + Settings round-trip) → Final scope: AudioRouter `CONSUMER_PATHS` registration + AC-AS-09 round-trip | **DONE** 2026-05-05 with scope mutation | Closure note (line 604); Volume API + Settings persistence portion is now Sprint 12 audio scope |
+| S11-S4 | Signal subscriptions (state_changed, enemy_killed, etc.) + UI tap chime via UIFramework hook | **CARRY-FORWARD** | Folded into Sprint 12 audio Must-Have (per `sprint-12.md` S12-M? audio scope; verify in Sprint 12 plan) |
+| S11-S5 | Re-playtest with persisted save (Story 016 AC-9) | **CARRY-FORWARD** | Re-scoped as Sprint 12 **S12-S1** |
+| S11-N1 | Audio Music/Ambient crossfade + biome-bed swap | **DEFERRED** | Sprint 12+ audio expansion (no carry-forward ID assigned yet) |
+| S11-N2 | Audio Music/Stinger duck envelope + reward fanfare | **DEFERRED** | Sprint 12+ audio expansion (no carry-forward ID assigned yet) |
+| S11-N3 | Audio asset placeholder commit (silent .ogg/.wav stubs) | **CARRY-FORWARD** | Re-scoped as Sprint 12 **S12-S5** |
+
+### Bonus pre-emptive work shipped during Sprint 11 execution
+
+The 2026-05-05 autonomous-execution session also shipped these stories that were NOT in the original Sprint 11 plan. They appear in the closure notes above:
+
+- **Story 007a** — `request_full_persist` happy-path orchestration body (line 209)
+- **S11-X1** — FloorUnlockSystem implementation (line 320)
+- **S11-X2** — FormationAssignment System GDD authoring (line 366)
+- **S11-X3** — Recruitment System GDD authoring (line 398)
+- **S11-X4** — OfflineProgressionEngine GDD authoring (line 435)
+- **S11-X5** — HeroRoster.get_copies_owned implementation (line 481)
+- **S11-X6** — Economy.flush_offline_signals + ADR-0013 Amendment #1 (line 512)
+- **S11-X7** — DungeonRunOrchestrator.flush_offline_signals (line 541)
+- **S11-X8** — ADR-0015 Recruitment Pool Determinism + Refresh Cadence (line 569)
+- **S11-X9** — FormationAssignment autoload skeleton (Sprint 12 Story 1 pre-emptive) (line 642)
+- **S11-X10** — Recruitment autoload skeleton (Sprint 12 Story 1 pre-emptive) (line 683)
+
+### Post-execution workstream (not part of Sprint 11)
+
+After Sprint 11 effectively closed, an independent **test coverage backfill** workstream ran via Ralph autonomous PRs (#48, #49). It shipped commits US-010 through US-035 backfilling unit-test coverage for 26 source files (locale_loader, recruitment, save_load_system, scene_manager, telemetry_sink, tick_system, boot_namespace, engine_bootstrap, runtime_locale_guard, main_root, combat_resolver, default_combat_resolver, matchup_resolver, default_matchup_resolver, biome, dungeon, floor, biome_dungeon_database, combat_config, combat_batch_result, combat_run_snapshot, combat_tick_events, kill_event, dungeon_run_state, run_snapshot, offline_progression_engine). This is hygiene work unrelated to Sprint 11's save-persist + audio scope.
+
+### Sprint 11 Definition of Done — verification
+
+- [x] All 4 Must Have tasks (S11-M1 through S11-M4) closed via closure notes with COMPLETE or COMPLETE WITH NOTES verdict — done 2026-05-05
+- [x] story-016 (save-persist end-to-end) status flipped from BLOCKED to COMPLETE-WITH-NOTES — done 2026-05-05
+- [x] Integration test verifies save-persist round trip — JSON.stringify byte-equality check across 7 consumers (S11-M4 closure note)
+- [x] At minimum S11-S2 + S11-S3 closed (audio MVP partial — autoload + consumer registration; signal subs deferred to Sprint 12)
+- [ ] S11-S5 re-playtest — **deferred to Sprint 12 S12-S1** (requires real Godot build session, not autonomous-doable)
+- [x] No S1 or S2 bugs in delivered features
+- [x] Code reviewed inline (Solo mode — no `/code-review` runs)
+- [x] Test suite at sprint close: 1116+ tests passing (per 2026-05-05 session close); current as of 2026-05-09: 1763/1763 PASS
+- [x] Sprint 11 closure note documents what shipped vs. deferred (this Status Update block)
+
+**Sprint 11 verdict**: **CLOSED WITH NOTES.** Save-persist workstream sprint goal met; audio MVP partially shipped (skeleton + consumer wiring); 11 bonus stories pulled forward into Sprint 11 window; re-playtest + offline modal + UI tap chime carried forward to Sprint 12 as S12-S1/S2 + S12 audio scope.

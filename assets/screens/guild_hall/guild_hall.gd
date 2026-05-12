@@ -14,6 +14,8 @@ extends Screen
 @onready var _dispatch_nav_button: Button = $DispatchNavButton
 @onready var _hall_nav_button: Button = $HallOfRetiredHeroesNavButton
 @onready var _toast_label: Label = $ToastLabel
+@onready var _gold_counter: Label = $GoldCounter
+@onready var _recruit_nav_button: Button = $RecruitNavButton
 
 # Prestige completion toast — fades over 4.0s matching the
 # formation_assignment + Recruitment toast pattern (GDD #21 §G).
@@ -27,6 +29,13 @@ func on_enter() -> void:
 		return
 	if not _dispatch_nav_button.pressed.is_connected(_on_dispatch_nav_pressed):
 		_dispatch_nav_button.pressed.connect(_on_dispatch_nav_pressed)
+
+	if _recruit_nav_button != null:
+		if not _recruit_nav_button.pressed.is_connected(_on_recruit_nav_pressed):
+			_recruit_nav_button.pressed.connect(_on_recruit_nav_pressed)
+	_refresh_gold_counter()
+	if not Economy.gold_changed.is_connected(_on_gold_changed):
+		Economy.gold_changed.connect(_on_gold_changed)
 
 	# Hall of Retired Heroes button: localized label + visibility gate +
 	# subscribe to prestige_completed_signal so a freshly-prestiged hero
@@ -43,6 +52,10 @@ func on_enter() -> void:
 func on_exit() -> void:
 	if _dispatch_nav_button != null and _dispatch_nav_button.pressed.is_connected(_on_dispatch_nav_pressed):
 		_dispatch_nav_button.pressed.disconnect(_on_dispatch_nav_pressed)
+	if _recruit_nav_button != null and _recruit_nav_button.pressed.is_connected(_on_recruit_nav_pressed):
+		_recruit_nav_button.pressed.disconnect(_on_recruit_nav_pressed)
+	if Economy.gold_changed.is_connected(_on_gold_changed):
+		Economy.gold_changed.disconnect(_on_gold_changed)
 	if _hall_nav_button != null and _hall_nav_button.pressed.is_connected(_on_hall_nav_pressed):
 		_hall_nav_button.pressed.disconnect(_on_hall_nav_pressed)
 	if HeroRoster.prestige_completed_signal.is_connected(_on_prestige_completed):
@@ -127,3 +140,28 @@ func _on_hall_nav_pressed() -> void:
 
 func _on_dispatch_nav_pressed() -> void:
 	SceneManager.request_screen("formation_assignment", SceneManager.TransitionType.CROSS_FADE)
+
+
+## Navigates to the recruitment screen.
+func _on_recruit_nav_pressed() -> void:
+	SceneManager.request_screen("recruitment", SceneManager.TransitionType.CROSS_FADE)
+
+
+## Refreshes the gold counter label against the live Economy balance.
+func _refresh_gold_counter() -> void:
+	if _gold_counter == null:
+		return
+	_set_gold_text(Economy.get_gold_balance())
+
+
+## Updates the gold counter label, guarding against redundant assignments
+## (Label.text setter marks the node dirty even on identical-value writes).
+func _set_gold_text(balance: int) -> void:
+	var formatted: String = "Gold: %d" % balance
+	if _gold_counter.text != formatted:
+		_gold_counter.text = formatted
+
+
+func _on_gold_changed(new_balance: int, _delta: int, _reason: String) -> void:
+	if _gold_counter != null:
+		_set_gold_text(new_balance)

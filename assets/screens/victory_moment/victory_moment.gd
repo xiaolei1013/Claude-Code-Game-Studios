@@ -94,8 +94,20 @@ func on_enter() -> void:
 		return
 
 	_kill_count = snapshot.kill_count
-	_floor_index = DungeonRunOrchestrator._dispatched_floor_index
-	_biome_id = DungeonRunOrchestrator._dispatched_biome_id
+	# Parse floor_index + biome_id from run_snapshot.floor_id rather than
+	# DungeonRunOrchestrator._dispatched_*, which _exit_active_foreground
+	# resets at the ACTIVE_FOREGROUND → RUN_ENDED transition (per the
+	# documented field contract at orchestrator.gd:249/:253). The snapshot
+	# survives the transition; floor_id format is "{biome_id}_floor_{N}".
+	var floor_id: String = snapshot.floor_id
+	_floor_index = 0
+	_biome_id = ""
+	var sep: int = floor_id.rfind("_floor_")
+	if sep != -1:
+		_biome_id = floor_id.substr(0, sep)
+		var idx_str: String = floor_id.substr(sep + 7)  # 7 = len("_floor_")
+		if idx_str.is_valid_int():
+			_floor_index = int(idx_str)
 
 	# Gold delta via run_snapshot.pre_dispatch_gold (S15-S4 ✓).
 	_gold_delta = Economy.get_gold_balance() - snapshot.pre_dispatch_gold
@@ -117,7 +129,11 @@ func on_enter() -> void:
 	# Render all panels.
 	_render_all()
 
-	# Wire DimBackdrop input for tap-to-continue.
+	# Tap-to-continue: root-level handler catches taps that CenterPanel would
+	# otherwise consume; DimBackdrop handler retained for tests that fire
+	# input directly at it.
+	if not gui_input.is_connected(_on_backdrop_input):
+		gui_input.connect(_on_backdrop_input)
 	if not _dim_backdrop.gui_input.is_connected(_on_backdrop_input):
 		_dim_backdrop.gui_input.connect(_on_backdrop_input)
 
@@ -131,6 +147,8 @@ func on_enter() -> void:
 
 
 func on_exit() -> void:
+	if gui_input.is_connected(_on_backdrop_input):
+		gui_input.disconnect(_on_backdrop_input)
 	if _dim_backdrop != null and _dim_backdrop.gui_input.is_connected(_on_backdrop_input):
 		_dim_backdrop.gui_input.disconnect(_on_backdrop_input)
 

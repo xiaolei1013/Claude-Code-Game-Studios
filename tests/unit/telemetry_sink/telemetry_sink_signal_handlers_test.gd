@@ -15,11 +15,19 @@
 #   E — run state-change handler dispatches both run_dispatched + run_completed
 #   F — sink dir override (test-isolation hygiene per memory
 #       `feedback_test_isolation_user_configfile`)
+#
+# Test isolation: this file injects fake heroes directly into the live
+# /root/HeroRoster autoload's _heroes dict. before_test/after_test wrap
+# every test in a full HeroRoster snapshot+restore via get_save_data /
+# load_save_data — needed because a save firing during the test window
+# would otherwise persist the injected hero into the player's save file.
+# Canonical isolation pattern: tests/integration/recruitment/recruitment_try_recruit_test.gd.
 extends GdUnitTestSuite
 
 const HeroInstanceScript = preload("res://src/core/hero_roster/hero_instance.gd")
 
 var _injected_hero_ids: Array[int] = []
+var _snapshot_hero_roster: Dictionary = {}
 
 
 # ---------------------------------------------------------------------------
@@ -56,13 +64,19 @@ func _make_hero(id: int, class_id: String) -> RefCounted:
 
 func before_test() -> void:
 	_reset_sink()
+	var roster: Node = get_tree().root.get_node_or_null("HeroRoster")
+	_snapshot_hero_roster = roster.get_save_data() if roster != null else {}
 
 
 func after_test() -> void:
 	_reset_sink()
+	# erase_by_id covers the no-HeroRoster test-env case where snapshot is empty.
 	for id: int in _injected_hero_ids:
 		HeroRoster._heroes.erase(id)
 	_injected_hero_ids.clear()
+	var roster: Node = get_tree().root.get_node_or_null("HeroRoster")
+	if roster != null and not _snapshot_hero_roster.is_empty():
+		roster.load_save_data(_snapshot_hero_roster)
 
 
 # Helper to fetch the last event of a given type from the spy log.

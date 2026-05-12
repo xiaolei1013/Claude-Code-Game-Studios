@@ -78,6 +78,7 @@ var _synergy_badge_tween: Tween = null
 @onready var _dispatch_button: Button = $DispatchButton
 @onready var _toast_label: Label = $ToastLabel
 @onready var _synergy_badge: Label = $SynergyBadge
+@onready var _back_button: Button = $BackButton
 
 # ---------------------------------------------------------------------------
 # Built-in lifecycle (_ready — tap-target enforcement)
@@ -92,10 +93,19 @@ func _ready() -> void:
 	# Key: formation_assignment_instructional_header → "Send your guild to:"
 	_header_label.text = tr("formation_assignment_instructional_header")
 
-	# Floor context label: surface the current target floor name so the player
-	# can see where they are dispatching without pressing the floor button.
-	# Key: floor_label_forest_reach_1 → "Forest Reach — Floor 1"
-	_floor_context_label.text = tr("floor_label_forest_reach_1")
+	# Apply any pending matchup target the player set via the
+	# matchup_assignment screen (per S15-N1 contract). Empty target → keep
+	# the cold-launch defaults.
+	var target: Dictionary = FormationAssignment.get_target()
+	if not target.is_empty():
+		var t_biome: String = String(target.get("biome_id", ""))
+		var t_floor: int = int(target.get("floor_index", 0))
+		if t_biome != "" and t_floor >= 1:
+			_selected_biome_id = t_biome
+			_selected_floor = t_floor
+
+	_floor_context_label.text = _compose_target_label(_selected_biome_id, _selected_floor)
+	_floor_button.text = _floor_context_label.text
 
 	# Walk all Button descendants and assert the 44×44 tap-target floor.
 	# This is defense-in-depth: .tscn already sets custom_minimum_size on each
@@ -117,6 +127,7 @@ func _ready() -> void:
 	# UIFramework's meta sentinel makes wire_touch_feedback idempotent anyway.
 	UIFrameworkScript.wire_touch_feedback(_dispatch_button)
 	UIFrameworkScript.wire_touch_feedback(_floor_button)
+	UIFrameworkScript.wire_touch_feedback(_back_button)
 
 
 # ---------------------------------------------------------------------------
@@ -143,6 +154,8 @@ func on_enter() -> void:
 		_dispatch_button.pressed.connect(_on_dispatch_pressed)
 	if not _floor_button.pressed.is_connected(_on_floor_button_pressed):
 		_floor_button.pressed.connect(_on_floor_button_pressed)
+	if not _back_button.pressed.is_connected(_on_back_pressed):
+		_back_button.pressed.connect(_on_back_pressed)
 	# Toast tap-to-dismiss: ToastLabel uses gui_input rather than pressed
 	# (Label has no pressed signal). MOUSE_FILTER_STOP enables input capture.
 	_toast_label.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -176,6 +189,8 @@ func on_exit() -> void:
 		_dispatch_button.pressed.disconnect(_on_dispatch_pressed)
 	if _floor_button != null and _floor_button.pressed.is_connected(_on_floor_button_pressed):
 		_floor_button.pressed.disconnect(_on_floor_button_pressed)
+	if _back_button != null and _back_button.pressed.is_connected(_on_back_pressed):
+		_back_button.pressed.disconnect(_on_back_pressed)
 	if _toast_label != null and _toast_label.gui_input.is_connected(_on_toast_input):
 		_toast_label.gui_input.disconnect(_on_toast_input)
 
@@ -342,14 +357,34 @@ func _on_hero_button_pressed(hero_id: int) -> void:
 	UIFrameworkScript.suppress_keyboard_focus(self)
 
 
-## Handles tapping the Floor button. Sprint 8 VS no-op — the floor target is
-## hard-coded to forest_reach floor 1 (see [member _selected_biome_id] /
-## [member _selected_floor]). Wired so the button tap-feedback fires on input
-## per Pillar 1 ("the game responds to me"); future Sprint 9+ work replaces
-## this with a multi-floor picker.
+## Routes to the Matchup Assignment Screen (#23) where the player can browse
+## biomes + select a floor. Selection is written back via
+## [code]FormationAssignment.set_target(biome_id, floor_index)[/code]; this
+## screen reads it on next on_enter via get_target.
 func _on_floor_button_pressed() -> void:
-	# Defensive: if Sprint 9+ adds a floor picker, route to it here.
-	pass
+	SceneManager.request_screen("matchup_assignment", SceneManager.TransitionType.CROSS_FADE)
+
+
+## Navigates back to Guild Hall.
+func _on_back_pressed() -> void:
+	SceneManager.request_screen("guild_hall", SceneManager.TransitionType.CROSS_FADE)
+
+
+## Composes "<Biome display_name> — Floor <N>" from biome_id + floor_index,
+## with defensive fallbacks:
+##   - cold-launch default (forest_reach floor 1) → uses the localized canonical key
+##   - biome resolved → "<display_name> — Floor <N>"
+##   - biome unresolvable → "<biome_id> — Floor <N>" raw fallback
+func _compose_target_label(biome_id: String, floor_index: int) -> String:
+	if biome_id == "forest_reach" and floor_index == 1:
+		return tr("floor_label_forest_reach_1")
+	var biome: Resource = DataRegistry.resolve("biomes", biome_id)
+	var biome_display: String = biome_id
+	if biome != null and "display_name" in biome:
+		var d: String = String(biome.get("display_name"))
+		if d != "":
+			biome_display = d
+	return "%s — Floor %d" % [biome_display, floor_index]
 
 
 ## Handles input on the toast label for tap-to-dismiss.
