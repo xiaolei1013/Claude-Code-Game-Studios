@@ -16,6 +16,10 @@ run/main_scene="res://src/core/scene_manager/MainRoot.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
+[audio]
+
+buses/default_bus_layout="res://assets/audio/audio_bus_layout.tres"
+
 [autoload]
 
 BootNamespace="*res://src/core/boot_namespace/boot_namespace.gd"
@@ -38,10 +42,6 @@ DungeonRunOrchestrator="*res://src/core/dungeon_run_orchestrator/dungeon_run_orc
 OfflineProgressionEngine="*res://src/core/offline_progression_engine/offline_progression_engine.gd"
 AudioRouter="*res://src/core/audio_router/audio_router.gd"
 TelemetrySink="*res://src/core/telemetry_sink/telemetry_sink.gd"
-
-[audio]
-
-buses/default_bus_layout="res://assets/audio/audio_bus_layout.tres"
 
 [display]
 

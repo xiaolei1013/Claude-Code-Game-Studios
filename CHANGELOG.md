@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.9] - 2026-05-13
+
+### Added
+- **Guild Hall now shows gold balance and has a Recruit button** — Players can see their current gold balance at the top of Guild Hall, and a Recruit button navigates to the recruitment screen. Previously the Recruit screen existed but no UI route reached it; the cozy onboarding loop (dispatch → earn → recruit → fill formation) was unreachable. Closes the Sprint 14 S14-S5 wiring gap.
+- **Formation Assignment now has a Back button** — Tapping `← Guild Hall` returns the player to Guild Hall without requiring a dispatch first. Closes a navigation deadlock where the only escape from this screen was running a full dungeon.
+- **Floor button on Formation Assignment opens the Matchup Assignment screen** — Tapping the current target floor now lets the player browse biomes and select a different floor; the selection is applied on return. Previously a `pass` placeholder from Sprint 8. Closes a Sprint 16 scaffold that shipped without a caller.
+- **Run-end now routes to the Victory Moment screen** — After clearing a floor, the player sees a "Forest Reach — Floor N cleared" summary with kill count, gold gained, and tap-to-continue (back to Guild Hall). Previously routed to a placeholder main menu with no rewards shown.
+
+### Fixed
+- **First-launch players now start with 100 gold instead of 0** — `Economy._on_first_launch` now subscribes to `SaveLoadSystem.first_launch` and seeds `_gold_balance = EconomyConfig.STARTING_GOLD`, emitting `gold_changed` for HUD reactivity. Closes the documented Sprint 14 S14-S3 wiring gap that soft-locked first-session players (recruit cost 150 > balance 0).
+- **`FormationAssignment.commit()` now aborts on invalid hero_id mid-write** — Implements AC-FA-08: when `HeroRoster.set_formation_slot` returns false (unknown hero_id), `commit()` push_errors with slot+hero_id detail, aborts further slot writes, and does NOT emit `formation_reassignment_committed`. HeroRoster is left in a partial-write state for the screen to re-query.
+- **Victory Moment now reads floor_index from `run_snapshot.floor_id`** — The screen previously read `DungeonRunOrchestrator._dispatched_floor_index`, which `_exit_active_foreground` resets to 0 at the ACTIVE_FOREGROUND → RUN_ENDED transition. Players saw "Floor 0 cleared" on every run. The snapshot's `floor_id` survives the state transition; floor_index is parsed back out.
+- **Victory Moment tap-to-continue now works** — The `gui_input` handler is now wired to the root `VictoryMoment` Control in addition to `DimBackdrop`. CenterPanel sits on top of DimBackdrop and was absorbing taps before they reached the backdrop's handler.
+- **Formation Assignment now reflects the matchup target selected on the Matchup Assignment screen** — `on_enter` now reads `FormationAssignment.get_target()` and updates the dispatch target. Previously the autoload accessors shipped (Sprint 15 S15-N1) but the consumer wiring was missing; selecting Floor 2 still dispatched to Floor 1.
+- **Duplicate "Forest Reach — Floor 1" label on Formation Assignment is gone** — The redundant FloorContextLabel is hidden; the FloorButton serves as both display and tap affordance.
+- **Run-end overlay no longer shows live tick/kill text bleeding through** — `StatsPanel` is now hidden when the run-end overlay shows. Both nodes were anchored at center 50% with the overlay's PanelContainer rendered with transparent background.
+- **Telemetry sink test no longer leaks "TestHero" entries into player save files** — `tests/unit/telemetry_sink/telemetry_sink_signal_handlers_test.gd` now snapshot/restores HeroRoster's full state via `get_save_data` / `load_save_data` in `before_test` / `after_test`. The prior erase-by-id cleanup pattern was vulnerable to save-persistence leakage: if a save fired during the test window, the synthetic "TestHero%d" hero got baked into `save_slot_1.dat` and resurfaced on next launch.
+
+### Notes
+- **Cozy idle-game register now plays end-to-end** — Vertical slice validated through Forest Reach floors 1-5 in playtest-05 (2026-05-12). 9 player-facing wiring gaps surfaced and closed in-session. See `production/playtests/playtest-05-sprint-12-2026-05-12.md` for the full session record. Sprint 22+ planning shifts to real-time `/sprint-plan` driven by playtest findings per the Sprint 21 pre-emptive cadence retirement.
+- **Test suite**: 2042 → 2058 (+16 net). +6 Economy first-launch tests, +7 FormationAssignment commit-contract tests, +3 AC-FA-09 cross-system tests. 4 existing assertions updated for the `main_menu` → `victory_moment` route change.
+
 ## [0.0.0.8] - 2026-05-10
 
 ### Fixed

@@ -232,6 +232,36 @@ Both landed during S12-M5:
 - **Audio binary asset authoring** (deferred from S12-S5) — needs a sound-design pass; AudioRouter cue dispatch is wired but plays silence until `.wav` / `.ogg` stubs land at `assets/audio/sfx/<id>.wav` (binary) wrapped in `assets/data/sfx/<id>.tres` (DataRegistry resource)
 - **Pre-existing test logic bug** (✓ FIXED 2026-05-06 by `1ec7f56`): `tests/integration/hero_roster/save_load_round_trip_test.gd:397` `test_load_save_data_pads_undersize_formation_slots_with_zero` — populated heroes so slot[0]=1 resolves cleanly; orphan-clear pass no longer masks the pad-pass assertion target.
 
+### S12-S4 — FormationAssignment Stories 2-4 (✓ DONE 2026-05-12)
+
+Verdict: **COMPLETE**.
+
+Per `formation-assignment-system.md` §J Stories 2-4 (browse/commit/save-load — the autoload-side surface). The implementation surface was already shipped via S11-X9 Sprint 12 Story 1 pre-emptive autoload skeleton + subsequent Sprint 15 (Matchup target accessors) + Sprint 21 (Class Synergy detection). The 2026-05-12 work closes the test gap on Stories 2-3 ACs that the skeleton test did not cover, plus one implementation gap.
+
+**Implementation change** — `src/core/formation_assignment/formation_assignment.gd` `commit()` body: added AC-FA-08 abort-on-false logic. `set_formation_slot` returns `bool` (false on out-of-range slot_index OR unknown hero_id per `hero_roster.gd:812-834`). The prior implementation ignored the return value; the updated implementation checks `ok`, push_errors with slot+hero_id detail, and aborts (no further writes, no signal emit). HeroRoster is left in a partial-write state for the screen to re-query.
+
+**Tests** — 2 new test files:
+- `tests/unit/formation_assignment/formation_assignment_commit_test.gd` (7 tests, Groups A-E)
+  - Group A — AC-FA-04: browse no-mutation (formation_slots unchanged after browse)
+  - Group B — AC-FA-05: commit writes set_formation_slot per slot in order (2 tests: full + null-slot)
+  - Group C — AC-FA-06: signal fires AFTER all slot writes complete (spy captures roster state at fire time; asserts post-mutation state visible)
+  - Group D — AC-FA-07: length validation rejects mismatched array (2 tests: undersize + oversize; no write, no emit)
+  - Group E — AC-FA-08: abort on invalid hero_id mid-write (phantom-id synthetic HeroInstance triggers set_formation_slot false; slot 1 not written, slot 2 not attempted, signal not emitted)
+- `tests/integration/formation_assignment/browse_no_orchestrator_consumption_test.gd` (3 tests, Groups A-C)
+  - Group A — AC-FA-09: orchestrator source has no formation_browse_opened code-level reference (CI-grep style, comments stripped)
+  - Group B — behavioral spot-check: browse() does not mutate orchestrator state or run_snapshot
+  - Group C — OQ-FA-3 corollary: formation_browse_opened has zero production consumers in `src/` (recursive scan)
+
+**Hygiene barrier** — snapshot/restore via HeroRoster.get_save_data/load_save_data per the recruitment_try_recruit_test.gd precedent. Tests run against the live `/root/FormationAssignment` + `/root/HeroRoster` autoloads.
+
+**Test results**: 10/10 new tests PASS; full project sweep **2052/2052 PASS, 0 errors / 0 failures / 0 flaky / 0 skipped / 0 orphans** (was 2042 baseline pre-change; +10 net).
+
+**Mid-flow snags**: none. The implementation change for AC-FA-08 was small + obviously-correct (one `var ok = ...; if not ok: ... return` block); no regressions surfaced in the existing skeleton tests or anywhere else in the suite.
+
+**Deferred** — GDD §J Stories 5-7 (screen refactor + confirmation dialog + AC-FA-12 CI grep) remain Sprint 13+ scope per the §J §"Alternative minimum-viable scope" note: "Stories 1-4 only (~1.5d) — autoload exists, signal contract is live, but the screen still calls HeroRoster directly. The CI grep AC-FA-12 fails. Sprint 13+ closes the screen refactor."
+
+**Sprint 12 final status update**: 6/6 Must Haves + 4/5 Should Haves DONE (S12-S1 re-playtest the only Should Have remaining). 3/5 Nice-to-Haves DONE (N3, N5, and partial N2 from S12-M6 hydration suppression).
+
 
 
 ## Notes
