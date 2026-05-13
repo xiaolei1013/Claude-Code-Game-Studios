@@ -153,6 +153,19 @@ func _render_biome_tabs() -> void:
 	# Clear existing biome tabs (idempotent re-entry).
 	for child: Node in pool_vbox.get_children():
 		child.queue_free()
+	# Sprint 17 — build the archetype → recommended-class inverse map once
+	# per render (cheap; 3 classes in MVP). Used for the prescriptive matchup
+	# hint below ("Recommended: Rogue, Mage") so the player gets actionable
+	# guidance rather than diagnostic archetype names.
+	var archetype_to_class: Dictionary[String, String] = {}
+	for class_id: String in HeroClassDatabase.get_all_ids():
+		var cls: HeroClass = HeroClassDatabase.get_by_id(class_id)
+		if cls == null:
+			continue
+		var counter: String = String(cls.counter_archetype)
+		if counter != "" and not archetype_to_class.has(counter):
+			archetype_to_class[counter] = String(cls.display_name)
+
 	# Per-biome tabs.
 	for biome: Resource in _biomes:
 		var biome_id: String = String(biome.id)
@@ -165,10 +178,12 @@ func _render_biome_tabs() -> void:
 		name_label.name = "NameLabel"
 		name_label.text = String(biome.display_name) if "display_name" in biome and String(biome.display_name) != "" else biome_id.capitalize()
 		biome_tab.add_child(name_label)
-		# Sprint 17 — matchup hint: surface the biome's dominant_archetypes
-		# so the player can pick a team composition with intent. Format:
-		# "Common: armored, caster". Hidden when dominant_archetypes is empty
-		# (defensive; no biome currently ships without archetypes).
+		# Sprint 17 — matchup hint: translate the biome's dominant_archetypes
+		# into a list of recommended classes via each class's
+		# counter_archetype mapping. Output: "Recommended: Rogue, Mage" —
+		# prescriptive (cozy-register: tell the player what to bring) rather
+		# than diagnostic ("Common: armored, caster" was Sprint 17's first
+		# pass; this PR replaces it with actionable guidance).
 		var archetypes: Array[String] = []
 		if "dominant_archetypes" in biome:
 			var raw: Array = biome.get("dominant_archetypes") as Array
@@ -176,9 +191,24 @@ func _render_biome_tabs() -> void:
 				if a is String and String(a) != "":
 					archetypes.append(String(a))
 		if not archetypes.is_empty():
+			var recommended: Array[String] = []
+			var seen: Dictionary = {}  # de-dup when two archetypes share a counter
+			for a: String in archetypes:
+				if archetype_to_class.has(a):
+					var class_name_for_a: String = archetype_to_class[a]
+					if not seen.has(class_name_for_a):
+						recommended.append(class_name_for_a)
+						seen[class_name_for_a] = true
 			var hint_label: Label = Label.new()
 			hint_label.name = "MatchupHintLabel"
-			hint_label.text = "Common: %s" % ", ".join(archetypes)
+			if recommended.is_empty():
+				# Defensive: no class counters any of this biome's archetypes
+				# (data drift between biome + class definitions). Fall back
+				# to the diagnostic "Common: ..." line so the player at
+				# least sees the biome's archetype profile.
+				hint_label.text = "Common: %s" % ", ".join(archetypes)
+			else:
+				hint_label.text = "Recommended: %s" % ", ".join(recommended)
 			biome_tab.add_child(hint_label)
 		# Floor row.
 		var floor_row: HBoxContainer = HBoxContainer.new()

@@ -63,10 +63,13 @@ func test_each_biome_tab_has_matchup_hint_label() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Test 2 — label text format "Common: <archetype>[, <archetype>]"
+# Test 2 — label text format "Recommended: <class>[, <class>]"
 # ---------------------------------------------------------------------------
 
-func test_matchup_hint_text_starts_with_common_prefix() -> void:
+# Sprint 17 follow-up: replaced the diagnostic "Common: <archetype>..." format
+# with the prescriptive "Recommended: <class>..." format (cozy register: tell
+# the player what to bring, not what they're up against).
+func test_matchup_hint_text_starts_with_recommended_prefix() -> void:
 	var screen: Control = await _make_screen_in_tree()
 	var biome_vbox: Node = screen.get_node_or_null("BiomePanel/BiomeVBox")
 	for child: Node in biome_vbox.get_children():
@@ -75,32 +78,36 @@ func test_matchup_hint_text_starts_with_common_prefix() -> void:
 		var hint: Label = child.get_node_or_null("MatchupHintLabel") as Label
 		if hint == null:
 			continue
-		assert_str(hint.text).override_failure_message(
-			"%s.MatchupHintLabel.text should start with 'Common: ' — got '%s'"
-			% [child.name, hint.text]
-		).starts_with("Common: ")
+		# Accept either prefix: prescriptive "Recommended: " (normal path)
+		# OR defensive fallback "Common: " (when no class counters any of
+		# the biome's archetypes — should never happen with current data
+		# but the screen falls back gracefully).
+		var t: String = hint.text
+		assert_bool(t.begins_with("Recommended: ") or t.begins_with("Common: ")).override_failure_message(
+			"%s.MatchupHintLabel.text should start with 'Recommended: ' (or fallback 'Common: ') — got '%s'"
+			% [child.name, t]
+		).is_true()
 
 
 # ---------------------------------------------------------------------------
-# Test 3 — Forest Reach hint shows "bruiser, armored" (per its data)
+# Test 3 — Forest Reach hint shows "Recommended: Warrior, Rogue"
 # ---------------------------------------------------------------------------
 
-# Validates that the label reflects the biome.tres dominant_archetypes
-# field rather than a hardcoded string.
-func test_forest_reach_hint_shows_bruiser_armored() -> void:
+# Forest Reach's dominant_archetypes is ["bruiser", "armored"]. Warrior
+# counters bruiser; Rogue counters armored. So the recommended list is
+# ["Warrior", "Rogue"] in archetype order.
+func test_forest_reach_hint_shows_warrior_and_rogue() -> void:
 	var screen: Control = await _make_screen_in_tree()
 	var tab: Node = screen.get_node_or_null("BiomePanel/BiomeVBox/BiomeTab_forest_reach")
 	if tab == null:
-		# Forest Reach is the MVP starter biome; if it's missing the test
-		# environment is broken, not the feature.
 		push_warning("Skipped: BiomeTab_forest_reach not found")
 		return
 	var hint: Label = tab.get_node_or_null("MatchupHintLabel") as Label
 	assert_object(hint).is_not_null()
 	assert_str(hint.text).override_failure_message(
-		"Forest Reach should report 'Common: bruiser, armored' per its dominant_archetypes; got '%s'"
+		"Forest Reach (bruiser+armored) should recommend Warrior+Rogue; got '%s'"
 		% hint.text
-	).is_equal("Common: bruiser, armored")
+	).is_equal("Recommended: Warrior, Rogue")
 
 
 # ---------------------------------------------------------------------------

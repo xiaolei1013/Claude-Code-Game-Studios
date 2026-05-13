@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.33] - 2026-05-14
+
+### Changed
+- **Matchup hint text now prescriptive, not diagnostic.** PR #83 surfaced biome archetype profiles as `Common: armored, caster`. This PR translates them into class recommendations: **`Recommended: Rogue, Mage`**. Cozy register: tell the player what to bring, not what they're up against.
+- The label is computed at render time via each `HeroClass.counter_archetype` mapping. Adding a new class with a new counter_archetype auto-updates the recommendation surface.
+
+### Notes
+- **Tests**: 2164/2164 PASS (unchanged count — existing 4 tests updated to assert the new prescriptive format).
+- **Sprint 17 second PR** — builds on PR #83 by closing the loop: PR #83 showed the player WHAT enemy classes; this PR shows the player WHICH heroes to bring. Class recommendation chain: biome.dominant_archetypes → HeroClass.counter_archetype → "Recommended: <class>".
+- **Recommendation summary** (with current data):
+  - **Forest Reach** → Warrior, Rogue
+  - **Whispering Crags** → Rogue, Mage
+  - **Sunken Ruins** → Mage, Warrior
+  - **Frostmire** → Rogue, Mage
+  - **Ember Wastes** → Rogue, Warrior
+  - **The Hollow Stair** → Rogue, Mage
+- **Saturation signal exposed**: 3 of 6 biomes recommend `Rogue, Mage`. Player saw "Common: armored, caster" repeat in PR #83 as data; now sees "Recommended: Rogue, Mage" repeat as gameplay implication. The saturation is real and visible. Worth a future rebalance pass to give biomes more distinct optimal compositions.
+- **Defensive fallback retained**: if a future biome ships with archetypes that no class counters (data drift), the label falls back to the diagnostic "Common: ..." format. Better than blank.
+
 ## [0.0.0.32] - 2026-05-14
 
 ### Added
