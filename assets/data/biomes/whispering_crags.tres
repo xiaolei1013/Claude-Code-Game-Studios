@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="Biome" format=3 uid="uid://boe3yqkqc6xbk"]
+
+[ext_resource type="Script" uid="uid://dap2c30cqt6to" path="res://src/core/biome_dungeon_database/biome.gd" id="1_bm"]
+[ext_resource type="Resource" uid="uid://b2wcdungeon0001" path="res://assets/data/dungeons/whispering_crags_dungeon_01.tres" id="2_dg"]
+
+[resource]
+script = ExtResource("1_bm")
+id = "whispering_crags"
+display_name = "Whispering Crags"
+primary_palette_key = "stormcut_slate"
+dominant_archetypes = Array[String](["caster", "armored", "bruiser"])
+dungeons = Array[Resource]([ExtResource("2_dg")])
+environmental_storytelling = Array[String](["wind-carved sentinels standing at the cliff edges", "cairns the guild's records cannot account for"])
+flavor_text = "High and dry, far above the forest's lanterns. The crags remember names the wind hasn't carried in centuries."
+status = "active"

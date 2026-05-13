@@ -1,0 +1,61 @@
+[gd_resource type="Resource" script_class="Dungeon" format=3 uid="uid://bi85wt65kfnbk"]
+
+[ext_resource type="Script" uid="uid://5r5078scb8my" path="res://src/core/biome_dungeon_database/dungeon.gd" id="1_dg"]
+[ext_resource type="Script" uid="uid://doafwgg4qfi2a" path="res://src/core/biome_dungeon_database/floor.gd" id="2_fl"]
+
+[sub_resource type="Resource" id="Floor_WC_F1"]
+script = ExtResource("2_fl")
+id = "whispering_crags_f1"
+display_name = "Floor 1: The Cliff Path"
+floor_index = 1
+enemy_list = [{"enemy_id": "stoneback_grub", "count": 2}, {"enemy_id": "crag_wraith", "count": 1}]
+expected_clear_time_seconds = 42
+is_boss_floor = false
+flavor_text = "The wind picks up here. The path narrows. Something pale watches from the rocks above."
+
+[sub_resource type="Resource" id="Floor_WC_F2"]
+script = ExtResource("2_fl")
+id = "whispering_crags_f2"
+display_name = "Floor 2: The Hollow Cairn"
+floor_index = 2
+enemy_list = [{"enemy_id": "windborne_hunter", "count": 2}, {"enemy_id": "crag_wraith", "count": 2}]
+expected_clear_time_seconds = 58
+is_boss_floor = false
+flavor_text = "Stones piled by no hand the guild remembers. The wraiths know who stacked them."
+
+[sub_resource type="Resource" id="Floor_WC_F3"]
+script = ExtResource("2_fl")
+id = "whispering_crags_f3"
+display_name = "Floor 3: The Singing Pass"
+floor_index = 3
+enemy_list = [{"enemy_id": "stoneback_grub", "count": 3}, {"enemy_id": "windborne_hunter", "count": 2}]
+expected_clear_time_seconds = 88
+is_boss_floor = false
+flavor_text = "The crags exhale through the gap. Every gust carries a name. None of them are yours yet."
+
+[sub_resource type="Resource" id="Floor_WC_F4"]
+script = ExtResource("2_fl")
+id = "whispering_crags_f4"
+display_name = "Floor 4: The Warden's Ridge"
+floor_index = 4
+enemy_list = [{"enemy_id": "spire_warden", "count": 2}, {"enemy_id": "crag_wraith", "count": 1}]
+expected_clear_time_seconds = 95
+is_boss_floor = false
+flavor_text = "Carved sentinels line the ridge. They have not moved in centuries. Today they will."
+
+[sub_resource type="Resource" id="Floor_WC_F5"]
+script = ExtResource("2_fl")
+id = "whispering_crags_f5"
+display_name = "Floor 5: The Echo Chamber"
+floor_index = 5
+enemy_list = [{"enemy_id": "echo_serpent", "count": 1}]
+expected_clear_time_seconds = 175
+is_boss_floor = true
+flavor_text = "The loudest silence the crags have ever held. Whatever rises from it has been waiting since before the founding."
+
+[resource]
+script = ExtResource("1_dg")
+id = "whispering_crags_dungeon_01"
+display_name = "Whispering Crags — The High Path"
+biome_id = "whispering_crags"
+floors = Array[Resource]([SubResource("Floor_WC_F1"), SubResource("Floor_WC_F2"), SubResource("Floor_WC_F3"), SubResource("Floor_WC_F4"), SubResource("Floor_WC_F5")])

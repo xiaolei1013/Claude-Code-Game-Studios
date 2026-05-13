@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://fgb45yas0xww"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "crag_wraith"
+display_name = "Crag Wraith"
+tier = 1
+archetype = "caster"
+biome = "whispering_crags"
+base_hp = 48
+base_attack = 11
+base_speed = 5
+sprite_path = "assets/art/enemies/crag_wraith/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "A pale shape in the wind-cut stone. It speaks in a voice the rock remembers."
+is_boss = false
