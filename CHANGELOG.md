@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.12] - 2026-05-13
+
+### Added
+- **Settings overlay is now reachable from a gear icon on Guild Hall.** Per Settings GDD #30 AC-30-01 + §C.1. Tapping the ⚙ icon top-right opens a parchment-themed modal with 3 volume sliders (Master / Music / SFX) wired to `AudioRouter.set_*_volume_db` via linear-to-dB curve from §C.2, plus a reduce_motion `CheckButton` wired to `SceneManager.set_reduce_motion` (S12-S2 wiring). Close button OR tap-outside dismisses via `SceneManager.pop_overlay`. Gear button is gated on `OfflineProgressionEngine.is_replay_in_flight()` per §E.6 — disabled mid-replay to avoid modal-slot conflict.
+- **Settings overlay replaces 28-line placeholder** at `assets/overlays/settings/settings.tscn` + `.gd` with the real layout (HeaderLabel + 3 sliders + reduce_motion row + close). Sliders seed from `AudioRouter.get_*_volume_db()` on `_ready` so they reflect persisted state across launches.
+
+### Notes
+- **Test suite**: 2064 → 2073 (+9 net). New `tests/integration/settings/settings_overlay_test.gd` covers Groups A (scene loads + @onready resolves), B (slider drag → AudioRouter via dB curve, including silent-floor + per-bus isolation), C (reduce_motion checkbox round-trip), D (gear button wiring on Guild Hall).
+- **Sprint 13 S13-S2 status** flipped from `backlog` to `done` in `production/sprint-status.yaml`.
+- **Sprint 13 closed**: 11/12 stories. S13-M3 (Story 016 AC-9 manual close-reload smoke) is the one outstanding human-gated item. The cozy register now has a full settings + accessibility surface reachable from Guild Hall.
+- **Deferred to polish iteration** (Sprint 14+): mute toggle (hard -INF override of Master slider per GDD #30 §C.3), dB display label per slider, locale dropdown (en-only is trivial), Reset to Defaults button. These are independent of the core wiring; can land any time.
+- **Manual playtest needed**: tap the gear, drag volume sliders + toggle reduce_motion, verify audio + transition timing actually responds; close cleanly. The integration test covers the wiring contract; feel verification is human-gated.
+
 ## [0.0.0.11] - 2026-05-13
 
 ### Added
