@@ -482,6 +482,49 @@ The PR #58 visible bug was caught by the screenshot the user shared. But the bug
 
 ---
 
+## 14. PanelContainer single-child rule
+
+`PanelContainer` is a Godot single-child layout primitive. It sizes itself to its child and anchors that child to fill its rect. Adding multiple direct children stacks them all at the panel's (0,0) with no layout — every child renders on top of every other.
+
+### Canonical example (Sprint 15)
+
+Hero Detail modal had this structure:
+
+```
+DetailPanel (PanelContainer)
+├── HeaderRow (HBoxContainer)
+├── StatsBlock (VBoxContainer)
+└── ActionRow (HBoxContainer)
+```
+
+PanelContainer anchored all three rows to the same rect — DisplayName, ClassName, Level, XP, and "warriors total" all overlapped in a single ~150px-tall stack. Hidden for weeks behind placeholder labels + a too-transparent dim backdrop; surfaced only when PR #58 + PR #65 made the real labels visible.
+
+### The fix is always the same
+
+Wrap in a layout container (almost always a `VBoxContainer`):
+
+```
+DetailPanel (PanelContainer)
+└── ContentVBox (VBoxContainer)        ← the wrapper PanelContainer needs
+    ├── HeaderRow
+    ├── StatsBlock
+    └── ActionRow
+```
+
+Both other modals in the project use this pattern correctly:
+- `settings.tscn`: `Panel (PanelContainer) → VBox (VBoxContainer) → rows`
+- `victory_moment.tscn`: `CenterPanel (PanelContainer) → CenterVBox (VBoxContainer) → rows`
+
+### CI guard
+
+`tests/unit/scene_layout/panel_container_single_child_ci_test.gd` scans every `.tscn` in `assets/` and `src/` and asserts no PanelContainer has more than one direct child. If you add a regression, the test prints the offending file + node path so you know exactly where to insert the missing VBoxContainer.
+
+### Why this bug class is sneaky
+
+The visible symptom — overlapping text — looks like a font / theme bug or a positioning issue. Developers reach for `anchors_preset` or `custom_minimum_size` adjustments and the symptom doesn't go away because the root cause is layout container choice, not layout numbers. Knowing the single-child rule shortcuts the diagnosis from ~30 min to ~30 sec.
+
+---
+
 ## Cross-references
 
 - `tests/README.md` — infrastructure (how to run, where files live, naming, coverage)
@@ -505,3 +548,4 @@ The PR #58 visible bug was caught by the screenshot the user shared. But the bug
 | Clear spy fields in `before_test` | Sprint 18 hygiene cycle (commit `e42c657`) | ~0.1d (V2 test sized 2 vs expected 1) |
 | Typed-collection literal-rejection | Sprint 11 S11-X10 (Recruitment) — re-surfaced Sprint 14 S14-M4 Story 4 | Fix is mechanical; the gotcha resurfaces every time net-new test code seeds a typed-collection field |
 | Lifecycle-asymmetry: check both halves of an API pair | Sprint 14 PR #58 → PR #59 (`show_modal` vs `request_screen`) | ~0.5d (visible bug surfaced by playtest screenshot; root-cause fix + regression suite landed next PR) |
+| PanelContainer single-child rule | Sprint 15 PR #69 (Hero Detail modal layout collapse) | ~0.25d once root cause identified; multiple weeks hidden behind placeholder labels + dim backdrop transparency before surfacing |
