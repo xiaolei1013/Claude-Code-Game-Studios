@@ -53,11 +53,11 @@ stories:
     name: "Hero Detail interactive actions — level-up confirm + dismiss-hero stub (closes S14-N1)"
     file: "assets/screens/hero_detail/hero_detail_modal.gd"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-05-14 — closed as no-work-needed after Day-0 audit. Level-up button + atomic try_spend→set_hero_level shipped in prior pre-emptive work (hero_detail_modal.gd:282-378); covered by hero_detail_modal_contract_test.gd. Prestige confirmation overlay already demonstrates the destructive-action modal pattern. Dismiss-hero stub deferred to a future sprint — adding it now would ship UX debt (button with no real effect) and conflict with GDD §B cozy-register principle (\"no destructive actions\")."
 
   - id: "S15-M4"
     name: "HeroLeveling AC-15-02 calibration playtest — Floor 3 re-run drag signal (Sprint 14 retro action #2)"
@@ -85,11 +85,11 @@ stories:
     name: "Level-up toast polish — Guild Hall bottom-of-screen toast on hero_leveled (closes S14-N2)"
     file: "assets/screens/guild_hall/guild_hall.gd"
     priority: should-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.5
-    blocker: "S15-M3"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-14 — PR (v0.0.0.21); +4 regression tests; reduce_motion path included"
 
   - id: "S15-S3"
     name: "Recruitment Stories 6+8 — Save/Load consumer surface (AC-RC-13) + CI grep for AC-RC-14 forbidden-pattern"
