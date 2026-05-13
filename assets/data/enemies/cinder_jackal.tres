@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://1k0mgwy1yaod"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "cinder_jackal"
+display_name = "Cinder Jackal"
+tier = 1
+archetype = "bruiser"
+biome = "ember_wastes"
+base_hp = 96
+base_attack = 15
+base_speed = 7
+sprite_path = "assets/art/enemies/cinder_jackal/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Hunts in packs that move faster than fire spreads. Its coat is the color of fresh smoke."
+is_boss = false

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://dlejsgls7vvnk"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "the_kiln_below"
+display_name = "The Kiln Below"
+tier = 3
+archetype = "bruiser"
+biome = "ember_wastes"
+base_hp = 5880
+base_attack = 48
+base_speed = 3
+sprite_path = "assets/art/enemies/the_kiln_below/sprite.png"
+death_anim_key = "enemy_death_boss"
+flavor_text = "The fire that fused this whole waste into a basin. It hasn't gone out. It is the floor itself, and it knows you're here."
+is_boss = true
