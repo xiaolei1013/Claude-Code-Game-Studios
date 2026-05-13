@@ -105,3 +105,25 @@ extends GameData
 ## unless explicitly marked otherwise.
 ## GDD §C — status.
 @export var status: String = "active"
+
+# ---------------------------------------------------------------------------
+# Section: Progression gate (Sprint 16 — biome unlock chain)
+# ---------------------------------------------------------------------------
+
+## Optional floor_id whose first-clear unlocks this biome.
+##
+## Format: [code]"<biome_id>_f<floor_index>"[/code] matching the existing
+## floor.id convention (e.g. [code]"frostmire_f5"[/code]). Empty string
+## (default) means the biome is unlocked from the start (a "starter" biome).
+##
+## When non-empty, [FloorUnlockSystem] excludes this biome from the fresh-save
+## seed; the biome only appears in [code]get_available_biomes()[/code] AFTER
+## the gate floor's first-clear signal fires. A [code]biome_unlocked[/code]
+## signal is emitted at that point — Guild Hall subscribes for a toast.
+##
+## V1.0 limitation: only single-floor gates. AND/OR combinations
+## (e.g. "clear forest_reach_f5 AND whispering_crags_f5") are V1.5+
+## scope — not needed for the initial 5-biome chain.
+##
+## Sprint 16 — biome progression gate.
+@export var unlock_after: String = ""

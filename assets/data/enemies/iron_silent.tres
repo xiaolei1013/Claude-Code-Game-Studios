@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://df7gf42us15cm"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "iron_silent"
+display_name = "Iron Silent"
+tier = 1
+archetype = "armored"
+biome = "hollow_stair"
+base_hp = 94
+base_attack = 9
+base_speed = 2
+sprite_path = "assets/art/enemies/iron_silent/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Armor that swallowed its wearer centuries ago. Walks the stair on a loop the lamps cannot interrupt."
+is_boss = false

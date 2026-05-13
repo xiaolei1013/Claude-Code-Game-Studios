@@ -55,6 +55,18 @@ enum FloorState { UNAVAILABLE, LOCKED, ACCESSIBLE, CLEARED }
 ## _ready() with no CONNECT_DEFERRED.
 signal floor_unlocked(biome_id: String, floor_index: int)
 
+## Sprint 16 — biome progression gate. Fires once per biome when its
+## [code]Biome.unlock_after[/code] gate floor is cleared for the first time.
+## Guild Hall subscribes for a cozy "you unlocked X" toast.
+##
+## Idempotent: re-clearing the gate floor does NOT re-emit (the biome is
+## already in _unlock_state, so the seed-and-emit guard short-circuits).
+##
+## Sprint 16 biome chain: only emitted for biomes with non-empty
+## unlock_after (gated biomes). Starter biomes are seeded directly and
+## never emit this signal.
+signal biome_unlocked(biome_id: String)
+
 
 # ---------------------------------------------------------------------------
 # Internal state (R1 §C.1)
@@ -125,6 +137,14 @@ var active_biome_mvp: String = "forest_reach"
 ## directly before invoking other methods.
 var BIOME_FLOOR_COUNT: Dictionary[String, int] = {}
 
+## Sprint 16 — biome progression gate map. Key = biome_id of a GATED biome;
+## value = the floor_id whose first-clear unlocks that biome (per
+## Biome.unlock_after). Populated in _ready() from DataRegistry alongside
+## BIOME_FLOOR_COUNT. Starter biomes (unlock_after == "") are NOT in this
+## map. Empty in fresh test envs — _on_floor_cleared_first_time short-
+## circuits the gate check when empty.
+var BIOME_UNLOCK_GATES: Dictionary[String, String] = {}
+
 
 # ---------------------------------------------------------------------------
 # Built-in lifecycle
@@ -194,7 +214,9 @@ func _ready() -> void:
 			return
 
 	# Populate BIOME_FLOOR_COUNT from the already-resolved active biome
-	# resources (avoids a second DataRegistry round-trip).
+	# resources (avoids a second DataRegistry round-trip). Sprint 16: also
+	# populate BIOME_UNLOCK_GATES for biomes whose Biome.unlock_after is
+	# non-empty (gated biomes that wait for a prereq floor-clear).
 	for biome: Resource in valid_active_biome_resources:
 		if not ("dungeons" in biome) or not ("id" in biome):
 			continue
@@ -206,18 +228,42 @@ func _ready() -> void:
 		if dungeon == null or not ("floors" in dungeon):
 			continue
 		var floors: Array = dungeon.get("floors") as Array
-		BIOME_FLOOR_COUNT[String(biome.get("id"))] = floors.size()
+		var biome_id_str: String = String(biome.get("id"))
+		BIOME_FLOOR_COUNT[biome_id_str] = floors.size()
+		# Sprint 16 progression gate.
+		var gate: String = String(biome.get("unlock_after")) if "unlock_after" in biome else ""
+		if gate != "":
+			BIOME_UNLOCK_GATES[biome_id_str] = gate
 
 	_seed_fresh_save_default()
 	_subscribe_to_orchestrator()
 
 
-## Seeds {"forest_reach": 0} per R2 fresh-save default. Idempotent — only
-## seeds when the dict is empty, so load_save_data hydrating the dict before
-## _ready ran (test envs) is preserved.
+## Seeds the fresh-save default for every STARTER biome (highest_cleared=0).
+## Per R2 fresh-save invariant: a player's first launch starts with floor 1
+## of each STARTER biome unlocked, nothing cleared. Gated biomes (those with
+## Biome.unlock_after non-empty) are NOT seeded — they enter _unlock_state
+## only when their gate floor clears for the first time (see
+## _on_floor_cleared_first_time gate-check at the bottom).
+##
+## Idempotent — only seeds when the dict is empty, so load_save_data
+## hydrating the dict before _ready ran (test envs) is preserved.
+##
+## Sprint 16 M1: iterates BIOME_FLOOR_COUNT instead of hard-coding
+## forest_reach. Sprint 16 progression gate: now also skips entries in
+## BIOME_UNLOCK_GATES (gated biomes). Defensive fallback to forest_reach
+## if BIOME_FLOOR_COUNT hasn't populated yet (test envs).
 func _seed_fresh_save_default() -> void:
-	if _unlock_state.is_empty():
+	if not _unlock_state.is_empty():
+		return
+	if BIOME_FLOOR_COUNT.is_empty():
 		_unlock_state["forest_reach"] = 0
+		return
+	for biome_id: String in BIOME_FLOOR_COUNT.keys():
+		if BIOME_UNLOCK_GATES.has(biome_id):
+			# Gated biome — seeded on first gate-clear, not at fresh-save time.
+			continue
+		_unlock_state[biome_id] = 0
 
 
 ## Subscribes to DungeonRunOrchestrator.floor_cleared_first_time per R3.
@@ -284,13 +330,23 @@ func is_biome_completed(biome_id: String) -> bool:
 	return highest == BIOME_FLOOR_COUNT.get(biome_id, 0) and highest > 0
 
 
-## Per R7: returns the list of biome IDs whose Biome DB status is "active".
-## UI consumers (Formation Assignment, Matchup Assignment, Guild Hall) call
-## this and do NOT read Biome DB's status field directly.
+## Per R7: returns the list of biome IDs that are CURRENTLY playable —
+## active status + (starter biome OR gate has fired). UI consumers (Formation
+## Assignment, Matchup Assignment, Guild Hall) call this and do NOT read
+## Biome DB's status field directly.
+##
+## Sprint 16 progression gate: gated biomes (Biome.unlock_after non-empty)
+## are filtered out until their gate floor first-clears. After unlock, the
+## biome enters _unlock_state and appears in this list. This is what makes
+## "you unlocked X" feel real — Matchup Assignment's biome list grows.
 func get_available_biomes() -> Array[String]:
 	var result: Array[String] = []
 	for biome_id_v: Variant in BIOME_FLOOR_COUNT.keys():
-		result.append(String(biome_id_v))
+		var biome_id: String = String(biome_id_v)
+		# Gated biome that hasn't been unlocked yet → hide from the list.
+		if BIOME_UNLOCK_GATES.has(biome_id) and not _unlock_state.has(biome_id):
+			continue
+		result.append(biome_id)
 	return result
 
 
@@ -466,6 +522,22 @@ func _on_floor_cleared_first_time(floor_index: int, biome_id: String, _losing_ru
 		if next_frontier <= floor_count:
 			floor_unlocked.emit(biome_id, next_frontier)
 	# else: silent idempotent no-op
+
+	# Sprint 16 — biome progression gate check. AFTER the per-biome advance,
+	# build the floor_id of this clear ("<biome_id>_f<floor_index>") and see
+	# if any GATED biome's unlock_after matches. If yes AND that biome isn't
+	# already seeded (idempotent on re-clears), seed it at 0 + emit
+	# biome_unlocked. Guild Hall subscribes for a toast.
+	if BIOME_UNLOCK_GATES.is_empty():
+		return
+	var cleared_floor_id: String = "%s_f%d" % [biome_id, floor_index]
+	for gated_biome_id: String in BIOME_UNLOCK_GATES.keys():
+		if BIOME_UNLOCK_GATES[gated_biome_id] != cleared_floor_id:
+			continue
+		if _unlock_state.has(gated_biome_id):
+			continue  # already unlocked — idempotent on re-clear
+		_unlock_state[gated_biome_id] = 0
+		biome_unlocked.emit(gated_biome_id)
 
 
 # ---------------------------------------------------------------------------

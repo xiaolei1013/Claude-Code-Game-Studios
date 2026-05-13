@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://dbofiopu6sm1c"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "ash_djinn"
+display_name = "Ash Djinn"
+tier = 1
+archetype = "caster"
+biome = "ember_wastes"
+base_hp = 54
+base_attack = 14
+base_speed = 5
+sprite_path = "assets/art/enemies/ash_djinn/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Spun out of a wildfire that burned for a decade. Still burning, just slower now."
+is_boss = false

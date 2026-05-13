@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.0.25] - 2026-05-14
+## [0.0.0.31] - 2026-05-14
 
 ### Added
 - **Warm-lantern overlay shader** (S15-N2) — `assets/shaders/warm_lantern_overlay.gdshader`. Soft amber-warmth vignette that pulls screen corners toward an incandescent tone (R 1.0, G 0.65, B 0.35) while leaving the center neutral. 4 tunable uniforms via the ShaderMaterial inspector: `warm_color` (vec4), `vignette_radius` (float 0..1), `vignette_softness` (float 0..1), `intensity` (float 0..1; defaults to 0.35 for a subtle cozy bias). Per `game-concept.md` Pillar 4 Visual Identity Anchor + HD-2D rendering pipeline GDD #26 OQ-26-2.
@@ -10,10 +10,91 @@ All notable changes to this project will be documented in this file.
 - **3 regression tests** in `tests/unit/shaders/warm_lantern_overlay_test.gd`: shader loads as resource; the 4 contract uniform declarations are present in source; Guild Hall scene resolves the shader ext_resource path.
 
 ### Notes
-- **Tests**: 2129/2129 PASS (+3 from this PR; was 2126 at PR #72).
+- **Tests**: 2160/2160 PASS at merge (was 2157 at PR #81; +3 from this PR's shader contract tests; final count to be confirmed when the merged branch's CI runs).
+- **Originally branched as v0.0.0.25** when authored 2026-05-14; rebased onto main + re-versioned to 0.0.0.31 after PRs #76-#81 (Sprint 15 closeout + 5 Sprint 16 biomes + progression gate) merged ahead of it.
 - **ADR-0017 deviation note**: ADR-0017 §Decision defers the full HD-2D pipeline (tilt-shift DoF + warm-lantern composite) to the Vertical Slice tier. This PR ships the warm-lantern half as a **preview** — ready-to-deploy infrastructure for the future Vertical Slice tier authoring, but applied to Guild Hall now for playtest visibility. If the cozy bias is undesired at this stage, revert by deleting the `WarmLanternOverlay` node from `guild_hall.tscn` (shader file + tests can stay as ready-for-deploy).
 - **Performance**: trivial fragment shader (one `length` + one `smoothstep`). Steam Deck 1280×800 frame budget unaffected per `.claude/docs/technical-preferences.md`.
-- **Sprint 15 status**: S15-N2 done. Sprint 16 plan + named-presets GDD coming next per the user's "all three" authorization.
+
+## [0.0.0.30] - 2026-05-14
+
+### Added
+- **Biome 6: The Hollow Stair** — **second link in the progression chain**. Gated behind clearing Ember Wastes' boss (`unlock_after = "ember_wastes_f5"`). 5-floor dungeon (First Landing → Choir Step → Kennel Step → Cradle Courts → The Floor Itself, boss). 5 new biome-themed enemies: Lamplit Chorister (caster), Iron Silent (armored), Stairmaw Hound (bruiser), Cradle Judge (tier-2 caster — "Has been judging for centuries. Has never returned a verdict."), The Last Step (tier-3 boss armored — "The reason the stair ends").
+- **6 regression tests** at `tests/integration/biome_dungeon_database/hollow_stair_gated_biome_test.gd`, including a full-chain end-to-end test (Frostmire boss → Ember Wastes unlock → Ember Wastes boss → Hollow Stair unlock; biome count grows 4 → 5 → 6).
+
+### Notes
+- **Tests**: 2157/2157 PASS (+6 from this PR; was 2151 at PR #80).
+- **Progression chain now has 2 links**: starter set (4 biomes) → Ember Wastes (gate: Frostmire F5) → Hollow Stair (gate: Ember Wastes F5). Each clear of a chain-end boss produces a "Unlocked: <biome>" toast on Guild Hall return.
+- **Sprint 16 momentum**: 5 biomes shipped today (Whispering Crags #77 → Sunken Ruins #78 → Frostmire #79 → Ember Wastes #80 → Hollow Stair this PR) + the progression-gate infra. Tests grew 2089 → 2157 across the session (+68 cases).
+- **Future**: chain can extend indefinitely. Each new biome with `unlock_after` set creates a new link. No code changes needed per biome — the gate logic is generic.
+
+## [0.0.0.29] - 2026-05-14
+
+### Added
+- **Biome 5: Ember Wastes** — first **gated** biome. Unlocks when the player clears Frostmire's Floor 5 boss (The Hollow Winter). 5-floor dungeon (Glass Flats → Smoke Bazaar → Ember Causeway → Obsidian Steps → Kiln's Mouth, boss). 5 new biome-themed enemies: Ash Djinn (caster), Glasswind Walker (armored), Cinder Jackal (bruiser), Obsidian Titan (tier-2 armored), The Kiln Below (tier-3 boss bruiser — "the basin's center; the fire is the floor and the walls and the air").
+- **Biome progression gate** (the first real "you earned this" loop in the game):
+  - `Biome.unlock_after: String` schema field — empty = unlocked from start; non-empty = floor_id whose first-clear unlocks this biome
+  - `FloorUnlock.BIOME_UNLOCK_GATES: Dictionary[String, String]` — populated at boot from active biomes' `unlock_after`
+  - `FloorUnlock.biome_unlocked(biome_id)` signal — fires exactly once when a gated biome's prereq clears
+  - `_seed_fresh_save_default` skips gated biomes; they enter `_unlock_state` only on gate-fire
+  - `get_available_biomes()` filters out gated-but-not-yet-unlocked biomes (Matchup Assignment menu auto-hides them)
+- **Guild Hall toast on `biome_unlocked`** — "Unlocked: Ember Wastes" surfaces via the existing `_show_toast` infra (reuses S15-S2's reduce_motion accessibility path).
+- **7 regression tests** at `tests/integration/biome_dungeon_database/ember_wastes_gated_biome_test.gd` covering: biome load, unlock_after field, dungeon resolution, enemy biome tags, fresh-save exclusion, gate-fire signal emission, idempotent re-clear.
+
+### Changed
+- **Existing 4 biomes (Forest Reach, Whispering Crags, Sunken Ruins, Frostmire) remain unlocked from start** — they're now the "starter set" + Ember Wastes is the first earned content.
+- **Test probe** in `test_fresh_save_does_not_seed_planned_v1_biomes` updated to `__nonexistent_biome_probe__` — previous probes (sunken_ruins, then ember_wastes) kept getting shipped as real biomes, invalidating the test name. Locked to a clearly-fake name now.
+
+### Notes
+- **Tests**: 2151/2151 PASS (+7 from this PR; was 2144 at PR #79).
+- **Player-visible delta**: cold launch shows 4 biome choices. Clear Frostmire's boss → toast: "Unlocked: Ember Wastes" → Matchup Assignment now shows 5 biomes. **First real progression feedback loop** beyond per-floor unlock.
+- **Pattern is extensible**: gate format is just `{biome_id}_f{floor_index}`. Future biomes 6-N can chain (Ember Wastes' boss → biome 6, etc.) by setting `unlock_after`. AND/OR composite gates are V1.5+ scope.
+- **Sprint 16 momentum**: 4 biomes shipped today (Whispering Crags PR #77 → Sunken Ruins PR #78 → Frostmire PR #79 → Ember Wastes-gated this PR). The content+depth push is real.
+
+## [0.0.0.28] - 2026-05-14
+
+### Added
+- **Biome 4: Frostmire** — third player-visible content add in the Sprint 16 push. 5-floor dungeon (Frozen Reeds → Bone Causeway → Hollow Cairns → Colossus Bog → Hollow Winter's Heart, boss). 5 new biome-themed enemies: Marrow Witch (caster), Icebound Pilgrim (armored), Frost Revenant (bruiser), Mire Colossus (tier-2 armored), The Hollow Winter (tier-3 boss caster — a season the bog refused to release).
+- **6 regression tests** at `tests/integration/biome_dungeon_database/frostmire_load_test.gd`.
+
+### Notes
+- **Tests**: 2144/2144 PASS (+6 from this PR; was 2138 at PR #78).
+- **Player-visible delta**: from cold launch the player now has **4 biome choices** at Matchup Assignment — Forest Reach (woods), Whispering Crags (high stone), Sunken Ruins (drowned city), Frostmire (frozen bog). Four distinct visual + thematic registers.
+- **Sprint 16 momentum**: 3 biomes shipped today (Whispering Crags PR #77, Sunken Ruins PR #78, Frostmire this PR). Each ~10 min from branch to push. Player-visible content throughput is back where it should be.
+- **Time to start gating progression?** With 4 biomes all unlocked at start, the cold-launch menu starts to feel like a buffet. Sprint 16's next step could be a soft progression gate (e.g., biome 5+ unlocks after clearing biome 1's boss). Flagged for the user's call.
+
+## [0.0.0.27] - 2026-05-14
+
+### Added
+- **Biome 3: Sunken Ruins** — second player-visible content add in the Sprint 16 push. Fills the `sunken_ruins` placeholder name that's been referenced in test code since the planned-V1.0 era. 5-floor dungeon (Tidal Steps → Salt Library → Coral Plaza → Thrallway → Drowned Hall, boss). 5 new biome-themed enemies: Tide Husk (caster), Coral Warden (armored), Abyss Eel (bruiser), Deep Thrall (tier-2 bruiser), The Drowned King (tier-3 boss caster).
+- **6 regression tests** at `tests/integration/biome_dungeon_database/sunken_ruins_load_test.gd` — mirrors the Whispering Crags pattern.
+
+### Changed
+- **`test_fresh_save_does_not_seed_planned_v1_biomes`** updated to use `ember_wastes` as the unregistered-biome probe (sunken_ruins was the prior placeholder; it's now shipped).
+
+### Notes
+- **Tests**: 2138/2138 PASS (+6 from this PR; was 2132 at PR #77).
+- **Player-visible delta**: from cold launch the player now has **3 biome choices** at Matchup Assignment — Forest Reach (woods), Whispering Crags (high stone), Sunken Ruins (drowned city). Three distinct archetypal feels.
+- **Sprint 16 momentum**: M1 done (Whispering Crags PR #77) + this PR's biome 3 = the "reweight toward player-visible content" action item is paying off — two consecutive PRs that move what the player can see, both shipped same-day with full test coverage.
+- **The biome-add pattern is mature**: data files only (1 biome + 1 dungeon + 5 enemies), zero code changes per new biome (the FloorUnlock auto-seed from PR #77 handles it). Future biomes 4-N are content authoring, not engineering.
+
+## [0.0.0.26] - 2026-05-14
+
+### Added
+- **Biome 2: Whispering Crags** (Sprint 16 M1 — first player-visible content add since Sprint 12). A new dungeon biome the player can select at Matchup Assignment. 5-floor dungeon (Cliff Path → Hollow Cairn → Singing Pass → Warden's Ridge → Echo Chamber, boss). 5 new biome-themed enemies: Crag Wraith (caster), Stoneback Grub (armored), Windborne Hunter (bruiser), Spire Warden (tier-2 armored), Echo Serpent (tier-3 boss caster). Per Sprint 16 plan reweight (reweight toward player-visible content) responding to playtest-08's "I don't see too much progress" signal.
+- **6 regression tests** at `tests/integration/biome_dungeon_database/whispering_crags_load_test.gd`: biome resource loads via DataRegistry; dungeon resolves with 5 floors; all 5 enemies load with correct biome tag; fresh-save seeds BOTH biomes (not just forest_reach); `get_available_biomes` returns both; Whispering Crags F1 is unlocked on fresh save (F2+ locked until F1 cleared, matching Forest Reach progression).
+
+### Changed
+- **`FloorUnlock._seed_fresh_save_default`** now iterates `BIOME_FLOOR_COUNT` instead of hard-coding `{forest_reach: 0}`. Any new biome `.tres` dropped into `assets/data/biomes/` auto-seeds on fresh save without a code change. Defensive fallback to `forest_reach` if the registry hasn't populated yet (e.g., test envs where _ready order differs).
+
+### Notes
+- **Tests**: 2132/2132 PASS (+6 from this PR; was 2126 at PR #76).
+- **Player-visible delta**: from cold launch a player can now select Forest Reach OR Whispering Crags at Matchup Assignment → dispatch a run → clear floors → unlock progression in either biome independently. First true new content since the cozy register loop closed in Sprint 12.
+- **Sprint 16 progress**: M1 done. Per the user's Sprint 15 retro action #1 ("each Must Have needs a visible change"), this PR delivers exactly that.
+- **Open dependencies** (still pending merge, do not block this PR):
+  - PR #73: HD-2D warm-lantern shader preview (Sprint 16 M2 candidate; ADR-0017 amendment needed if kept)
+  - PR #74: Sprint 16 plan + Formation Presets GDD #33
+  - PR #75: GDD #33 §K self-critique with K.1 BLOCKING resolution options
+- **K.1 decision pending**: per the user's direction, formation Recall should use **immediate-commit** (Option A from GDD #33 §K.1) when implemented in Sprint 17+. This PR doesn't touch the GDD; the decision can be folded into PR #75 on merge.
 
 ## [0.0.0.24] - 2026-05-14
 

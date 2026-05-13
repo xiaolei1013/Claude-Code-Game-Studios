@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2deepthralltre"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "deep_thrall"
+display_name = "Deep Thrall"
+tier = 2
+archetype = "bruiser"
+biome = "sunken_ruins"
+base_hp = 235
+base_attack = 19
+base_speed = 3
+sprite_path = "assets/art/enemies/deep_thrall/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Whatever it was before the flood, the Drowned King's voice is louder now."
+is_boss = false

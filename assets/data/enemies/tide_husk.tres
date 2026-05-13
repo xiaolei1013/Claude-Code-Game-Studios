@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2tidehusktres"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "tide_husk"
+display_name = "Tide Husk"
+tier = 1
+archetype = "caster"
+biome = "sunken_ruins"
+base_hp = 52
+base_attack = 12
+base_speed = 4
+sprite_path = "assets/art/enemies/tide_husk/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Robes still drift in the current. Whatever it studied here, it remembers."
+is_boss = false

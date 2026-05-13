@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2cradlejudge01"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "cradle_judge"
+display_name = "Cradle Judge"
+tier = 2
+archetype = "caster"
+biome = "hollow_stair"
+base_hp = 210
+base_attack = 22
+base_speed = 3
+sprite_path = "assets/art/enemies/cradle_judge/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Sits in an iron chair at the landings. Has been judging for centuries. Has never returned a verdict."
+is_boss = false

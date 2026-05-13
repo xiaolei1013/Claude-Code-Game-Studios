@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2frostrevenant"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "frost_revenant"
+display_name = "Frost Revenant"
+tier = 1
+archetype = "bruiser"
+biome = "frostmire"
+base_hp = 92
+base_attack = 13
+base_speed = 5
+sprite_path = "assets/art/enemies/frost_revenant/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Whatever it died of, the cold preserved enough of it to keep going."
+is_boss = false

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://bvkom20mxbdon"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "stairmaw_hound"
+display_name = "Stairmaw Hound"
+tier = 1
+archetype = "bruiser"
+biome = "hollow_stair"
+base_hp = 98
+base_attack = 16
+base_speed = 6
+sprite_path = "assets/art/enemies/stairmaw_hound/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Bred deep, never up. The dark is its kennel. The stair is its leash, and the leash is long."
+is_boss = false

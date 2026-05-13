@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="Biome" format=3 uid="uid://b2hollowstairb1"]
+
+[ext_resource type="Script" uid="uid://dap2c30cqt6to" path="res://src/core/biome_dungeon_database/biome.gd" id="1_bm"]
+[ext_resource type="Resource" uid="uid://b2hsdungeon0001" path="res://assets/data/dungeons/hollow_stair_dungeon_01.tres" id="2_dg"]
+
+[resource]
+script = ExtResource("1_bm")
+id = "hollow_stair"
+display_name = "The Hollow Stair"
+primary_palette_key = "vault_blue"
+dominant_archetypes = Array[String](["caster", "armored", "bruiser"])
+dungeons = Array[Resource]([ExtResource("2_dg")])
+environmental_storytelling = Array[String](["lamps that burn without oil on every landing", "iron chairs holding centuries-old verdicts"])
+flavor_text = "Discovered under the Ember Wastes by accident. The stair was already going down. The guild's first survey said it had no bottom. The second survey did not return."
+status = "active"
+unlock_after = "ember_wastes_f5"

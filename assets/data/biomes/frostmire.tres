@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="Biome" format=3 uid="uid://b2frostmireb01"]
+
+[ext_resource type="Script" uid="uid://dap2c30cqt6to" path="res://src/core/biome_dungeon_database/biome.gd" id="1_bm"]
+[ext_resource type="Resource" uid="uid://b2fmdungeon0001" path="res://assets/data/dungeons/frostmire_dungeon_01.tres" id="2_dg"]
+
+[resource]
+script = ExtResource("1_bm")
+id = "frostmire"
+display_name = "Frostmire"
+primary_palette_key = "bonewhite_ice"
+dominant_archetypes = Array[String](["caster", "armored", "bruiser"])
+dungeons = Array[Resource]([ExtResource("2_dg")])
+environmental_storytelling = Array[String](["reeds frozen upright since a winter the guild's records don't name", "cairns of frozen peat marking pilgrims who never made it home"])
+flavor_text = "The bog froze three hundred winters ago and forgot how to thaw. What walks on it now does not feel the cold."
+status = "active"

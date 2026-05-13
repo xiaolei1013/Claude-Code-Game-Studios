@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://8slgjy4i4pvd"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "glasswind_walker"
+display_name = "Glasswind Walker"
+tier = 1
+archetype = "armored"
+biome = "ember_wastes"
+base_hp = 90
+base_attack = 9
+base_speed = 3
+sprite_path = "assets/art/enemies/glasswind_walker/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Skin like the fused-glass ridges the storms leave behind. Slow, patient, hard to break."
+is_boss = false

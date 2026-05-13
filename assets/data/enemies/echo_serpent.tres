@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://cufc026f32tv4"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "echo_serpent"
+display_name = "Echo Serpent"
+tier = 3
+archetype = "caster"
+biome = "whispering_crags"
+base_hp = 5240
+base_attack = 41
+base_speed = 4
+sprite_path = "assets/art/enemies/echo_serpent/sprite.png"
+death_anim_key = "enemy_death_boss"
+flavor_text = "Coiled inside the loudest silence in the crags. Strikes with a sound that has been waiting centuries to be released."
+is_boss = true

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2drownedking01"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "the_drowned_king"
+display_name = "The Drowned King"
+tier = 3
+archetype = "caster"
+biome = "sunken_ruins"
+base_hp = 5512
+base_attack = 44
+base_speed = 3
+sprite_path = "assets/art/enemies/the_drowned_king/sprite.png"
+death_anim_key = "enemy_death_boss"
+flavor_text = "Was a king when the city stood. Still a king, in the silt-dark hall the city became."
+is_boss = true

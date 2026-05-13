@@ -347,8 +347,8 @@ The screen, not this system, owns the confirm dialog. This GDD documents the con
 
 ## I. Open Questions & ADR Candidates
 
-**OQ-FA-1 — V1.0 named formation presets**
-The save consumer surface is reserved (returns `{}` in MVP). V1.0 adds named presets — the design pass for this feature lives in a future GDD (`formation-presets.md` or similar). Schema migration is additive: existing MVP saves with empty payload load as "no presets" without a version bump.
+**OQ-FA-1 — V1.0 named formation presets** — *DESIGN PASS COMPLETE 2026-05-14*
+The save consumer surface is reserved (returns `{}` in MVP). V1.0 adds named presets — **the design pass is now authored at `design/gdd/formation-presets.md` (GDD #33, FIRST-PASS DRAFT 2026-05-14)**. Implementation per that GDD's §J 8-story sequence. Schema migration is additive: existing MVP saves with empty payload load as "no presets" without a version bump (per AC-FP-09).
 
 **OQ-FA-2 — Formation history undo**
 Player-facing "undo last formation change" is V1.0+ scope. Could reuse the named-presets save namespace by storing a rolling buffer of recent formations. Out of MVP.

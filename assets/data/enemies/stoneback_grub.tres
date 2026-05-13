@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://bvys8qy102avl"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "stoneback_grub"
+display_name = "Stoneback Grub"
+tier = 1
+archetype = "armored"
+biome = "whispering_crags"
+base_hp = 78
+base_attack = 8
+base_speed = 2
+sprite_path = "assets/art/enemies/stoneback_grub/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Older than it looks. Slower than it appears. Hits harder than either suggests."
+is_boss = false
