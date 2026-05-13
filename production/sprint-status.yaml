@@ -61,13 +61,13 @@ stories:
 
   - id: "S15-M4"
     name: "HeroLeveling AC-15-02 calibration playtest — Floor 3 re-run drag signal (Sprint 14 retro action #2)"
-    file: "production/playtests/playtest-08-hero-leveling-calibration-2026-05-??.md"
+    file: "production/playtests/playtest-08-hero-leveling-calibration-2026-05-14.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei (human)"
     estimate_days: 0.5
-    blocker: "human availability"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-14 — PASS, core gameplay confirmed working; AC-15-02 no leveling drag. Broader 'not too much progress' signal captured in S15 retro action items."
 
   # ===== Should Have =====
 
@@ -103,13 +103,13 @@ stories:
 
   - id: "S15-S4"
     name: "Sprint 15 retrospective"
-    file: "production/retrospectives/sprint-15-retrospective-2026-05-??.md"
+    file: "production/retrospectives/sprint-15-retrospective-2026-05-14.md"
     priority: should-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.25
-    blocker: "M1-M4 close"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-14 — retro captures the 'technically successful, experientially flat' lesson + 4 Sprint 16 action items"
 
   # ===== Nice to Have =====
 
