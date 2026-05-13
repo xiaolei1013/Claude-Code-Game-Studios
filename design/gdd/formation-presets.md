@@ -1,0 +1,237 @@
+# Formation Presets — GDD #33 (V1.0)
+
+> **Status: First-pass DRAFT 2026-05-14** by Sprint 16 Day-0 authoring session (S16-M3). Closes the FormationAssignment §C.6 save-namespace placeholder + the named-presets scope reserved since Sprint 11 S11-X8 ("V1.0 fills this in alongside named-preset persistence"). Run `/design-review formation-presets.md` before APPROVED. Implementation deferred to Sprint 17+ per the design-first principle.
+
+---
+
+## A. Overview
+
+**Formation Presets** is a V1.0 affordance that lets the player save named formation configurations and recall them with one tap. The MVP shipped formation as a 3-slot hero arrangement persisted in HeroRoster's `_formation_slots`; players who experiment with different rosters (warrior-heavy for boss floors, mage-heavy for spell-resistant biomes) currently rebuild from scratch each time. Named presets remove that friction while keeping the cozy register: presets are **player-curated** (no auto-save), **named** (player chooses the label), and **non-destructive** (recalling a preset shows it, doesn't commit until confirmed).
+
+The system layers on top of FormationAssignment's commit() contract (per ADR-0001 + AC-FA-12) without changing the underlying single-write-point invariant. A preset recall **populates the screen's edit buffer**; the player still presses commit to write to HeroRoster — preserving the mid-run reassignment confirmation gate (AC-FA-13) for in-flight runs.
+
+---
+
+## B. Player Fantasy
+
+**Intended feeling**: "I have my favorite trio. Now I have three favorite trios."
+
+> *"I've been running Theron + Mira + Sable on Forest Reach for two weeks. Now I'm trying Cyra + Ewan + Sable on Whispering Crags — they handle the resistance better. Going back to Forest Reach used to mean three taps to rebuild my old trio. Now I tap 'Forest Trio' from my saved presets and they snap back into the slots. I can keep both setups; I never lose the work of figuring them out."*
+
+The cozy register hard-floor: **presets are an organization tool, not an optimization treadmill**. They MUST NOT surface "your most efficient preset" suggestions, "you haven't used Preset 2 in 3 days" nudges, leaderboards of "popular community presets", or any auto-tuning. The player picks, names, recalls. The game remembers; it doesn't push.
+
+---
+
+## C. Detailed Rules
+
+### C.1 — Schema
+
+A formation preset is a record with:
+
+- `id: int` — monotonic, never-reused (mirrors HeroInstance.instance_id convention)
+- `name: String` — player-chosen, 1-32 chars, UTF-8 (player may use locale-specific characters; no sanitization beyond length cap)
+- `created_at_unix: int` — Unix timestamp of preset creation (informational; not surfaced in UI MVP)
+- `slot_hero_ids: Array[int]` — exactly `formation_size()` entries (= 3 in MVP); each is a HeroInstance.instance_id OR 0 (empty slot sentinel)
+
+The preset's `slot_hero_ids` is a **snapshot** of HeroInstance ids at save time. Heroes referenced by a preset are NOT pinned — if the player dismisses or prestiges a hero, the next preset recall sees the missing id and renders that slot as empty (with a defensive warning toast: "Preset 'Forest Trio': Theron is no longer in your roster — slot empty").
+
+### C.2 — Storage cap
+
+MVP V1.0 ships with a hard cap of **6 presets per player**. The cap exists for:
+- UI list ergonomics (6 fits a single dropdown without scrolling on Steam Deck 1280×800)
+- Save schema bounded growth (6 × ~80 bytes per preset = ~500 bytes; trivial)
+- Cozy register: 6 named slots is "a small handful", not "an inventory to manage"
+
+Reaching the cap surfaces a defensive toast on Save attempt: "Preset limit reached (6 / 6). Delete a preset before saving a new one." No silent overwrite, no auto-rotation.
+
+### C.3 — UI affordances (per `design/gdd/formation-assignment-system.md` §C.5 extension)
+
+On the FormationAssignment screen, add a **PresetsRow** between the FormationPanel and the existing ActionRow. The row contains:
+
+- **PresetDropdown** (OptionButton) — lists saved presets by `name`, sorted by `created_at_unix` ascending (oldest first; preserves player's mental model of "1st, 2nd, 3rd preset"). Default item is "(none)".
+- **RecallButton** — visible only when a preset is selected in the dropdown. Tap → populate the screen's edit buffer with the preset's `slot_hero_ids` (resolved via `HeroRoster.get_hero_by_id` per S15-M1). Does NOT write to HeroRoster — the player still presses commit (or the auto-commit per S15-M2's mid-run-aware flow).
+- **SaveButton** — opens a small modal: "Save current formation as new preset?" with a name TextEdit (placeholder "My formation") and Save/Cancel buttons. Player types, taps Save → preset committed.
+- **DeleteButton** — visible only when a preset is selected. Opens a confirmation modal: "Delete '<name>'?" with Confirm/Cancel. Cancel default-focused (cozy register: destructive default is the safe one).
+
+### C.4 — Recall semantics
+
+`RecallButton.pressed` populates the **screen's edit buffer**, not HeroRoster. The screen's existing per-slot rendering reads from the edit buffer; the existing commit flow (S15-M1's `FormationAssignment.commit()` route) handles the write-on-confirm.
+
+When recalling a preset:
+1. Iterate `preset.slot_hero_ids` positionally.
+2. For each id: if `HeroRoster.get_hero_by_id(id) == null` (hero removed since preset was saved), the slot is rendered as empty AND a toast surfaces (one toast per missing hero, dedup'd by display_name).
+3. The recalled buffer is the screen's working state until the player commits or navigates away.
+
+### C.5 — Save semantics
+
+`SaveButton.pressed` opens the name-input modal. On confirm:
+1. Validate name: 1-32 chars after `strip_edges()`. Empty → reject with toast "Preset name cannot be empty"; over 32 → truncate with `_truncate_to(32, name)` + toast "Preset name truncated to 32 characters".
+2. Validate cap: `_presets.size() < 6`. At cap → reject with toast per §C.2.
+3. Snapshot current formation: `var slot_hero_ids: Array[int]` from `HeroRoster.get_formation_slot(i)` for i in `range(formation_size())`.
+4. Construct preset: `{id: _next_preset_id, name: stripped_name, created_at_unix: Time.get_unix_time_from_system(), slot_hero_ids: slot_hero_ids}`.
+5. Append to `_presets` array. Increment `_next_preset_id`.
+6. Emit `preset_saved(preset_id, name)` signal (informational; UI subscribes to refresh dropdown).
+7. SaveLoadSystem persists on next heartbeat (no synchronous save — consistent with the rest of FormationAssignment).
+
+### C.6 — Delete semantics
+
+`DeleteButton.pressed` on a selected preset opens the confirmation modal. On confirm:
+1. Find preset by id in `_presets`.
+2. Remove it (`erase` or splice).
+3. Emit `preset_deleted(preset_id)` signal.
+4. Dropdown's currently-selected index resets to "(none)".
+
+`_next_preset_id` is NOT decremented (monotonic invariant per HeroInstance pattern — IDs are never reused even after deletion).
+
+### C.7 — Mid-run gate (AC-FA-13 inheritance)
+
+Recall does NOT trigger the mid-run reassignment dialog (it doesn't commit). Save and Delete also do not commit. The dialog fires only on the player's explicit commit action AFTER a recall, exactly as it does today for any manual edit. **No new code path is needed in the dialog gate logic** — `_on_hero_button_pressed` is unchanged.
+
+---
+
+## D. Formulas
+
+No new formulas. Preset save/recall is structural (snapshot + assign), not computational.
+
+---
+
+## E. Edge Cases
+
+| Edge case | Behavior |
+|-----------|----------|
+| Recall a preset where ALL 3 heroes are missing | All 3 slots render empty; 3 toasts surface (capped at 3 per recall — preset can't have more than 3 heroes); player sees a "blank" formation |
+| Save with empty formation (all 3 slots empty) | Permitted. Preset.slot_hero_ids = [0, 0, 0]. Recalling it clears the buffer. Edge case but harmless. |
+| Two presets with the same name | Permitted. Players can disambiguate via the created_at_unix order. UI doesn't enforce uniqueness. |
+| Preset references a hero that was prestiged | Prestige removes the hero from `_heroes`, so `get_hero_by_id` returns null. Same path as "hero dismissed" — slot empty + toast. |
+| Save schema migration: old saves (pre-V1.0) have no `_presets` key | `load_save_data({})` initializes `_presets = []` and `_next_preset_id = 1`. Forward-compat invariant. |
+| Player edits a hero referenced in a preset (level-up, rename) | Preset stores `instance_id` only. Recall always fetches current hero state via `HeroRoster.get_hero_by_id`. Preset survives hero mutations. |
+| 4-slot or 2-slot formation in a future content update | `slot_hero_ids` length is always `formation_size()` at save time. On load, mismatched lengths trigger a "preset version mismatch — discarded" warning (one per affected preset). V2.0+ migration is a future concern. |
+
+---
+
+## F. Dependencies
+
+### Forward dependencies (Formation Presets reads from / writes through)
+
+| System | Why | Surface used |
+|---|---|---|
+| **FormationAssignment** (#11) | Owner of commit() write-path | `formation_size()`, `commit(new_formation)`, mid-run gate (AC-FA-13) |
+| **HeroRoster** (#12) | Source of truth for hero list | `get_formation_slot(i)`, `get_hero_by_id(id)` (S15-M1 accessor) |
+| **SaveLoadSystem** (#3) | Persistence | `get_save_data()` / `load_save_data(d)` consumer contract |
+| **Time** (engine) | Timestamps | `Time.get_unix_time_from_system()` |
+| **TranslationServer** (engine) | Locale-aware name input | `tr(...)` for UI labels (player name is raw String, not tr'd) |
+
+### Reverse dependencies (other systems must adapt)
+
+- **FormationAssignment GDD #11 §C.6** — supersede the "save consumer surface is empty per Save/Load Rule 10 deferral" line; reference this GDD's `_presets` schema as the now-canonical payload
+- **Save/Load schema_version** — bump from current version when V1.0 ships (per ADR-0011 schema migration contract)
+- **Formation Assignment screen** (assets/screens/formation_assignment/) — add the PresetsRow nodes + the 3 button handlers (Recall, Save, Delete) + the 2 modal sub-scenes (name input + delete confirm)
+
+---
+
+## G. Tuning Knobs
+
+| Knob | Type | Default | Safe range | Owner | Gameplay impact |
+|------|------|---------|------------|-------|------------------|
+| `MAX_PRESETS_PER_PLAYER` | int | 6 | 3–12 | game-designer | Larger = more flexibility; smaller = forces curation. 6 is "small handful" per §C.2. |
+| `PRESET_NAME_MAX_LENGTH` | int | 32 | 16–64 | game-designer | Below 16 → players can't fit short biome names; above 64 → UI truncation issues. |
+| `RECALL_MISSING_HERO_TOAST_CAP` | int | 3 | 1–10 | ux-designer | Cap on toast count per recall to avoid spam if many heroes missing. Default 3 matches formation_size. |
+| `DELETE_CONFIRMATION_DEFAULT_FOCUS` | enum | "cancel" | {"cancel", "confirm"} | ux-designer | Cozy register: destructive default is the safe one. Don't change without playtest signal. |
+
+All knobs live in `assets/data/config/formation_presets_config.tres` (new file authored alongside implementation).
+
+---
+
+## H. Acceptance Criteria
+
+**AC-FP-01** — Schema round-trips through SaveLoadSystem JSON envelope
+> A preset with all 4 fields (id, name, created_at_unix, slot_hero_ids) saved and reloaded via SaveLoadSystem reproduces identically. Verified by integration test mirroring `tests/integration/recruitment/save_round_trip_test.gd`.
+
+**AC-FP-02** — Save validates name length (empty + over-cap)
+> Calling `save_preset("", current_formation)` → returns false, emits no signal, surfaces toast "Preset name cannot be empty". Calling `save_preset(33_chars, ...)` → truncates to 32 chars, surfaces toast, saves the truncated name.
+
+**AC-FP-03** — Save enforces cap
+> With 6 presets already saved, `save_preset("seventh", ...)` → returns false, surfaces toast per §C.2. `_presets.size()` remains 6.
+
+**AC-FP-04** — Recall populates edit buffer, NOT HeroRoster
+> `recall_preset(id)` writes to the screen's local edit-buffer state. `HeroRoster.get_formation_slot(i)` is unchanged. The player must press commit (existing flow) to write.
+
+**AC-FP-05** — Recall surfaces toast per missing hero
+> A preset referencing a removed hero (`get_hero_by_id` returns null) renders the slot empty AND fires a toast. Toast count capped per §G `RECALL_MISSING_HERO_TOAST_CAP`.
+
+**AC-FP-06** — Delete removes from `_presets` + emits signal
+> `delete_preset(id)` removes the preset; subsequent `get_presets()` does not return it; `preset_deleted` signal fires exactly once.
+
+**AC-FP-07** — Delete confirmation default focus is "Cancel" (cozy register)
+> The confirmation modal opens with Cancel button focused / styled as primary. Visual + interaction check.
+
+**AC-FP-08** — `_next_preset_id` is monotonic across delete + save
+> Save preset → id=1. Save another → id=2. Delete preset id=1 → save another → id=3 (NOT id=1 reused).
+
+**AC-FP-09** — Save schema migration: pre-V1.0 saves load cleanly
+> A save file from before the V1.0 ship (no `_presets` key in FormationAssignment's namespace) loads via `load_save_data({})` → initializes `_presets = []` + `_next_preset_id = 1`. No crash, no push_error.
+
+**AC-FP-10** — `formation_size()` mismatch on load is defensive
+> A save file with a preset whose `slot_hero_ids.size() != formation_size()` (e.g., from a future 4-slot variant) is discarded on load with a single push_warning per affected preset. Other presets in the same save load normally.
+
+**AC-FP-11** — Mid-run reassignment dialog inheritance
+> Recalling a preset during ACTIVE_FOREGROUND state does NOT fire the dialog (recall doesn't commit). Pressing commit AFTER recall DOES fire the dialog per AC-FA-13.
+
+**AC-FP-12** — CI grep: forbidden patterns
+> No code outside `src/core/formation_assignment/` reads or writes `_presets` directly. The autoload exposes `save_preset(name, formation)`, `recall_preset(id)`, `delete_preset(id)`, `get_presets()` as the public API.
+
+---
+
+## I. Open Questions & ADR Candidates
+
+**OQ-FP-1 — Preset ordering in the dropdown** — *RESOLVED in §C.3*
+> ~~Should presets sort by created_at_unix asc, alphabetical, or last-recalled-first?~~
+> **Resolution**: created_at_unix asc (oldest first). Preserves the player's "1st, 2nd, 3rd preset" mental model. Last-recalled-first surfaces a usage-tracking signal that risks the FOMO trap (§B cozy register hard floor). Alphabetical is too clinical for the cozy register.
+
+**OQ-FP-2 — Should presets persist heroes-by-id or heroes-by-value (deep copy)?**
+> By id (per §C.1). Heroes-by-value would freeze a level-2 hero in the preset even as the live hero levels up — confusing UX ("why is my saved preset showing my level-5 hero as level-2?"). By-id surfaces the intuitive "preset is a roster choice, not a snapshot of stats".
+
+**OQ-FP-3 — Should named presets unlock progressively?**
+> No. All 6 slots available from preset #1's save. Locking presets behind a progression gate would impose a meta-game on a quality-of-life feature — anti-cozy.
+
+**OQ-FP-4 — Auto-save on formation commit?**
+> No (per §B cozy register). Auto-save would surface "your last formation is saved as Preset 0" which couples the feature to every commit. Players want explicit curation. If a player wants their last formation saved, they tap Save.
+
+**OQ-FP-5 — Should the recall produce an undo affordance?**
+> Out of MVP V1.0. Recall populates the screen buffer; if the player doesn't like it, they manually rebuild OR recall a different preset OR navigate away (no commit happens). True undo (revert to pre-recall buffer state) is V1.0+ if playtest signal demands.
+
+**OQ-FP-6 — Sharing presets between players (cloud / clipboard)?**
+> Deferred to V1.0+ AND gated on cert + privacy review. Not in MVP V1.0 scope.
+
+---
+
+## J. Implementation Sequencing (Sprint 17+ candidate)
+
+Per Sprint 15-16 cadence (~0.5–1.0d per story), this GDD breaks into:
+
+1. **Story 1 (~0.25d)** — Schema + autoload-side API skeleton in `src/core/formation_assignment/formation_assignment.gd`: `_presets`, `_next_preset_id` fields; `save_preset`, `recall_preset`, `delete_preset`, `get_presets` stubs with `push_error` bodies. `get_save_data` / `load_save_data` extend per §C.1. Tests: skeleton (methods exist + signals declared).
+
+2. **Story 2 (~0.5d)** — `save_preset` body (§C.5) + AC-FP-02, AC-FP-03, AC-FP-08 tests.
+
+3. **Story 3 (~0.25d)** — `delete_preset` body (§C.6) + AC-FP-06, AC-FP-08 tests.
+
+4. **Story 4 (~0.5d)** — `recall_preset` returns an `Array[HeroInstance]` (positional, with nulls for empty/missing slots) + AC-FP-04, AC-FP-05 tests. Signal: `preset_recalled(preset_id, formation)`.
+
+5. **Story 5 (~0.5d)** — Save/load schema migration (§C.1 schema_version bump) + AC-FP-01, AC-FP-09, AC-FP-10 tests. SaveLoadSystem schema_version increment.
+
+6. **Story 6 (~0.5d)** — formation_assignment.tscn UI authoring (PresetsRow + 3 buttons + 2 modal sub-scenes) + button-handler wiring on the screen script.
+
+7. **Story 7 (~0.25d)** — End-to-end integration test: save → recall → commit → assert HeroRoster mutated correctly. Covers AC-FP-11.
+
+8. **Story 8 (~0.25d)** — CI grep test for AC-FP-12 (no external `_presets` access). Plus registry entry in `docs/registry/architecture.yaml` per ADR-0015 precedent.
+
+**Total Sprint 17 scope**: ~3.0 days. Single sprint absorbable in solo mode.
+
+---
+
+## Notes
+
+- **First-pass DRAFT** — pending `/design-review formation-presets.md`. The first-pass-revision-cost pattern from Sprints 13-14 suggests 5+ BLOCKING items may surface; budget for revisions in Sprint 16 closure.
+- **Cozy register hard floor preserved**: no analytics-driven preset suggestions, no usage-frequency surfacing, no "shared community presets". Player-curated, player-named, player-owned.
+- **Mid-run reassignment gate (AC-FA-13)** inherits unchanged — preset Recall doesn't commit, so the dialog logic on `_on_hero_button_pressed` is untouched.
+- **Save schema migration** is additive (new keys in FormationAssignment's namespace). No risk to pre-V1.0 saves; the missing-key path falls back to defaults per Save/Load Rule 10.
