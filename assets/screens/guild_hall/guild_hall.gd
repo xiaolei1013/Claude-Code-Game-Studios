@@ -302,6 +302,16 @@ func _on_hero_card_pressed(instance_id: int) -> void:
 	if modal.has_method("set_target_hero"):
 		modal.set_target_hero(instance_id)
 	SceneManager.show_modal(modal)
+	# SceneManager.show_modal adds the modal to the tree but does NOT call
+	# its on_enter lifecycle hook (show_modal is for caller-owned modals;
+	# unlike request_screen, lifecycle is the caller's responsibility).
+	# Hero Detail's on_enter is where _render_all populates the placeholder
+	# labels with real hero data — without this call, the modal opens with
+	# "Hero Name" / "Class" placeholder text. Per the modal's docstring at
+	# hero_detail_modal.gd:11-17 ("Caller calls SceneManager.show_modal(self)
+	# → on_enter resolves hero").
+	if modal.has_method("on_enter"):
+		modal.on_enter()
 
 
 ## Opens the Settings overlay per GDD #30 AC-30-01. Gated on

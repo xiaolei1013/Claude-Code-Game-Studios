@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.17] - 2026-05-13
+
+### Fixed
+- **Hero Detail modal showed placeholder labels** ("Hero Name", "Class", "Level 1") instead of the tapped hero's real data. Root cause: `SceneManager.show_modal()` adds the modal to the tree but does NOT call its `on_enter()` lifecycle hook (`show_modal` is for caller-owned modals; unlike `request_screen`, lifecycle is the caller's responsibility). The modal's `_render_all` ran inside `on_enter`, so it never ran — the .tscn placeholder text persisted. Fixed in `guild_hall.gd._on_hero_card_pressed` by calling `modal.on_enter()` after `SceneManager.show_modal()`. Surfaced by playtest screenshot 2026-05-13.
+- **DimBackdrop too transparent** (Color alpha 0.4) — Guild Hall content rendered visibly through all three modal/overlay backdrops (Hero Detail, Settings, Victory Moment), making the screen feel cluttered and unfocused. Boosted to 0.75 across all three for proper "modal" visual focus. Per cozy-register principle: modals should feel like a deliberate context switch, not a layered HUD.
+- **Guild Hall RosterPanel overlapped Dispatch button** — `custom_minimum_size = Vector2(480, 280)` combined with `anchor 0.5` + `offset_top -200` extended the panel from -200 to +80 vertically (because `custom_minimum_size` overrides the offset-derived height), overlapping with `DispatchNavButton` at -40 to +12. With many heroes in the roster, the bottom row of HeroCards bled into the "Go to Dispatch" button text. Resized the panel to 200 tall, lifted to offsets -260 to -60, leaving a 20px gap above the unchanged nav buttons.
+
+### Notes
+- **Test suite**: 2089/2089 PASS (no test changes — these are visual/layout fixes only).
+- **Playtest signal**: this PR is a direct response to the user playtest screenshot showing a "messy layout" mid-modal. Tests passing did not catch any of these because they are all rendering/layout issues that only surface in a running viewport.
+
 ## [0.0.0.16] - 2026-05-13
 
 ### Added
