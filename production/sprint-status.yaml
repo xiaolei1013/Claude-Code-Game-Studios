@@ -60,14 +60,14 @@ stories:
     completed: ""
 
   - id: "S13-M4"
-    name: "Hero Detail overlay real content — DEFERRED to Sprint 14 (modal exists at assets/screens/hero_detail/hero_detail_modal.gd; wire-up needs UX pass on Guild Hall HeroCard surface)"
-    file: "assets/screens/hero_detail/hero_detail_modal.gd"
+    name: "Hero Detail overlay wire-up — DONE 2026-05-13 (Guild Hall RosterPanel + HeroCard taps → modal show_modal per GDD #22 AC-22-01)"
+    file: "assets/screens/guild_hall/guild_hall.gd"
     priority: must-have
-    status: deferred-to-sprint-14
+    status: done
     owner: ""
     estimate_days: 1.5
-    blocker: "UX pass needed: Guild Hall has no HeroCard surface; Formation Assignment's hero tap already means 'assign to slot'. Modal implementation shipped pre-emptive (584 lines + integration test) but no invoker site exists yet."
-    completed: ""
+    blocker: ""
+    completed: "2026-05-13 — Sprint 14 Day 1 follow-up closing Sprint 13 carry-forward. Added RosterPanel + ScrollContainer + dynamic HeroCard buttons to Guild Hall .tscn; .gd populates from HeroRoster.get_all_heroes() sorted by current_level desc then class_id asc; HeroCard tap calls set_target_hero + SceneManager.show_modal; subscribed to hero_recruited / hero_removed / hero_leveled for live refresh; gated on SceneManager.state != PAUSED per GDD #22 'modal already open' resolution. 6 new integration tests in tests/integration/guild_hall/roster_panel_test.gd."
 
   # ===== Should Have =====
 
