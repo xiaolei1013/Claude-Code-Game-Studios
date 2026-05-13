@@ -82,14 +82,14 @@ stories:
     completed: "Pre-emptive autonomous work; verified 2026-05-13 — test file is 411 lines covering Groups A (signal flow), B (AC-OE-12 5s ADVISORY), C (AC-OE-13 16ms BLOCKING per-chunk)"
 
   - id: "S13-S2"
-    name: "Settings overlay real content — volume slider (Master/Music/SFX) + reduce_motion toggle + Close; gear icon on Guild Hall"
+    name: "Settings overlay real content — DONE 2026-05-13 (3 volume sliders + reduce_motion toggle + close button + gear icon on Guild Hall per GDD #30 §C.1)"
     file: "assets/overlays/settings/settings.gd"
     priority: should-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-05-13 — Sprint 14 Day 2 follow-up. Replaced 28-line placeholder with real implementation: 3 HSliders wired to AudioRouter.set_*_volume_db via linear-to-dB curve (GDD #30 §C.2); reduce_motion CheckButton wired to SceneManager.set_reduce_motion (S12-S2); Close button + tap-outside dismiss via SceneManager.pop_overlay; gear icon added to Guild Hall top-right with OfflineProgressionEngine.is_replay_in_flight gate per AC-30-01 + §E.6. 9 new integration tests in tests/integration/settings/settings_overlay_test.gd. Deferred to polish: mute toggle, dB display per slider, locale dropdown, Reset to Defaults button."
 
   - id: "S13-S3"
     name: "HeroLeveling real XP curve — DONE pre-emptive (HeroRoster.add_xp + DungeonRunOrchestrator.xp_per_floor_clear + xp_per_kill all using real data-driven curves; stub references in doc-comments only)"

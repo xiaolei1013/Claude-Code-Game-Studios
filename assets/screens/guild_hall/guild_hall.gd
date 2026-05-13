@@ -17,6 +17,7 @@ extends Screen
 @onready var _gold_counter: Label = $GoldCounter
 @onready var _recruit_nav_button: Button = $RecruitNavButton
 @onready var _roster_list: VBoxContainer = $RosterPanel/RosterScroll/RosterList
+@onready var _settings_gear_button: Button = $SettingsGearButton
 
 const HeroDetailModalScene: PackedScene = preload(
 	"res://assets/screens/hero_detail/hero_detail_modal.tscn"
@@ -50,6 +51,10 @@ func on_enter() -> void:
 	if not HeroRoster.hero_leveled.is_connected(_on_hero_leveled):
 		HeroRoster.hero_leveled.connect(_on_hero_leveled)
 
+	if _settings_gear_button != null:
+		if not _settings_gear_button.pressed.is_connected(_on_settings_gear_pressed):
+			_settings_gear_button.pressed.connect(_on_settings_gear_pressed)
+
 	# Hall of Retired Heroes button: localized label + visibility gate +
 	# subscribe to prestige_completed_signal so a freshly-prestiged hero
 	# pops the button into view immediately on screen-resume.
@@ -75,6 +80,8 @@ func on_exit() -> void:
 		HeroRoster.hero_removed.disconnect(_on_roster_changed)
 	if HeroRoster.hero_leveled.is_connected(_on_hero_leveled):
 		HeroRoster.hero_leveled.disconnect(_on_hero_leveled)
+	if _settings_gear_button != null and _settings_gear_button.pressed.is_connected(_on_settings_gear_pressed):
+		_settings_gear_button.pressed.disconnect(_on_settings_gear_pressed)
 	if _hall_nav_button != null and _hall_nav_button.pressed.is_connected(_on_hall_nav_pressed):
 		_hall_nav_button.pressed.disconnect(_on_hall_nav_pressed)
 	if HeroRoster.prestige_completed_signal.is_connected(_on_prestige_completed):
@@ -253,3 +260,12 @@ func _on_hero_card_pressed(instance_id: int) -> void:
 	if modal.has_method("set_target_hero"):
 		modal.set_target_hero(instance_id)
 	SceneManager.show_modal(modal)
+
+
+## Opens the Settings overlay per GDD #30 AC-30-01. Gated on
+## OfflineProgressionEngine.is_replay_in_flight (GDD #30 §E.6) so the player
+## cannot open Settings mid-replay (would conflict with the replay modal slot).
+func _on_settings_gear_pressed() -> void:
+	if OfflineProgressionEngine.is_replay_in_flight():
+		return
+	SceneManager.push_overlay("settings", false)
