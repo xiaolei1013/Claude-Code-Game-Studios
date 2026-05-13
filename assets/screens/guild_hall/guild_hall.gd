@@ -131,14 +131,22 @@ func _on_prestige_completed(record: Dictionary, _new_count: int) -> void:
 		return
 	# Single %s, no literal %, so the % operator is safe here.
 	var text: String = tr("prestige_complete_toast") % display_name
-	_show_prestige_toast(text)
+	_show_toast(text)
 
 
 ## Renders [param text] on the bottom-center toast label and fades it
 ## over [code]TOAST_FADE_DURATION_SEC[/code]. Mirrors the formation_assignment
 ## + Recruitment toast pattern (GDD #21 §G precedent). Kills any in-flight
 ## prior toast before starting the new one.
-func _show_prestige_toast(text: String) -> void:
+##
+## Reduce-motion variant (S15-S2): when [code]SceneManager.reduce_motion[/code]
+## is true, the fade tween is suppressed. The toast snap-shows and is hidden
+## via a one-shot timer after the same total duration — no animation, no
+## easing. Same on-screen residency, accessible behaviour.
+##
+## Generic — used by both prestige completion and hero level-up toasts.
+## Renamed from _show_prestige_toast in S15-S2.
+func _show_toast(text: String) -> void:
 	if _toast_label == null:
 		return
 	if _toast_tween != null and _toast_tween.is_valid():
@@ -147,6 +155,10 @@ func _show_prestige_toast(text: String) -> void:
 	_toast_label.text = text
 	_toast_label.modulate.a = 1.0
 	_toast_label.visible = true
+	if SceneManager.reduce_motion:
+		# Snap-hide via a one-shot timer (no fade).
+		get_tree().create_timer(TOAST_FADE_DURATION_SEC).timeout.connect(_dismiss_toast, CONNECT_ONE_SHOT)
+		return
 	_toast_tween = create_tween()
 	_toast_tween.tween_property(_toast_label, "modulate:a", 0.0, TOAST_FADE_DURATION_SEC)
 	_toast_tween.finished.connect(_dismiss_toast, CONNECT_ONE_SHOT)
@@ -281,10 +293,29 @@ func _on_roster_changed(_a: Variant = null, _b: Variant = null, _c: Variant = nu
 	_refresh_roster_panel()
 
 
-## hero_leveled handler — same rebuild trigger. Signal arity is
-## (id, old_level, new_level) per HeroRoster.gd:790.
-func _on_hero_leveled(_id: int, _old_level: int, _new_level: int) -> void:
+## hero_leveled handler — refresh the roster (XP bar repaint) AND fire a
+## cozy toast announcing the level-up. S15-S2 (closes S14-N2).
+##
+## The toast reuses _show_toast which mirrors the prestige toast tween path:
+## fades over TOAST_FADE_DURATION_SEC. Under reduce_motion, the fade is
+## suppressed and the toast snap-hides via a Timer after the same duration
+## (no animation, no easing).
+##
+## Signal arity is (id, old_level, new_level) per HeroRoster.gd:790.
+func _on_hero_leveled(id: int, _old_level: int, new_level: int) -> void:
 	_refresh_roster_panel()
+	# Resolve display name for the toast. If the hero isn't resolvable
+	# (race: removed between level-up and the signal handler), skip the
+	# toast — the roster refresh has already happened.
+	var hero: HeroInstance = HeroRoster.get_hero_by_id(id)
+	if hero == null:
+		return
+	var display_name: String = String(hero.display_name)
+	if display_name == "":
+		return
+	# Localized format: "%s reached level %d!" per assets/locale/en.csv.
+	var text: String = tr("hero_level_up_toast_format") % [display_name, new_level]
+	_show_toast(text)
 
 
 ## HeroCard tap handler. Per GDD #22 AC-22-01: instantiate Hero Detail modal

@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.21] - 2026-05-14
+
+### Added
+- **Level-up toast on Guild Hall** (S15-S2, closes S14-N2) — when a hero levels up (via Hero Detail modal's Level Up button), the Guild Hall now shows a bottom-of-screen toast: "[hero name] reached level [N]!". Reuses the existing prestige-toast tween path; fades over 4.0s. Per Guild Hall + Recruit toast pattern.
+- **`reduce_motion` accessibility path** on the toast renderer — when `SceneManager.reduce_motion == true`, the fade tween is suppressed and the toast snap-hides via a one-shot Timer after the same total duration. Same on-screen residency without animation.
+- **Regression test** `tests/integration/guild_hall/level_up_toast_test.gd` (4 cases): formatted text rendering; second toast replaces first; unknown-id defensive no-op (no crash); `reduce_motion` suppresses the tween.
+
+### Changed
+- **`_show_prestige_toast` → `_show_toast`** in `guild_hall.gd` — renamed for clarity, now serves both prestige and level-up callers. Function body unchanged except for the reduce_motion branch.
+- **S15-M3 closed as no-work-needed** after Day-0 audit. Hero Detail level-up button + atomic `try_spend` → `set_hero_level` flow + cap-gated visibility were all shipped in prior pre-emptive work (`hero_detail_modal.gd:282-378`) and are covered by `hero_detail_modal_contract_test.gd`. Prestige confirmation overlay already demonstrates the destructive-action modal pattern; adding a separate dismiss-hero stub would conflict with GDD §B cozy-register principle ("no destructive actions") and ship UX debt. Deferred to a future sprint pending a real destructive-action design call.
+
+### Notes
+- **Tests**: 2113/2113 PASS (+4 from this PR; was 2109 at v0.0.0.20).
+- **Sprint 15 progress**: 3/4 Must Haves done (M1 + M2 + M3); M4 (HeroLeveling AC-15-02 playtest) remains, human-gated. S15-S2 done. S15-S1 (PATTERNS.md lifecycle entry) + S15-S3 (Recruitment save/load) still open.
+
 ## [0.0.0.20] - 2026-05-14
 
 ### Added
