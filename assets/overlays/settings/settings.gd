@@ -22,6 +22,9 @@ const _DEFAULT_SFX_DB: float = -3.0
 const _DEFAULT_REDUCE_MOTION: bool = false
 const _DEFAULT_MUTE: bool = false
 const _DEFAULT_LOCALE: String = "en"
+# Per `production/live-ops/telemetry-events-v1.md` §C.1: opt-in default is OFF.
+# Cozy register + privacy-first; no tracking until the player explicitly enables.
+const _DEFAULT_TELEMETRY_OPT_IN: bool = false
 
 
 @onready var _dim_backdrop: ColorRect = $DimBackdrop
@@ -34,6 +37,7 @@ const _DEFAULT_LOCALE: String = "en"
 @onready var _mute_check: CheckButton = $Panel/VBox/MuteRow/MuteCheck
 @onready var _reduce_motion_check: CheckButton = $Panel/VBox/ReduceMotionRow/ReduceMotionCheck
 @onready var _locale_option: OptionButton = $Panel/VBox/LocaleRow/LocaleOption
+@onready var _telemetry_check: CheckButton = $Panel/VBox/TelemetryRow/TelemetryCheck
 @onready var _reset_button: Button = $Panel/VBox/ButtonRow/ResetButton
 @onready var _close_button: Button = $Panel/VBox/ButtonRow/CloseButton
 
@@ -45,6 +49,10 @@ func _ready() -> void:
 	_sfx_slider.value = _db_to_linear(AudioRouter.get_sfx_volume_db())
 	_mute_check.button_pressed = AudioRouter.is_master_muted()
 	_reduce_motion_check.button_pressed = SceneManager.reduce_motion
+	# Per telemetry-events-v1.md §C.1: read the persisted opt-in state. The
+	# TelemetrySink autoload is the source of truth; the Settings checkbox is
+	# just a UI mirror.
+	_telemetry_check.button_pressed = TelemetrySink.is_opt_in()
 
 	# Wire slider value_changed → AudioRouter setters.
 	_master_slider.value_changed.connect(_on_master_slider_changed)
@@ -54,6 +62,7 @@ func _ready() -> void:
 	# Wire toggles.
 	_mute_check.toggled.connect(_on_mute_toggled)
 	_reduce_motion_check.toggled.connect(_on_reduce_motion_toggled)
+	_telemetry_check.toggled.connect(_on_telemetry_toggled)
 
 	# Locale dropdown (GDD #30 §C.5): populate from TranslationServer; disable
 	# if only one locale exists (MVP en-only state).
@@ -127,6 +136,13 @@ func _on_reduce_motion_toggled(value: bool) -> void:
 	SceneManager.set_reduce_motion(value)
 
 
+## Per telemetry-events-v1.md §C.1: toggle takes effect immediately. The
+## TelemetrySink autoload owns the buffer-drop / flush behavior on
+## ON→OFF / OFF→ON transitions; the screen just notifies it.
+func _on_telemetry_toggled(value: bool) -> void:
+	TelemetrySink.set_opt_in(value)
+
+
 # ---------------------------------------------------------------------------
 # Close handlers
 # ---------------------------------------------------------------------------
@@ -190,6 +206,10 @@ func _on_reset_pressed() -> void:
 	_mute_check.toggled.emit(_DEFAULT_MUTE)
 	_reduce_motion_check.button_pressed = _DEFAULT_REDUCE_MOTION
 	_reduce_motion_check.toggled.emit(_DEFAULT_REDUCE_MOTION)
+	# Telemetry: reset to opt-out default per telemetry-events-v1.md §C.1
+	# (privacy-first; resetting Settings should not silently leave tracking on).
+	_telemetry_check.button_pressed = _DEFAULT_TELEMETRY_OPT_IN
+	_telemetry_check.toggled.emit(_DEFAULT_TELEMETRY_OPT_IN)
 	# Locale: select the default option. select() doesn't emit item_selected,
 	# so emit explicitly.
 	for i: int in range(_locale_option.item_count):
