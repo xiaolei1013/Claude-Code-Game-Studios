@@ -2645,6 +2645,16 @@ forbidden_patterns:
     enforcement: "Grep CI: `grep -rn 'WorkerThreadPool' src/offline` must return zero hits in MVP."
     added: 2026-04-22
 
+  # ─── Recruitment (ADR-0015) ──────────────────────────────────────────────
+
+  - pattern: add_hero_outside_recruitment
+    status: active
+    description: "`HeroRoster.add_hero(` MUST have exactly one production caller in `src/` outside of `HeroRoster`'s own internal first-launch seed path. That caller is `src/core/recruitment/recruitment.gd` (the `try_recruit` flow). Test fixtures may call `add_hero` for seeding (allowlisted to `tests/`). Adding a second production call site outside recruitment requires an ADR amendment + GDD §C.5 update."
+    why: "Per AC-RC-14: Recruitment is the single writer for hero ingestion. The flow is Economy.try_spend → HeroRoster.add_hero, atomically, with rollback on failure. A second add_hero caller (e.g., 'admin grants a free hero', 'first-clear gives a bonus hero') would bypass cost-curve accounting, the deterministic pool seed, and the hero_recruited signal contract. The single-writer invariant is load-bearing for save determinism per ADR-0015 OQ-RC-1."
+    adr: docs/architecture/ADR-0015-recruitment-pool-determinism.md
+    enforcement: "Grep CI step `tests/unit/recruitment/recruitment_single_writer_ci_grep_test.gd` (active since Sprint 12). Scans `src/` for `HeroRoster.add_hero(` or `roster.add_hero(`/`call('add_hero',` indirect calls; excludes HeroRoster's own file + docstring/comment references. Fails on any non-Recruitment production call site. Allowlist: `tests/` directories (test seed helpers may call add_hero freely)."
+    added: 2026-05-14
+
 # Example:
 #
 # forbidden_patterns:
