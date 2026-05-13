@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.13] - 2026-05-13
+
+### Added
+- **Onboarding / First-Session Flow integration test suite** — per Onboarding GDD #29 §J Story 2. Locks down the cold-launch seed pathway as a regression guard: AC-29-02 (Theron seeded in roster + formation slot 0), AC-29-03 (Economy starting gold = 100), AC-29-04 (Floor 1 of forest_reach ACCESSIBLE; floors 2-5 LOCKED per fresh-save state), AC-29-05 (Recruitment pool seeded with non-zero RNG + non-empty draw). 7 tests in `tests/integration/onboarding/first_launch_flow_test.gd` with snapshot/restore hygiene barrier across HeroRoster + Economy + Recruitment + FloorUnlock; defensive re-seed in after_test guarantees post-state validity regardless of test ordering.
+- **AC-29-14 grep test** — per Onboarding GDD §J Story 4. `tests/unit/onboarding/no_tutorial_copy_grep_test.gd` scans `src/`, `assets/screens/`, `assets/overlays/` for the 4 canonical forbidden phrases (`"Click here"`, `"Tap to begin"`, `"Welcome!"`, `"Press to dispatch"`). Comment lines exempted (so doc-comments referencing the rule don't false-positive). Enforces the cozy-register principle that the player discovers the game through the UI itself, not through tutorial hints.
+
+### Notes
+- **Test suite**: 2073 → 2080 (+7 net). 6 onboarding flow tests + 1 grep test (also covers 1 minor reorganization).
+- **Sprint 13 onboarding coverage**: Story 1 (STARTING_GOLD constant) shipped in v0.0.0.9; Story 2 (E2E integration test) ships here; Story 3 (manual smoke + playtest checklist) remains human-gated as part of S13-M3; Story 4 (AC-29-12 idempotent seed) was already covered by `tests/unit/hero_roster/first_launch_seed_test.gd` from pre-emptive work, plus AC-29-14 grep ships here.
+- **Discovery during test authoring**: `FloorUnlock.debug_unlock_all` defaults to `true` in debug builds (QA convenience), which means AC-29-04 ("floors 2-5 LOCKED") requires explicit `debug_unlock_all = false` in the test. Production builds disable this. Pattern captured in test's `before_test` for future reference.
+
 ## [0.0.0.12] - 2026-05-13
 
 ### Added
