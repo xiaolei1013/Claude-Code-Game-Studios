@@ -121,11 +121,12 @@ func test_fresh_save_does_not_seed_planned_v1_biomes() -> void:
 	# not-shipped biomes signal "unavailable" via absence from
 	# get_available_biomes (which reads BIOME_FLOOR_COUNT).
 	#
-	# Sprint 16 M1 update: sunken_ruins (the prior placeholder name) was
-	# shipped as biome 3. Use ember_wastes as the new unregistered probe.
+	# Probe name updated multiple times as previous probes shipped as real
+	# biomes (sunken_ruins → ember_wastes → now). Using a clearly-fake name
+	# that will never collide with a future biome.
 	var fu: Node = _make_floor_unlock_with_stubs()
-	assert_int(fu.get_highest_cleared("ember_wastes")).is_equal(0)  # default
-	assert_bool(fu.is_biome_available("ember_wastes")).is_false()
+	assert_int(fu.get_highest_cleared("__nonexistent_biome_probe__")).is_equal(0)
+	assert_bool(fu.is_biome_available("__nonexistent_biome_probe__")).is_false()
 
 
 # ===========================================================================

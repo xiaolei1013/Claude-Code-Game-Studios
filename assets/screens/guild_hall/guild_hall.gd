@@ -51,6 +51,11 @@ func on_enter() -> void:
 		HeroRoster.hero_removed.connect(_on_roster_changed)
 	if not HeroRoster.hero_leveled.is_connected(_on_hero_leveled):
 		HeroRoster.hero_leveled.connect(_on_hero_leveled)
+	# Sprint 16 — biome progression gate. FloorUnlock emits biome_unlocked
+	# when a gated biome's prereq floor first-clears (e.g. clearing
+	# frostmire_f5 unlocks ember_wastes). Guild Hall surfaces a cozy toast.
+	if FloorUnlock.has_signal("biome_unlocked") and not FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked):
+		FloorUnlock.biome_unlocked.connect(_on_biome_unlocked)
 
 	if _settings_gear_button != null:
 		if not _settings_gear_button.pressed.is_connected(_on_settings_gear_pressed):
@@ -81,6 +86,8 @@ func on_exit() -> void:
 		HeroRoster.hero_removed.disconnect(_on_roster_changed)
 	if HeroRoster.hero_leveled.is_connected(_on_hero_leveled):
 		HeroRoster.hero_leveled.disconnect(_on_hero_leveled)
+	if FloorUnlock.has_signal("biome_unlocked") and FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked):
+		FloorUnlock.biome_unlocked.disconnect(_on_biome_unlocked)
 	if _settings_gear_button != null and _settings_gear_button.pressed.is_connected(_on_settings_gear_pressed):
 		_settings_gear_button.pressed.disconnect(_on_settings_gear_pressed)
 	if _hall_nav_button != null and _hall_nav_button.pressed.is_connected(_on_hall_nav_pressed):
@@ -316,6 +323,22 @@ func _on_hero_leveled(id: int, _old_level: int, new_level: int) -> void:
 	# Localized format: "%s reached level %d!" per assets/locale/en.csv.
 	var text: String = tr("hero_level_up_toast_format") % [display_name, new_level]
 	_show_toast(text)
+
+
+## Sprint 16 — biome progression gate handler. Fires when a gated biome's
+## prereq floor first-clears (FloorUnlock.biome_unlocked). Surfaces a cozy
+## toast: "Unlocked: <display_name>". Reuses the existing _show_toast path
+## (with reduce_motion accessibility branch from S15-S2).
+func _on_biome_unlocked(biome_id: String) -> void:
+	# Resolve the biome's display_name via DataRegistry. Defensive: skip the
+	# toast if the registry can't resolve (data drift between save and load).
+	var biome: Variant = DataRegistry.resolve("biomes", biome_id)
+	if biome == null:
+		return
+	var display_name: String = String(biome.get("display_name"))
+	if display_name == "":
+		return
+	_show_toast("Unlocked: %s" % display_name)
 
 
 ## HeroCard tap handler. Per GDD #22 AC-22-01: instantiate Hero Detail modal

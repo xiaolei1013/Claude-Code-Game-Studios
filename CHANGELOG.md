@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.29] - 2026-05-14
+
+### Added
+- **Biome 5: Ember Wastes** — first **gated** biome. Unlocks when the player clears Frostmire's Floor 5 boss (The Hollow Winter). 5-floor dungeon (Glass Flats → Smoke Bazaar → Ember Causeway → Obsidian Steps → Kiln's Mouth, boss). 5 new biome-themed enemies: Ash Djinn (caster), Glasswind Walker (armored), Cinder Jackal (bruiser), Obsidian Titan (tier-2 armored), The Kiln Below (tier-3 boss bruiser — "the basin's center; the fire is the floor and the walls and the air").
+- **Biome progression gate** (the first real "you earned this" loop in the game):
+  - `Biome.unlock_after: String` schema field — empty = unlocked from start; non-empty = floor_id whose first-clear unlocks this biome
+  - `FloorUnlock.BIOME_UNLOCK_GATES: Dictionary[String, String]` — populated at boot from active biomes' `unlock_after`
+  - `FloorUnlock.biome_unlocked(biome_id)` signal — fires exactly once when a gated biome's prereq clears
+  - `_seed_fresh_save_default` skips gated biomes; they enter `_unlock_state` only on gate-fire
+  - `get_available_biomes()` filters out gated-but-not-yet-unlocked biomes (Matchup Assignment menu auto-hides them)
+- **Guild Hall toast on `biome_unlocked`** — "Unlocked: Ember Wastes" surfaces via the existing `_show_toast` infra (reuses S15-S2's reduce_motion accessibility path).
+- **7 regression tests** at `tests/integration/biome_dungeon_database/ember_wastes_gated_biome_test.gd` covering: biome load, unlock_after field, dungeon resolution, enemy biome tags, fresh-save exclusion, gate-fire signal emission, idempotent re-clear.
+
+### Changed
+- **Existing 4 biomes (Forest Reach, Whispering Crags, Sunken Ruins, Frostmire) remain unlocked from start** — they're now the "starter set" + Ember Wastes is the first earned content.
+- **Test probe** in `test_fresh_save_does_not_seed_planned_v1_biomes` updated to `__nonexistent_biome_probe__` — previous probes (sunken_ruins, then ember_wastes) kept getting shipped as real biomes, invalidating the test name. Locked to a clearly-fake name now.
+
+### Notes
+- **Tests**: 2151/2151 PASS (+7 from this PR; was 2144 at PR #79).
+- **Player-visible delta**: cold launch shows 4 biome choices. Clear Frostmire's boss → toast: "Unlocked: Ember Wastes" → Matchup Assignment now shows 5 biomes. **First real progression feedback loop** beyond per-floor unlock.
+- **Pattern is extensible**: gate format is just `{biome_id}_f{floor_index}`. Future biomes 6-N can chain (Ember Wastes' boss → biome 6, etc.) by setting `unlock_after`. AND/OR composite gates are V1.5+ scope.
+- **Sprint 16 momentum**: 4 biomes shipped today (Whispering Crags PR #77 → Sunken Ruins PR #78 → Frostmire PR #79 → Ember Wastes-gated this PR). The content+depth push is real.
+
 ## [0.0.0.28] - 2026-05-14
 
 ### Added

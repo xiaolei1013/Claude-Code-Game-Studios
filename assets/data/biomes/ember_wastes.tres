@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="Biome" format=3 uid="uid://c4710lojjssee"]
+
+[ext_resource type="Script" uid="uid://dap2c30cqt6to" path="res://src/core/biome_dungeon_database/biome.gd" id="1_bm"]
+[ext_resource type="Resource" uid="uid://b2ewdungeon0001" path="res://assets/data/dungeons/ember_wastes_dungeon_01.tres" id="2_dg"]
+
+[resource]
+script = ExtResource("1_bm")
+id = "ember_wastes"
+display_name = "Ember Wastes"
+primary_palette_key = "ash_orange"
+dominant_archetypes = Array[String](["caster", "armored", "bruiser"])
+dungeons = Array[Resource]([ExtResource("2_dg")])
+environmental_storytelling = Array[String](["fused-glass ridges where the wind cooked the sand", "trading-post ruins half-swallowed by ash"])
+flavor_text = "A burn so old the maps still call it 'the green basin'. The fire is the floor now. It has been, for centuries."
+status = "active"
+unlock_after = "frostmire_f5"
