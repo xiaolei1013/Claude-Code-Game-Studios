@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.25] - 2026-05-14
+
+### Added
+- **Warm-lantern overlay shader** (S15-N2) — `assets/shaders/warm_lantern_overlay.gdshader`. Soft amber-warmth vignette that pulls screen corners toward an incandescent tone (R 1.0, G 0.65, B 0.35) while leaving the center neutral. 4 tunable uniforms via the ShaderMaterial inspector: `warm_color` (vec4), `vignette_radius` (float 0..1), `vignette_softness` (float 0..1), `intensity` (float 0..1; defaults to 0.35 for a subtle cozy bias). Per `game-concept.md` Pillar 4 Visual Identity Anchor + HD-2D rendering pipeline GDD #26 OQ-26-2.
+- **Applied to Guild Hall as a preview** via a new `WarmLanternOverlay` ColorRect (full-rect, `mouse_filter = ignore`, `z_index = 1`, ShaderMaterial attached). Composes on top of the screen without blocking input.
+- **3 regression tests** in `tests/unit/shaders/warm_lantern_overlay_test.gd`: shader loads as resource; the 4 contract uniform declarations are present in source; Guild Hall scene resolves the shader ext_resource path.
+
+### Notes
+- **Tests**: 2129/2129 PASS (+3 from this PR; was 2126 at PR #72).
+- **ADR-0017 deviation note**: ADR-0017 §Decision defers the full HD-2D pipeline (tilt-shift DoF + warm-lantern composite) to the Vertical Slice tier. This PR ships the warm-lantern half as a **preview** — ready-to-deploy infrastructure for the future Vertical Slice tier authoring, but applied to Guild Hall now for playtest visibility. If the cozy bias is undesired at this stage, revert by deleting the `WarmLanternOverlay` node from `guild_hall.tscn` (shader file + tests can stay as ready-for-deploy).
+- **Performance**: trivial fragment shader (one `length` + one `smoothstep`). Steam Deck 1280×800 frame budget unaffected per `.claude/docs/technical-preferences.md`.
+- **Sprint 15 status**: S15-N2 done. Sprint 16 plan + named-presets GDD coming next per the user's "all three" authorization.
+
 ## [0.0.0.24] - 2026-05-14
 
 ### Fixed

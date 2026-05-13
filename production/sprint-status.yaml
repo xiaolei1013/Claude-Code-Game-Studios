@@ -125,13 +125,13 @@ stories:
 
   - id: "S15-N2"
     name: "HD-2D shader — warm-lantern overlay (single visible polish pass per Visual Identity Anchor)"
-    file: "assets/shaders/"
+    file: "assets/shaders/warm_lantern_overlay.gdshader"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 2.0
     blocker: ""
-    completed: ""
+    completed: "2026-05-14 — PR (v0.0.0.25); shader + 4 tunable uniforms + applied to Guild Hall as ADR-0017 preview; 3 regression tests"
 
   - id: "S15-N3"
     name: "First-run onboarding flow UX polish (closes S14-N3) — UX pass on first-screen per Onboarding GDD #29"
