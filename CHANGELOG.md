@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.32] - 2026-05-14
+
+### Added
+- **Matchup hint affordance on Matchup Assignment** — each biome tab now shows a `MatchupHintLabel` below the biome name: `Common: armored, caster`. Surfaces the existing `Biome.dominant_archetypes` data (which had been authored but never displayed). Converts 6 biomes from "visually distinct, mechanically same" into "each biome has a recommended team composition signal". First in-game teaching of the class-vs-enemy matchup mechanic.
+- **Biome NameLabel now uses `Biome.display_name`** instead of `capitalize(biome_id)`. "hollow_stair" → "The Hollow Stair" (the actual title) instead of "Hollow_Stair" (capitalized id).
+- **4 regression tests** at `tests/integration/matchup_assignment/matchup_hint_label_test.gd`.
+
+### Changed
+- **Biome `dominant_archetypes` data** updated per actual rosters across all 6 biomes — previously all biomes had the same `["caster", "armored", "bruiser"]` placeholder (a copy-paste artifact from Sprint 16's content push). Now each biome reports its real top-2 archetypes:
+  - **Forest Reach** → `["bruiser", "armored"]`
+  - **Whispering Crags** → `["armored", "caster"]`
+  - **Sunken Ruins** → `["caster", "bruiser"]`
+  - **Frostmire** → `["armored", "caster"]`
+  - **Ember Wastes** → `["armored", "bruiser"]`
+  - **The Hollow Stair** → `["armored", "caster"]`
+
+### Notes
+- **Tests**: 2164/2164 PASS (+4 from this PR; was 2160 at PR #82).
+- **Sprint 17 first PR** — per Sprint 16 retro action #2 ("check biome saturation"): instead of biome 7, surface signal on the existing 6. Converts content variety into gameplay variety.
+- **Honest observation**: 3 of 6 biomes lean `armored, caster`. Player signal is "bring a warrior counter for most biomes". Worth a future rebalance pass if the matchup mechanic feels too uniform — but exposing the signal is the prerequisite to playtesting that.
+- **Player-visible delta**: from cold launch, the Matchup Assignment screen now teaches the matchup mechanic that has existed silently under the game since Sprint 8.
+
 ## [0.0.0.31] - 2026-05-14
 
 ### Added
