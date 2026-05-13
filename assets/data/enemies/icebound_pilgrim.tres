@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2iceboundpilgr"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "icebound_pilgrim"
+display_name = "Icebound Pilgrim"
+tier = 1
+archetype = "armored"
+biome = "frostmire"
+base_hp = 86
+base_attack = 8
+base_speed = 2
+sprite_path = "assets/art/enemies/icebound_pilgrim/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Was walking somewhere when the cold took it. Still walking, in the same direction."
+is_boss = false
