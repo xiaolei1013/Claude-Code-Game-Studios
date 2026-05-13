@@ -158,8 +158,8 @@ func test_enemy_data_schema_has_no_loot_override_or_resistance_fields() -> void:
 
 	# Check that no property name starts with "resistance_"
 	var has_resistance_field: bool = false
-	for name: String in all_names:
-		if name.begins_with("resistance_"):
+	for enemy_name: String in all_names:
+		if enemy_name.begins_with("resistance_"):
 			has_resistance_field = true
 			break
 	assert_bool(has_resistance_field).is_false()

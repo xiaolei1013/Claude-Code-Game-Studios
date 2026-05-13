@@ -100,10 +100,10 @@ func test_reset_button_restores_telemetry_to_opt_out() -> void:
 	# Arrange — telemetry is ON.
 	TelemetrySink.set_opt_in(true)
 	var overlay: Control = _make_overlay_in_tree()
-	var reset: Button = overlay.get_node("Panel/VBox/ButtonRow/ResetButton")
+	var reset_button: Button = overlay.get_node("Panel/VBox/ButtonRow/ResetButton")
 
 	# Act.
-	reset.pressed.emit()
+	reset_button.pressed.emit()
 
 	# Assert — telemetry flipped to OFF.
 	assert_bool(TelemetrySink.is_opt_in()).override_failure_message(

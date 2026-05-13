@@ -102,11 +102,11 @@ func test_every_consumer_self_feed_round_trip_does_not_crash() -> void:
 		# as a test failure (gdunit converts push_error to test fail by default).
 		node.call("load_save_data", snapshot)
 		# Re-snapshot — should still produce a Dictionary.
-		var after: Variant = node.call("get_save_data")
-		if not (after is Dictionary):
+		var after_dict: Variant = node.call("get_save_data")
+		if not (after_dict is Dictionary):
 			violations.append(
 				"%s: post-self-feed get_save_data returned non-Dictionary (type=%d)"
-				% [path, typeof(after)]
+				% [path, typeof(after_dict)]
 			)
 
 	if not violations.is_empty():

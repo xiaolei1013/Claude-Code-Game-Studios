@@ -134,9 +134,9 @@ func test_generate_name_does_not_return_already_used_name_for_same_class() -> vo
 
 	# Act — generate 30 names (more than enough to detect collision risk).
 	for _i: int in range(30):
-		var name: String = hr._generate_name("warrior", 100)
+		var generated_name: String = hr._generate_name("warrior", 100)
 		# Assert — never returns "Theron" while it's in use.
-		assert_str(name).is_not_equal("Theron")
+		assert_str(generated_name).is_not_equal("Theron")
 
 
 func test_generate_name_can_reuse_same_name_across_different_classes() -> void:
@@ -225,10 +225,10 @@ func test_generate_name_unknown_class_returns_placeholder_with_warning() -> void
 	var hr: Node = _make_fresh_roster()
 
 	# Act
-	var name: String = hr._generate_name("ghost_class_does_not_exist", 42)
+	var generated_name: String = hr._generate_name("ghost_class_does_not_exist", 42)
 
 	# Assert
-	assert_str(name).is_equal("Hero 42")
+	assert_str(generated_name).is_equal("Hero 42")
 
 
 # ===========================================================================
@@ -245,7 +245,7 @@ func test_generate_name_for_warrior_does_not_return_placeholder_format() -> void
 	var hr: Node = _make_fresh_roster()
 
 	# Act
-	var name: String = hr._generate_name("warrior", 7)
+	var generated_name: String = hr._generate_name("warrior", 7)
 
 	# Assert
-	assert_str(name).is_not_equal("Hero 7")
+	assert_str(generated_name).is_not_equal("Hero 7")

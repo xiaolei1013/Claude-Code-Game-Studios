@@ -92,8 +92,8 @@ func test_hero_roster_private_fields_use_underscore_prefix() -> void:
 		if n.begins_with("_") and n in expected:
 			prop_names.append(n)
 	assert_int(prop_names.size()).is_equal(expected.size())
-	for name: String in expected:
-		assert_bool(prop_names.has(name)).is_true()
+	for class_name_check: String in expected:
+		assert_bool(prop_names.has(class_name_check)).is_true()
 	hr.free()
 
 

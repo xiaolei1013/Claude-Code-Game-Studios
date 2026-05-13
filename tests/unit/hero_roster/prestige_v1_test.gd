@@ -171,9 +171,9 @@ func test_prestige_hero_emits_prestige_completed_signal() -> void:
 	roster.prestige_hero(id)
 
 	assert_int(_prestige_signal_calls.size()).is_equal(1)
-	var call: Dictionary = _prestige_signal_calls[0]
-	assert_int(call.get("new_count", -1)).is_equal(1)
-	var rec: Dictionary = call.get("record", {})
+	var call_record: Dictionary = _prestige_signal_calls[0]
+	assert_int(call_record.get("new_count", -1)).is_equal(1)
+	var rec: Dictionary = call_record.get("record", {})
 	assert_str(rec.get("display_name", "")).is_equal("Mira")
 	assert_str(rec.get("class_id", "")).is_equal("mage")
 
