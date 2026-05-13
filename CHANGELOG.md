@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.20] - 2026-05-14
+
+### Added
+- **Mid-run reassignment confirmation dialog** on Formation Assignment screen (S15-M2, AC-FA-13). When a hero-button tap arrives while `DungeonRunOrchestrator.state` is `DISPATCHING` / `ACTIVE_FOREGROUND` / `ACTIVE_OFFLINE_REPLAY`, the commit is deferred and a modal dialog appears: "Changing your formation will end the current run. Continue?" with Cancel + End Run & Change buttons. Per `formation-assignment-system.md` §G.1. Gated by `MID_RUN_REASSIGN_WARNING_ENABLED` const on the screen (default true; false bypasses for QA / smoke tests).
+- **Regression test** `tests/integration/formation_assignment/mid_run_reassign_confirm_dialog_test.gd` (6 cases): NO_RUN commits immediately; ACTIVE_FOREGROUND defers + shows dialog; Confirm runs deferred commit; Cancel discards (no signal, no mutation); ACTIVE_OFFLINE_REPLAY also defers; RUN_ENDED commits immediately.
+
+### Notes
+- **Tests**: 2109/2109 PASS (+6 from this PR; was 2103 at v0.0.0.19).
+- **AC-FA-13 contract**: the screen, not the autoload, owns the dialog (per GDD). The autoload contains zero dialog UI references — verified by spec text. Future polish: migrate `MID_RUN_REASSIGN_WARNING_ENABLED` from screen const to `scene_manager_config.tres` or a per-screen config resource.
+- **Real-world reachability**: today the formation_assignment screen is only reachable between runs (NO_RUN / RUN_ENDED), so the gate is defense-in-depth. If a future feature exposes the screen mid-run (e.g., a "view formation" tab during dungeon run), the dialog already protects against accidental run-end.
+- **Sprint 15 progress**: S15-M1 + S15-M2 closed. Remaining must-haves: S15-M3 (Hero Detail interactive actions), S15-M4 (HeroLeveling AC-15-02 playtest, human-gated).
+
 ## [0.0.0.19] - 2026-05-14
 
 ### Changed

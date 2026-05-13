@@ -79,6 +79,36 @@ var _synergy_badge_tween: Tween = null
 @onready var _toast_label: Label = $ToastLabel
 @onready var _synergy_badge: Label = $SynergyBadge
 @onready var _back_button: Button = $BackButton
+# S15-M2 — mid-run reassignment confirmation dialog (AC-FA-13).
+@onready var _reassign_confirm_root: Control = $MidRunReassignConfirmation
+@onready var _reassign_confirm_button: Button = $MidRunReassignConfirmation/ConfirmPanel/ConfirmContent/ConfirmButtonRow/ConfirmButton
+@onready var _reassign_cancel_button: Button = $MidRunReassignConfirmation/ConfirmPanel/ConfirmContent/ConfirmButtonRow/CancelButton
+
+# ---------------------------------------------------------------------------
+# AC-FA-13 (S15-M2) — Mid-run reassignment confirm dialog gating
+# ---------------------------------------------------------------------------
+
+## Per formation-assignment-system.md §G.1: gates the confirm dialog when
+## a hero-button tap arrives while DungeonRunOrchestrator.state is
+## ACTIVE_FOREGROUND or OFFLINE_REPLAY. The dialog warns the player that
+## confirming will end the current run (per ADR-0001 + §C.3 — the
+## Orchestrator's _on_formation_reassigned handler ends + restarts the run
+## on formation_reassignment_committed).
+##
+## Default true (cozy default — surface the consequence). false disables the
+## dialog and commits immediately; reserved for QA / smoke-test contexts.
+##
+## GDD §G Tuning Knobs: lives in scene_manager_config.tres or a screen-
+## config equivalent (future polish). For now, owned by the screen as a
+## const — the contract is "the screen reads this and gates commit()",
+## independent of where it's stored.
+const MID_RUN_REASSIGN_WARNING_ENABLED: bool = true
+
+## When a tap-during-active-run is deferred for confirmation, the screen
+## stashes the hero_id + active_slot_index here. _on_reassign_confirm_pressed
+## consumes them; _on_reassign_cancel_pressed clears them.
+var _pending_reassign_hero_id: int = 0
+var _pending_reassign_slot_index: int = -1
 
 # ---------------------------------------------------------------------------
 # Built-in lifecycle (_ready — tap-target enforcement)
@@ -156,6 +186,11 @@ func on_enter() -> void:
 		_floor_button.pressed.connect(_on_floor_button_pressed)
 	if not _back_button.pressed.is_connected(_on_back_pressed):
 		_back_button.pressed.connect(_on_back_pressed)
+	# S15-M2: confirm dialog button wiring (idempotent — buttons are static).
+	if not _reassign_confirm_button.pressed.is_connected(_on_reassign_confirm_pressed):
+		_reassign_confirm_button.pressed.connect(_on_reassign_confirm_pressed)
+	if not _reassign_cancel_button.pressed.is_connected(_on_reassign_cancel_pressed):
+		_reassign_cancel_button.pressed.connect(_on_reassign_cancel_pressed)
 	# Toast tap-to-dismiss: ToastLabel uses gui_input rather than pressed
 	# (Label has no pressed signal). MOUSE_FILTER_STOP enables input capture.
 	_toast_label.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -203,6 +238,11 @@ func on_exit() -> void:
 		_back_button.pressed.disconnect(_on_back_pressed)
 	if _toast_label != null and _toast_label.gui_input.is_connected(_on_toast_input):
 		_toast_label.gui_input.disconnect(_on_toast_input)
+	# S15-M2: mirror confirm-dialog button wiring.
+	if _reassign_confirm_button != null and _reassign_confirm_button.pressed.is_connected(_on_reassign_confirm_pressed):
+		_reassign_confirm_button.pressed.disconnect(_on_reassign_confirm_pressed)
+	if _reassign_cancel_button != null and _reassign_cancel_button.pressed.is_connected(_on_reassign_cancel_pressed):
+		_reassign_cancel_button.pressed.disconnect(_on_reassign_cancel_pressed)
 
 	# Kill any in-flight toast tween to avoid modulating a freed node.
 	if _toast_tween != null and _toast_tween.is_valid():
@@ -354,40 +394,82 @@ func _on_slot_button_pressed(slot_index: int) -> void:
 ##
 ## S15-M1 refactor (AC-FA-12 single-write-point): routes the write through
 ## [code]FormationAssignment.commit()[/code] instead of calling
-## [code]HeroRoster.set_formation_slot[/code] directly. The screen builds a
-## new positional [code]Array[HeroInstance][/code] from the current formation
-## state with the tapped hero swapped into [member _active_slot_index], then
-## hands it to commit(). The autoload writes per-slot via set_formation_slot
-## and emits [signal FormationAssignment.formation_reassignment_committed]
-## once after all writes complete.
+## [code]HeroRoster.set_formation_slot[/code] directly.
 ##
-## Mid-run reassignment dialog (AC-FA-13) is S15-M2 scope and will gate this
-## call when DungeonRunOrchestrator.state is ACTIVE_FOREGROUND or
-## OFFLINE_REPLAY. Today the screen is only reachable between runs.
+## S15-M2 mid-run gate (AC-FA-13): when
+## [code]MID_RUN_REASSIGN_WARNING_ENABLED == true[/code] AND
+## [code]DungeonRunOrchestrator.state[/code] is ACTIVE_FOREGROUND or
+## OFFLINE_REPLAY, the commit is deferred — the screen shows
+## [member _reassign_confirm_root] and stashes the pending tap. On confirm
+## the commit proceeds; on cancel it's discarded.
 ##
-## On success, advances [member _active_slot_index] to fill successive slots
+## On commit, advances [member _active_slot_index] to fill successive slots
 ## with successive taps (progressive fill pattern). Refreshes both panels.
 func _on_hero_button_pressed(hero_id: int) -> void:
+	# AC-FA-13 gate: defer the commit if mid-run + warning enabled.
+	if MID_RUN_REASSIGN_WARNING_ENABLED and _is_orchestrator_active():
+		_pending_reassign_hero_id = hero_id
+		_pending_reassign_slot_index = _active_slot_index
+		_reassign_confirm_root.visible = true
+		return
+	_apply_hero_commit(hero_id, _active_slot_index)
+
+
+## Returns true when DungeonRunOrchestrator.state warrants the confirm
+## dialog. Per formation-assignment-system.md §C.3 + §G.1: any state in
+## which a run is in flight should surface the consequence. That includes
+## DISPATCHING (1), ACTIVE_FOREGROUND (2), and ACTIVE_OFFLINE_REPLAY (3).
+## NO_RUN (0) and RUN_ENDED (4) commit immediately — no in-flight run to
+## interrupt.
+func _is_orchestrator_active() -> bool:
+	# Resolve at call time via get_node_or_null so test envs without the
+	# orchestrator wired don't crash on the global lookup.
+	var orch: Node = get_node_or_null("/root/DungeonRunOrchestrator")
+	if orch == null:
+		return false
+	var s: int = int(orch.get("state"))
+	# Hard-coded enum values to avoid script-load coupling. Per
+	# dungeon_run_state.gd: NO_RUN=0, RUN_ENDED=4. Active = anything else.
+	return s != 0 and s != 4
+
+
+## Builds the positional Array[HeroInstance], applies the tap, routes through
+## FormationAssignment.commit(), and advances the active slot. Called either
+## directly (no-confirmation path) or from _on_reassign_confirm_pressed.
+func _apply_hero_commit(hero_id: int, slot_index: int) -> void:
 	var formation_size: int = HeroRoster.formation_size()
-	# Build the new positional formation from current state.
 	var new_formation: Array[HeroInstance] = []
 	new_formation.resize(formation_size)
 	for i: int in range(formation_size):
 		var existing_id: int = HeroRoster.get_formation_slot(i)
 		new_formation[i] = HeroRoster.get_hero_by_id(existing_id)
-	# Apply the tap: swap the tapped hero into the active slot. commit()'s
-	# per-slot set_formation_slot loop handles auto-clear if the same hero
-	# was occupying a different slot.
-	new_formation[_active_slot_index] = HeroRoster.get_hero_by_id(hero_id)
+	new_formation[slot_index] = HeroRoster.get_hero_by_id(hero_id)
 	FormationAssignment.commit(new_formation)
-	# Advance active slot cyclically so successive taps fill progressively.
-	# commit() emits validation_failed signal on rejection, so we don't gate
-	# the advance on success — match prior UX (advance after every tap).
-	_active_slot_index = (_active_slot_index + 1) % formation_size
+	_active_slot_index = (slot_index + 1) % formation_size
 	_refresh_roster_panel()
 	_refresh_formation_panel()
-	# Re-suppress focus on any newly-created buttons.
 	UIFrameworkScript.suppress_keyboard_focus(self)
+
+
+## Confirm button on the mid-run reassignment dialog. Consumes the pending
+## tap, runs the commit (which triggers run-end + restart per ADR-0001),
+## hides the dialog.
+func _on_reassign_confirm_pressed() -> void:
+	var hero_id: int = _pending_reassign_hero_id
+	var slot_index: int = _pending_reassign_slot_index
+	_pending_reassign_hero_id = 0
+	_pending_reassign_slot_index = -1
+	_reassign_confirm_root.visible = false
+	if hero_id != 0 and slot_index >= 0:
+		_apply_hero_commit(hero_id, slot_index)
+
+
+## Cancel button on the mid-run reassignment dialog. Discards the pending
+## tap; no signal emit; the run continues unaffected.
+func _on_reassign_cancel_pressed() -> void:
+	_pending_reassign_hero_id = 0
+	_pending_reassign_slot_index = -1
+	_reassign_confirm_root.visible = false
 
 
 ## Routes to the Matchup Assignment Screen (#23) where the player can browse
