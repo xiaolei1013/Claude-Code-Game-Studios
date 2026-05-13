@@ -152,6 +152,17 @@ layout_mode = 2
 size_flags_horizontal = 3
 focus_mode = 0
 
+[node name="TelemetryRow" type="HBoxContainer" parent="Panel/VBox"]
+layout_mode = 2
+
+[node name="TelemetryLabel" type="Label" parent="Panel/VBox/TelemetryRow"]
+custom_minimum_size = Vector2(280, 0)
+layout_mode = 2
+text = "Share anonymous diagnostic data"
+
+[node name="TelemetryCheck" type="CheckButton" parent="Panel/VBox/TelemetryRow"]
+layout_mode = 2
+
 [node name="Separator2" type="HSeparator" parent="Panel/VBox"]
 layout_mode = 2
 

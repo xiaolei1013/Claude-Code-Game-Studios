@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.23] - 2026-05-14
+
+### Added
+- **Settings overlay telemetry opt-in toggle** — new "Share anonymous diagnostic data" CheckButton row between Language and Reset. Wired to `TelemetrySink.set_opt_in()` / `is_opt_in()`. Closes the last unshipped piece of Telemetry V1.0 (per `production/live-ops/telemetry-events-v1.md` §F.5). Default OFF per §C.1 (cozy register + privacy first).
+- **Reset to Defaults now restores telemetry opt-out** — privacy-first invariant: resetting Settings should never silently leave tracking on.
+- **Regression test** `tests/integration/settings/telemetry_opt_in_toggle_test.gd` (5 cases): init from OFF; init from ON; toggle OFF→ON writes through; toggle ON→OFF writes through; Reset button restores opt-out regardless of prior state.
+
+### Notes
+- **Tests**: 2122/2122 PASS (+5 from this PR; was 2117 at v0.0.0.22).
+- **Sprint 16 candidate pulled forward**: Sprint 15 autonomous work was exhausted (M4 + S4 human-gated). This PR closes one Sprint 16 backlog item now rather than leaving the Telemetry V1.0 surface incomplete. TelemetrySink autoload, JSONL writer, opt-in save consumer, and 5-event taxonomy were all shipped in prior pre-emptive work (`src/core/telemetry_sink/telemetry_sink.gd:407 lines`); only the Settings UI hook was outstanding.
+- **Cozy register guardrail**: opt-in defaults OFF — no events buffered, written, or emitted until the player explicitly enables. Per the telemetry V1 spec §C.1 + §B (anti-list).
+
 ## [0.0.0.22] - 2026-05-14
 
 ### Added
