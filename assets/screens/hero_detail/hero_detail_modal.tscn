@@ -65,6 +65,10 @@ text = "Class"
 layout_mode = 2
 text = "(owned: 1 warrior)"
 
+[node name="CounterArchetypeLabel" type="Label" parent="DetailPanel/ContentVBox/HeaderRow/HeaderLabels"]
+layout_mode = 2
+text = ""
+
 [node name="StatsBlock" type="VBoxContainer" parent="DetailPanel/ContentVBox"]
 layout_mode = 2
 

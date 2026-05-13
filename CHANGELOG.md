@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.34] - 2026-05-14
+
+### Added
+- **Hero Detail modal now shows "Strong vs: <archetype>"** beneath the OwnedCount line. Surfaces each class's existing `counter_archetype` data (`warrior → bruiser`, `mage → caster`, `rogue → armored`) so the player can identify which heroes counter what when planning a team. Closes the matchup awareness chain on the hero side:
+  - PR #83: Matchup Assignment shows biome archetypes (diagnostic)
+  - PR #84: Matchup Assignment shows recommended classes (prescriptive)
+  - **This PR: Hero Detail shows each hero's counter** — player can now confirm a hero's role before dispatching.
+- **3 regression tests** in `tests/integration/hero_detail/hero_detail_modal_contract_test.gd` — one per class verifying the label renders the correct counter_archetype.
+
+### Notes
+- **Tests**: 2167/2167 PASS (+3 from this PR; was 2164 at PR #84).
+- **Player workflow**: dispatch flow now reads as a coherent loop — biome screen recommends classes → hero detail confirms which heroes counter what → formation assignment dispatches with intent. No more "guess which hero is good vs what enemy".
+- **Defensive**: if a class ships with no `counter_archetype` set (data drift), the label stays empty — no broken text. Verified via the "" fallback path in `_refresh_header`.
+
 ## [0.0.0.33] - 2026-05-14
 
 ### Changed

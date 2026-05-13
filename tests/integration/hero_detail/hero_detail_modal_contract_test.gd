@@ -260,3 +260,50 @@ func test_modal_level_up_press_with_insufficient_gold_does_not_advance() -> void
 	# Hero level unchanged; Economy balance unchanged.
 	assert_int(hero.current_level).is_equal(pre_level)
 	assert_int(Economy.get_gold_balance()).is_equal(0)
+
+
+# ===========================================================================
+# Group G — Sprint 17 counter-archetype label
+# ===========================================================================
+
+# Warrior counters bruiser per assets/data/classes/warrior.tres. Modal must
+# surface this as "Strong vs: bruiser" so the player can plan team
+# composition against biome dominant_archetypes (PR #84 closes the other
+# end of the chain).
+func test_modal_shows_counter_archetype_label_for_warrior() -> void:
+	if DataRegistry.resolve("classes", "warrior") == null:
+		push_warning("Skipped: DataRegistry can't resolve 'warrior'")
+		return
+	var modal: Node = _make_modal()
+	_inject_hero_into_roster(120, "warrior", 1, 0)
+	modal.set_target_hero(120)
+	modal.on_enter()
+	var label: Label = modal._counter_archetype_label
+	assert_object(label).is_not_null()
+	assert_str(label.text).override_failure_message(
+		"Warrior should show 'Strong vs: bruiser'; got '%s'" % label.text
+	).is_equal("Strong vs: bruiser")
+
+
+# Mage counters caster.
+func test_modal_shows_counter_archetype_label_for_mage() -> void:
+	if DataRegistry.resolve("classes", "mage") == null:
+		push_warning("Skipped: DataRegistry can't resolve 'mage'")
+		return
+	var modal: Node = _make_modal()
+	_inject_hero_into_roster(121, "mage", 1, 0)
+	modal.set_target_hero(121)
+	modal.on_enter()
+	assert_str(modal._counter_archetype_label.text).is_equal("Strong vs: caster")
+
+
+# Rogue counters armored.
+func test_modal_shows_counter_archetype_label_for_rogue() -> void:
+	if DataRegistry.resolve("classes", "rogue") == null:
+		push_warning("Skipped: DataRegistry can't resolve 'rogue'")
+		return
+	var modal: Node = _make_modal()
+	_inject_hero_into_roster(122, "rogue", 1, 0)
+	modal.set_target_hero(122)
+	modal.on_enter()
+	assert_str(modal._counter_archetype_label.text).is_equal("Strong vs: armored")
