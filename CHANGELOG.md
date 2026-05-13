@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.15] - 2026-05-13
+
+### Added
+- **HeroCards on Guild Hall now respond to taps with a 1.05× scale pulse** + UI tap chime (silent until audio assets land per ADR-0016). Wired via `UIFramework.wire_touch_feedback` per Art Bible §7 / ADR-0008. Matches the touch-responsiveness pattern used on every other interactive Control in the project.
+- **Master mute toggle on Settings overlay** per GDD #30 §C.3. CheckButton row labeled "Mute (master)" sits above the reduce_motion row; toggle calls `AudioRouter.set_master_muted(bool)`. Seeds initial state from `AudioRouter.is_master_muted()` on overlay open. The mute is a hard override per GDD §C.3 — the slider's stored value is preserved, just bypassed when mute is on.
+
+### Notes
+- **Test suite**: 2082 → 2084 (+2 net). 2 new tests in `tests/integration/settings/settings_overlay_test.gd` cover the mute toggle round-trip + initialization-from-AudioRouter. HeroCard touch-feedback wiring verified by reuse of the existing UIFramework idempotency contract (no new test).
+- **Hero Detail Level Up button audited** as fully wired during this PR's investigation: cost resolution via `Economy.level_cost(tier, level)`, atomic `try_spend("level_up")` → `set_hero_level(id, +1)` transaction, affordability gating, cap-hide, prestige takeover at cap. No changes needed; documented here for traceability.
+- **Deferred from PR #55 still pending**: parchment sub-panel theme styling for HeroCards (theme variation work — independent of wiring), class icon (V1.0+), animated XP bar fill on level-up.
+
 ## [0.0.0.14] - 2026-05-13
 
 ### Changed

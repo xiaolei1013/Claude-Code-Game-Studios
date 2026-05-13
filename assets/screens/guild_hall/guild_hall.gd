@@ -22,6 +22,7 @@ extends Screen
 const HeroDetailModalScene: PackedScene = preload(
 	"res://assets/screens/hero_detail/hero_detail_modal.tscn"
 )
+const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
 
 # Prestige completion toast — fades over 4.0s matching the
 # formation_assignment + Recruitment toast pattern (GDD #21 §G).
@@ -268,6 +269,8 @@ func _build_hero_card(hero: RefCounted) -> Button:
 
 	var instance_id: int = int(hero.get("instance_id"))
 	card.pressed.connect(_on_hero_card_pressed.bind(instance_id))
+	# Touch-feedback pulse + UI tap chime per Art Bible §7 / ADR-0008 §wire_touch_feedback.
+	UIFrameworkScript.wire_touch_feedback(card)
 	return card
 
 
