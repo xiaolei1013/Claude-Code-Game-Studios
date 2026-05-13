@@ -159,11 +159,27 @@ func _render_biome_tabs() -> void:
 		var biome_tab: VBoxContainer = VBoxContainer.new()
 		biome_tab.name = "BiomeTab_%s" % biome_id
 		pool_vbox.add_child(biome_tab)
-		# Biome name label (placeholder; full BiomeIcon + matchup hint
-		# deferred per visual-polish carve-out).
+		# Biome name label — use the resource's localizable display_name
+		# instead of capitalize(id) so "hollow_stair" → "The Hollow Stair".
 		var name_label: Label = Label.new()
-		name_label.text = biome_id.capitalize()
+		name_label.name = "NameLabel"
+		name_label.text = String(biome.display_name) if "display_name" in biome and String(biome.display_name) != "" else biome_id.capitalize()
 		biome_tab.add_child(name_label)
+		# Sprint 17 — matchup hint: surface the biome's dominant_archetypes
+		# so the player can pick a team composition with intent. Format:
+		# "Common: armored, caster". Hidden when dominant_archetypes is empty
+		# (defensive; no biome currently ships without archetypes).
+		var archetypes: Array[String] = []
+		if "dominant_archetypes" in biome:
+			var raw: Array = biome.get("dominant_archetypes") as Array
+			for a: Variant in raw:
+				if a is String and String(a) != "":
+					archetypes.append(String(a))
+		if not archetypes.is_empty():
+			var hint_label: Label = Label.new()
+			hint_label.name = "MatchupHintLabel"
+			hint_label.text = "Common: %s" % ", ".join(archetypes)
+			biome_tab.add_child(hint_label)
 		# Floor row.
 		var floor_row: HBoxContainer = HBoxContainer.new()
 		floor_row.name = "FloorRow"
