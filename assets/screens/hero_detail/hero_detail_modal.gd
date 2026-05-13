@@ -7,14 +7,17 @@
 ## Visual polish (anchors + final theme variation tuning + portrait
 ## sourcing) deferred to post-`/design-review` of GDD #22.
 ##
-## Lifecycle (per GDD §C.2):
+## Lifecycle (per GDD §C.2; S14-M6 update — SceneManager now drives the
+## Screen lifecycle hooks):
 ##   1. Caller (Guild Hall HeroCard tap) instantiates the modal scene
 ##   2. Caller calls set_target_hero(instance_id) BEFORE show_modal
 ##   3. Caller calls SceneManager.show_modal(self)
-##   4. on_enter resolves hero + class via HeroRoster + DataRegistry,
+##   4. SceneManager.show_modal calls self.on_enter() automatically;
+##      on_enter resolves hero + class via HeroRoster + DataRegistry,
 ##      subscribes to signals, renders all panels
-##   5. Player taps LevelUp / Close / DimBackdrop to dismiss
-##   6. on_exit disconnects signal handlers
+##   5. Player taps LevelUp / Close / DimBackdrop → calls SceneManager.hide_modal(self)
+##   6. SceneManager.hide_modal calls self.on_exit() automatically (before
+##      queue_free); on_exit disconnects signal handlers
 ##
 ## Atomic Level-Up transaction (per GDD §C.6):
 ##   try_spend(cost, "level_up") → on success → set_hero_level(id, +1)

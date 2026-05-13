@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.18] - 2026-05-13
+
+### Changed
+- **`SceneManager.show_modal()` now calls `modal.on_enter()` automatically** after add_child + tracking + state transition to PAUSED, matching `request_screen`'s lifecycle contract. Symmetric change in `hide_modal()` calls `modal.on_exit()` before `queue_free`. Type-guarded via `is Screen` so plain Control modals are unaffected. **S14-M6 regression hardening** for the PR #58 bug class: callers no longer need to remember to manually call `on_enter()` after `show_modal()`. The Hero Detail call site in `guild_hall.gd._on_hero_card_pressed` was updated to drop the now-redundant manual call (would otherwise double-fire `_render_all`).
+- **`hero_detail_modal.gd` docstring** updated to reflect that step 4 (on_enter) is now invoked by SceneManager, not the caller.
+
+### Added
+- **Regression test** `tests/unit/scene_manager/show_modal_lifecycle_test.gd` (8 cases): asserts `show_modal` calls `on_enter` exactly once and only after modal is in tree + state is PAUSED; asserts `hide_modal` calls `on_exit` exactly once and only while modal is still in tree; covers plain-Control modals (no-op via `is Screen` guard); covers full show→hide cycle ordering.
+
+### Notes
+- **Tests**: 2097/2097 PASS (+8 from this PR; was 2089 at v0.0.0.17). No regressions in `offline_replay_modal_coordination_test.gd` (the existing show_modal test) — plain Control modals there are skipped by the `is Screen` guard.
+- **Audit**: only one production `show_modal` call site exists today (`guild_hall.gd:_on_hero_card_pressed`). Future callers benefit from the lifecycle hook automatically.
+- **Sprint 14 progress**: S14-M6 closed. Remaining must-haves: S14-M4 (close-reload smoke playtest, human-gated) and S14-M5 (playtest-07 full-loop validation).
+
+## [0.0.0.17] - 2026-05-13
+
+### Fixed
+- **Hero Detail modal showed placeholder labels** ("Hero Name", "Class", "Level 1") instead of the tapped hero's real data. Root cause: `SceneManager.show_modal()` adds the modal to the tree but does NOT call its `on_enter()` lifecycle hook (`show_modal` is for caller-owned modals; unlike `request_screen`, lifecycle is the caller's responsibility). The modal's `_render_all` ran inside `on_enter`, so it never ran — the .tscn placeholder text persisted. Fixed in `guild_hall.gd._on_hero_card_pressed` by calling `modal.on_enter()` after `SceneManager.show_modal()`. Surfaced by playtest screenshot 2026-05-13.
+- **DimBackdrop too transparent** (Color alpha 0.4) — Guild Hall content rendered visibly through all three modal/overlay backdrops (Hero Detail, Settings, Victory Moment), making the screen feel cluttered and unfocused. Boosted to 0.75 across all three for proper "modal" visual focus. Per cozy-register principle: modals should feel like a deliberate context switch, not a layered HUD.
+- **Guild Hall RosterPanel overlapped Dispatch button** — `custom_minimum_size = Vector2(480, 280)` combined with `anchor 0.5` + `offset_top -200` extended the panel from -200 to +80 vertically (because `custom_minimum_size` overrides the offset-derived height), overlapping with `DispatchNavButton` at -40 to +12. With many heroes in the roster, the bottom row of HeroCards bled into the "Go to Dispatch" button text. Resized the panel to 200 tall, lifted to offsets -260 to -60, leaving a 20px gap above the unchanged nav buttons.
+
+### Notes
+- **Test suite**: 2089/2089 PASS (no test changes — these are visual/layout fixes only).
+- **Playtest signal**: this PR is a direct response to the user playtest screenshot showing a "messy layout" mid-modal. Tests passing did not catch any of these because they are all rendering/layout issues that only surface in a running viewport.
+
 ## [0.0.0.16] - 2026-05-13
 
 ### Added

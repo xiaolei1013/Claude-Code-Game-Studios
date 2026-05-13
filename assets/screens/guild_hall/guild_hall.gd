@@ -301,6 +301,9 @@ func _on_hero_card_pressed(instance_id: int) -> void:
 		return
 	if modal.has_method("set_target_hero"):
 		modal.set_target_hero(instance_id)
+	# S14-M6: SceneManager.show_modal auto-calls modal.on_enter() after add_child,
+	# matching the request_screen lifecycle contract. Hero Detail's on_enter is
+	# where _render_all populates labels with real hero data.
 	SceneManager.show_modal(modal)
 
 
