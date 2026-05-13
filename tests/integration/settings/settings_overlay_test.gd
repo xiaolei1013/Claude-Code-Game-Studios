@@ -66,7 +66,10 @@ func test_settings_overlay_scene_loads_without_crash() -> void:
 	assert_object(overlay.get_node_or_null("Panel/VBox/MusicRow/MusicSlider")).is_not_null()
 	assert_object(overlay.get_node_or_null("Panel/VBox/SFXRow/SFXSlider")).is_not_null()
 	assert_object(overlay.get_node_or_null("Panel/VBox/ReduceMotionRow/ReduceMotionCheck")).is_not_null()
-	assert_object(overlay.get_node_or_null("Panel/VBox/CloseButton")).is_not_null()
+	assert_object(overlay.get_node_or_null("Panel/VBox/ButtonRow/CloseButton")).is_not_null()
+	assert_object(overlay.get_node_or_null("Panel/VBox/ButtonRow/ResetButton")).is_not_null()
+	assert_object(overlay.get_node_or_null("Panel/VBox/LocaleRow/LocaleOption")).is_not_null()
+	assert_object(overlay.get_node_or_null("Panel/VBox/MasterRow/MasterDbLabel")).is_not_null()
 
 
 func test_sliders_initialize_from_current_audiorouter_state() -> void:
@@ -147,6 +150,71 @@ func test_mute_check_initializes_from_audio_router() -> void:
 	var overlay: Control = _make_overlay_in_tree()
 	var check: CheckButton = overlay.get_node("Panel/VBox/MuteRow/MuteCheck")
 	assert_bool(check.button_pressed).is_true()
+
+
+# ===========================================================================
+# Group E — dB display labels render slider values
+# ===========================================================================
+
+func test_master_slider_at_1_shows_0_db_label() -> void:
+	var overlay: Control = _make_overlay_in_tree()
+	var slider: HSlider = overlay.get_node("Panel/VBox/MasterRow/MasterSlider")
+	var label: Label = overlay.get_node("Panel/VBox/MasterRow/MasterDbLabel")
+	slider.value = 1.0
+	# 0 dB displays as "0 dB"
+	assert_str(label.text).is_equal("0 dB")
+
+
+func test_master_slider_at_0_shows_inf_label() -> void:
+	var overlay: Control = _make_overlay_in_tree()
+	var slider: HSlider = overlay.get_node("Panel/VBox/MasterRow/MasterSlider")
+	var label: Label = overlay.get_node("Panel/VBox/MasterRow/MasterDbLabel")
+	slider.value = 0.0
+	assert_str(label.text).is_equal("-INF")
+
+
+# ===========================================================================
+# Group F — Reset button restores GDD §C.2-§C.5 defaults
+# ===========================================================================
+
+func test_reset_button_restores_audio_defaults() -> void:
+	AudioRouter.set_master_volume_db(-40.0)
+	AudioRouter.set_music_volume_db(-40.0)
+	AudioRouter.set_sfx_volume_db(-40.0)
+	AudioRouter.set_master_muted(true)
+	SceneManager.set_reduce_motion(true)
+
+	var overlay: Control = _make_overlay_in_tree()
+	var reset_btn: Button = overlay.get_node("Panel/VBox/ButtonRow/ResetButton")
+	reset_btn.pressed.emit()
+
+	# Defaults per GDD §C.2 / §C.3 / §C.4.
+	assert_float(AudioRouter.get_master_volume_db()).is_equal_approx(0.0, 0.5)
+	assert_float(AudioRouter.get_music_volume_db()).is_equal_approx(-8.0, 0.5)
+	assert_float(AudioRouter.get_sfx_volume_db()).is_equal_approx(-3.0, 0.5)
+	assert_bool(AudioRouter.is_master_muted()).is_false()
+	assert_bool(SceneManager.reduce_motion).is_false()
+
+
+# ===========================================================================
+# Group G — Locale dropdown population + disabled state
+# ===========================================================================
+
+func test_locale_option_populated_with_loaded_locales() -> void:
+	var overlay: Control = _make_overlay_in_tree()
+	var opt: OptionButton = overlay.get_node("Panel/VBox/LocaleRow/LocaleOption")
+	# At least one locale must always be present (en fallback).
+	assert_int(opt.item_count).is_greater_equal(1)
+
+
+func test_locale_option_disabled_when_only_one_locale() -> void:
+	var overlay: Control = _make_overlay_in_tree()
+	var opt: OptionButton = overlay.get_node("Panel/VBox/LocaleRow/LocaleOption")
+	# MVP en-only state: dropdown disabled per GDD §C.5.
+	if opt.item_count <= 1:
+		assert_bool(opt.disabled).is_true()
+	else:
+		assert_bool(opt.disabled).is_false()
 
 
 # ===========================================================================

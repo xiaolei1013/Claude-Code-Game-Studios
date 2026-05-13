@@ -56,12 +56,18 @@ layout_mode = 2
 text = "Master"
 
 [node name="MasterSlider" type="HSlider" parent="Panel/VBox/MasterRow"]
-custom_minimum_size = Vector2(280, 32)
+custom_minimum_size = Vector2(220, 32)
 layout_mode = 2
 size_flags_horizontal = 3
 max_value = 1.0
 step = 0.01
 value = 1.0
+
+[node name="MasterDbLabel" type="Label" parent="Panel/VBox/MasterRow"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+text = "0 dB"
+horizontal_alignment = 2
 
 [node name="MusicRow" type="HBoxContainer" parent="Panel/VBox"]
 layout_mode = 2
@@ -72,12 +78,18 @@ layout_mode = 2
 text = "Music"
 
 [node name="MusicSlider" type="HSlider" parent="Panel/VBox/MusicRow"]
-custom_minimum_size = Vector2(280, 32)
+custom_minimum_size = Vector2(220, 32)
 layout_mode = 2
 size_flags_horizontal = 3
 max_value = 1.0
 step = 0.01
 value = 0.4
+
+[node name="MusicDbLabel" type="Label" parent="Panel/VBox/MusicRow"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+text = "-8 dB"
+horizontal_alignment = 2
 
 [node name="SFXRow" type="HBoxContainer" parent="Panel/VBox"]
 layout_mode = 2
@@ -88,12 +100,18 @@ layout_mode = 2
 text = "SFX"
 
 [node name="SFXSlider" type="HSlider" parent="Panel/VBox/SFXRow"]
-custom_minimum_size = Vector2(280, 32)
+custom_minimum_size = Vector2(220, 32)
 layout_mode = 2
 size_flags_horizontal = 3
 max_value = 1.0
 step = 0.01
 value = 0.7
+
+[node name="SFXDbLabel" type="Label" parent="Panel/VBox/SFXRow"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+text = "-3 dB"
+horizontal_alignment = 2
 
 [node name="MuteRow" type="HBoxContainer" parent="Panel/VBox"]
 layout_mode = 2
@@ -120,12 +138,38 @@ text = "Reduce motion"
 [node name="ReduceMotionCheck" type="CheckButton" parent="Panel/VBox/ReduceMotionRow"]
 layout_mode = 2
 
+[node name="LocaleRow" type="HBoxContainer" parent="Panel/VBox"]
+layout_mode = 2
+
+[node name="LocaleLabel" type="Label" parent="Panel/VBox/LocaleRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "Language"
+
+[node name="LocaleOption" type="OptionButton" parent="Panel/VBox/LocaleRow"]
+custom_minimum_size = Vector2(280, 32)
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+
 [node name="Separator2" type="HSeparator" parent="Panel/VBox"]
 layout_mode = 2
 
-[node name="CloseButton" type="Button" parent="Panel/VBox"]
+[node name="ButtonRow" type="HBoxContainer" parent="Panel/VBox"]
+layout_mode = 2
+
+[node name="ResetButton" type="Button" parent="Panel/VBox/ButtonRow"]
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+mouse_filter = 0
+text = "Reset to Defaults"
+
+[node name="CloseButton" type="Button" parent="Panel/VBox/ButtonRow"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
 focus_mode = 0
 mouse_filter = 0
 text = "Close"

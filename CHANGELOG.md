@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.16] - 2026-05-13
+
+### Added
+- **Settings overlay dB display per slider** — each volume slider row now shows the resulting dB value to the right ("-6 dB", "0 dB", "-INF" at the silent floor). Updates live as the player drags the slider. Per GDD #30 §C.2 examples.
+- **Settings overlay Locale dropdown** — `OptionButton` populated by `TranslationServer.get_loaded_locales()`. Disabled (grayed) when only one locale is loaded (MVP en-only state). On change, calls `TranslationServer.set_locale(id)` so future `tr()` calls retrieve translations. Forward-compat for V1.0 i18n rollout. Per GDD #30 §C.5.
+- **Settings overlay Reset to Defaults button** — restores Master 0 dB / Music -8 dB / SFX -3 dB / mute off / reduce_motion off / locale "en" per GDD #30 §C.2-§C.5. CheckButton + OptionButton signals emitted explicitly after the property assignments so AudioRouter + SceneManager + TranslationServer receive the change. Per GDD #30 §C.6.
+
+### Notes
+- **Test suite**: 2084 → 2089 (+5 net). 5 new tests in `tests/integration/settings/settings_overlay_test.gd`: dB label at 0 / silent floor; Reset restores defaults; Locale dropdown populated; Locale disabled when single-locale.
+- **GDD #30 implementation status**: §C.1 (layout) ✓, §C.2 (volume curve + dB display) ✓, §C.3 (mute) ✓ from v0.0.0.15, §C.4 (reduce_motion) ✓ from v0.0.0.12, §C.5 (locale) ✓, §C.6 (Reset) ✓. §C.7 (persistence routing) was always via the existing AudioRouter + SceneManager save consumer surfaces. Settings overlay implementation is **substantially complete** for MVP.
+- **GDD §C.6 deviation noted**: GDD specifies "Reset does NOT auto-save — player must click Save to persist," but the MVP overlay has no Save button (Close auto-saves via AudioRouter's value_changed propagation). The simpler auto-save UX is acceptable for MVP; a separate Save action can be added if playtest reveals the "I clicked Reset by accident" pitfall.
+
 ## [0.0.0.15] - 2026-05-13
 
 ### Added
