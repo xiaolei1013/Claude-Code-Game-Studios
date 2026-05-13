@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2coralwardentr"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "coral_warden"
+display_name = "Coral Warden"
+tier = 1
+archetype = "armored"
+biome = "sunken_ruins"
+base_hp = 82
+base_attack = 7
+base_speed = 2
+sprite_path = "assets/art/enemies/coral_warden/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Stone overgrown by coral over centuries. The two are one creature now."
+is_boss = false

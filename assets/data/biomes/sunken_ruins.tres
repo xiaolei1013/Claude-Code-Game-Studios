@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="Biome" format=3 uid="uid://b2sunkenruinsb1"]
+
+[ext_resource type="Script" uid="uid://dap2c30cqt6to" path="res://src/core/biome_dungeon_database/biome.gd" id="1_bm"]
+[ext_resource type="Resource" uid="uid://b2srdungeon0001" path="res://assets/data/dungeons/sunken_ruins_dungeon_01.tres" id="2_dg"]
+
+[resource]
+script = ExtResource("1_bm")
+id = "sunken_ruins"
+display_name = "Sunken Ruins"
+primary_palette_key = "abyss_indigo"
+dominant_archetypes = Array[String](["caster", "armored", "bruiser"])
+dungeons = Array[Resource]([ExtResource("2_dg")])
+environmental_storytelling = Array[String](["coral overgrowth swallowing what used to be statues", "slate tablets half-legible in the silt"])
+flavor_text = "What the sea took, the sea kept. The city is still down there, with everyone who was in it."
+status = "active"
