@@ -95,11 +95,11 @@ stories:
     name: "Recruitment Stories 6+8 — Save/Load consumer surface (AC-RC-13) + CI grep for AC-RC-14 forbidden-pattern"
     file: "src/core/recruitment/recruitment.gd"
     priority: should-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-05-14 — registry entry add_hero_outside_recruitment added to docs/registry/architecture.yaml + JSON envelope round-trip integration test (4 cases) at tests/integration/recruitment/save_round_trip_test.gd. Get/load_save_data + CI grep had shipped in Sprints 11-12 pre-emptive work."
 
   - id: "S15-S4"
     name: "Sprint 15 retrospective"

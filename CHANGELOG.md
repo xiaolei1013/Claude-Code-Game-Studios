@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.22] - 2026-05-14
+
+### Added
+- **Registry entry `add_hero_outside_recruitment`** in `docs/registry/architecture.yaml` forbidden-patterns section (S15-S3, AC-RC-14). Codifies the single-writer invariant for `HeroRoster.add_hero` already enforced by `tests/unit/recruitment/recruitment_single_writer_ci_grep_test.gd` (active since Sprint 12). Locks the contract in the architecture registry so future ADR work has a discoverable reference.
+- **Integration test** `tests/integration/recruitment/save_round_trip_test.gd` (4 cases) covering Recruitment's save/load surface (AC-RC-13) through the **JSON envelope path** (the production code path through SaveLoadSystem):
+  - Float-coercion round-trip (`JSON.parse_string` returns numeric values as TYPE_FLOAT; `load_save_data` casts back to int)
+  - Empty envelope triggers first-launch seed init
+  - Forward-compat: unknown future keys are ignored silently
+  - Anti-tamper: non-string pool entries are filtered
+
+### Notes
+- **Tests**: 2117/2117 PASS (+4 from this PR; was 2113 at v0.0.0.21).
+- **S15-S3 scope reconciliation**: `Recruitment.get_save_data` / `load_save_data` themselves shipped in Sprint 11 S11-X8 / ADR-0015; the CI grep test shipped in Sprint 12. S15-S3 closure delivers the **registry entry** (the documentation gap) and the **JSON envelope integration test** (the unit-level dict-to-dict round-trip in `recruitment_skeleton_test.gd:233` covered the structural case, not the realistic JSON-mangled types from SaveLoadSystem).
+- **Sprint 15 progress**: 3/4 Must Haves + 3/3 Should Haves done. Only S15-M4 (HeroLeveling AC-15-02 playtest, human-gated) and S15-S4 (Sprint 15 retro, M4-blocked) remain.
+
 ## [0.0.0.21] - 2026-05-14
 
 ### Added
