@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://bpjnk3k4avhxd"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "windborne_hunter"
+display_name = "Windborne Hunter"
+tier = 1
+archetype = "bruiser"
+biome = "whispering_crags"
+base_hp = 95
+base_attack = 12
+base_speed = 4
+sprite_path = "assets/art/enemies/windborne_hunter/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Knows every updraft, every gully, every loose stone. The crags are its kennel."
+is_boss = false

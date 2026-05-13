@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.26] - 2026-05-14
+
+### Added
+- **Biome 2: Whispering Crags** (Sprint 16 M1 — first player-visible content add since Sprint 12). A new dungeon biome the player can select at Matchup Assignment. 5-floor dungeon (Cliff Path → Hollow Cairn → Singing Pass → Warden's Ridge → Echo Chamber, boss). 5 new biome-themed enemies: Crag Wraith (caster), Stoneback Grub (armored), Windborne Hunter (bruiser), Spire Warden (tier-2 armored), Echo Serpent (tier-3 boss caster). Per Sprint 16 plan reweight (reweight toward player-visible content) responding to playtest-08's "I don't see too much progress" signal.
+- **6 regression tests** at `tests/integration/biome_dungeon_database/whispering_crags_load_test.gd`: biome resource loads via DataRegistry; dungeon resolves with 5 floors; all 5 enemies load with correct biome tag; fresh-save seeds BOTH biomes (not just forest_reach); `get_available_biomes` returns both; Whispering Crags F1 is unlocked on fresh save (F2+ locked until F1 cleared, matching Forest Reach progression).
+
+### Changed
+- **`FloorUnlock._seed_fresh_save_default`** now iterates `BIOME_FLOOR_COUNT` instead of hard-coding `{forest_reach: 0}`. Any new biome `.tres` dropped into `assets/data/biomes/` auto-seeds on fresh save without a code change. Defensive fallback to `forest_reach` if the registry hasn't populated yet (e.g., test envs where _ready order differs).
+
+### Notes
+- **Tests**: 2132/2132 PASS (+6 from this PR; was 2126 at PR #76).
+- **Player-visible delta**: from cold launch a player can now select Forest Reach OR Whispering Crags at Matchup Assignment → dispatch a run → clear floors → unlock progression in either biome independently. First true new content since the cozy register loop closed in Sprint 12.
+- **Sprint 16 progress**: M1 done. Per the user's Sprint 15 retro action #1 ("each Must Have needs a visible change"), this PR delivers exactly that.
+- **Open dependencies** (still pending merge, do not block this PR):
+  - PR #73: HD-2D warm-lantern shader preview (Sprint 16 M2 candidate; ADR-0017 amendment needed if kept)
+  - PR #74: Sprint 16 plan + Formation Presets GDD #33
+  - PR #75: GDD #33 §K self-critique with K.1 BLOCKING resolution options
+- **K.1 decision pending**: per the user's direction, formation Recall should use **immediate-commit** (Option A from GDD #33 §K.1) when implemented in Sprint 17+. This PR doesn't touch the GDD; the decision can be folded into PR #75 on merge.
+
+## [0.0.0.25] - 2026-05-14
+
+### Added
+- **Warm-lantern overlay shader** (S15-N2) — `assets/shaders/warm_lantern_overlay.gdshader`. Soft amber-warmth vignette that pulls screen corners toward an incandescent tone (R 1.0, G 0.65, B 0.35) while leaving the center neutral. 4 tunable uniforms via the ShaderMaterial inspector: `warm_color` (vec4), `vignette_radius` (float 0..1), `vignette_softness` (float 0..1), `intensity` (float 0..1; defaults to 0.35 for a subtle cozy bias). Per `game-concept.md` Pillar 4 Visual Identity Anchor + HD-2D rendering pipeline GDD #26 OQ-26-2.
+- **Applied to Guild Hall as a preview** via a new `WarmLanternOverlay` ColorRect (full-rect, `mouse_filter = ignore`, `z_index = 1`, ShaderMaterial attached). Composes on top of the screen without blocking input.
+- **3 regression tests** in `tests/unit/shaders/warm_lantern_overlay_test.gd`: shader loads as resource; the 4 contract uniform declarations are present in source; Guild Hall scene resolves the shader ext_resource path.
+
+### Notes
+- **Tests**: 2129/2129 PASS (+3 from this PR; was 2126 at PR #72).
+- **ADR-0017 deviation note**: ADR-0017 §Decision defers the full HD-2D pipeline (tilt-shift DoF + warm-lantern composite) to the Vertical Slice tier. This PR ships the warm-lantern half as a **preview** — ready-to-deploy infrastructure for the future Vertical Slice tier authoring, but applied to Guild Hall now for playtest visibility. If the cozy bias is undesired at this stage, revert by deleting the `WarmLanternOverlay` node from `guild_hall.tscn` (shader file + tests can stay as ready-for-deploy).
+- **Performance**: trivial fragment shader (one `length` + one `smoothstep`). Steam Deck 1280×800 frame budget unaffected per `.claude/docs/technical-preferences.md`.
+- **Sprint 15 status**: S15-N2 done. Sprint 16 plan + named-presets GDD coming next per the user's "all three" authorization.
+
 ## [0.0.0.24] - 2026-05-14
 
 ### Fixed

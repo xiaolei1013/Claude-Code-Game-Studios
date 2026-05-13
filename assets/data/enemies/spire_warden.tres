@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://brsxad0hsy5u2"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "spire_warden"
+display_name = "Spire Warden"
+tier = 2
+archetype = "armored"
+biome = "whispering_crags"
+base_hp = 215
+base_attack = 17
+base_speed = 3
+sprite_path = "assets/art/enemies/spire_warden/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Carved from the cliff it guards. The crags don't ask why — they just leave it standing."
+is_boss = false

@@ -212,12 +212,26 @@ func _ready() -> void:
 	_subscribe_to_orchestrator()
 
 
-## Seeds {"forest_reach": 0} per R2 fresh-save default. Idempotent — only
-## seeds when the dict is empty, so load_save_data hydrating the dict before
-## _ready ran (test envs) is preserved.
+## Seeds the fresh-save default for every active biome (highest_cleared=0).
+## Per R2 fresh-save invariant: a player's first launch starts with floor 1
+## of each available biome unlocked, nothing cleared.
+##
+## Idempotent — only seeds when the dict is empty, so load_save_data
+## hydrating the dict before _ready ran (test envs) is preserved.
+##
+## Sprint 16 M1 update: previously hard-coded forest_reach. Now iterates
+## BIOME_FLOOR_COUNT (populated from DataRegistry in _ready) so any
+## new biome .tres dropped into assets/data/biomes/ auto-seeds without
+## a code change. Defensive fallback to forest_reach if the registry hasn't
+## populated yet (e.g., test env where _ready order differs).
 func _seed_fresh_save_default() -> void:
-	if _unlock_state.is_empty():
+	if not _unlock_state.is_empty():
+		return
+	if BIOME_FLOOR_COUNT.is_empty():
 		_unlock_state["forest_reach"] = 0
+		return
+	for biome_id: String in BIOME_FLOOR_COUNT.keys():
+		_unlock_state[biome_id] = 0
 
 
 ## Subscribes to DungeonRunOrchestrator.floor_cleared_first_time per R3.
