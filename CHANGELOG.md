@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.35] - 2026-05-14
+
+### Changed
+- **Formation Assignment hero buttons now show "vs <archetype>"** — each hero in the roster panel renders as `Theron (warrior Lv5 · vs bruiser)`. The player can now pick heroes for the formation slots against the biome's recommendation (from PR #84) without leaving the screen. Defensive fallback to the prior `Theron (warrior Lv5)` format if the class has no `counter_archetype` set.
+- **Matchup awareness chain — fully surfaced across the dispatch flow**:
+  - Matchup Assignment biome tab: `Recommended: Rogue, Mage` (PR #84)
+  - Hero Detail modal header: `Strong vs: armored` (PR #85)
+  - **Formation Assignment roster button: `Theron (warrior Lv5 · vs bruiser)` (this PR)**
+  - Player can navigate the entire dispatch flow without forgetting which hero counters what.
+
+### Notes
+- **Tests**: 2167/2167 PASS (unchanged; existing roster-button tests assert on the `display_name` prefix, which is preserved).
+- **Defensive**: future classes with empty `counter_archetype` automatically fall back to the prior label format (no broken text).
+- **Player workflow**: visible enhancement on every dispatch. The matchup mechanic is now self-teaching across 3 screens.
+
 ## [0.0.0.34] - 2026-05-14
 
 ### Added
