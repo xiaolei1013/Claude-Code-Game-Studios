@@ -89,6 +89,7 @@ var _cached_level_up_cost: int = -1
 @onready var _display_name_label: Label = $DetailPanel/ContentVBox/HeaderRow/HeaderLabels/DisplayNameLabel
 @onready var _class_name_label: Label = $DetailPanel/ContentVBox/HeaderRow/HeaderLabels/ClassNameLabel
 @onready var _owned_count_label: Label = $DetailPanel/ContentVBox/HeaderRow/HeaderLabels/OwnedCountLabel
+@onready var _counter_archetype_label: Label = $DetailPanel/ContentVBox/HeaderRow/HeaderLabels/CounterArchetypeLabel
 @onready var _level_value_label: Label = $DetailPanel/ContentVBox/StatsBlock/LevelRow/LevelValueLabel
 @onready var _xp_label: Label = $DetailPanel/ContentVBox/StatsBlock/XPRow/XPLabel
 @onready var _xp_progress_bar: ProgressBar = $DetailPanel/ContentVBox/StatsBlock/XPRow/XPProgressBar
@@ -262,6 +263,17 @@ func _refresh_header() -> void:
 	# OwnedCountLabel — locale-format via tr.
 	var copies: int = HeroRoster.get_copies_owned(_hero.class_id)
 	_owned_count_label.text = tr("hero_detail_owned_format") % [copies, _resolve_class_display_name().to_lower()]
+	# CounterArchetypeLabel — Sprint 17: surface this class's counter
+	# archetype so the player knows what each hero is good against.
+	# Pairs with the Matchup Assignment "Recommended: <class>" hint (PR
+	# #84): biome shows what to bring; hero shows what they counter.
+	# Defensive: if the class has no counter_archetype set, the label
+	# stays empty (rendered hidden via implicit zero-height layout).
+	var counter: String = String(_class_data.counter_archetype) if "counter_archetype" in _class_data else ""
+	if counter != "":
+		_counter_archetype_label.text = "Strong vs: %s" % counter
+	else:
+		_counter_archetype_label.text = ""
 
 
 func _refresh_stats() -> void:
