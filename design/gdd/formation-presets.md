@@ -235,3 +235,65 @@ Per Sprint 15-16 cadence (~0.5–1.0d per story), this GDD breaks into:
 - **Cozy register hard floor preserved**: no analytics-driven preset suggestions, no usage-frequency surfacing, no "shared community presets". Player-curated, player-named, player-owned.
 - **Mid-run reassignment gate (AC-FA-13)** inherits unchanged — preset Recall doesn't commit, so the dialog logic on `_on_hero_button_pressed` is untouched.
 - **Save schema migration** is additive (new keys in FormationAssignment's namespace). No risk to pre-V1.0 saves; the missing-key path falls back to defaults per Save/Load Rule 10.
+
+---
+
+## K. Pre-review self-critique (authored 2026-05-14 by GDD author)
+
+I authored this GDD as a single draft in the same session that wrote the FormationAssignment commit refactor (PR #63) and the mid-run dialog (PR #64). That creates blind-spot risk — I designed against my own mental model rather than the deployed code. A clean-eyes `/design-review` should treat these as the top probes:
+
+### K.1 — BLOCKING: there is no screen-side edit buffer (largest architectural mismatch)
+
+The GDD §C.4 describes Recall as populating "the screen's edit buffer". But the actual implementation in `assets/screens/formation_assignment/formation_assignment.gd` (post-PR #63) has **no edit buffer**: each `_on_hero_button_pressed` immediately calls `_apply_hero_commit` which calls `FormationAssignment.commit()` and writes to HeroRoster. The mid-run dialog (PR #64) defers the commit by stashing `_pending_reassign_hero_id` + `_pending_reassign_slot_index`, but that's a single-tap deferral, not a multi-tap accumulating buffer.
+
+**Implications**:
+- §C.4 Recall semantics are fiction as written. Recall would need to either (a) commit the entire snapshot at once (one signal emit, mid-run dialog fires once if active state) or (b) require a screen-side buffer refactor first.
+- §C.5 step 3 "Snapshot current formation from HeroRoster" is consistent with no-buffer reality, but contradicts the §C.4 "recall into buffer then commit later" framing.
+- AC-FP-04 ("recall does NOT write to HeroRoster") is incompatible with AC-FP-11 ("commit AFTER recall fires the dialog") under the deployed architecture.
+
+**Resolution options for review to decide**:
+1. **Recall = immediate commit**: simpler; aligns with deployed architecture. Recall fires `FormationAssignment.commit(new_formation)` once with the full preset. Mid-run dialog fires once (existing path). Lose the "show before commit" UX intermediate state. Update §C.4 + AC-FP-04 + AC-FP-11.
+2. **Refactor the screen to add a multi-tap edit buffer**: matches §C.4 as written. Big screen refactor (touches `_on_hero_button_pressed`, the formation panel render, the commit button). Adds a "Confirm formation" button (currently the screen has no explicit confirm — the existing Dispatch button is for run-launch, not formation-commit). Should be its own Sprint 17 story before preset work.
+3. **Hybrid**: Recall = immediate commit (Option 1) for V1.0; refactor to buffered editing (Option 2) in V1.5+ if playtest signals need.
+
+I lean toward Option 1 for V1.0 — preserves cozy register simplicity (no "did I confirm or not?" cognitive load) and matches deployed code. Flag for designer call.
+
+### K.2 — CONCERN: spec assumes node names that don't exist
+
+§C.3 places PresetsRow "between the FormationPanel and the existing ActionRow". The deployed `formation_assignment.tscn` has no `ActionRow` node — the screen has FormationPanel, RosterPanel, FloorSelectorPanel, DispatchButton (a Button, not a Row), FloorButton, BackButton, ToastLabel, SynergyBadge, MidRunReassignConfirmation. A reviewer reading §C.3 to spec the UI work will hit this mismatch immediately.
+
+**Resolution**: Update §C.3 to reference actual nodes (`PresetsRow positioned above DispatchButton, anchored to bottom-center of the screen with offset` or similar) once the actual layout intent is locked.
+
+### K.3 — CONCERN: §C.5 captures HeroRoster state, not player intent
+
+§C.5 step 3 says "Snapshot current formation: `slot_hero_ids` from `HeroRoster.get_formation_slot(i)`". Under K.1's no-buffer reality this is correct — there's nothing else to snapshot. But under K.1's Option 2 (buffered editing), saving while the player has uncommitted edits would silently capture the OLD formation, not the player's intended new one. Surprising UX.
+
+**Resolution**: Locks to K.1's choice. If K.1 picks Option 1, §C.5 stays. If Option 2, §C.5 must read from the buffer not HeroRoster.
+
+### K.4 — CONCERN: §F dependency on `Time` is heavier than I implied
+
+§C.1 + §F use `Time.get_unix_time_from_system()` for `created_at_unix`. This relies on the system clock, which can drift / be tampered. Other systems in the project use `TickSystem.get_unix_seconds()` for clock-tamper-defended timestamps. The GDD doesn't choose between them, and pre-existing code patterns prefer the tick-system path (see ADR-0014 precedent).
+
+**Resolution**: Update §F to specify TickSystem.get_unix_seconds() (or document why raw Time is acceptable for `created_at_unix` since it's informational, not load-bearing).
+
+### K.5 — CONCERN: tuning knob file schema unspecified
+
+§G says `assets/data/config/formation_presets_config.tres` will exist with 4 knobs. ADR-0013 precedent for config files (economy_config.gd) authoring a typed `Resource` class for the .tres schema. I didn't specify the schema class — implementation would need a `FormationPresetsConfig` typed resource alongside the .tres.
+
+**Resolution**: §G amendment specifying `assets/data/config/formation_presets_config.gd` (Resource class) + `.tres` instance pattern matching `economy_config.gd` + `economy_config.tres`.
+
+### K.6 — ADVISORY: OQ-FA-2 reverse-dependency call-out
+
+FormationAssignment GDD #11 OQ-FA-2 (Formation history undo) suggests reusing the named-presets save namespace for a rolling buffer. My GDD #33 doesn't acknowledge this potential consumer. Could create future schema friction if undo work wants to layer on top of presets without an explicit cross-system contract.
+
+**Resolution**: §F.reverse-deps amendment + OQ-FP-7 added: "if undo work lands, does it share the presets namespace or get its own?"
+
+### K.7 — ADVISORY: tests/PATTERNS.md §13 lifecycle-asymmetry check
+
+§J's stories are skeleton → save body → delete body → recall body → save/load schema → UI → integration → CI grep. The pattern is: each story ships some methods; full lifecycle (save → recall → delete) isn't exercised end-to-end until Story 7. Per PATTERNS.md §13 (lifecycle-asymmetry CI gate from PR #66), partial-lifecycle ships can hide bugs. Story 1 should ship a basic round-trip test before Story 2 starts, not wait for Story 7.
+
+**Resolution**: §J amendment to add "Story 1 includes a save→recall→delete smoke test against the stubs (even if methods push_error — assert they don't crash)".
+
+---
+
+**Net**: I count **1 BLOCKING (K.1) + 3 CONCERN (K.2, K.3, K.4, K.5) + 2 ADVISORY (K.6, K.7)** items I'd surface against my own draft. The pattern from Sprint 13-14 first-pass GDDs (~5-12 BLOCKING per pass) suggests `/design-review` will find MORE — these are just the ones the author can see. K.1 alone is sprint-shifting (Option 1 keeps Sprint 17 scope; Option 2 adds a buffer-refactor pre-req).
