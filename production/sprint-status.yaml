@@ -59,33 +59,33 @@ stories:
 
   - id: "S14-M4"
     name: "Story 016 AC-9 close-reload smoke playtest — manual; verify state preserved across quit/reopen (carryover from S13-M3)"
-    file: "production/playtests/playtest-07-ac9-close-reload-2026-05-??.md"
+    file: "production/playtests/playtest-06-ac9-close-reload-2026-05-13.md"
     priority: must-have
-    status: ready-for-dev
-    owner: "xiaolei (human)"
-    estimate_days: 0.5
-    blocker: "human availability"
-    completed: ""
-
-  - id: "S14-M5"
-    name: "Sprint 14 playtest-07 — full Guild Hall → Hero Detail → Settings → dispatch → victory loop; confirms PR #58 visual fixes hold"
-    file: "production/playtests/playtest-07-sprint-14-2026-05-??.md"
-    priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei (human)"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-05-13 — playtest-06 report PASS; no save round-trip regressions across multiple cycles"
+
+  - id: "S14-M5"
+    name: "Sprint 14 full-loop playtest-07 — Guild Hall → Hero Detail → Settings → dispatch → victory loop; confirms PR #58 visual fixes hold"
+    file: "production/playtests/playtest-07-sprint-14-2026-05-13.md"
+    priority: must-have
+    status: done
+    owner: "xiaolei (human)"
+    estimate_days: 0.5
+    blocker: ""
+    completed: "2026-05-13 — playtest-07 report PASS; zero issues surfaced"
 
   - id: "S14-M6"
     name: "show_modal lifecycle hardening — patch SceneManager.show_modal to call on_enter(); add regression test; audit all show_modal call sites"
     file: "src/core/scene_manager/scene_manager.gd"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.75
     blocker: ""
-    completed: ""
+    completed: "2026-05-13 — PR #59, v0.0.0.18; +8 regression tests (suite 2089 → 2097 PASS)"
 
   # ===== Should Have =====
 
@@ -133,10 +133,10 @@ stories:
     name: "Sprint 14 retrospective"
     file: "production/retrospectives/sprint-14-retrospective-2026-05-??.md"
     priority: should-have
-    status: backlog
+    status: ready-for-dev
     owner: ""
     estimate_days: 0.25
-    blocker: "M4–M6 close"
+    blocker: ""
     completed: ""
 
   # ===== Nice to Have =====

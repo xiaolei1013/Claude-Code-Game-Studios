@@ -25,9 +25,9 @@
 | S14-M1 | **DONE** — Hero Detail modal wire-up from Guild Hall RosterPanel HeroCard (closes deferred S13-M4) | gameplay-programmer | 0.5d | — | PR #52, v0.0.0.11, merge `fe84cea` |
 | S14-M2 | **DONE** — Settings overlay real content + gear icon on Guild Hall (closes deferred S13-S2) | ui-programmer | 1.0d | — | PR #53, v0.0.0.12, merge `4bc2919` |
 | S14-M3 | **DONE** — Onboarding first-session E2E test (lock the seed pathway) | qa-tester | 0.5d | — | PR #54, v0.0.0.13, merge `447d12b` |
-| S14-M4 | **Carryover from S13-M3** — Story 016 AC-9 close-reload smoke playtest (manual) — real Godot build, verify gold/heroes/dungeon-progress survive quit/reopen | xiaolei (human) | 0.5d | none | `production/playtests/playtest-07-ac9-close-reload-2026-05-??.md` exists; gold + roster + floor unlocks unchanged across restart |
-| S14-M5 | **Sprint 14 playtest-07** — full Guild Hall → HeroCard tap → Hero Detail close → Settings open → adjust volume → dispatch → victory loop. Confirm PR #58 visual fixes hold. | xiaolei (human) | 0.5d | M1, M2, S4 | `production/playtests/playtest-07-sprint-14-2026-05-??.md`; no S1/S2 visual bugs observed |
-| S14-M6 | **`show_modal` lifecycle hardening** — patch `SceneManager.show_modal()` to call `on_enter()` automatically; add a regression test that opens Hero Detail through the production code path and asserts labels populate (not placeholders). Prevents the next instance of the PR #58 bug class. | godot-gdscript-specialist | 0.75d | — | New test in `tests/unit/scene_manager/show_modal_lifecycle_test.gd`; all existing show_modal call sites audited for `on_enter` double-call safety |
+| S14-M4 | **DONE** — Story 016 AC-9 close-reload smoke playtest (carryover from S13-M3) | xiaolei (human) | 0.5d | — | `production/playtests/playtest-06-ac9-close-reload-2026-05-13.md` — PASS |
+| S14-M5 | **DONE** — Sprint 14 full-loop playtest — Guild Hall → Hero Detail → Settings → dispatch → victory loop; PR #58 visual fixes hold | xiaolei (human) | 0.5d | M1, M2, S4 | `production/playtests/playtest-07-sprint-14-2026-05-13.md` — PASS, zero issues |
+| S14-M6 | **DONE** — `show_modal` lifecycle hardening: patch `SceneManager.show_modal()` to call `on_enter()` automatically + symmetric `on_exit()` in `hide_modal()`; +8 regression tests | godot-gdscript-specialist | 0.75d | — | PR #59, v0.0.0.18, commit `f2f849d`; suite 2089 → 2097 PASS |
 
 **Must Have total**: 3.75 days. ~2.0 days already burned on M1+M2+M3; ~1.75 remaining for M4+M5+M6.
 
@@ -73,14 +73,14 @@
 
 ## Definition of Done for this Sprint
 
-- [x] All Must Have tasks completed (M1–M3 done; M4–M6 pending)
-- [ ] All tasks pass acceptance criteria
-- [ ] QA plan exists (`production/qa/qa-plan-sprint-14.md`)
-- [x] All Logic/Integration stories have passing tests — 2089/2089 PASS at v0.0.0.17
-- [ ] Playtest-07 report committed
-- [ ] No S1 or S2 bugs in delivered features (subject to playtest-07)
-- [ ] Sprint 14 retrospective written
-- [x] Code reviewed and merged (7 PRs to date)
+- [x] All Must Have tasks completed (M1–M6 all DONE as of 2026-05-13)
+- [x] All tasks pass acceptance criteria — playtest-06 + playtest-07 both PASS
+- [ ] QA plan exists (`production/qa/qa-plan-sprint-14.md`) — skipped per retroactive-plan call
+- [x] All Logic/Integration stories have passing tests — **2097/2097 PASS** at v0.0.0.18
+- [x] Playtest-06 (M4) + playtest-07 (M5) reports committed
+- [x] No S1 or S2 bugs in delivered features — confirmed by playtest-07
+- [ ] Sprint 14 retrospective written — S14-S5 still open
+- [x] Code reviewed and merged (8 PRs: #52–#59)
 
 ## Sprint 15+ candidates (post-Sprint-14)
 
