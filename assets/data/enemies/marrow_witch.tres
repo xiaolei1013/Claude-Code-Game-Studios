@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2marrowwitch01"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "marrow_witch"
+display_name = "Marrow Witch"
+tier = 1
+archetype = "caster"
+biome = "frostmire"
+base_hp = 50
+base_attack = 13
+base_speed = 4
+sprite_path = "assets/art/enemies/marrow_witch/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Casts in a tongue the bog learned long before words. The cold answers her."
+is_boss = false

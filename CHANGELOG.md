@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.28] - 2026-05-14
+
+### Added
+- **Biome 4: Frostmire** — third player-visible content add in the Sprint 16 push. 5-floor dungeon (Frozen Reeds → Bone Causeway → Hollow Cairns → Colossus Bog → Hollow Winter's Heart, boss). 5 new biome-themed enemies: Marrow Witch (caster), Icebound Pilgrim (armored), Frost Revenant (bruiser), Mire Colossus (tier-2 armored), The Hollow Winter (tier-3 boss caster — a season the bog refused to release).
+- **6 regression tests** at `tests/integration/biome_dungeon_database/frostmire_load_test.gd`.
+
+### Notes
+- **Tests**: 2144/2144 PASS (+6 from this PR; was 2138 at PR #78).
+- **Player-visible delta**: from cold launch the player now has **4 biome choices** at Matchup Assignment — Forest Reach (woods), Whispering Crags (high stone), Sunken Ruins (drowned city), Frostmire (frozen bog). Four distinct visual + thematic registers.
+- **Sprint 16 momentum**: 3 biomes shipped today (Whispering Crags PR #77, Sunken Ruins PR #78, Frostmire this PR). Each ~10 min from branch to push. Player-visible content throughput is back where it should be.
+- **Time to start gating progression?** With 4 biomes all unlocked at start, the cold-launch menu starts to feel like a buffet. Sprint 16's next step could be a soft progression gate (e.g., biome 5+ unlocks after clearing biome 1's boss). Flagged for the user's call.
+
 ## [0.0.0.27] - 2026-05-14
 
 ### Added

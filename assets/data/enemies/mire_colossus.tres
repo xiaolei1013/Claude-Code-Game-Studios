@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2mirecolossus0"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "mire_colossus"
+display_name = "Mire Colossus"
+tier = 2
+archetype = "armored"
+biome = "frostmire"
+base_hp = 245
+base_attack = 17
+base_speed = 2
+sprite_path = "assets/art/enemies/mire_colossus/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Risen out of the swamp by something patient. Carries the smell of every century it slept through."
+is_boss = false

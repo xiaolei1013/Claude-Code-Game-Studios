@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2hollowwinter0"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "the_hollow_winter"
+display_name = "The Hollow Winter"
+tier = 3
+archetype = "caster"
+biome = "frostmire"
+base_hp = 5680
+base_attack = 46
+base_speed = 4
+sprite_path = "assets/art/enemies/the_hollow_winter/sprite.png"
+death_anim_key = "enemy_death_boss"
+flavor_text = "Not a creature — a season the bog refused to release. Three centuries the same midwinter. It does not want it to end."
+is_boss = true
