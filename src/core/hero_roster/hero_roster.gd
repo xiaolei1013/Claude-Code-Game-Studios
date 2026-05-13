@@ -1008,6 +1008,30 @@ func get_formation_slot(slot_index: int) -> int:
 	return _formation_slots[slot_index]
 
 
+## Returns the HeroInstance for [param instance_id], or null if no hero with
+## that id exists. O(1) — wraps the internal _heroes dictionary lookup.
+##
+## Added Sprint 15 S15-M1 to support the formation_assignment screen's
+## FormationAssignment.commit() refactor (AC-FA-12). Callers building an
+## Array[HeroInstance] for commit() need a positional lookup, which
+## get_formation_heroes() (which strips empty slots) cannot provide.
+##
+## [param instance_id] of 0 (the empty-slot sentinel) always returns null.
+##
+## Example:
+##   [codeblock]
+##   var hero: HeroInstance = HeroRoster.get_hero_by_id(slot_hero_id)
+##   if hero != null:
+##       print(hero.display_name)
+##   [/codeblock]
+func get_hero_by_id(instance_id: int) -> HeroInstance:
+	if instance_id == 0:
+		return null
+	if not _heroes.has(instance_id):
+		return null
+	return _heroes[instance_id] as HeroInstance
+
+
 ## Returns all heroes in the roster, sorted per [param sort_mode].
 ## Default sort is [code]BY_CLASS[/code] (alphabetic class_id ordering with
 ## level-desc tiebreaker) — matches the Recruitment / Roster UI's taxonomy-
