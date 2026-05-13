@@ -199,9 +199,9 @@ func _on_gold_changed(new_balance: int, _delta: int, _reason: String) -> void:
 
 ## Rebuilds the HeroCard list from HeroRoster.get_all_heroes(). Sorted by
 ## current_level desc, then class_id ascending, per GDD #19 §C.4. Each card
-## is a Button labeled "{display_name} ({class_id} Lv{current_level})";
-## tap fires _on_hero_card_pressed(instance_id) which loads + shows the
-## Hero Detail modal.
+## is a Button (for tap handling) with child Labels showing name/class/level
+## + a slim ProgressBar for XP toward next level. Tap fires
+## _on_hero_card_pressed(instance_id) which opens the Hero Detail modal.
 func _refresh_roster_panel() -> void:
 	if _roster_list == null:
 		return
@@ -219,17 +219,56 @@ func _refresh_roster_panel() -> void:
 		var hero: RefCounted = hero_v as RefCounted
 		if hero == null:
 			continue
-		var card: Button = Button.new()
-		card.text = "%s (%s Lv%d)" % [
-			String(hero.get("display_name")),
-			String(hero.get("class_id")),
-			int(hero.get("current_level")),
-		]
-		card.focus_mode = Control.FOCUS_NONE
-		card.custom_minimum_size = Vector2(0, 44)
-		var instance_id: int = int(hero.get("instance_id"))
-		card.pressed.connect(_on_hero_card_pressed.bind(instance_id))
-		_roster_list.add_child(card)
+		_roster_list.add_child(_build_hero_card(hero))
+
+
+## Constructs a single HeroCard widget per GDD #19 §C.4. Layout:
+##   Button (no text; captures tap)
+##   └── VBoxContainer (mouse_filter = IGNORE so taps pass to Button)
+##       ├── Label "{display_name} · {class_id} · Lv {current_level}"
+##       └── ProgressBar (slim, no percent text) showing xp / xp_threshold
+##
+## At level cap (level_cap()), the bar shows full. Below cap, the bar shows
+## fraction of XP toward next level via HeroRoster.xp_threshold(level).
+func _build_hero_card(hero: RefCounted) -> Button:
+	var card: Button = Button.new()
+	card.text = ""
+	card.focus_mode = Control.FOCUS_NONE
+	card.custom_minimum_size = Vector2(0, 56)
+
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vbox.add_theme_constant_override("separation", 4)
+	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(vbox)
+
+	var summary_label: Label = Label.new()
+	summary_label.text = "%s · %s · Lv %d" % [
+		String(hero.get("display_name")),
+		String(hero.get("class_id")),
+		int(hero.get("current_level")),
+	]
+	summary_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	vbox.add_child(summary_label)
+
+	var xp_bar: ProgressBar = ProgressBar.new()
+	xp_bar.custom_minimum_size = Vector2(0, 6)
+	xp_bar.show_percentage = false
+	xp_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var current_level: int = int(hero.get("current_level"))
+	var cap: int = HeroRoster.level_cap()
+	if current_level >= cap:
+		xp_bar.max_value = 1.0
+		xp_bar.value = 1.0
+	else:
+		var threshold: int = HeroRoster.xp_threshold(current_level)
+		xp_bar.max_value = maxi(threshold, 1)
+		xp_bar.value = clampi(int(hero.get("xp")), 0, threshold)
+	vbox.add_child(xp_bar)
+
+	var instance_id: int = int(hero.get("instance_id"))
+	card.pressed.connect(_on_hero_card_pressed.bind(instance_id))
+	return card
 
 
 ## HeroRoster signal handlers — re-render the panel on roster changes.
