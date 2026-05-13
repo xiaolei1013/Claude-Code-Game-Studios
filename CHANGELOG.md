@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.27] - 2026-05-14
+
+### Added
+- **Biome 3: Sunken Ruins** — second player-visible content add in the Sprint 16 push. Fills the `sunken_ruins` placeholder name that's been referenced in test code since the planned-V1.0 era. 5-floor dungeon (Tidal Steps → Salt Library → Coral Plaza → Thrallway → Drowned Hall, boss). 5 new biome-themed enemies: Tide Husk (caster), Coral Warden (armored), Abyss Eel (bruiser), Deep Thrall (tier-2 bruiser), The Drowned King (tier-3 boss caster).
+- **6 regression tests** at `tests/integration/biome_dungeon_database/sunken_ruins_load_test.gd` — mirrors the Whispering Crags pattern.
+
+### Changed
+- **`test_fresh_save_does_not_seed_planned_v1_biomes`** updated to use `ember_wastes` as the unregistered-biome probe (sunken_ruins was the prior placeholder; it's now shipped).
+
+### Notes
+- **Tests**: 2138/2138 PASS (+6 from this PR; was 2132 at PR #77).
+- **Player-visible delta**: from cold launch the player now has **3 biome choices** at Matchup Assignment — Forest Reach (woods), Whispering Crags (high stone), Sunken Ruins (drowned city). Three distinct archetypal feels.
+- **Sprint 16 momentum**: M1 done (Whispering Crags PR #77) + this PR's biome 3 = the "reweight toward player-visible content" action item is paying off — two consecutive PRs that move what the player can see, both shipped same-day with full test coverage.
+- **The biome-add pattern is mature**: data files only (1 biome + 1 dungeon + 5 enemies), zero code changes per new biome (the FloorUnlock auto-seed from PR #77 handles it). Future biomes 4-N are content authoring, not engineering.
+
 ## [0.0.0.26] - 2026-05-14
 
 ### Added

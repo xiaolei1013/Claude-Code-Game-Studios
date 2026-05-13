@@ -117,11 +117,15 @@ func test_fresh_save_default_is_forest_reach_zero() -> void:
 
 
 func test_fresh_save_does_not_seed_planned_v1_biomes() -> void:
-	# R2: only forest_reach is seeded; planned_v1 biomes signal "unavailable"
-	# via absence from get_available_biomes (which reads BIOME_FLOOR_COUNT).
+	# R2: only biomes present in BIOME_FLOOR_COUNT are seeded; planned-but-
+	# not-shipped biomes signal "unavailable" via absence from
+	# get_available_biomes (which reads BIOME_FLOOR_COUNT).
+	#
+	# Sprint 16 M1 update: sunken_ruins (the prior placeholder name) was
+	# shipped as biome 3. Use ember_wastes as the new unregistered probe.
 	var fu: Node = _make_floor_unlock_with_stubs()
-	assert_int(fu.get_highest_cleared("sunken_ruins")).is_equal(0)  # default
-	assert_bool(fu.is_biome_available("sunken_ruins")).is_false()
+	assert_int(fu.get_highest_cleared("ember_wastes")).is_equal(0)  # default
+	assert_bool(fu.is_biome_available("ember_wastes")).is_false()
 
 
 # ===========================================================================
