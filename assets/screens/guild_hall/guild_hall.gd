@@ -16,6 +16,11 @@ extends Screen
 @onready var _toast_label: Label = $ToastLabel
 @onready var _gold_counter: Label = $GoldCounter
 @onready var _recruit_nav_button: Button = $RecruitNavButton
+@onready var _roster_list: VBoxContainer = $RosterPanel/RosterScroll/RosterList
+
+const HeroDetailModalScene: PackedScene = preload(
+	"res://assets/screens/hero_detail/hero_detail_modal.tscn"
+)
 
 # Prestige completion toast — fades over 4.0s matching the
 # formation_assignment + Recruitment toast pattern (GDD #21 §G).
@@ -37,6 +42,14 @@ func on_enter() -> void:
 	if not Economy.gold_changed.is_connected(_on_gold_changed):
 		Economy.gold_changed.connect(_on_gold_changed)
 
+	_refresh_roster_panel()
+	if not HeroRoster.hero_recruited.is_connected(_on_roster_changed):
+		HeroRoster.hero_recruited.connect(_on_roster_changed)
+	if not HeroRoster.hero_removed.is_connected(_on_roster_changed):
+		HeroRoster.hero_removed.connect(_on_roster_changed)
+	if not HeroRoster.hero_leveled.is_connected(_on_hero_leveled):
+		HeroRoster.hero_leveled.connect(_on_hero_leveled)
+
 	# Hall of Retired Heroes button: localized label + visibility gate +
 	# subscribe to prestige_completed_signal so a freshly-prestiged hero
 	# pops the button into view immediately on screen-resume.
@@ -56,6 +69,12 @@ func on_exit() -> void:
 		_recruit_nav_button.pressed.disconnect(_on_recruit_nav_pressed)
 	if Economy.gold_changed.is_connected(_on_gold_changed):
 		Economy.gold_changed.disconnect(_on_gold_changed)
+	if HeroRoster.hero_recruited.is_connected(_on_roster_changed):
+		HeroRoster.hero_recruited.disconnect(_on_roster_changed)
+	if HeroRoster.hero_removed.is_connected(_on_roster_changed):
+		HeroRoster.hero_removed.disconnect(_on_roster_changed)
+	if HeroRoster.hero_leveled.is_connected(_on_hero_leveled):
+		HeroRoster.hero_leveled.disconnect(_on_hero_leveled)
 	if _hall_nav_button != null and _hall_nav_button.pressed.is_connected(_on_hall_nav_pressed):
 		_hall_nav_button.pressed.disconnect(_on_hall_nav_pressed)
 	if HeroRoster.prestige_completed_signal.is_connected(_on_prestige_completed):
@@ -165,3 +184,72 @@ func _set_gold_text(balance: int) -> void:
 func _on_gold_changed(new_balance: int, _delta: int, _reason: String) -> void:
 	if _gold_counter != null:
 		_set_gold_text(new_balance)
+
+
+# ---------------------------------------------------------------------------
+# Roster panel (Guild Hall GDD #19 §C.4 + Hero Detail GDD #22 §C.2 wire-up)
+# ---------------------------------------------------------------------------
+
+## Rebuilds the HeroCard list from HeroRoster.get_all_heroes(). Sorted by
+## current_level desc, then class_id ascending, per GDD #19 §C.4. Each card
+## is a Button labeled "{display_name} ({class_id} Lv{current_level})";
+## tap fires _on_hero_card_pressed(instance_id) which loads + shows the
+## Hero Detail modal.
+func _refresh_roster_panel() -> void:
+	if _roster_list == null:
+		return
+	for child in _roster_list.get_children():
+		child.queue_free()
+	var heroes: Array = HeroRoster.get_all_heroes()
+	heroes.sort_custom(func(a: Variant, b: Variant) -> bool:
+		var la: int = int(a.get("current_level"))
+		var lb: int = int(b.get("current_level"))
+		if la != lb:
+			return la > lb
+		return String(a.get("class_id")) < String(b.get("class_id"))
+	)
+	for hero_v: Variant in heroes:
+		var hero: RefCounted = hero_v as RefCounted
+		if hero == null:
+			continue
+		var card: Button = Button.new()
+		card.text = "%s (%s Lv%d)" % [
+			String(hero.get("display_name")),
+			String(hero.get("class_id")),
+			int(hero.get("current_level")),
+		]
+		card.focus_mode = Control.FOCUS_NONE
+		card.custom_minimum_size = Vector2(0, 44)
+		var instance_id: int = int(hero.get("instance_id"))
+		card.pressed.connect(_on_hero_card_pressed.bind(instance_id))
+		_roster_list.add_child(card)
+
+
+## HeroRoster signal handlers — re-render the panel on roster changes.
+## Both hero_recruited (1-arg) and hero_removed (3-arg) route here; the args
+## are ignored — we rebuild from current roster state.
+func _on_roster_changed(_a: Variant = null, _b: Variant = null, _c: Variant = null) -> void:
+	_refresh_roster_panel()
+
+
+## hero_leveled handler — same rebuild trigger. Signal arity is
+## (id, old_level, new_level) per HeroRoster.gd:790.
+func _on_hero_leveled(_id: int, _old_level: int, _new_level: int) -> void:
+	_refresh_roster_panel()
+
+
+## HeroCard tap handler. Per GDD #22 AC-22-01: instantiate Hero Detail modal
+## scene, call set_target_hero(instance_id), then SceneManager.show_modal(modal).
+##
+## Gated on SceneManager.state — if a modal is already active (PAUSED state),
+## ignore the tap per GDD #22 §"Rapid HeroCard taps" resolution.
+func _on_hero_card_pressed(instance_id: int) -> void:
+	if SceneManager.state == SceneManager.State.PAUSED:
+		return
+	var modal: Control = HeroDetailModalScene.instantiate() as Control
+	if modal == null:
+		push_error("[GuildHall] Failed to instantiate hero_detail_modal scene")
+		return
+	if modal.has_method("set_target_hero"):
+		modal.set_target_hero(instance_id)
+	SceneManager.show_modal(modal)

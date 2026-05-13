@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.11] - 2026-05-13
+
+### Added
+- **Guild Hall now shows a roster of HeroCards; tap a hero to open the Hero Detail modal.** Per Guild Hall GDD #19 §C.4 + Hero Detail GDD #22 AC-22-01. The Hero Detail modal already existed as a 584-line implementation from Sprint 16 pre-emptive work, but no UI surface invoked it. This PR adds the `RosterPanel` (ScrollContainer + VBoxContainer of HeroCard buttons) to Guild Hall, populates it from `HeroRoster.get_all_heroes()` sorted by current_level desc then class_id asc, wires each HeroCard's pressed signal to instantiate the modal + `set_target_hero(instance_id)` + `SceneManager.show_modal`. Tap gated on `SceneManager.state != PAUSED` per GDD #22 "modal already open" resolution. Live-refreshes on `hero_recruited` / `hero_removed` / `hero_leveled`. Closes Sprint 13 S13-M4 carry-forward (Sprint 14 Day 1 follow-up). 6 new integration tests in `tests/integration/guild_hall/roster_panel_test.gd`.
+
+### Notes
+- **Test suite**: 2058 → 2064 (+6 net).
+- **Sprint 13 S13-M4 status updated** in `production/sprint-status.yaml` from `deferred-to-sprint-14` to `done` (2026-05-13).
+- **What's left in Sprint 13**: S13-M3 (Story 016 AC-9 manual close-reload smoke) remains human-gated; S13-S2 Settings overlay deferred to Sprint 14 next session (needs gear icon + Settings overlay real content per GDD #30).
+- **Manual playtest needed**: tap a hero card in Guild Hall and verify the Hero Detail modal opens with the correct stats, then closes cleanly. Integration test covers the wiring; UX feel verification is human-gated.
+
 ## [0.0.0.10] - 2026-05-13
 
 ### Changed
