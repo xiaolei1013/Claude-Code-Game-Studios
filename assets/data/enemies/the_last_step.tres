@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2laststep0001"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "the_last_step"
+display_name = "The Last Step"
+tier = 3
+archetype = "armored"
+biome = "hollow_stair"
+base_hp = 6240
+base_attack = 49
+base_speed = 2
+sprite_path = "assets/art/enemies/the_last_step/sprite.png"
+death_anim_key = "enemy_death_boss"
+flavor_text = "The reason the stair ends. Older than the stair itself. The guild's lanterns dim in its presence — and stay dim, even after."
+is_boss = true
