@@ -86,15 +86,24 @@ func test_hero_card_text_includes_name_class_and_level() -> void:
 	var roster_list: Node = screen.get_node("RosterPanel/RosterScroll/RosterList")
 	var found: bool = false
 	for child in roster_list.get_children():
-		var btn: Button = child as Button
-		if btn == null:
-			continue
-		if btn.text.contains("rogue") and btn.text.contains("Lv3"):
+		# HeroCard text lives in the child Label, not the Button itself (the
+		# Button uses children for layout; its text is empty for click capture).
+		var summary_text: String = _extract_card_summary_text(child)
+		if summary_text.contains("rogue") and summary_text.contains("Lv 3"):
 			found = true
 			break
 	assert_bool(found).override_failure_message(
-		"Expected a HeroCard with 'rogue' + 'Lv3' for seeded hero id %d" % id
+		"Expected a HeroCard with 'rogue' + 'Lv 3' for seeded hero id %d" % id
 	).is_true()
+
+
+func _extract_card_summary_text(card_node: Node) -> String:
+	# Walk children for the first Label (the summary row label).
+	for descendant in card_node.find_children("*", "Label", true, false):
+		var lbl: Label = descendant as Label
+		if lbl != null and not lbl.text.is_empty():
+			return lbl.text
+	return ""
 
 
 # ===========================================================================
@@ -118,9 +127,7 @@ func test_hero_cards_sorted_level_desc_then_class_id_asc() -> void:
 	var roster_list: Node = screen.get_node("RosterPanel/RosterScroll/RosterList")
 	var labels: Array[String] = []
 	for child in roster_list.get_children():
-		var btn: Button = child as Button
-		if btn != null:
-			labels.append(btn.text)
+		labels.append(_extract_card_summary_text(child))
 	assert_int(labels.size()).is_equal(3)
 	# Higher levels first; within same level, class_id alphabetical (mage < rogue).
 	assert_bool(labels[0].contains("mage")).is_true()
@@ -168,6 +175,56 @@ func test_hero_card_tap_ignored_when_modal_already_active() -> void:
 # ===========================================================================
 # Group D — Roster signal subscriptions trigger refresh
 # ===========================================================================
+
+func test_hero_card_has_xp_progress_bar_with_correct_fraction() -> void:
+	# AC: HeroCard includes a slim ProgressBar per GDD #19 §C.4. Bar's
+	# value / max_value reflects the hero's xp / xp_threshold(current_level).
+	var id: int = _seed_hero("warrior", 1)
+	# Inject specific xp value to make the assertion deterministic.
+	var theron: RefCounted = HeroRoster._heroes.get(id)
+	if theron == null:
+		# _seed_hero may have failed if class fixture absent; skip with diagnostic.
+		assert_int(id).is_greater(0)
+		return
+	theron.xp = 50  # halfway toward level 2 if threshold is 100
+
+	var screen: Node = _make_guild_hall_in_tree()
+	var roster_list: Node = screen.get_node("RosterPanel/RosterScroll/RosterList")
+	var found_bar: ProgressBar = null
+	for child in roster_list.get_children():
+		for pb in child.find_children("*", "ProgressBar", true, false):
+			found_bar = pb as ProgressBar
+			break
+		if found_bar != null:
+			break
+	assert_object(found_bar).is_not_null()
+	# value > 0 and < max_value at this xp state.
+	assert_float(found_bar.value).is_greater(0.0)
+	assert_float(found_bar.value).is_less(found_bar.max_value)
+
+
+func test_hero_card_xp_bar_full_at_level_cap() -> void:
+	var id: int = _seed_hero("warrior", 1)
+	var theron: RefCounted = HeroRoster._heroes.get(id)
+	if theron == null:
+		assert_int(id).is_greater(0)
+		return
+	theron.current_level = HeroRoster.level_cap()
+	theron.xp = 0  # at cap, accumulated XP is meaningless
+
+	var screen: Node = _make_guild_hall_in_tree()
+	var roster_list: Node = screen.get_node("RosterPanel/RosterScroll/RosterList")
+	var found_bar: ProgressBar = null
+	for child in roster_list.get_children():
+		for pb in child.find_children("*", "ProgressBar", true, false):
+			found_bar = pb as ProgressBar
+			break
+		if found_bar != null:
+			break
+	assert_object(found_bar).is_not_null()
+	# At cap, bar shows full (value == max_value).
+	assert_float(found_bar.value).is_equal_approx(found_bar.max_value, 0.001)
+
 
 func test_hero_recruited_signal_refreshes_roster_panel() -> void:
 	var screen: Node = _make_guild_hall_in_tree()

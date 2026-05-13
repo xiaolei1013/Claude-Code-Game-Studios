@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.14] - 2026-05-13
+
+### Changed
+- **Guild Hall HeroCards now show an XP-progress bar** per GDD #19 §C.4. Each HeroCard is a Button with a child VBoxContainer holding a summary Label (`"{display_name} · {class_id} · Lv {current_level}"`) and a slim ProgressBar showing `hero.xp / xp_threshold(current_level)`. At level cap (15), the bar shows full. Children use `mouse_filter = IGNORE` so taps pass through to the Button's `pressed` handler — the modal-open wiring is unchanged. Player now sees a visible progression cue per hero, replacing the plain text-only Button from v0.0.0.11.
+
+### Notes
+- **Test suite**: 2080 → 2082 (+2 net). Added 2 new tests covering the XP-progress bar fraction (mid-level) + level-cap state (bar full). Updated 2 existing tests to read summary text from the child Label instead of `Button.text`.
+- **UX polish deferred**: Parchment-themed sub-panel styling (GDD #19 §C.4 calls for "parchment sub-panel"), class icon (V1.0+ scope), animated bar fill on level-up. The current bar uses Godot's default ProgressBar styling — usable but unbranded; theme variation lands when the parchment theme has a `progress_bar` styling pass.
+
 ## [0.0.0.13] - 2026-05-13
 
 ### Added
