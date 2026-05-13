@@ -295,10 +295,31 @@ func _refresh_roster_panel() -> void:
 		_roster_list.add_child(lbl)
 		return
 
+	# Sprint 17 — build archetype lookup once per refresh. Each hero button
+	# now appends "vs <archetype>" so the player can pick heroes against
+	# the biome's recommendation (PR #84) without leaving the screen.
+	# Continues the matchup awareness chain: biome shows what to bring,
+	# Hero Detail confirms a hero's counter, this surface puts the counter
+	# on every hero in the dispatch flow.
+	var class_to_counter: Dictionary[String, String] = {}
+	for class_id: String in HeroClassDatabase.get_all_ids():
+		var cls: HeroClass = HeroClassDatabase.get_by_id(class_id)
+		if cls == null:
+			continue
+		var counter: String = String(cls.counter_archetype)
+		if counter != "":
+			class_to_counter[class_id] = counter
+
 	for hero: Variant in heroes:
 		var btn: Button = Button.new()
-		# Label format: "<display_name> (<class_id> Lv<level>)"
-		btn.text = "%s (%s Lv%d)" % [hero.display_name, hero.class_id, hero.current_level]
+		# Label format: "<display_name> (<class_id> Lv<level> · vs <archetype>)"
+		# Falls back to the prior "<name> (<class> Lv<n>)" form when the
+		# class has no counter_archetype (data drift defensive path).
+		var counter: String = class_to_counter.get(String(hero.class_id), "")
+		if counter != "":
+			btn.text = "%s (%s Lv%d · vs %s)" % [hero.display_name, hero.class_id, hero.current_level, counter]
+		else:
+			btn.text = "%s (%s Lv%d)" % [hero.display_name, hero.class_id, hero.current_level]
 		btn.custom_minimum_size = Vector2(120, 44)
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.mouse_filter = Control.MOUSE_FILTER_STOP
