@@ -276,5 +276,35 @@ This ADR documents the decision to NOT ship HD-2D shader work in MVP. No code mi
 
 - **2026-05-07** — Authored autonomously as Proposed pending user sign-off.
 - **2026-05-07** — Accepted by autonomous-session creative-direction authorization. User instruction: "no need to interrupt to wait for my decisions. you can help to decide for me." The defensible-default path was chosen (§Decision); pivot triggers (§Pivot Triggers) remain available if circumstances change.
+- **2026-05-14 — PARTIAL ADOPTION (Amendment §A1)** — warm-lantern overlay shader shipped early per user direction.
 
 The decision is reversible via successor ADR authoring per §Pivot Triggers; this is not a one-way door at the architectural level (parchment theme stays shipped; HD-2D shader pass is purely additive when it lands).
+
+---
+
+## Amendment §A1 — Warm-lantern overlay shipped (2026-05-14)
+
+The user authorized shipping the warm-lantern half of the HD-2D pipeline ahead of Vertical Slice tier (`/move on to whatever you can do` → "shader" selection from the 3-option offer on 2026-05-14). This amendment captures the partial adoption without superseding the ADR — the deferral framework still applies to **tilt-shift DoF** (the riskier-and-more-distinctive half).
+
+### What shipped (v0.0.0.31, PR #73)
+
+- `assets/shaders/warm_lantern_overlay.gdshader` — single-pass canvas_item fragment shader (one `length` + one `smoothstep`); 4 tunable uniforms (`warm_color`, `vignette_radius`, `vignette_softness`, `intensity`).
+- `WarmLanternOverlay` ColorRect node on `guild_hall.tscn` (full-rect, `mouse_filter = ignore`, `z_index = 1`).
+- `tests/unit/shaders/warm_lantern_overlay_test.gd` — 3 contract tests (shader loads; 4 uniform declarations present in source; Guild Hall scene resolves the ext_resource path).
+
+### What's still deferred
+
+- **Tilt-shift DoF** (`assets/shaders/tilt_shift_dof.gdshader`) — the harder of the two passes per ADR-0017 §Decision. Requires neighborhood sampling, performance profiling on Steam Deck (1280×800 native + 16ms budget), and lens-blur tuning. Still deferred to Vertical Slice tier until a §Pivot Triggers fires (or a future user-authorized partial-adoption amendment, modeled on this one).
+- **SubViewport composition root** — the full HD-2D pipeline plan involved a SubViewport composition layer. Warm-lantern overlay sits directly on screens via a ColorRect + ShaderMaterial; no SubViewport composition was needed. The SubViewport plan only matters if/when tilt-shift DoF ships (DoF needs a render-target it can sample neighborhood pixels from). Still deferred.
+
+### Why "partial adoption" not "supersession"
+
+ADR-0017 is the canonical record of the deferral decision. The warm-lantern overlay ships as a **preview surface** for the broader HD-2D direction — it's the cheaper half that doesn't require the SubViewport composition or DoF profiling work. The expensive parts (tilt-shift DoF, SubViewport pipeline, Steam Deck profiling) remain deferred. Superseding ADR-0017 would imply the full pipeline is locked in; it isn't. A partial-adoption amendment is the honest framing.
+
+### Reversibility
+
+The warm-lantern overlay can be reverted without superseding this ADR: delete the `WarmLanternOverlay` node from `guild_hall.tscn`. The shader file + tests can stay as ready-to-deploy infrastructure for the Vertical Slice tier. The ADR's deferral framework remains valid for the tilt-shift DoF half.
+
+### Trigger for this amendment
+
+User direction during 2026-05-14 autonomous session — explicit selection of "shader" from a 3-option offer (shader / GDD / sprint plan). Not a §Pivot Triggers fire (no playtest signal, no contributor onboarding, no certification deadline). A direct user choice to ship visible polish ahead of schedule. Per Sprint 15 retro's "internally valuable ≠ externally meaningful" finding, the user prioritized player-visible delta over strict ADR adherence — a valid taste call by the project author.
