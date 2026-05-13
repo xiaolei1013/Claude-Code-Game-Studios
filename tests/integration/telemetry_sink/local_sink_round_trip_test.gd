@@ -30,11 +30,11 @@ func _clear_test_sink() -> void:
 		var dir: DirAccess = DirAccess.open(_TEST_SINK_DIR)
 		if dir != null:
 			dir.list_dir_begin()
-			var name: String = dir.get_next()
-			while name != "":
+			var entry_name: String = dir.get_next()
+			while entry_name != "":
 				if not dir.current_is_dir():
-					DirAccess.remove_absolute(_TEST_SINK_DIR + name)
-				name = dir.get_next()
+					DirAccess.remove_absolute(_TEST_SINK_DIR + entry_name)
+				entry_name = dir.get_next()
 			dir.list_dir_end()
 
 

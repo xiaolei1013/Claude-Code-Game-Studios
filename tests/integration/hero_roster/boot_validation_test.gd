@@ -38,11 +38,11 @@ func _data_registry_can_resolve_warrior() -> bool:
 # HeroInstance.to_dict from Sprint 6 Story 001).
 func _make_hero_dict(id: int, class_id: String = WARRIOR_ID,
 		display_name: String = "", level: int = 1, xp: int = 0) -> Dictionary:
-	var name: String = display_name if display_name != "" else ("Hero %d" % id)
+	var hero_name: String = display_name if display_name != "" else ("Hero %d" % id)
 	return {
 		"instance_id": id,
 		"class_id": class_id,
-		"display_name": name,
+		"display_name": hero_name,
 		"current_level": level,
 		"xp": xp,
 	}

@@ -110,10 +110,10 @@ func test_first_launch_emits_gold_changed_with_seed_reason() -> void:
 	econ.call("_on_first_launch")
 
 	assert_int(_gold_changed_calls.size()).is_equal(1)
-	var call: Dictionary = _gold_changed_calls[0]
-	assert_int(int(call["new_balance"])).is_equal(100)
-	assert_int(int(call["delta"])).is_equal(100)
-	assert_str(String(call["reason"])).is_equal("first_launch_seed")
+	var call_record: Dictionary = _gold_changed_calls[0]
+	assert_int(int(call_record["new_balance"])).is_equal(100)
+	assert_int(int(call_record["delta"])).is_equal(100)
+	assert_str(String(call_record["reason"])).is_equal("first_launch_seed")
 
 	if econ.gold_changed.is_connected(_on_gold_changed_spy):
 		econ.gold_changed.disconnect(_on_gold_changed_spy)
