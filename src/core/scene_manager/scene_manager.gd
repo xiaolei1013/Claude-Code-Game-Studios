@@ -538,8 +538,17 @@ func pop_overlay(overlay_id: String) -> void:
 ## The offline replay tick loop must remain running (ADR-0014: replay path bypasses
 ## tick_fired but the modal's UI animations must render).
 ##
+## Lifecycle (S14-M6 hardening, after PR #58 regression class):
+## If the modal exposes on_enter(), SceneManager calls it AFTER add_child + tracking
+## + current_screen.on_pause() + state transition to PAUSED. This matches the
+## request_screen contract (screen_changed → on_enter) so callers of show_modal
+## get the same lifecycle guarantees as request_screen callers. Modals that do
+## not implement on_enter (e.g., plain Control instances) are unaffected.
+##
 ## Example:
 ##   SceneManager.show_modal(_progress_modal)  # OfflineProgressionEngine call site
+##   # SceneManager calls _progress_modal.on_enter() automatically — caller must
+##   # NOT call it again or signal handlers will double-connect.
 ##
 ## ADR-0014 §Time-gated UX — TR-scene-manager-009
 func show_modal(modal: Control) -> void:
@@ -557,6 +566,12 @@ func show_modal(modal: Control) -> void:
 	# Do NOT increment _modal_pause_count — offline replay does not pause the tree.
 	# (replay path bypasses tick_fired per ADR-0005; UI animations on the modal
 	# must continue rendering while replay batches process.)
+	# S14-M6: call the modal's on_enter AFTER add_child + tracking + state transition
+	# so the modal can rely on being in the tree + SceneManager.state == PAUSED.
+	# Type-guarded via `is Screen` (not has_method — tween_transitions F-01 forbids
+	# has_method in this file). Plain Control modals are unaffected.
+	if modal is Screen:
+		(modal as Screen).on_enter()
 
 
 ## Hides and frees a caller-owned modal that was previously shown via show_modal.
@@ -566,6 +581,11 @@ func show_modal(modal: Control) -> void:
 ## _active_freestanding_modals AND _active_overlays are empty — i.e., if
 ## push_overlay has stacked overlays on top, state stays PAUSED.
 ##
+## Lifecycle (S14-M6 hardening): if the modal exposes on_exit(), SceneManager
+## calls it BEFORE queue_free so the modal can disconnect signal handlers and
+## kill in-flight tweens before its node is freed. Symmetric with show_modal's
+## auto on_enter call. Duck-typed via has_method.
+##
 ## Example:
 ##   SceneManager.hide_modal(_progress_modal)  # called on offline_rewards_collected
 ##
@@ -574,6 +594,11 @@ func hide_modal(modal: Control) -> void:
 	if not _active_freestanding_modals.has(modal):
 		push_warning("[SceneManager] hide_modal: modal not tracked; no-op")
 		return
+	# S14-M6: call the modal's on_exit BEFORE queue_free so it can disconnect
+	# signal handlers + kill tweens while the node is still valid. Type-guarded
+	# via `is Screen` (tween_transitions F-01 forbids has_method here).
+	if modal is Screen:
+		(modal as Screen).on_exit()
 	_active_freestanding_modals.erase(modal)
 	modal.queue_free()
 	if _active_freestanding_modals.is_empty() and _active_overlays.is_empty():
