@@ -23,6 +23,7 @@ var _snapshot_master_db: float = 0.0
 var _snapshot_music_db: float = 0.0
 var _snapshot_sfx_db: float = 0.0
 var _snapshot_reduce_motion: bool = false
+var _snapshot_master_muted: bool = false
 
 
 func before_test() -> void:
@@ -30,6 +31,7 @@ func before_test() -> void:
 	_snapshot_music_db = AudioRouter.get_music_volume_db()
 	_snapshot_sfx_db = AudioRouter.get_sfx_volume_db()
 	_snapshot_reduce_motion = SceneManager.reduce_motion
+	_snapshot_master_muted = AudioRouter.is_master_muted()
 
 
 func after_test() -> void:
@@ -37,6 +39,7 @@ func after_test() -> void:
 	AudioRouter.set_music_volume_db(_snapshot_music_db)
 	AudioRouter.set_sfx_volume_db(_snapshot_sfx_db)
 	SceneManager.set_reduce_motion(_snapshot_reduce_motion)
+	AudioRouter.set_master_muted(_snapshot_master_muted)
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +126,26 @@ func test_reduce_motion_check_initializes_from_scene_manager() -> void:
 	SceneManager.set_reduce_motion(true)
 	var overlay: Control = _make_overlay_in_tree()
 	var check: CheckButton = overlay.get_node("Panel/VBox/ReduceMotionRow/ReduceMotionCheck")
+	assert_bool(check.button_pressed).is_true()
+
+
+# ===========================================================================
+# Group C2 — Mute checkbox writes through AudioRouter
+# ===========================================================================
+
+func test_mute_check_toggled_writes_to_audio_router() -> void:
+	AudioRouter.set_master_muted(false)
+	var overlay: Control = _make_overlay_in_tree()
+	var check: CheckButton = overlay.get_node("Panel/VBox/MuteRow/MuteCheck")
+	check.button_pressed = true
+	check.toggled.emit(true)
+	assert_bool(AudioRouter.is_master_muted()).is_true()
+
+
+func test_mute_check_initializes_from_audio_router() -> void:
+	AudioRouter.set_master_muted(true)
+	var overlay: Control = _make_overlay_in_tree()
+	var check: CheckButton = overlay.get_node("Panel/VBox/MuteRow/MuteCheck")
 	assert_bool(check.button_pressed).is_true()
 
 

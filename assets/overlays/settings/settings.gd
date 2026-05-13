@@ -20,15 +20,17 @@ const _MIN_DB: float = -80.0  # below this, treat as -INF (silent floor)
 @onready var _master_slider: HSlider = $Panel/VBox/MasterRow/MasterSlider
 @onready var _music_slider: HSlider = $Panel/VBox/MusicRow/MusicSlider
 @onready var _sfx_slider: HSlider = $Panel/VBox/SFXRow/SFXSlider
+@onready var _mute_check: CheckButton = $Panel/VBox/MuteRow/MuteCheck
 @onready var _reduce_motion_check: CheckButton = $Panel/VBox/ReduceMotionRow/ReduceMotionCheck
 @onready var _close_button: Button = $Panel/VBox/CloseButton
 
 
 func _ready() -> void:
-	# Seed slider positions from current AudioRouter state.
+	# Seed slider positions + toggle states from current autoload state.
 	_master_slider.value = _db_to_linear(AudioRouter.get_master_volume_db())
 	_music_slider.value = _db_to_linear(AudioRouter.get_music_volume_db())
 	_sfx_slider.value = _db_to_linear(AudioRouter.get_sfx_volume_db())
+	_mute_check.button_pressed = AudioRouter.is_master_muted()
 	_reduce_motion_check.button_pressed = SceneManager.reduce_motion
 
 	# Wire slider value_changed → AudioRouter setters.
@@ -36,7 +38,8 @@ func _ready() -> void:
 	_music_slider.value_changed.connect(_on_music_slider_changed)
 	_sfx_slider.value_changed.connect(_on_sfx_slider_changed)
 
-	# Wire toggle → SceneManager.set_reduce_motion.
+	# Wire toggles.
+	_mute_check.toggled.connect(_on_mute_toggled)
 	_reduce_motion_check.toggled.connect(_on_reduce_motion_toggled)
 
 	# Wire close button + tap-outside.
@@ -73,8 +76,12 @@ func _on_sfx_slider_changed(value: float) -> void:
 
 
 # ---------------------------------------------------------------------------
-# reduce_motion toggle handler
+# Toggle handlers
 # ---------------------------------------------------------------------------
+
+func _on_mute_toggled(value: bool) -> void:
+	AudioRouter.set_master_muted(value)
+
 
 func _on_reduce_motion_toggled(value: bool) -> void:
 	SceneManager.set_reduce_motion(value)
