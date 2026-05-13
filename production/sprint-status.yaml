@@ -75,11 +75,11 @@ stories:
     name: "tests/PATTERNS.md — lifecycle asymmetry entry (Sprint 14 retro action #3)"
     file: "tests/PATTERNS.md"
     priority: should-have
-    status: backlog
+    status: done
     owner: ""
     estimate_days: 0.25
     blocker: ""
-    completed: ""
+    completed: "2026-05-14 — §13 added with detection heuristic, test contract template, and PR #58 → #59 origin"
 
   - id: "S15-S2"
     name: "Level-up toast polish — Guild Hall bottom-of-screen toast on hero_leveled (closes S14-N2)"

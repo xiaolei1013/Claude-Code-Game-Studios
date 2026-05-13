@@ -436,6 +436,52 @@ For continuous-emission spies (counters), omit the flag and ensure cleanup expli
 
 ---
 
+## 13. Lifecycle-asymmetry: check both halves of an API pair
+
+When SceneManager (or any other system) exposes a pair of complementary methods — show/hide, open/close, push/pop, request/release — they should call equivalent lifecycle hooks. If one half automatically invokes a hook and the other doesn't, the asymmetric half WILL be the next bug.
+
+### Canonical example (Sprint 14)
+
+`SceneManager.request_screen()` automatically calls `new_screen.on_enter()` after the transition completes. `SceneManager.show_modal()` (added later for caller-owned modals) added the modal to the tree but did NOT call `on_enter()`. Hero Detail's `_render_all` ran inside `on_enter`, so the modal opened with `.tscn` placeholder labels ("Hero Name" / "Class" / "Level 1") instead of real hero data.
+
+| Bug surfaced | Fix shipped |
+|---|---|
+| PR #58 (v0.0.0.17) — visible to playtest | Caller (Guild Hall) manually called `modal.on_enter()` after `show_modal()` |
+| PR #59 (v0.0.0.18) — root cause fix | `show_modal()` now auto-calls `on_enter()`; `hide_modal()` symmetrically auto-calls `on_exit()`. Locked in by `tests/unit/scene_manager/show_modal_lifecycle_test.gd` (8 cases). |
+
+### Detection heuristic
+
+When you see one of these patterns, immediately check both halves:
+
+```gdscript
+# Symmetric (good):
+func push_screen(s): ... s.on_enter()       # ✅ hook fires
+func pop_screen(s):  s.on_exit()  ...       # ✅ hook fires
+
+# Asymmetric (bug class):
+func push_screen(s): ... s.on_enter()       # ✅ hook fires
+func pop_screen(s):  ...                    # ❌ on_exit never called → signal handlers leak
+```
+
+### Test contract that catches it
+
+When adding the second half of an API pair, write the regression test FIRST:
+
+```gdscript
+# Given a SpyScreen (records hook_log on each lifecycle call)
+# When the new API method is called
+# Then the spy's hook_log records on_enter (or on_exit, etc.) exactly once,
+# at the right time (after add_child, after state transition, before queue_free).
+```
+
+`tests/unit/scene_manager/show_modal_lifecycle_test.gd` is the template — it asserts not just that the hook fired, but that the modal was in the tree at hook time + state was PAUSED at hook time + plain Controls (no Screen base) are skipped gracefully (`is Screen` type guard, not `has_method` — Story 004 contract forbids `has_method` in `scene_manager.gd`).
+
+### Why the rule matters
+
+The PR #58 visible bug was caught by the screenshot the user shared. But the bug class — "caller has to remember a lifecycle hook the API doesn't fire automatically" — is *invisible* in code review because absence-of-a-call is hard to spot. The regression test in PR #59 locks the contract by exercising the production code path; future callers cannot reintroduce the bug.
+
+---
+
 ## Cross-references
 
 - `tests/README.md` — infrastructure (how to run, where files live, naming, coverage)
@@ -458,3 +504,4 @@ For continuous-emission spies (counters), omit the flag and ensure cleanup expli
 | auto_free in `_make_*` factory helpers | Sprint 18 hygiene cycle (commit `f826643`) | ~0.2d (15-orphan baseline masked detection) |
 | Clear spy fields in `before_test` | Sprint 18 hygiene cycle (commit `e42c657`) | ~0.1d (V2 test sized 2 vs expected 1) |
 | Typed-collection literal-rejection | Sprint 11 S11-X10 (Recruitment) — re-surfaced Sprint 14 S14-M4 Story 4 | Fix is mechanical; the gotcha resurfaces every time net-new test code seeds a typed-collection field |
+| Lifecycle-asymmetry: check both halves of an API pair | Sprint 14 PR #58 → PR #59 (`show_modal` vs `request_screen`) | ~0.5d (visible bug surfaced by playtest screenshot; root-cause fix + regression suite landed next PR) |
