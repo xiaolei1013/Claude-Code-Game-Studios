@@ -166,6 +166,16 @@ func on_enter() -> void:
 	_refresh_roster_panel()
 	_refresh_formation_panel()
 
+	# S15-M1 (AC-FA-12): fire the read-intent informational signal so any
+	# subscribers (currently UI consumers only — DungeonRunOrchestrator
+	# ignores per formation-assignment-system.md §C.7) know the player is
+	# looking at their formation. Payload is the current formation snapshot.
+	var current_formation: Array[HeroInstance] = []
+	current_formation.resize(HeroRoster.formation_size())
+	for i: int in range(HeroRoster.formation_size()):
+		current_formation[i] = HeroRoster.get_hero_by_id(HeroRoster.get_formation_slot(i))
+	FormationAssignment.browse(current_formation)
+
 	# Single-focus-mode strategy: suppress keyboard/gamepad focus on all buttons
 	# INCLUDING dynamically-created hero buttons from _refresh_roster_panel.
 	UIFrameworkScript.suppress_keyboard_focus(self)
@@ -342,15 +352,38 @@ func _on_slot_button_pressed(slot_index: int) -> void:
 
 ## Handles tapping a hero button in the roster panel.
 ##
-## Calls [code]HeroRoster.set_formation_slot(_active_slot_index, hero_id)[/code].
-## On success, advances [member _active_slot_index] to fill successive slots with
-## successive taps (progressive fill pattern). Refreshes both panels.
+## S15-M1 refactor (AC-FA-12 single-write-point): routes the write through
+## [code]FormationAssignment.commit()[/code] instead of calling
+## [code]HeroRoster.set_formation_slot[/code] directly. The screen builds a
+## new positional [code]Array[HeroInstance][/code] from the current formation
+## state with the tapped hero swapped into [member _active_slot_index], then
+## hands it to commit(). The autoload writes per-slot via set_formation_slot
+## and emits [signal FormationAssignment.formation_reassignment_committed]
+## once after all writes complete.
+##
+## Mid-run reassignment dialog (AC-FA-13) is S15-M2 scope and will gate this
+## call when DungeonRunOrchestrator.state is ACTIVE_FOREGROUND or
+## OFFLINE_REPLAY. Today the screen is only reachable between runs.
+##
+## On success, advances [member _active_slot_index] to fill successive slots
+## with successive taps (progressive fill pattern). Refreshes both panels.
 func _on_hero_button_pressed(hero_id: int) -> void:
-	var success: bool = HeroRoster.set_formation_slot(_active_slot_index, hero_id)
-	if success:
-		# Advance active slot cyclically so successive taps fill progressively.
-		var slot_count: int = HeroRoster.formation_size()
-		_active_slot_index = (_active_slot_index + 1) % slot_count
+	var formation_size: int = HeroRoster.formation_size()
+	# Build the new positional formation from current state.
+	var new_formation: Array[HeroInstance] = []
+	new_formation.resize(formation_size)
+	for i: int in range(formation_size):
+		var existing_id: int = HeroRoster.get_formation_slot(i)
+		new_formation[i] = HeroRoster.get_hero_by_id(existing_id)
+	# Apply the tap: swap the tapped hero into the active slot. commit()'s
+	# per-slot set_formation_slot loop handles auto-clear if the same hero
+	# was occupying a different slot.
+	new_formation[_active_slot_index] = HeroRoster.get_hero_by_id(hero_id)
+	FormationAssignment.commit(new_formation)
+	# Advance active slot cyclically so successive taps fill progressively.
+	# commit() emits validation_failed signal on rejection, so we don't gate
+	# the advance on success — match prior UX (advance after every tap).
+	_active_slot_index = (_active_slot_index + 1) % formation_size
 	_refresh_roster_panel()
 	_refresh_formation_panel()
 	# Re-suppress focus on any newly-created buttons.

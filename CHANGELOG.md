@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.19] - 2026-05-14
+
+### Changed
+- **FormationAssignment screen now routes formation writes through `FormationAssignment.commit()`** instead of calling `HeroRoster.set_formation_slot` directly (S15-M1, closes AC-FA-12 single-write-point contract). Per-tap behavior is unchanged from the player's perspective: tap a hero → that hero lands in the active slot → active slot advances. But `formation_reassignment_committed` now fires per tap, giving subscribers (DungeonRunOrchestrator per ADR-0001, Economy for formation_strength recompute, etc.) a single canonical "the formation just changed" notification. The mid-run reassignment confirm dialog (AC-FA-13) is S15-M2's scope; today the screen is only reachable between runs so the new signal-fire path is safe.
+- **`formation_assignment.on_enter()` now calls `FormationAssignment.browse()`** with the current formation snapshot, firing the informational `formation_browse_opened` signal per AC-FA-12. The signal is consumer-optional (orchestrator ignores per AC-FA-09).
+
+### Added
+- **`HeroRoster.get_hero_by_id(instance_id) -> HeroInstance`** — O(1) positional accessor needed by the screen to build the `Array[HeroInstance]` payload for `commit()`. Returns null for the 0 empty-slot sentinel and for unknown ids.
+- **Regression test** `tests/integration/formation_assignment/screen_routes_through_commit_test.gd` (6 cases): CI grep guard (no direct `HeroRoster.set_formation_slot` in screen code); behavioral assert (hero-button tap fires commit signal once with correct payload); end-state assert (slot is still mutated post-commit); `get_hero_by_id` happy + edge paths.
+
+### Notes
+- **Tests**: 2103/2103 PASS (+6 from this PR; was 2097 at v0.0.0.18).
+- **AC-FA-12** (single-write-point): now enforced by the CI-grep test. Future regressions where the screen reverts to direct HeroRoster calls fail the build.
+- **Sprint 15 progress**: S15-M1 closed. Remaining must-haves: S15-M2 (confirm dialog + CI guard for AC-FA-13), S15-M3 (Hero Detail interactive actions), S15-M4 (HeroLeveling playtest).
+
 ## [0.0.0.18] - 2026-05-13
 
 ### Changed
