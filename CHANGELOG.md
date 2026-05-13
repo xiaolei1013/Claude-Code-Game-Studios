@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.24] - 2026-05-14
+
+### Fixed
+- **Hero Detail modal layout collapse** — all labels (DisplayName, ClassName, OwnedCount, Level, XP, "warriors total") were stacking on top of each other in an overlapping mess. Root cause: `DetailPanel` is a `PanelContainer`, which only handles a single direct child as its content. The modal had three direct children (HeaderRow + StatsBlock + ActionRow), and PanelContainer anchored all three to the same rect, stacking them. Fixed by wrapping the children in a new `ContentVBox` VBoxContainer — matches the pattern used by the Settings and Victory Moment modals. Bug pre-existed PR #58 (the dim-backdrop fix) but the placeholder labels and dim 0.4 alpha hid it; PR #58 surfaced the real labels and dropped the backdrop to 0.75, making the overlap obvious in playtest. Surfaced by user screenshot.
+- **DimBackdrop alpha 0.75 → 0.85** — Guild Hall HeroCards were still faintly visible behind the modal at 0.75. Boosted to 0.85 for proper modal context-switch focus.
+- **DetailPanel sized up** — `custom_minimum_size` 400×320 → 480×360 to match the Settings overlay dimensions and accommodate the now-properly-laid-out content with breathing room.
+
+### Notes
+- **Tests**: 2122/2122 PASS (unchanged from v0.0.0.23 — pure layout/path-rename fix, no test changes needed; existing tests survived the @onready path update from `DetailPanel/HeaderRow/...` to `DetailPanel/ContentVBox/HeaderRow/...`).
+- **Lesson**: `PanelContainer` is a single-child layout primitive. Multiple direct children stack at (0,0) with no layout. Hero Detail was scaffolded missing the VBoxContainer wrapper. Worth a PATTERNS.md addition if the bug class recurs.
+- **Pre-existing bug class**: same issue could exist in any other scene where someone adds children directly under a PanelContainer. Worth a CI grep audit in a future sprint.
+
 ## [0.0.0.23] - 2026-05-14
 
 ### Added

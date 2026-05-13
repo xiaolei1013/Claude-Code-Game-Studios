@@ -18,7 +18,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.75)
+color = Color(0, 0, 0, 0.85)
 mouse_filter = 0
 
 [node name="DetailPanel" type="PanelContainer" parent="."]
@@ -28,80 +28,84 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -200.0
-offset_top = -160.0
-offset_right = 200.0
-offset_bottom = 160.0
+offset_left = -240.0
+offset_top = -180.0
+offset_right = 240.0
+offset_bottom = 180.0
 grow_horizontal = 2
 grow_vertical = 2
-custom_minimum_size = Vector2(400, 320)
+custom_minimum_size = Vector2(480, 360)
 
-[node name="HeaderRow" type="HBoxContainer" parent="DetailPanel"]
+[node name="ContentVBox" type="VBoxContainer" parent="DetailPanel"]
 layout_mode = 2
 
-[node name="ClassPortrait" type="TextureRect" parent="DetailPanel/HeaderRow"]
+[node name="HeaderRow" type="HBoxContainer" parent="DetailPanel/ContentVBox"]
+layout_mode = 2
+
+[node name="ClassPortrait" type="TextureRect" parent="DetailPanel/ContentVBox/HeaderRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(96, 96)
 expand_mode = 1
 stretch_mode = 5
 
-[node name="HeaderLabels" type="VBoxContainer" parent="DetailPanel/HeaderRow"]
+[node name="HeaderLabels" type="VBoxContainer" parent="DetailPanel/ContentVBox/HeaderRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="DisplayNameLabel" type="Label" parent="DetailPanel/HeaderRow/HeaderLabels"]
+[node name="DisplayNameLabel" type="Label" parent="DetailPanel/ContentVBox/HeaderRow/HeaderLabels"]
 layout_mode = 2
 text = "Hero Name"
 theme_type_variation = &"IdentityHeader"
 
-[node name="ClassNameLabel" type="Label" parent="DetailPanel/HeaderRow/HeaderLabels"]
+[node name="ClassNameLabel" type="Label" parent="DetailPanel/ContentVBox/HeaderRow/HeaderLabels"]
 layout_mode = 2
 text = "Class"
 
-[node name="OwnedCountLabel" type="Label" parent="DetailPanel/HeaderRow/HeaderLabels"]
+[node name="OwnedCountLabel" type="Label" parent="DetailPanel/ContentVBox/HeaderRow/HeaderLabels"]
 layout_mode = 2
 text = "(owned: 1 warrior)"
 
-[node name="StatsBlock" type="VBoxContainer" parent="DetailPanel"]
+[node name="StatsBlock" type="VBoxContainer" parent="DetailPanel/ContentVBox"]
 layout_mode = 2
 
-[node name="LevelRow" type="HBoxContainer" parent="DetailPanel/StatsBlock"]
+[node name="LevelRow" type="HBoxContainer" parent="DetailPanel/ContentVBox/StatsBlock"]
 layout_mode = 2
 
-[node name="LevelLabel" type="Label" parent="DetailPanel/StatsBlock/LevelRow"]
+[node name="LevelLabel" type="Label" parent="DetailPanel/ContentVBox/StatsBlock/LevelRow"]
 layout_mode = 2
 text = "Level"
 
-[node name="LevelValueLabel" type="Label" parent="DetailPanel/StatsBlock/LevelRow"]
+[node name="LevelValueLabel" type="Label" parent="DetailPanel/ContentVBox/StatsBlock/LevelRow"]
 layout_mode = 2
+size_flags_horizontal = 3
 text = "1"
 
-[node name="XPRow" type="VBoxContainer" parent="DetailPanel/StatsBlock"]
+[node name="XPRow" type="VBoxContainer" parent="DetailPanel/ContentVBox/StatsBlock"]
 layout_mode = 2
 
-[node name="XPLabel" type="Label" parent="DetailPanel/StatsBlock/XPRow"]
+[node name="XPLabel" type="Label" parent="DetailPanel/ContentVBox/StatsBlock/XPRow"]
 layout_mode = 2
 text = "XP: 0 / 150"
 
-[node name="XPProgressBar" type="ProgressBar" parent="DetailPanel/StatsBlock/XPRow"]
+[node name="XPProgressBar" type="ProgressBar" parent="DetailPanel/ContentVBox/StatsBlock/XPRow"]
 layout_mode = 2
 max_value = 1.0
 step = 0.01
 value = 0.0
 show_percentage = false
 
-[node name="ActionRow" type="HBoxContainer" parent="DetailPanel"]
+[node name="ActionRow" type="HBoxContainer" parent="DetailPanel/ContentVBox"]
 layout_mode = 2
 alignment = 1
 
-[node name="LevelUpButton" type="Button" parent="DetailPanel/ActionRow"]
+[node name="LevelUpButton" type="Button" parent="DetailPanel/ContentVBox/ActionRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(180, 44)
 focus_mode = 0
 mouse_filter = 0
 text = "Level Up"
 
-[node name="PrestigeButton" type="Button" parent="DetailPanel/ActionRow"]
+[node name="PrestigeButton" type="Button" parent="DetailPanel/ContentVBox/ActionRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(180, 44)
 focus_mode = 0
@@ -109,7 +113,7 @@ mouse_filter = 0
 text = "Prestige Hero"
 visible = false
 
-[node name="CloseButton" type="Button" parent="DetailPanel/ActionRow"]
+[node name="CloseButton" type="Button" parent="DetailPanel/ContentVBox/ActionRow"]
 layout_mode = 2
 custom_minimum_size = Vector2(120, 44)
 focus_mode = 0

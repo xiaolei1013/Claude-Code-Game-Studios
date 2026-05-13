@@ -85,20 +85,20 @@ var _cached_level_up_cost: int = -1
 ## S17-M1 known scope) — placeholder while ClassPortrait sourcing follows
 ## the ADR-0016 silent-MVP precedent or an art-asset binding lands.
 @warning_ignore("unused_private_class_variable")
-@onready var _class_portrait: TextureRect = $DetailPanel/HeaderRow/ClassPortrait
-@onready var _display_name_label: Label = $DetailPanel/HeaderRow/HeaderLabels/DisplayNameLabel
-@onready var _class_name_label: Label = $DetailPanel/HeaderRow/HeaderLabels/ClassNameLabel
-@onready var _owned_count_label: Label = $DetailPanel/HeaderRow/HeaderLabels/OwnedCountLabel
-@onready var _level_value_label: Label = $DetailPanel/StatsBlock/LevelRow/LevelValueLabel
-@onready var _xp_label: Label = $DetailPanel/StatsBlock/XPRow/XPLabel
-@onready var _xp_progress_bar: ProgressBar = $DetailPanel/StatsBlock/XPRow/XPProgressBar
-@onready var _level_up_button: Button = $DetailPanel/ActionRow/LevelUpButton
-@onready var _close_button: Button = $DetailPanel/ActionRow/CloseButton
+@onready var _class_portrait: TextureRect = $DetailPanel/ContentVBox/HeaderRow/ClassPortrait
+@onready var _display_name_label: Label = $DetailPanel/ContentVBox/HeaderRow/HeaderLabels/DisplayNameLabel
+@onready var _class_name_label: Label = $DetailPanel/ContentVBox/HeaderRow/HeaderLabels/ClassNameLabel
+@onready var _owned_count_label: Label = $DetailPanel/ContentVBox/HeaderRow/HeaderLabels/OwnedCountLabel
+@onready var _level_value_label: Label = $DetailPanel/ContentVBox/StatsBlock/LevelRow/LevelValueLabel
+@onready var _xp_label: Label = $DetailPanel/ContentVBox/StatsBlock/XPRow/XPLabel
+@onready var _xp_progress_bar: ProgressBar = $DetailPanel/ContentVBox/StatsBlock/XPRow/XPProgressBar
+@onready var _level_up_button: Button = $DetailPanel/ContentVBox/ActionRow/LevelUpButton
+@onready var _close_button: Button = $DetailPanel/ContentVBox/ActionRow/CloseButton
 
 # Prestige V1.0 — Story 3 UI (Slice A) — `prestige-system.md` §C.1 + §C.2
 # + AC-PR-19 + AC-PR-20. The Prestige button is mutually exclusive with
 # LevelUpButton: one OR the other shows depending on hero level vs cap.
-@onready var _prestige_button: Button = $DetailPanel/ActionRow/PrestigeButton
+@onready var _prestige_button: Button = $DetailPanel/ContentVBox/ActionRow/PrestigeButton
 @onready var _prestige_confirmation: Control = $PrestigeConfirmation
 @onready var _prestige_confirm_backdrop: ColorRect = $PrestigeConfirmation/ConfirmDimBackdrop
 @onready var _prestige_confirm_body_label: Label = $PrestigeConfirmation/ConfirmPanel/ConfirmContent/ConfirmBodyLabel
