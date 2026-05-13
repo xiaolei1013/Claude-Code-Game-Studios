@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2qmm3ej2o02m"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "lamplit_chorister"
+display_name = "Lamplit Chorister"
+tier = 1
+archetype = "caster"
+biome = "hollow_stair"
+base_hp = 56
+base_attack = 14
+base_speed = 4
+sprite_path = "assets/art/enemies/lamplit_chorister/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Each carries its own dim lamp. They sing in a key that makes the stair longer."
+is_boss = false

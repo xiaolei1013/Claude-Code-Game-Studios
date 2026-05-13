@@ -1,0 +1,61 @@
+[gd_resource type="Resource" script_class="Dungeon" format=3 uid="uid://b2hsdungeon0001"]
+
+[ext_resource type="Script" uid="uid://5r5078scb8my" path="res://src/core/biome_dungeon_database/dungeon.gd" id="1_dg"]
+[ext_resource type="Script" uid="uid://doafwgg4qfi2a" path="res://src/core/biome_dungeon_database/floor.gd" id="2_fl"]
+
+[sub_resource type="Resource" id="Floor_HS_F1"]
+script = ExtResource("2_fl")
+id = "hollow_stair_f1"
+display_name = "Floor 1: The First Landing"
+floor_index = 1
+enemy_list = [{"enemy_id": "iron_silent", "count": 2}, {"enemy_id": "lamplit_chorister", "count": 1}]
+expected_clear_time_seconds = 50
+is_boss_floor = false
+flavor_text = "The lamps on this landing have not been refilled in centuries. They still burn."
+
+[sub_resource type="Resource" id="Floor_HS_F2"]
+script = ExtResource("2_fl")
+id = "hollow_stair_f2"
+display_name = "Floor 2: The Choir Step"
+floor_index = 2
+enemy_list = [{"enemy_id": "lamplit_chorister", "count": 3}, {"enemy_id": "stairmaw_hound", "count": 1}]
+expected_clear_time_seconds = 68
+is_boss_floor = false
+flavor_text = "The choristers' song carries down the stair for kilometers. The hounds answer."
+
+[sub_resource type="Resource" id="Floor_HS_F3"]
+script = ExtResource("2_fl")
+id = "hollow_stair_f3"
+display_name = "Floor 3: The Kennel Step"
+floor_index = 3
+enemy_list = [{"enemy_id": "stairmaw_hound", "count": 3}, {"enemy_id": "iron_silent", "count": 2}]
+expected_clear_time_seconds = 100
+is_boss_floor = false
+flavor_text = "Where the hounds are kept. The Iron Silents are their keepers. The leash is not literal."
+
+[sub_resource type="Resource" id="Floor_HS_F4"]
+script = ExtResource("2_fl")
+id = "hollow_stair_f4"
+display_name = "Floor 4: The Cradle Courts"
+floor_index = 4
+enemy_list = [{"enemy_id": "cradle_judge", "count": 2}, {"enemy_id": "lamplit_chorister", "count": 1}]
+expected_clear_time_seconds = 115
+is_boss_floor = false
+flavor_text = "Three iron chairs. Three judges. They have been hearing the same case for nine hundred years."
+
+[sub_resource type="Resource" id="Floor_HS_F5"]
+script = ExtResource("2_fl")
+id = "hollow_stair_f5"
+display_name = "Floor 5: The Floor Itself"
+floor_index = 5
+enemy_list = [{"enemy_id": "the_last_step", "count": 1}]
+expected_clear_time_seconds = 205
+is_boss_floor = true
+flavor_text = "The stair ends here. There was supposed to be more. There used to be more. The thing that stopped the stair is still here, sitting on the last step."
+
+[resource]
+script = ExtResource("1_dg")
+id = "hollow_stair_dungeon_01"
+display_name = "The Hollow Stair — The Long Descent"
+biome_id = "hollow_stair"
+floors = Array[Resource]([SubResource("Floor_HS_F1"), SubResource("Floor_HS_F2"), SubResource("Floor_HS_F3"), SubResource("Floor_HS_F4"), SubResource("Floor_HS_F5")])

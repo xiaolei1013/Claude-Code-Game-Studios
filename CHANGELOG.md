@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.30] - 2026-05-14
+
+### Added
+- **Biome 6: The Hollow Stair** — **second link in the progression chain**. Gated behind clearing Ember Wastes' boss (`unlock_after = "ember_wastes_f5"`). 5-floor dungeon (First Landing → Choir Step → Kennel Step → Cradle Courts → The Floor Itself, boss). 5 new biome-themed enemies: Lamplit Chorister (caster), Iron Silent (armored), Stairmaw Hound (bruiser), Cradle Judge (tier-2 caster — "Has been judging for centuries. Has never returned a verdict."), The Last Step (tier-3 boss armored — "The reason the stair ends").
+- **6 regression tests** at `tests/integration/biome_dungeon_database/hollow_stair_gated_biome_test.gd`, including a full-chain end-to-end test (Frostmire boss → Ember Wastes unlock → Ember Wastes boss → Hollow Stair unlock; biome count grows 4 → 5 → 6).
+
+### Notes
+- **Tests**: 2157/2157 PASS (+6 from this PR; was 2151 at PR #80).
+- **Progression chain now has 2 links**: starter set (4 biomes) → Ember Wastes (gate: Frostmire F5) → Hollow Stair (gate: Ember Wastes F5). Each clear of a chain-end boss produces a "Unlocked: <biome>" toast on Guild Hall return.
+- **Sprint 16 momentum**: 5 biomes shipped today (Whispering Crags #77 → Sunken Ruins #78 → Frostmire #79 → Ember Wastes #80 → Hollow Stair this PR) + the progression-gate infra. Tests grew 2089 → 2157 across the session (+68 cases).
+- **Future**: chain can extend indefinitely. Each new biome with `unlock_after` set creates a new link. No code changes needed per biome — the gate logic is generic.
+
 ## [0.0.0.29] - 2026-05-14
 
 ### Added
