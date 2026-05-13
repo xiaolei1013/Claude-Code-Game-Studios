@@ -131,13 +131,13 @@ stories:
 
   - id: "S14-S5"
     name: "Sprint 14 retrospective"
-    file: "production/retrospectives/sprint-14-retrospective-2026-05-??.md"
+    file: "production/retrospectives/sprint-14-retrospective-2026-05-13.md"
     priority: should-have
-    status: ready-for-dev
+    status: done
     owner: ""
     estimate_days: 0.25
     blocker: ""
-    completed: ""
+    completed: "2026-05-13 — fresh retro authored; pre-emptive 2026-05-07 retro archived as obsoleted scope"
 
   # ===== Nice to Have =====
 
