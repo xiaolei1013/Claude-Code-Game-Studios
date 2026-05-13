@@ -263,11 +263,29 @@ func _build_hero_card(hero: RefCounted) -> Button:
 	card.add_child(vbox)
 
 	var summary_label: Label = Label.new()
-	summary_label.text = "%s · %s · Lv %d" % [
-		String(hero.get("display_name")),
-		String(hero.get("class_id")),
-		int(hero.get("current_level")),
-	]
+	# Sprint 17 — append "· vs <archetype>" so the matchup signal is
+	# visible on the Guild Hall roster without needing a modal tap.
+	# Defensive: class with no counter_archetype falls back to the prior
+	# 3-segment format. Continues the matchup awareness chain
+	# (PR #84, #85, #86) into the player's home screen.
+	var class_id_str: String = String(hero.get("class_id"))
+	var class_data: Resource = DataRegistry.resolve("classes", class_id_str)
+	var counter: String = ""
+	if class_data != null and "counter_archetype" in class_data:
+		counter = String(class_data.counter_archetype)
+	if counter != "":
+		summary_label.text = "%s · %s · Lv %d · vs %s" % [
+			String(hero.get("display_name")),
+			class_id_str,
+			int(hero.get("current_level")),
+			counter,
+		]
+	else:
+		summary_label.text = "%s · %s · Lv %d" % [
+			String(hero.get("display_name")),
+			class_id_str,
+			int(hero.get("current_level")),
+		]
 	summary_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(summary_label)
 
