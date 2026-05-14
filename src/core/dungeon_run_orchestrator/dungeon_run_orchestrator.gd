@@ -219,13 +219,20 @@ const LOSING_RUN_LOOT_FACTOR: float = 0.5
 # Per design/gdd/class-synergy-system.md §G Tuning Knobs. Cozy-register hard
 # floor (OQ-32-6 + AC-CS-16): all synergy multipliers ≤ 1.5. Current first-pass
 # uses ≤ 1.25 — well under the cap. Test: a static-analysis CI test asserts
-# all three constants are ≤ 1.5 (cozy_register_cap_test.gd).
+# all four constants are ≤ 1.5 (cozy_register_cap_test.gd).
 # ---------------------------------------------------------------------------
 
 ## Steel Wall (3 Warriors) gold multiplier vs `archetype = "bruiser"`.
 ## Conditional — applies only when the formation is 3 Warriors AND the kill
 ## archetype is bruiser. Per GDD §C.1 + §D.2 + AC-CS-06/07.
 const STEEL_WALL_GOLD_MULT: float = 1.25
+
+## Triple Strike (3 Rogues) gold multiplier vs `archetype = "armored"`.
+## Conditional — applies only when the formation is 3 Rogues AND the kill
+## archetype is armored. Structurally parallel to Steel Wall; added in the
+## 2026-05-14 GDD re-review to close the 3-Rogue asymmetric-class-treatment
+## gap. Per GDD §C.1 + §D.2 + AC-CS-22/23.
+const TRIPLE_STRIKE_GOLD_MULT: float = 1.25
 
 ## Triple Threat (1W+1M+1R) gold multiplier — unconditional.
 ## Per GDD §C.1 + §D.2 + AC-CS-08.
@@ -1181,6 +1188,13 @@ func _resolve_synergy_gold_multiplier(synergy_id: String, archetype: String) -> 
 		"steel_wall":
 			# Conditional: only applies vs bruiser archetype kills.
 			return STEEL_WALL_GOLD_MULT if archetype == "bruiser" else 1.0
+		"triple_strike":
+			# Conditional: only applies vs armored archetype kills
+			# (parallel to steel_wall; Rogue counters Armored per
+			# assets/data/classes/rogue.tres counter_archetype).
+			# Added in the 2026-05-14 GDD re-review to close the
+			# 3-Rogue asymmetric-class-treatment gap.
+			return TRIPLE_STRIKE_GOLD_MULT if archetype == "armored" else 1.0
 		"triple_threat":
 			# Unconditional: applies to all kill archetypes.
 			return TRIPLE_THREAT_GOLD_MULT
@@ -1206,8 +1220,10 @@ func _resolve_synergy_xp_multiplier(synergy_id: String) -> float:
 		"arcane_elite":
 			# Unconditional XP boost.
 			return ARCANE_ELITE_XP_MULT
-		"steel_wall", "triple_threat":
-			# Gold-only synergies (XP path is baseline).
+		"steel_wall", "triple_strike", "triple_threat":
+			# Gold-only synergies (XP path is baseline). Triple Strike
+			# added 2026-05-14 alongside Steel Wall as the second
+			# conditional gold synergy.
 			return 1.0
 		_:
 			# AC-CS-18 forward-compat fallback.

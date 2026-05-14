@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.38] - 2026-05-14
+
+### Added
+- **Triple Strike — 3-Rogue class synergy.** Dispatching a formation of 3 Rogues against armored-archetype enemies now earns +25% gold per kill (parallel to Steel Wall's 3-Warrior vs bruiser bonus). Non-armored kills earn baseline gold. The synergy is discoverable, not mandatory — a 3-Rogue player who never fights armored enemies still earns full baseline rewards. Closes the asymmetric-class-treatment gap from the original Sprint 19 first-pass roster where 3-Warrior and 3-Mage had synergies but 3-Rogue did not.
+
+### Internal
+- **Class Synergy V1.0 backend wired end-to-end** (Sprint 18 S18-M2). The Sprint 19 pre-emptive scaffolding (constants, resolver functions, signal declarations, RunSnapshot.synergy_id field, dispatch-time detection wiring) is now complete and player-active. Triple Strike addition: new `TRIPLE_STRIKE_GOLD_MULT = 1.25` const + new `triple_strike` match arm in `_resolve_synergy_gold_multiplier` (conditional on archetype == "armored") + new `SYNERGY_TRIPLE_STRIKE` const + new detection clause in `FormationAssignment.detect_active_synergy` for `["rogue", "rogue", "rogue"]`. `ADR-0018` authored documenting the multi-multiplier composition order (BASE_KILL × matchup × loot × synergy → single `floori`), per-synergy cap enforcement layer (resolver, not compound product), and snapshot-immutability invariant (AC-CS-13). 3 new ACs (AC-CS-21/22/23) + 4 new formula tests + updated detection + invariants tests. Bidirectional dependency amendments applied to economy-system.md + class-vs-enemy-matchup-resolver.md GDDs. Full test suite 2197/2197 pass (1 pre-existing matchup_resolver_perf flake, unrelated).
+
 ## [0.0.0.37] - 2026-05-14
 
 ### Fixed

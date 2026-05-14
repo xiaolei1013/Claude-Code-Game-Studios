@@ -85,16 +85,18 @@ func test_detect_active_synergy_two_plus_one_returns_empty() -> void:
 	assert_str(result).is_equal("")
 
 
-func test_detect_active_synergy_three_rogues_returns_empty() -> void:
-	# Note: 3 Rogues is NOT a V1.0 first-pass synergy (only 3W, 3M, and 1+1+1).
-	# 3 Rogues IS a V1.5+ candidate but explicitly not in the first-pass roster.
+func test_detect_active_synergy_three_rogues_returns_triple_strike() -> void:
+	# AC-CS-21: 3 Rogues → "triple_strike". Added 2026-05-14 to close the
+	# 3-Rogue asymmetric-class-treatment gap. Structurally parallel to
+	# Steel Wall (×1.25 gold, conditional on archetype counter — armored
+	# for Rogue per assets/data/classes/rogue.tres counter_archetype).
 	var fa: Node = _make_fa()
 	var formation: Array[String] = ["rogue", "rogue", "rogue"]
 	var snapshot: Dictionary = _heroes_dict(formation)
 
 	var result: String = fa.detect_active_synergy(snapshot)
 
-	assert_str(result).is_equal("")
+	assert_str(result).is_equal("triple_strike")
 
 
 func test_detect_active_synergy_empty_slot_class_id_returns_empty() -> void:
