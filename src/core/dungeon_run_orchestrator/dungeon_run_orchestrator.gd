@@ -1064,7 +1064,14 @@ func _process_kill_events(events: Variant) -> void:
 			# Layer 3: Economy monotonic-credit gate.
 			var awarded: bool = false
 			if economy_can_add_gold and bonus > 0 and economy.has_method("try_award_floor_clear"):
-				awarded = bool(economy.try_award_floor_clear(floor_idx, bonus))
+				# Sprint 17 schema v2: Economy.try_award_floor_clear takes
+				# biome_id as the first param so the monotonic-credit ledger
+				# is namespaced per biome. Pre-Sprint-17 (single-biome MVP)
+				# this call was (floor_idx, bonus) — the int-keyed ledger
+				# collided across biomes (e.g. clearing Forest Reach F5
+				# blocked Frostmire F5's first-clear progression). The
+				# biome-aware signature fixes the multi-biome chain.
+				awarded = bool(economy.try_award_floor_clear(_dispatched_biome_id, floor_idx, bonus))
 			# Layer 2 flag set regardless of awarded — prevents within-dispatch
 			# re-entry from re-calling Economy (whose monotonic gate would block
 			# anyway, but skipping the call is cheaper).

@@ -74,7 +74,11 @@ const OFFLINE_REPLAY_REASON: String = "offline_replay"
 ## [code]push_error[/code] and the instance retains its current state.
 ##
 ## ADR-0004 §Consumer contract — ADR-0013 §save schema.
-const SAVE_SCHEMA_VERSION: int = 1
+## Schema version 2 (Sprint 17): widens floor_clear_bonus_credited ledger from
+## int-keyed (floor_index alone) to String-keyed ("<biome_id>_f<floor_index>")
+## to support multi-biome progression. v1 saves are auto-migrated by prefixing
+## int keys with "forest_reach_f" (Sprint 11-era saves predate multi-biome).
+const SAVE_SCHEMA_VERSION: int = 2
 
 # ---------------------------------------------------------------------------
 # Signals
@@ -103,7 +107,10 @@ signal gold_changed(new_balance: int, delta: int, reason: String)
 ## SUPPRESSED during offline replay ([member _is_offline_replay] == true).
 ##
 ## ADR-0013 §Signals — ADR-0002 monotonic-credit contract
-signal first_clear_awarded(floor_index: int)
+## Sprint 17 schema v2 widening: payload now carries biome_id alongside
+## floor_index. Pre-Sprint-17 consumers subscribing with arity 1 must be
+## updated to accept the new (biome_id, floor_index) signature.
+signal first_clear_awarded(biome_id: String, floor_index: int)
 
 # ---------------------------------------------------------------------------
 # Private state
@@ -121,18 +128,26 @@ var _gold_balance: int = 0
 ## ADR-0013 §Requirements — GDD §C
 var _lifetime_gold_earned: int = 0
 
-## Monotonic floor-clear bonus ledger. Keys are floor indices (1..5); values
-## are the highest bonus_amount credited for each floor.
+## Monotonic floor-clear bonus ledger. Keys are "<biome_id>_f<floor_index>"
+## strings (e.g. "forest_reach_f1", "frostmire_f5"); values are the highest
+## bonus_amount credited for that (biome, floor) pair.
 ##
 ## ADR-0002 credit-the-gap contract: only amounts EXCEEDING the stored value
-## are credited. This prevents double-crediting when the same floor is cleared
-## multiple times with different bonus amounts.
+## are credited. This prevents double-crediting when the same (biome, floor)
+## pair is cleared multiple times with different bonus amounts.
 ##
-## Typed [Dictionary][int, int] (Godot 4.4+ syntax — precedent-verified via
-## ADR-0009 / ADR-0012 landed usage).
+## Sprint 17 schema v2 widening: previously [Dictionary][int, int] keyed by
+## floor_index alone. That broke Sprint 16's multi-biome architecture —
+## clearing F5 in Forest Reach blocked first-clear progression for F5 in
+## every other biome (ember_wastes, frostmire, etc.), which silently
+## suppressed FloorUnlockSystem advance via the orchestrator's `awarded`
+## gate. The (biome_id, floor_index) namespacing fixes this.
+##
+## Typed [Dictionary][String, int] (Godot 4.4+ syntax — precedent-verified
+## via ADR-0009 / ADR-0012 landed usage).
 ## Persisted via [method get_save_data] / [method load_save_data].
-## ADR-0013 §Requirements — ADR-0002
-var _floor_clear_bonus_credited: Dictionary[int, int] = {}
+## ADR-0013 §Requirements — ADR-0002 (Sprint 17 amendment for multi-biome).
+var _floor_clear_bonus_credited: Dictionary[String, int] = {}
 
 ## Transient flag: true only during the [method compute_offline_batch] call.
 ##
@@ -156,16 +171,20 @@ var _is_offline_replay: bool = false
 ## Cleared by [method flush_offline_signals] post-emit.
 var _offline_pending_delta: int = 0
 
-## Floor indices pending [signal first_clear_awarded] aggregate emission per
-## ADR-0013 Amendment #1. When [member _is_offline_replay] is true and a
-## [method try_award_floor_clear] call matches the first-clear gate, the
-## floor_index is appended here instead of emitting per-call. Flushed in
-## insertion order by [method flush_offline_signals].
+## (biome_id, floor_index) pairs pending [signal first_clear_awarded] aggregate
+## emission per ADR-0013 Amendment #1. When [member _is_offline_replay] is true
+## and a [method try_award_floor_clear] call matches the first-clear gate, the
+## pair is appended here instead of emitting per-call. Flushed in insertion
+## order by [method flush_offline_signals].
+##
+## Sprint 17 schema v2 widening: previously Array[int] (floor_index only).
+## Now Array[Array] with [biome_id, floor_index] tuples to match the widened
+## signal payload.
 ##
 ## Per OfflineProgressionEngine GDD §C.3 signal suppression policy:
-## first_clear_awarded fires POST-replay for each first-cleared floor in the
-## offline window (not per-chunk).
-var _offline_pending_first_clears: Array[int] = []
+## first_clear_awarded fires POST-replay for each first-cleared (biome, floor)
+## pair in the offline window (not per-chunk).
+var _offline_pending_first_clears: Array[Array] = []
 
 ## Resolved EconomyConfig instance from DataRegistry. Populated in _ready().
 ## Null if DataRegistry has not yet reached READY state (e.g. during boot
@@ -376,33 +395,47 @@ func try_spend(amount: int, reason: String) -> bool:
 ##   [member _is_offline_replay] is [code]true[/code]. [method add_gold] already
 ##   self-suppresses [signal gold_changed] during offline replay.
 ##
-## Example:
-##   Economy.try_award_floor_clear(2, 1200)  # credits F2 first-clear bonus
+## Sprint 17 schema v2: signature widened to take [param biome_id] as the
+## first param to support multi-biome progression. Pre-v2 callers (single-biome
+## tests, MVP code paths) must pass [code]"forest_reach"[/code] explicitly.
 ##
-## ADR-0013 §Requirements — ADR-0002 monotonic-credit contract — GDD §C.4, §D.5
-func try_award_floor_clear(floor_index: int, bonus_amount: int) -> bool:
+## [param biome_id]: Biome identifier (e.g. [code]"forest_reach"[/code],
+##   [code]"frostmire"[/code]). Empty string is rejected with [method push_error].
+##
+## Example:
+##   Economy.try_award_floor_clear("forest_reach", 2, 1200)  # credits Forest Reach F2 first-clear
+##   Economy.try_award_floor_clear("frostmire", 5, 2500)     # credits Frostmire F5 first-clear
+##
+## ADR-0013 §Requirements — ADR-0002 monotonic-credit contract (Sprint 17 amendment
+## for multi-biome ledger) — GDD §C.4, §D.5
+func try_award_floor_clear(biome_id: String, floor_index: int, bonus_amount: int) -> bool:
+	if biome_id.is_empty():
+		push_error("Economy.try_award_floor_clear: biome_id is empty — refusing to credit")
+		return false
 	if floor_index < 1 or floor_index > 5:
 		push_error("Economy.try_award_floor_clear: floor_index=%d out of range [1,5]" % floor_index)
 		return false
 	if bonus_amount < 0:
 		push_error("Economy.try_award_floor_clear: bonus_amount=%d is negative (authoring bug)" % bonus_amount)
 		return false
-	var already: int = _floor_clear_bonus_credited.get(floor_index, 0)
+	var key: String = "%s_f%d" % [biome_id, floor_index]
+	var already: int = _floor_clear_bonus_credited.get(key, 0)
 	if bonus_amount <= already:
 		return false  # at-or-below ceiling; covers zero-bonus, repeat-WIN, LOSING-after-WIN
 	var delta: int = bonus_amount - already
 	var is_first: bool = already == 0  # captured before add_gold mutates any state
 	add_gold(delta)  # routes through the canonical mutation site; updates lifetime
-	_floor_clear_bonus_credited[floor_index] = bonus_amount
+	_floor_clear_bonus_credited[key] = bonus_amount
 	# ADR-0013 Amendment #1: during offline replay, accumulate first-clear
-	# floor indices for post-replay aggregate emission (preserves
-	# OfflineProgressionEngine GDD §C.3 contract: first_clear_awarded fires
-	# POST-replay for each first-cleared floor in the offline window).
+	# (biome_id, floor_index) pairs for post-replay aggregate emission
+	# (preserves OfflineProgressionEngine GDD §C.3 contract: first_clear_awarded
+	# fires POST-replay for each first-cleared (biome, floor) pair in the
+	# offline window).
 	if is_first:
 		if _is_offline_replay:
-			_offline_pending_first_clears.append(floor_index)
+			_offline_pending_first_clears.append([biome_id, floor_index])
 		else:
-			first_clear_awarded.emit(floor_index)
+			first_clear_awarded.emit(biome_id, floor_index)
 	return true
 
 
@@ -584,9 +617,10 @@ func flush_offline_signals() -> void:
 	# Aggregate gold_changed emit (only if non-zero — zero-delta is silent).
 	if _offline_pending_delta != 0:
 		gold_changed.emit(_gold_balance, _offline_pending_delta, "offline_replay_aggregate")
-	# Aggregate first_clear_awarded emits in insertion order.
-	for floor_index: int in _offline_pending_first_clears:
-		first_clear_awarded.emit(floor_index)
+	# Aggregate first_clear_awarded emits in insertion order. Sprint 17 schema
+	# v2: each entry is [biome_id: String, floor_index: int].
+	for pair: Array in _offline_pending_first_clears:
+		first_clear_awarded.emit(String(pair[0]), int(pair[1]))
 	# Clear accumulators + replay flag.
 	_offline_pending_delta = 0
 	_offline_pending_first_clears.clear()
@@ -675,9 +709,13 @@ func load_save_data(data: Dictionary) -> void:
 		)
 		return
 	var version: int = int(raw_version)
-	if version != SAVE_SCHEMA_VERSION:
+	# Sprint 17: accept v1 (legacy, int-keyed ledger) and v2 (current,
+	# String-keyed ledger). v1 → v2 migration prefixes int keys with
+	# "forest_reach_f" since Sprint 11-era saves predate multi-biome
+	# content and any cleared floors were implicitly Forest Reach.
+	if version != 1 and version != SAVE_SCHEMA_VERSION:
 		push_error(
-			"Economy.load_save_data: unsupported schema_version=%d (expected %d) — load aborted, state unchanged"
+			"Economy.load_save_data: unsupported schema_version=%d (expected 1 or %d) — load aborted, state unchanged"
 			% [version, SAVE_SCHEMA_VERSION]
 		)
 		return
@@ -702,15 +740,39 @@ func load_save_data(data: Dictionary) -> void:
 			% _gold_balance
 		)
 		_gold_balance = 0
-	# Rebuild the floor-clear ledger with explicit int(key)/int(value) coercion
-	# so JSON-round-tripped String keys / TYPE_FLOAT values produce the typed
-	# Dictionary[int, int] shape that the rest of the API depends on.
+	# Rebuild the floor-clear ledger. Sprint 17 schema v2 uses String keys
+	# of the form "<biome_id>_f<floor_index>" (e.g. "forest_reach_f1").
+	# v1 saves have int keys (floor_index alone, implicitly Forest Reach);
+	# we migrate by prefixing with "forest_reach_f". The migration is
+	# best-effort defensive: numeric-looking string keys on v2 also get
+	# treated as legacy ints so a hand-edited save doesn't lose state.
 	var ledger_in: Variant = data.get("floor_clear_bonus_credited", {})
-	var ledger_out: Dictionary[int, int] = {}
+	var ledger_out: Dictionary[String, int] = {}
 	if typeof(ledger_in) == TYPE_DICTIONARY:
 		for key: Variant in (ledger_in as Dictionary):
-			var typed_key: int = int(key)
-			var typed_value: int = int((ledger_in as Dictionary)[key])
+			var raw_value: Variant = (ledger_in as Dictionary)[key]
+			var typed_value: int = int(raw_value)
+			var typed_key: String = ""
+			if typeof(key) == TYPE_INT:
+				# Legacy v1 int key → migrate to "forest_reach_f<idx>".
+				typed_key = "forest_reach_f%d" % int(key)
+			elif typeof(key) == TYPE_FLOAT:
+				typed_key = "forest_reach_f%d" % int(key)
+			elif typeof(key) == TYPE_STRING:
+				var s: String = String(key)
+				# Defensive: a JSON round-trip can convert int keys to numeric-
+				# looking strings ("1", "2", ...). If the entire string is digits,
+				# treat as a legacy v1 entry; otherwise pass through as a v2 key.
+				if s.is_valid_int():
+					typed_key = "forest_reach_f%d" % s.to_int()
+				else:
+					typed_key = s
+			else:
+				push_warning(
+					"Economy.load_save_data: floor_clear_bonus_credited has unexpected key type=%d — skipping entry"
+					% typeof(key)
+				)
+				continue
 			ledger_out[typed_key] = typed_value
 	else:
 		push_warning(
@@ -758,15 +820,20 @@ func get_lifetime_gold_earned() -> int:
 ## Presentation layer uses this to decide whether to show the "first clear!"
 ## celebration overlay on the floor card.
 ##
+## Sprint 17 schema v2: signature widened to take [param biome_id] for
+## multi-biome support.
+##
+## [param biome_id]: Biome identifier (e.g. [code]"forest_reach"[/code]).
 ## [param floor_index]: Floor index to check (1..5).
 ##
 ## Example:
-##   if Economy.is_first_clear_awarded(3):
+##   if Economy.is_first_clear_awarded("forest_reach", 3):
 ##       show_first_clear_badge(3)
 ##
-## ADR-0013 §Requirements — ADR-0002
-func is_first_clear_awarded(floor_index: int) -> bool:
-	return _floor_clear_bonus_credited.get(floor_index, 0) > 0
+## ADR-0013 §Requirements — ADR-0002 (Sprint 17 amendment for multi-biome).
+func is_first_clear_awarded(biome_id: String, floor_index: int) -> bool:
+	var key: String = "%s_f%d" % [biome_id, floor_index]
+	return _floor_clear_bonus_credited.get(key, 0) > 0
 
 
 ## Returns the resolved [EconomyConfig] instance or [code]null[/code] if

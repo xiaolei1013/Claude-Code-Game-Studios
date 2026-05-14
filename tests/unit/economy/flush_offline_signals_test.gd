@@ -36,7 +36,7 @@ func _on_gold_changed(new_balance: int, delta: int, reason: String) -> void:
 	})
 
 
-func _on_first_clear_awarded(floor_index: int) -> void:
+func _on_first_clear_awarded(biome_id: String, floor_index: int) -> void:
 	_first_clear_calls.append(floor_index)
 
 
@@ -203,8 +203,9 @@ func test_try_award_floor_clear_accumulates_first_clear_during_offline_replay() 
 	# Simulate try_award_floor_clear semantics: floor 1 + 2 first-cleared.
 	# Direct accumulator manipulation matches what try_award_floor_clear does
 	# when is_first AND _is_offline_replay are both true.
-	e._offline_pending_first_clears.append(1)
-	e._offline_pending_first_clears.append(3)
+	# Sprint 17 schema v2: accumulator now stores [biome_id, floor_index] pairs.
+	e._offline_pending_first_clears.append(["forest_reach", 1])
+	e._offline_pending_first_clears.append(["forest_reach", 3])
 
 	# Pre-flush: zero per-call signals.
 	assert_int(_first_clear_calls.size()).is_equal(0)
@@ -227,8 +228,8 @@ func test_flush_emits_gold_and_first_clears_in_order() -> void:
 	_connect_spy(e)
 
 	e.add_gold(500)
-	e._offline_pending_first_clears.append(2)
-	e._offline_pending_first_clears.append(4)
+	e._offline_pending_first_clears.append(["forest_reach", 2])
+	e._offline_pending_first_clears.append(["forest_reach", 4])
 
 	e.flush_offline_signals()
 

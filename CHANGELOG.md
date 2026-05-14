@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.37] - 2026-05-14
+
+### Fixed
+- **Boss-floor progression now advances in every biome.** Previously, after clearing Forest Reach end-to-end, the player could not progress past Floor 1 in any other biome (Frostmire, Ember Wastes, Whispering Crags, Sunken Ruins, Hollow Stair) — F2 onward stayed locked because the monotonic floor-clear ledger collided across biomes. Now each biome has its own first-clear track, so Frostmire F5 → unlocks Ember Wastes, and Ember Wastes F5 → unlocks Hollow Stair as the progression chain intends. Caught by the Sprint 17 S17-M6 progression-chain playtest.
+
+### Internal
+- **Economy ledger widened from per-floor to per-(biome, floor).** `Economy._floor_clear_bonus_credited` storage changed from `Dictionary[int, int]` keyed by `floor_index` alone to `Dictionary[String, int]` keyed by `"<biome_id>_f<floor_index>"`. `Economy.try_award_floor_clear(floor_index, bonus)` signature gains a `biome_id` first param; orchestrator call site at `dungeon_run_orchestrator.gd:1067` passes `_dispatched_biome_id`. `first_clear_awarded(floor_index)` signal payload widened to `(biome_id, floor_index)`. `Economy.SAVE_SCHEMA_VERSION` bumped 1 → 2 with auto-migration on load (legacy v1 int keys prefix with `"forest_reach_f"` since v1 predates multi-biome). ADR-0002 amended (Amendment 1, 2026-05-14). New regression suite `tests/integration/economy/multi_biome_floor_clear_ledger_test.gd` (6 tests) + 5 existing test files mechanically updated. Cumulative tests: 2190 PASS at fix landing.
+
 ## [0.0.0.36] - 2026-05-14
 
 ### Changed
