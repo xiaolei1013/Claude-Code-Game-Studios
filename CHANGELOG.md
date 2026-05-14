@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.40] - 2026-05-14
+
+### Fixed
+- **Combat now actually exercises enemy stats on every floor.** Discovered during the S18-M4 playtest follow-up: real Floor data stores `enemy_list` as `[{enemy_id, count}]` pairs (per ADR-0011), but combat code reads `entry.get("base_hp")` / `entry.get("archetype")` / `entry.get("base_attack")` — fields that don't exist on the raw pair shape. Since Sprint 16 shipped multi-biome content, every real-floor dispatch silently produced degenerate combat: enemies "died" at tick 0 (base_hp=0, instant TTK), matchup advantage never fired (archetype=""), `formation_total_hp / floor_total_enemy_attack` always returned the defensive 1.0 fallback (denominator=0), `losing_run` was structurally impossible. The orchestrator now materializes `{enemy_id, count}` pairs into the full `{id, archetype, tier, is_boss, base_hp, base_attack}` shape via `DataRegistry.resolve("enemies", ...)` before passing to combat. **Player-visible impact**: combat duration is now real (Forest Reach F1 should take ~40s per Floor.expected_clear_time_seconds, not ~0s). Matchup-advantaged kills now grant the documented ×1.5 gold. Class synergies (Steel Wall, Triple Strike) now multiply against meaningful archetype-matched kills. Floor difficulty curve becomes real — weaker formations may now LOSE runs (half gold, floor still clears per ADR-0002).
+
+### Internal
+- New `DungeonRunOrchestrator._materialize_enemy_list(floor_enemy_list)` helper. Detects shape per-entry: entries with an `"id"` key (the synthetic test-fallback shape) pass through unchanged so existing 308 orchestrator tests stay green; entries with an `"enemy_id"` key (the real Floor data shape) get materialized via `DataRegistry.resolve("enemies", enemy_id)` and expanded to `count` copies. Defensive paths (missing enemy_id, unresolvable EnemyData, non-positive count, non-Dictionary entries) `push_warning` and skip the entry — combat sees a trimmed list rather than crashing. Smoking-gun comment at `data_registry.gd:983` ("for MVP; other cross-refs (Floor.enemy_list[].enemy_id → EnemyData)") confirmed the materialization step was deferred during MVP and never landed. New regression suite `tests/unit/dungeon_run_orchestrator/materialize_enemy_list_test.gd` (10 tests) pins: real-shape materialization via DataRegistry, multi-entry ordering preservation, synthetic-shape passthrough, mixed-shape inputs, all four defensive skip-paths, and per-copy independence (no aliasing). Full test suite 2203/2203 effective pass (1 pre-existing matchup_resolver_perf flake, unrelated).
+- **Balance implications**: this fix changes the combat equilibrium for the first time. Prior playtests were measured against degenerate instant-kill combat; new playtests should re-evaluate gold rate, floor clear time, and difficulty curve against `Floor.expected_clear_time_seconds` targets. Tuning knobs may need adjustment in Sprint 19. The fix also makes ADR-0002 (LOSING reclaim) and the matchup-advantage system load-bearing for the first time since they were authored.
+
 ## [0.0.0.38] - 2026-05-14
 
 ### Added

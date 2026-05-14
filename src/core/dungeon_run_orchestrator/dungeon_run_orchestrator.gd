@@ -1632,7 +1632,18 @@ func _build_combat_snapshot(formation: Array, floor_index: int, biome_id: String
 	# fails so the data path completes.
 	var floor_data: Resource = _resolve_floor(biome_id, floor_index)
 	if floor_data != null and "enemy_list" in floor_data:
-		snap.enemy_list = (floor_data.get("enemy_list") as Array).duplicate(true)
+		# Sprint 18 post-S18-M4 playtest fix: real Floor.enemy_list stores
+		# {enemy_id, count} pairs per ADR-0011 §Decision; combat expects
+		# the materialized shape {id, archetype, tier, is_boss, base_hp,
+		# base_attack}. Pre-fix this shape mismatch silently degenerated
+		# combat on every real floor (base_hp=0 → instant-kill cascades,
+		# archetype="" → matchup advantage never fired, floor_total_enemy_attack=0
+		# → hp_bonus_factor defensively returned 1.0 → losing_run always false).
+		# Materialize via DataRegistry; pass synthetic shape through unchanged
+		# so existing tests stay green.
+		snap.enemy_list = _materialize_enemy_list(
+			(floor_data.get("enemy_list") as Array).duplicate(true)
+		)
 	else:
 		# Synthetic 3-enemy default: gives integration tests a deterministic
 		# floor to drive ticks against.
@@ -1659,6 +1670,77 @@ func _build_combat_snapshot(formation: Array, floor_index: int, biome_id: String
 	# Story 004 will compute this from floor difficulty + formation throughput.
 	snap.loops_per_run = 1
 	return snap
+
+
+## Sprint 18 post-S18-M4 playtest fix: expands a Floor.enemy_list of
+## [code]{enemy_id: String, count: int}[/code] pairs (per ADR-0011 §Decision)
+## into the materialized shape combat expects:
+## [code]{id, archetype, tier, is_boss, base_hp, base_attack}[/code], with
+## [param count] copies emitted per pair (preserves enemy_list ordering).
+##
+## Per-entry shape detection: entries that already have an [code]"id"[/code]
+## key (the synthetic test-fallback shape from [method _build_combat_snapshot])
+## pass through unchanged so existing tests stay green. Entries with an
+## [code]"enemy_id"[/code] key get materialized via DataRegistry.
+##
+## Failure handling: missing [code]enemy_id[/code], unresolvable EnemyData,
+## or non-positive [code]count[/code] emit a [code]push_warning[/code] and
+## skip the entry. Combat sees the trimmed list (still better than the
+## pre-fix silently-degenerate path where every entry produced [code]base_hp=0[/code]
+## instant kills).
+##
+## Returns a fresh Array (no aliasing with caller).
+##
+## Per `design/gdd/biome-dungeon-database.md` §C.4 + ADR-0011 + DataRegistry
+## §enemies category. Sprint 18 ship: this was the missing wiring that
+## silently degenerated combat on every real floor since Sprint 16 shipped
+## multi-biome content. Player-facing symptom: instant-kill cascades on
+## every dispatch with no LOSING-run possibility, no matchup advantage,
+## no real synergy effect.
+func _materialize_enemy_list(floor_enemy_list: Array) -> Array:
+	var materialized: Array = []
+	for entry: Variant in floor_enemy_list:
+		if not (entry is Dictionary):
+			continue
+		var entry_dict: Dictionary = entry as Dictionary
+		# Pass-through: synthetic shape already has the materialized fields.
+		# Detect by presence of "id" key (synthetic uses "id"; real Floor data
+		# uses "enemy_id"). Mutually exclusive in well-formed inputs.
+		if entry_dict.has("id"):
+			materialized.append(entry_dict.duplicate(true))
+			continue
+		var enemy_id: String = String(entry_dict.get("enemy_id", ""))
+		if enemy_id.is_empty():
+			push_warning(
+				"DungeonRunOrchestrator._materialize_enemy_list: entry missing both 'id' and 'enemy_id'; skipping"
+			)
+			continue
+		var count: int = int(entry_dict.get("count", 0))
+		if count <= 0:
+			push_warning(
+				"DungeonRunOrchestrator._materialize_enemy_list: entry '%s' has non-positive count=%d; skipping"
+				% [enemy_id, count]
+			)
+			continue
+		var enemy_data: Resource = DataRegistry.resolve("enemies", enemy_id)
+		if enemy_data == null:
+			push_warning(
+				"DungeonRunOrchestrator._materialize_enemy_list: DataRegistry could not resolve enemy_id='%s'; skipping %d copies"
+				% [enemy_id, count]
+			)
+			continue
+		var template: Dictionary = {
+			"id": StringName(enemy_id),
+			"enemy_id": StringName(enemy_id),
+			"archetype": StringName(String(enemy_data.get("archetype")) if "archetype" in enemy_data else ""),
+			"tier": int(enemy_data.get("tier")) if "tier" in enemy_data else 1,
+			"is_boss": bool(enemy_data.get("is_boss")) if "is_boss" in enemy_data else false,
+			"base_hp": int(enemy_data.get("base_hp")) if "base_hp" in enemy_data else 0,
+			"base_attack": int(enemy_data.get("base_attack")) if "base_attack" in enemy_data else 0,
+		}
+		for i: int in count:
+			materialized.append(template.duplicate(true))
+	return materialized
 
 
 ## Looks up Floor resource by [param biome_id] + [param floor_index]. Returns
