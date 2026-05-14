@@ -9,39 +9,39 @@
 #   done           ↔  Complete
 #   blocked        ↔  Blocked
 #
-# UPDATED 2026-05-14 via /sprint-plan new (Sprint 18 Day-0):
-#   - Sprint 17 closed: all 7 Must Haves DONE; both Should Haves DONE; Sprint goal MET.
-#     10 PRs total: #83-#87 matchup-hints sweep, #88 plan doc, #89 stray uids,
-#     #90 multi-biome ledger fix + ADR-0002 Amendment 1, #91-#92 gitignore policy,
-#     #93/#95 upstream framework v1.0 sync, #94 Sprint 17 closeout.
-#     Cumulative tests at S17 close: 2196 PASS.
-#   - Sprint 18 theme: Class Synergy V1.0 — first net-new mechanic since Sprint 9.
+# UPDATED 2026-05-14 via /sprint-plan new (Sprint 19 Day-0):
+#   - Sprint 18 closed: all 7 Must Haves DONE; both Should Haves DONE; 1 Nice to Have DONE.
+#     7 PRs total: #96 sprint plan, #97 GDD revisions, #98 synergy backend + ADR-0018,
+#     #99 M3+S1+S2 closeout, #100 LOSING wiring, #101 materialize_enemy_list,
+#     #102 tilt-shift DoF + disable-by-default fix, #103 Sprint 18 retro.
+#     Cumulative tests at S18 close: ~2393 PASS. 2 critical scaffolded-but-unwired bugs
+#     caught + fixed by playtest (LOSING wiring, materialize_enemy_list).
+#   - Sprint 19 theme: HD-2D First Visual Pass — biome backgrounds + tilt-shift activation.
 #   - Solo review mode — no PR-SPRINT producer gate.
-#   - Sprint 17 final state archived in comment block below.
-#   - Biome-cost re-baseline: ~0.2d/biome under data-only pattern (established Sprint 16).
+#   - Sprint 18 final state archived in comment block below.
+#
+# Sprint 18 final state (archived 2026-05-14):
+#   sprint_status: CLOSED — all 7 Must Haves DONE; both Should Haves DONE; 1 N DONE
+#   actual_close: 2026-05-14 (same-day compressed)
+#   Must Have: 7/7 DONE — M1 GDD APPROVED PR#97; M2 synergy backend PR#98; M3 live preview
+#              PR#99; M4 playtest (3 rounds — caught LOSING wiring + materialize bugs);
+#              M5 retro PR#103.
+#   Should Have: 2/2 DONE — S1 onboarding RETIRED; S2 PATTERNS §15 scaffolds audit pattern.
+#   Nice to Have: 1/1 DONE — N1 tilt-shift DoF shader disabled-by-default PR#102.
+#   ADR authored: ADR-0018 (multiplier composition order).
+#   Critical mid-sprint bugs: PR#100 LOSING wiring (hardcoded 1.0 since S7-M13);
+#     PR#101 materialize_enemy_list (deferred MVP step never landed since Sprint 16).
 #
 # Sprint 17 final state (archived 2026-05-14):
 #   sprint_status: CLOSED — all 7 Must Haves DONE; both Should Haves DONE; sprint goal MET
-#   actual_close: 2026-05-14 (vs. nominal end 2026-05-26 — 22 days ahead)
-#   Must Have: 7/7 DONE — M1-M5 matchup-hints PRs (#83-#87); M6 playtest-09 PASS;
-#              M7 sprint-17 retro.
-#   Should Have: 2/2 DONE — S2 biome-cost re-baseline (PR #88 yaml); S1 Recruitment
-#              audit RETIRED (recruitment-system.md §J).
-#   Nice to Have: 1/1 DONE — S18-N1 tilt-shift DoF shader (v0.0.0.41).
-#   Critical mid-sprint bug: PR #90 Economy multi-biome ledger collision fix +
-#     ADR-0002 Amendment 1 (2190→2196 tests, +6 regression suite).
-#   Framework: upstream v1.0 synced via PR #95 (96 files, +2895/-720;
-#     73 skills, 49 agents, /vertical-slice, AskUserQuestion patches).
+#   Must Have: 7/7 DONE — M1-M5 matchup-hints PRs (#83-#87); M6 playtest-09 PASS; M7 retro.
+#   Should Have: 2/2 DONE — S2 biome-cost re-baseline; S1 Recruitment audit RETIRED.
+#   Nice to Have: 0/0 (tilt-shift carried to S18-N1).
+#   Critical mid-sprint bug: PR #90 Economy multi-biome ledger collision + ADR-0002 Amend 1.
 #
-# Sprint 16 final state (archived 2026-05-14):
-#   Must Have: 4/4 DONE — plan+named-presets-gdd (#74); biome-2-whispering-crags (#77);
-#              biome-3-sunken-ruins (#78); adr-amend-and-retro (#82).
-#   Should Have: biomes 4/5/6 (#79, #80, #81), gdd33-self-critique (#75),
-#                telemetry-opt-in (#68).
-#   Sprint goal MET — 5 new biomes + progression-gate mechanic + ADR honesty restored.
 
-sprint: 18
-goal: "Ship Class Synergy V1.0 — the first cross-class team bonus mechanic — and validate it feels rewarding without trivializing the cozy register."
+sprint: 19
+goal: "Ship HD-2D first visual pass: biome backgrounds + activated tilt-shift DoF, validating the diorama register before real product art lands."
 start: "2026-05-14"
 end: "2026-05-27"
 generated: "2026-05-14"
@@ -50,86 +50,96 @@ updated: "2026-05-14"
 stories:
   # ===== Must Have =====
 
-  - id: "S18-M1"
-    name: "Class Synergy GDD #32 design-review → APPROVED"
-    file: "design/gdd/class-synergy-system.md"
+  - id: "S19-M1"
+    name: "HD-2D GDD #26 first-pass authoring (expand stub to 8 sections)"
+    file: "design/gdd/hd-2d-rendering-pipeline.md"
     priority: must-have
-    status: done
-    owner: "user + claude-code"
-    estimate_days: 0.25
+    status: ready-for-dev
+    owner: "game-designer + claude-code"
+    estimate_days: 0.5
     blocker: ""
-    completed: "2026-05-14 — GDD #32 design-review completed; re-review surfaced 3-rogue asymmetric class treatment gap → Triple Strike synergy added structurally parallel to Steel Wall. APPROVED 2026-05-10 + revisions 2026-05-14 via PR #97."
+    completed: ""
 
-  - id: "S18-M2"
-    name: "Class Synergy V1.0 backend — detect_active_synergy() + orchestrator wiring + ADR-0018"
-    file: "src/core/class_synergy_system/class_synergy_system.gd"
+  - id: "S19-M2"
+    name: "ADR-0019 — HD-2D pipeline activation (successor to ADR-0017)"
+    file: "docs/architecture/ADR-0019-hd2d-pipeline-activation.md"
     priority: must-have
-    status: done
+    status: ready-for-dev
+    owner: "claude-code"
+    estimate_days: 0.25
+    blocker: "S19-M1"
+    completed: ""
+
+  - id: "S19-M3"
+    name: "Biome background system — BiomeBackground node + 6 palette-keyed presets + Guild Hall tavern preset"
+    file: "assets/screens/dungeon_run_view/dungeon_run_view.tscn"
+    priority: must-have
+    status: ready-for-dev
     owner: "godot-gdscript-specialist"
     estimate_days: 1.0
-    blocker: "S18-M1"
-    completed: "2026-05-14 — PR #98. 4 synergies live: Steel Wall (3W vs bruiser ×1.25 gold), Arcane Elite (3M ×1.20 XP), Triple Strike (3R vs armored ×1.25 gold), Triple Threat (1+1+1 ×1.15 gold). ADR-0018 locks 4-factor multiplicative composition: BASE_KILL × matchup × loot_factor × synergy → single floori. Per-synergy caps at resolver layer; snapshot immutability per AC-CS-13."
+    blocker: "S19-M1"
+    completed: ""
 
-  - id: "S18-M3"
-    name: "Class Synergy live preview in Formation Assignment screen"
-    file: "assets/screens/formation_assignment/formation_assignment.gd"
+  - id: "S19-M4"
+    name: "Tilt-shift re-wiring + activation (scene restructure + enabled=1.0 + z-order fix)"
+    file: "assets/shaders/tilt_shift_dof.gdshader"
     priority: must-have
-    status: done
-    owner: "godot-gdscript-specialist"
+    status: ready-for-dev
+    owner: "godot-shader-specialist"
     estimate_days: 0.5
-    blocker: ""
-    completed: "2026-05-14 — most of the screen integration was already shipped in Sprint 19 pre-emptive work (SynergyBadge Label node, _refresh_synergy_badge function, tween animation, reduce-motion variant, detect_active_synergy wiring). The actual M3 gap was 2 missing locale keys (class_synergy_badge_triple_strike, class_synergy_effect_triple_strike) + 1 new badge test for Triple Strike rendering. Bundled with S1 + S2 in the M3-S1-S2 closeout PR."
+    blocker: "S19-M3"
+    completed: ""
 
-  - id: "S18-M4"
-    name: "Sprint 18 playtest — class synergy validation"
-    file: "production/playtests/playtest-10-class-synergy-validation-2026-05-14.md"
+  - id: "S19-M5"
+    name: "Sprint 19 playtest — HD-2D visual validation (5 checks)"
+    file: "production/playtests/playtest-11-hd2d-visual-2026-05-14.md"
     priority: must-have
-    status: done
+    status: ready-for-dev
     owner: "xiaolei (human)"
     estimate_days: 0.5
-    blocker: "S18-M3"
-    completed: "2026-05-14 — multi-round playtest. Round 1 surfaced LOSING-run question (hp_bonus_factor hardcoded to 1.0 since S7-M13) → PR #100. Round 2 surfaced 'no defeat status, can't progress' (Floor.enemy_list never materialized; combat silently degenerate since Sprint 16) → PR #101. Round 3 (post-N1 visual landing) surfaced tilt-shift UI ghost-smear → PR #102's disable-by-default fix. Three critical bugs caught by playtest that 2386-test suite missed."
+    blocker: "S19-M4"
+    completed: ""
 
-  - id: "S18-M5"
-    name: "Sprint 18 retrospective"
-    file: "production/retrospectives/sprint-18-retrospective-2026-05-14.md"
+  - id: "S19-M6"
+    name: "Sprint 19 retrospective"
+    file: "production/retrospectives/sprint-19-retrospective-2026-05-14.md"
     priority: must-have
-    status: done
+    status: ready-for-dev
     owner: "producer + claude-code"
     estimate_days: 0.25
-    blocker: ""
-    completed: "2026-05-14 — sprint-18-retrospective-2026-05-14.md authored. Sprint 18 closes 7/7 Must Have + 2/2 Should Have + 1/1 Nice to Have, all done, no deferred items. Sprint goal MET. 5 action items for Sprint 19: scaffolded-but-unwired audit (highest priority), Sprint 19 theme decision, /review on rebased branches, accept visual-correctness gap as manual gate, tilt-shift activation timing."
+    blocker: "S19-M5"
+    completed: ""
 
   # ===== Should Have =====
 
-  - id: "S18-S1"
-    name: "Onboarding carry — final disposition (4-sprint carry; recommend retire)"
-    file: "design/gdd/onboarding-first-session.md"
+  - id: "S19-S1"
+    name: "Scaffolded-but-unwired audit (Sprint 18 retro action #1 — highest priority)"
+    file: "production/sprint-19-scaffolds-audit.md"
     priority: should-have
-    status: done
-    owner: "game-designer + claude-code"
-    estimate_days: 0.25
-    blocker: ""
-    completed: "2026-05-14 — RETIRED as deferred-indefinitely. 4-sprint carry chain (S15-N3 → S16-N4 → S17-N2 → S18-S1) produced zero playtest signals demanding polish; the live first-session flow is shipped and working per S17-M6 playtest verdict. §J retirement note appended to onboarding-first-session.md. AC-29-01..14 remain the contract for any future onboarding changes."
-
-  - id: "S18-S2"
-    name: "ADR-amendment test-coverage audit pattern in PATTERNS.md §15"
-    file: "tests/PATTERNS.md"
-    priority: should-have
-    status: done
+    status: backlog
     owner: "claude-code"
     estimate_days: 0.25
     blocker: ""
-    completed: "2026-05-14 — §15 entry committed to tests/PATTERNS.md. Documents the canonical example (Sprint 17 PR #90 multi-biome ledger collision), detection heuristic (4-step audit checklist), test-contract template (P(x) → P(x,y) widening), and 'why this bug class is sneaky' closing rationale. Closes Sprint 17 retro action item #2."
+    completed: ""
+
+  - id: "S19-S2"
+    name: "Per-biome tilt-shift parameter presets (6 ShaderMaterial resources, tuned per biome depth)"
+    file: "assets/shaders/biome_tilt_shift_presets/"
+    priority: should-have
+    status: backlog
+    owner: "godot-shader-specialist"
+    estimate_days: 0.5
+    blocker: "S19-M4"
+    completed: ""
 
   # ===== Nice to Have =====
 
-  - id: "S18-N1"
-    name: "HD-2D tilt-shift DoF shader (3-sprint carry S16-N2 → S17-N4 → S18-N1)"
-    file: "assets/shaders/tilt_shift_dof.gdshader"
+  - id: "S19-N1"
+    name: "BiomeBackground 3-stop gradient shader (sky/midground/ground palette uniforms)"
+    file: "assets/shaders/biome_background.gdshader"
     priority: nice-to-have
-    status: done
+    status: backlog
     owner: "godot-shader-specialist"
-    estimate_days: 2.0
-    blocker: ""
-    completed: "2026-05-14"
+    estimate_days: 0.5
+    blocker: "S19-M3"
+    completed: ""
