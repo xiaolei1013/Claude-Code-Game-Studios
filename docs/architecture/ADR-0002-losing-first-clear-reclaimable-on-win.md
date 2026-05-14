@@ -271,6 +271,30 @@ If a post-MVP retrofit ever becomes necessary (e.g., a hotfix retrofits the recl
 | Game concept (pillar statement) | Vision | "'No fail state — losing run returns partial loot'" | LOSING first-clear returns half immediately + half pending; no content is permanently destroyed |
 | `design/gdd/combat-resolution.md` Rule 9 (+ Pass 4B-Economy supersession) | Combat Resolution | "`LOSING_RUN_LOOT_FACTOR = 0.5` applies to kill gold + floor-clear bonus" | Kill-gold halving unchanged; floor-clear halving now has a reclaim path (does not violate Rule 9 — Rule 9 specifies the multiplier at emission time, not the lifetime credited total) |
 
+## Amendments
+
+### Amendment 1 — Multi-biome ledger widening (Sprint 17, 2026-05-14)
+
+**Trigger**: S17-M6 progression-chain playtest revealed that boss floors in non-Forest-Reach biomes don't advance after kill resolution. Root cause: Economy's `_floor_clear_bonus_credited` ledger was authored against the MVP single-biome assumption — keyed by `floor_index: int` alone (range 1..5). Sprint 16 shipped 5 additional biomes (Whispering Crags, Sunken Ruins, Frostmire, Ember Wastes, Hollow Stair), each with its own F1–F5. The int-keyed ledger collided across biomes: clearing Forest Reach F5 (credited[5] = 2500) silently blocked Frostmire F5's first-clear gate (bonus 2500 ≤ already 2500 → `try_award_floor_clear` returns false → orchestrator's `awarded` stays false → `floor_cleared_first_time` is never emitted → `FloorUnlockSystem._unlock_state[<biome>]` never advances past 0 → the biome-progression chain that depends on F5 clears never fires).
+
+**Decision**: Widen the monotonic-credit predicate from `floor_index → bonus` to `(biome_id, floor_index) → bonus`. The credit-the-gap semantic is preserved per-biome — LOSING-then-WIN reclaim still works inside one biome, and the milestone signal (`first_clear_awarded`) still fires once per genuine first-clear, but now per (biome, floor) pair.
+
+**Scope of change**:
+- `Economy._floor_clear_bonus_credited` storage: `Dictionary[int, int]` → `Dictionary[String, int]`, keys are `"<biome_id>_f<floor_index>"` (e.g. `"forest_reach_f1"`, `"frostmire_f5"`).
+- `Economy.try_award_floor_clear(floor_index, bonus_amount)` → `try_award_floor_clear(biome_id, floor_index, bonus_amount)` (biome_id as new first param; empty-string biome_id is rejected via `push_error`).
+- `Economy.first_clear_awarded(floor_index)` signal payload → `first_clear_awarded(biome_id, floor_index)`.
+- `Economy.is_first_clear_awarded(floor_index)` → `is_first_clear_awarded(biome_id, floor_index)`.
+- `Economy._offline_pending_first_clears: Array[int]` → `Array[Array]` with `[biome_id, floor_index]` tuples.
+- `DungeonRunOrchestrator` call site at `dungeon_run_orchestrator.gd:1067` passes `_dispatched_biome_id` to the new `try_award_floor_clear` signature.
+
+**Save schema migration**: `Economy.SAVE_SCHEMA_VERSION` bumped from 1 → 2. `load_save_data` accepts both v1 and v2 payloads: v1 int keys are prefixed with `"forest_reach_f"` since Sprint 11-era saves predate multi-biome content. The migration is transparent — players returning from v1 saves see their progression intact and their previously-credited Forest Reach floors carry over correctly.
+
+**Anti-exploit invariant preserved**: the monotonic-credit ceiling still applies per `(biome, floor)` pair — clearing Frostmire F5 twice still credits gold once. The Pass-3 "LOSING-grind seam" remains bounded by `FLOOR_CLEAR_BONUS[floor_index]` per biome. No new exploit surface created.
+
+**Regression test**: `tests/integration/economy/multi_biome_floor_clear_ledger_test.gd` (6 tests) covers: same-floor-index credits in different biomes both first-clear-fire (the broken case); ledger keys are namespaced; in-biome monotonic still holds; LOSING-then-WIN reclaim doesn't leak across biomes; save/load round-trip preserves biome-keyed ledger; legacy v1 saves auto-migrate to v2.
+
+**Related**: ADR-0017 (Sprint 15+ deferral list amendment) — this fix lands during the Sprint 17 matchup-hints UI sweep and the S17-M6 progression-chain playtest, which is the load-bearing closure gate for the Sprint 16 multi-biome content drop.
+
 ## Related
 
 - ADR-0001 (companion — mid-run reassignment MVP lock, Pass 5A decision 17a)

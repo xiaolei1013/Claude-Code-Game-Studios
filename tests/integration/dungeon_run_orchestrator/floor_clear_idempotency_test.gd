@@ -100,7 +100,7 @@ func test_first_clear_credits_full_bonus_on_winning_run() -> void:
 
 	# Assert — floor 1 bonus = 100; no losing factor; balance gains 100.
 	assert_int(int(economy._gold_balance) - pre_balance).is_equal(100)
-	assert_int(int(economy._floor_clear_bonus_credited.get(1, 0))).is_equal(100)
+	assert_int(int(economy._floor_clear_bonus_credited.get("forest_reach_f1", 0))).is_equal(100)
 
 
 func test_first_clear_credits_half_bonus_on_losing_run() -> void:
@@ -118,7 +118,7 @@ func test_first_clear_credits_half_bonus_on_losing_run() -> void:
 
 	# Assert
 	assert_int(int(economy._gold_balance) - pre_balance).is_equal(50)
-	assert_int(int(economy._floor_clear_bonus_credited.get(1, 0))).is_equal(50)
+	assert_int(int(economy._floor_clear_bonus_credited.get("forest_reach_f1", 0))).is_equal(50)
 
 
 func test_first_clear_credits_correct_bonus_for_floor_5() -> void:
@@ -161,7 +161,7 @@ func test_first_clear_does_not_re_credit_within_same_dispatch() -> void:
 
 	# Assert — only ONE credit (Layer 2 gate prevents the second call).
 	assert_int(int(economy._gold_balance) - pre_balance).is_equal(250)
-	assert_int(int(economy._floor_clear_bonus_credited.get(2, 0))).is_equal(250)
+	assert_int(int(economy._floor_clear_bonus_credited.get("forest_reach_f2", 0))).is_equal(250)
 
 
 func test_floor_clear_emitted_flag_set_on_first_clear() -> void:
@@ -210,7 +210,7 @@ func test_second_dispatch_at_same_floor_does_not_re_credit() -> void:
 	assert_int(after_first - pre_balance).is_equal(100)
 	assert_int(after_second - after_first).is_equal(0)
 	# Ledger still shows the original 100 credit (not doubled).
-	assert_int(int(economy._floor_clear_bonus_credited.get(1, 0))).is_equal(100)
+	assert_int(int(economy._floor_clear_bonus_credited.get("forest_reach_f1", 0))).is_equal(100)
 
 
 func test_losing_first_clear_followed_by_winning_clear_credits_difference() -> void:
@@ -239,7 +239,7 @@ func test_losing_first_clear_followed_by_winning_clear_credits_difference() -> v
 	assert_int(after_losing - pre_balance).is_equal(50)
 	assert_int(after_winning - after_losing).is_equal(50)
 	# Ledger reflects the maximum-amount-ever-credited.
-	assert_int(int(economy._floor_clear_bonus_credited.get(1, 0))).is_equal(100)
+	assert_int(int(economy._floor_clear_bonus_credited.get("forest_reach_f1", 0))).is_equal(100)
 
 
 # ===========================================================================

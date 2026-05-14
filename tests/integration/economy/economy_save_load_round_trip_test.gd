@@ -54,7 +54,7 @@ func test_h11_round_trip_preserves_gold_lifetime_and_ledger_exactly() -> void:
 	var economy_a: Node = _make_economy()
 	economy_a._gold_balance = 12345
 	economy_a._lifetime_gold_earned = 98765
-	var ledger_init: Dictionary[int, int] = {1: 500, 2: 1200, 3: 1500}
+	var ledger_init: Dictionary[String, int] = {"forest_reach_f1": 500, "forest_reach_f2": 1200, "forest_reach_f3": 1500}
 	economy_a._floor_clear_bonus_credited = ledger_init
 
 	# Act — serialize → deserialize on a fresh instance B
@@ -66,15 +66,16 @@ func test_h11_round_trip_preserves_gold_lifetime_and_ledger_exactly() -> void:
 	assert_int(economy_b.get_gold_balance()).is_equal(12345)
 	assert_int(economy_b.get_lifetime_gold_earned()).is_equal(98765)
 
-	# Assert — ledger has exactly 3 keys (1, 2, 3 → 500, 1200, 1500)
-	# F4 + F5 must NOT be present (absent != zero in this contract)
+	# Assert — ledger has exactly 3 keys (forest_reach_f1, _f2, _f3 → 500, 1200, 1500)
+	# F4 + F5 must NOT be present (absent != zero in this contract).
+	# Sprint 17 schema v2: keys are "<biome_id>_f<idx>" strings.
 	var ledger: Dictionary = economy_b._floor_clear_bonus_credited
 	assert_int(ledger.size()).is_equal(3)
-	assert_int(int(ledger[1])).is_equal(500)
-	assert_int(int(ledger[2])).is_equal(1200)
-	assert_int(int(ledger[3])).is_equal(1500)
-	assert_bool(ledger.has(4)).is_false()
-	assert_bool(ledger.has(5)).is_false()
+	assert_int(int(ledger["forest_reach_f1"])).is_equal(500)
+	assert_int(int(ledger["forest_reach_f2"])).is_equal(1200)
+	assert_int(int(ledger["forest_reach_f3"])).is_equal(1500)
+	assert_bool(ledger.has("forest_reach_f4")).is_false()
+	assert_bool(ledger.has("forest_reach_f5")).is_false()
 
 	# Cleanup
 	economy_a.free()
@@ -139,7 +140,7 @@ func test_h11_reclaim_path_post_restore_credit_the_gap_no_first_clear_re_emit() 
 	var economy_a: Node = _make_economy()
 	economy_a._gold_balance = 12345
 	economy_a._lifetime_gold_earned = 98765
-	var ledger_init: Dictionary[int, int] = {1: 500, 2: 1200, 3: 1500}
+	var ledger_init: Dictionary[String, int] = {"forest_reach_f1": 500, "forest_reach_f2": 1200, "forest_reach_f3": 1500}
 	economy_a._floor_clear_bonus_credited = ledger_init
 
 	var data: Dictionary = economy_a.get_save_data()
@@ -147,18 +148,17 @@ func test_h11_reclaim_path_post_restore_credit_the_gap_no_first_clear_re_emit() 
 	economy_b.load_save_data(data)
 
 	var first_clear_emissions: Array[int] = []
-	economy_b.first_clear_awarded.connect(
-		func(floor_index: int) -> void:
+	economy_b.first_clear_awarded.connect(func(biome_id: String, floor_index: int) -> void:
 			first_clear_emissions.append(floor_index)
 	)
 
 	# Act — WIN at F3 with bonus_amount=3000 (delta = 3000 - 1500 = 1500)
-	var awarded: bool = economy_b.try_award_floor_clear(3, 3000)
+	var awarded: bool = economy_b.try_award_floor_clear("forest_reach", 3, 3000)
 
 	# Assert — credit-the-gap semantic, ledger advances, first_clear_awarded NOT re-fired
 	assert_bool(awarded).is_true()
 	assert_int(economy_b.get_gold_balance()).is_equal(12345 + 1500)
-	assert_int(int(economy_b._floor_clear_bonus_credited[3])).is_equal(3000)
+	assert_int(int(economy_b._floor_clear_bonus_credited["forest_reach_f3"])).is_equal(3000)
 	# first_clear_awarded did NOT fire because already > 0 pre-save (already credited milestone)
 	assert_int(first_clear_emissions.size()).is_equal(0)
 
@@ -177,7 +177,7 @@ func test_load_save_data_is_signal_quiet_zero_emissions_on_either_signal() -> vo
 	var economy_a: Node = _make_economy()
 	economy_a._gold_balance = 12345
 	economy_a._lifetime_gold_earned = 98765
-	var ledger_init: Dictionary[int, int] = {1: 500, 3: 1500}
+	var ledger_init: Dictionary[String, int] = {"forest_reach_f1": 500, "forest_reach_f3": 1500}
 	economy_a._floor_clear_bonus_credited = ledger_init
 	var data: Dictionary = economy_a.get_save_data()
 
@@ -215,7 +215,7 @@ func test_load_save_data_with_unsupported_schema_version_v0_aborts_and_preserves
 	var economy: Node = _make_economy()
 	economy._gold_balance = 999
 	economy._lifetime_gold_earned = 999
-	var ledger_init: Dictionary[int, int] = {1: 100}
+	var ledger_init: Dictionary[String, int] = {"forest_reach_f1": 100}
 	economy._floor_clear_bonus_credited = ledger_init
 
 	var bad_data: Dictionary = {
@@ -232,22 +232,22 @@ func test_load_save_data_with_unsupported_schema_version_v0_aborts_and_preserves
 	assert_int(economy.get_gold_balance()).is_equal(999)
 	assert_int(economy.get_lifetime_gold_earned()).is_equal(999)
 	assert_int(economy._floor_clear_bonus_credited.size()).is_equal(1)
-	assert_int(int(economy._floor_clear_bonus_credited[1])).is_equal(100)
+	assert_int(int(economy._floor_clear_bonus_credited["forest_reach_f1"])).is_equal(100)
 
 	# Cleanup
 	economy.free()
 
 
 # ---------------------------------------------------------------------------
-# Test 7 — AC: schema_version mismatch (V2 future version) also aborts
+# Test 7 — AC: schema_version mismatch (V3 future version) also aborts
 # ---------------------------------------------------------------------------
-func test_load_save_data_with_future_schema_version_v2_aborts_and_preserves_state() -> void:
+func test_load_save_data_with_future_schema_version_v3_aborts_and_preserves_state() -> void:
 	# Arrange
 	var economy: Node = _make_economy()
 	economy._gold_balance = 555
 
 	var future_data: Dictionary = {
-		"schema_version": 2,
+		"schema_version": 3,
 		"gold_balance": 12345,
 		"lifetime_gold_earned": 98765,
 		"floor_clear_bonus_credited": {},
@@ -298,7 +298,7 @@ func test_load_save_data_with_only_schema_version_applies_safe_defaults() -> voi
 	var economy: Node = _make_economy()
 	economy._gold_balance = 777
 	economy._lifetime_gold_earned = 777
-	var ledger_init: Dictionary[int, int] = {1: 100}
+	var ledger_init: Dictionary[String, int] = {"forest_reach_f1": 100}
 	economy._floor_clear_bonus_credited = ledger_init
 
 	var minimal_data: Dictionary = {
@@ -413,7 +413,7 @@ func test_load_save_data_after_json_round_trip_coerces_string_keys_and_float_val
 	var economy_a: Node = _make_economy()
 	economy_a._gold_balance = 12345
 	economy_a._lifetime_gold_earned = 98765
-	var ledger_init: Dictionary[int, int] = {1: 500, 3: 1500}
+	var ledger_init: Dictionary[String, int] = {"forest_reach_f1": 500, "forest_reach_f3": 1500}
 	economy_a._floor_clear_bonus_credited = ledger_init
 	var data: Dictionary = economy_a.get_save_data()
 	var json_str: String = JSON.stringify(data)
@@ -438,8 +438,8 @@ func test_load_save_data_after_json_round_trip_coerces_string_keys_and_float_val
 	assert_int(economy_b.get_gold_balance()).is_equal(12345)
 	assert_int(economy_b.get_lifetime_gold_earned()).is_equal(98765)
 	assert_int(economy_b._floor_clear_bonus_credited.size()).is_equal(2)
-	assert_int(int(economy_b._floor_clear_bonus_credited[1])).is_equal(500)
-	assert_int(int(economy_b._floor_clear_bonus_credited[3])).is_equal(1500)
+	assert_int(int(economy_b._floor_clear_bonus_credited["forest_reach_f1"])).is_equal(500)
+	assert_int(int(economy_b._floor_clear_bonus_credited["forest_reach_f3"])).is_equal(1500)
 
 	# Cleanup
 	economy_a.free()
@@ -499,15 +499,19 @@ func test_load_save_data_with_gold_exceeding_sanity_cap_clamps_to_cap() -> void:
 func test_get_save_data_returns_deep_copy_caller_mutation_does_not_leak_into_economy() -> void:
 	# Arrange
 	var economy: Node = _make_economy()
-	var ledger_init: Dictionary[int, int] = {1: 500}
+	var ledger_init: Dictionary[String, int] = {"forest_reach_f1": 500}
 	economy._floor_clear_bonus_credited = ledger_init
 
-	# Act — caller mutates the returned dict's nested ledger
+	# Act — caller mutates the returned dict's nested ledger.
+	# Sprint 17 schema v2 detail: the returned ledger is now a typed
+	# Dictionary[String, int], so the synthetic mutation key must also be
+	# a String. Use "hack_f99" so it's distinguishable from any biome's
+	# legitimate "<biome_id>_f<idx>" key.
 	var data: Dictionary = economy.get_save_data()
-	(data["floor_clear_bonus_credited"] as Dictionary)[99] = 999_999
+	(data["floor_clear_bonus_credited"] as Dictionary)["hack_f99"] = 999_999
 
 	# Assert — Economy's internal ledger is untouched
-	assert_bool(economy._floor_clear_bonus_credited.has(99)).is_false()
+	assert_bool(economy._floor_clear_bonus_credited.has("hack_f99")).is_false()
 	assert_int(economy._floor_clear_bonus_credited.size()).is_equal(1)
 
 	# Cleanup

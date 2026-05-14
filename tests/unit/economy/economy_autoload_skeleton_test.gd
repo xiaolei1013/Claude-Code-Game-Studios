@@ -64,8 +64,8 @@ func test_economy_floor_clear_bonus_credited_field_is_declared_and_empty() -> vo
 	# the derived getter. Direct field access checks presence and is_empty.
 	# _floor_clear_bonus_credited is private, but we verify its observable
 	# behaviour via is_first_clear_awarded (which reads the ledger).
-	var f1_awarded: bool = economy.is_first_clear_awarded(1)
-	var f5_awarded: bool = economy.is_first_clear_awarded(5)
+	var f1_awarded: bool = economy.is_first_clear_awarded("forest_reach", 1)
+	var f5_awarded: bool = economy.is_first_clear_awarded("forest_reach", 5)
 
 	# Assert — empty ledger means no floor is awarded yet
 	assert_bool(f1_awarded).is_false()
@@ -208,7 +208,7 @@ func test_economy_try_award_floor_clear_credits_and_returns_true() -> void:
 	# ledger empty → delta=500, add_gold(500) called, ledger advances, returns true.
 	# (Updated from the S2-M1 stub assertion of false now that Story 005 is implemented.
 	#  Comprehensive behavioral tests live in economy_try_award_floor_clear_test.gd.)
-	var result: bool = economy.try_award_floor_clear(1, 500)
+	var result: bool = economy.try_award_floor_clear("forest_reach", 1, 500)
 
 	# Assert — success path: returns true, gold credited
 	assert_bool(result).is_true()
@@ -321,11 +321,11 @@ func test_economy_is_first_clear_awarded_returns_false_for_uncredited_floor() ->
 	var economy: Node = EconomyScript.new()
 
 	# Act — check each valid floor index; all must be false on fresh instance
-	var f1: bool = economy.is_first_clear_awarded(1)
-	var f2: bool = economy.is_first_clear_awarded(2)
-	var f3: bool = economy.is_first_clear_awarded(3)
-	var f4: bool = economy.is_first_clear_awarded(4)
-	var f5: bool = economy.is_first_clear_awarded(5)
+	var f1: bool = economy.is_first_clear_awarded("forest_reach", 1)
+	var f2: bool = economy.is_first_clear_awarded("forest_reach", 2)
+	var f3: bool = economy.is_first_clear_awarded("forest_reach", 3)
+	var f4: bool = economy.is_first_clear_awarded("forest_reach", 4)
+	var f5: bool = economy.is_first_clear_awarded("forest_reach", 5)
 
 	# Assert
 	assert_bool(f1).is_false()
