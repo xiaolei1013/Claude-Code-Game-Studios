@@ -1,8 +1,8 @@
 # Class Synergy System (V1.0 first-pass) — GDD #32
 
-> **Status: FIRST-PASS DRAFT 2026-05-09** by Sprint 19 S19-M3 autonomous-execution session. Promoted from STUB DRAFT 2026-05-07. Scoped to the load-bearing 3-class MVP roster + FORMATION_SIZE=3; covers all 8 required GDD sections. Open Questions OQ-32-1..6 from the stub are RESOLVED here per the recommended defaults; OQ-32-7..8 deferred to a future ADR pass once a third multiplier source emerges. Per `production/sprints/sprint-19.md` S19-M3: "design pass is autonomous-doable; APPROVED verdict via /design-review is the user-gated portion" — this draft awaits `/design-review` for APPROVED status.
+> **Status: APPROVED 2026-05-10** (first pass authored 2026-05-09; APPROVED via `/design-review` 2026-05-10; re-review revisions 2026-05-14 closed 2 BLOCKING items before Sprint 18 M2 implementation). Scoped to the load-bearing 3-class MVP roster + FORMATION_SIZE=3; covers all 8 required GDD sections. Open Questions OQ-32-1..6 from the stub are RESOLVED here per the recommended defaults; OQ-32-7..8 deferred to a future ADR pass once a third multiplier source emerges. Implementation unblocked for Sprint 18 S18-M2.
 
-> **Pass 1 (this draft) scope locks**: 3 first-pass synergies, multiplicative effects, live preview at formation_assignment + dispatch-time confirmation, all synergies always-available (no unlock cadence), ≤+25% multiplier cap (well under the cozy-register hard floor of +50% from OQ-32-6).
+> **Pass 1 (this draft) scope locks**: 4 first-pass synergies (3 mono-class + 1 mix), multiplicative effects, live preview at formation_assignment + dispatch-time confirmation, all synergies always-available (no unlock cadence), ≤+25% multiplier cap (well under the cozy-register hard floor of +50% from OQ-32-6). Revised 2026-05-14 review pass added Triple Strike (3-Rogue) for symmetric class treatment alongside Steel Wall (3-Warrior) and Arcane Elite (3-Mage).
 
 ---
 
@@ -42,27 +42,29 @@ The synergy system is **patient** — most players will run mixed formations ear
 
 ### C.1 — Synergy roster (V1.0 first-pass)
 
-Three synergies ship in the first-pass V1.0 implementation. Each is keyed by an exact composition signature (multiset of `class_id` values across the formation's 3 slots). Order doesn't matter; class instance levels don't matter.
+Four synergies ship in the first-pass V1.0 implementation: three mono-class (one per MVP class) plus one 1+1+1 mix. Each is keyed by an exact composition signature (multiset of `class_id` values across the formation's 3 slots). Order doesn't matter; class instance levels don't matter.
 
 | ID | Display Name | Composition Signature | Effect | Conditional |
 |---|---|---|---|---|
 | **steel_wall** | Steel Wall | `{warrior, warrior, warrior}` | ×1.25 kill gold | Only on kills against `archetype = bruiser` |
 | **arcane_elite** | Arcane Elite | `{mage, mage, mage}` | ×1.20 kill XP | Unconditional (all kills) |
+| **triple_strike** | Triple Strike | `{rogue, rogue, rogue}` | ×1.25 kill gold | Only on kills against `archetype = armored` |
 | **triple_threat** | Triple Threat | `{warrior, mage, rogue}` | ×1.15 kill gold | Unconditional (all kills) |
 
 **Design rationale per synergy**:
 - **Steel Wall** (3 Warriors, +25% gold vs Bruisers): conditional on archetype matchup, so the synergy *teaches* the player about the warrior-counters-bruiser relationship from `class-vs-enemy-matchup-resolver.md`. Non-bruiser kills get baseline gold. This forces the player to think about WHEN to deploy Steel Wall, not just "always run 3 Warriors".
-- **Arcane Elite** (3 Mages, +20% XP): unconditional XP boost. Teaches "concentrate mages for accelerated leveling" — an investment archetype. Pairs naturally with Hero Leveling GDD #15's LEVEL_CAP=15 ceiling: Arcane Elite is the canonical "level-cap-rush" formation.
-- **Triple Threat** (1+1+1 mix, +15% gold): the "balanced" reward. Lower bonus than Steel Wall but unconditional. Teaches that diversity has its own value. Caps at +15% so it stays under Steel Wall's conditional max — the conditional path rewards more aggressively when it triggers.
+- **Arcane Elite** (3 Mages, +20% XP): unconditional XP boost. Teaches "concentrate mages for accelerated leveling" — an investment archetype. Pairs naturally with Hero Leveling GDD #15's LEVEL_CAP=15 ceiling: Arcane Elite is the canonical "level-cap-rush" formation. Mages get the *investment* framing (XP) rather than the *exploit-the-matchup* framing (gold) used by Steel Wall and Triple Strike — distinguishes Mage's role as the long-term-curve class.
+- **Triple Strike** (3 Rogues, +25% gold vs Armored): structurally parallel to Steel Wall. Conditional on archetype matchup per the Rogue-counters-Armored relationship in `class-vs-enemy-matchup-resolver.md`. Non-armored kills get baseline gold. The symmetric design (both 3-W and 3-R use the same +25% × counter-archetype shape) gives players the same discovery moment regardless of which class their recruit pool deepens into first. Added in the 2026-05-14 review pass to close the asymmetric-class-treatment gap from the 2026-05-09 first-pass draft.
+- **Triple Threat** (1+1+1 mix, +15% gold): the "balanced" reward. Lower bonus than Steel Wall / Triple Strike but unconditional. Teaches that diversity has its own value. Caps at +15% so it stays under the mono-class conditional max — the conditional path rewards more aggressively when it triggers.
 
 ### C.2 — Synergy detection (live preview + dispatch-time confirmation)
 
 Per OQ-32-3 resolution: BOTH live preview during slot edit AND dispatch-time confirmation.
 
 **Live preview** (formation_assignment screen, per `formation-assignment-system.md`):
-- Whenever the formation slot composition changes (player taps a slot to swap heroes), `FormationAssignment.detect_active_synergy(formation_snapshot) -> ClassSynergy?` runs.
-- If a synergy matches, the formation panel shows a **synergy badge** with the synergy display name + effect summary text. Localized via `tr("class_synergy_badge_<id>")` keys (e.g., `class_synergy_badge_steel_wall`).
-- If no synergy matches, the badge is hidden.
+- Whenever the formation slot composition changes (player taps a slot to swap heroes), `FormationAssignment.detect_active_synergy(formation_snapshot) -> String` runs (returns the synergy_id string per §D.1, or `""` when no synergy matches).
+- If a synergy matches (non-empty synergy_id), the formation panel shows a **synergy badge** with the synergy display name + effect summary text. Localized via `tr("class_synergy_badge_<id>")` keys (e.g., `class_synergy_badge_steel_wall`).
+- If no synergy matches (empty synergy_id), the badge is hidden.
 - The detection function is pure (no signals fired, no side effects); it's safe to call every slot edit. Idempotent.
 
 **Dispatch-time confirmation** (DungeonRunOrchestrator, per `dungeon-run-orchestrator.md`):
@@ -88,6 +90,8 @@ Where `_resolve_synergy_gold_multiplier(synergy_id, archetype)` returns:
 - `1.0` for `synergy_id == ""` (no synergy active)
 - `STEEL_WALL_GOLD_MULT` (1.25) for `synergy_id == "steel_wall" AND archetype == "bruiser"`
 - `1.0` for `synergy_id == "steel_wall" AND archetype != "bruiser"` (Steel Wall is conditional)
+- `TRIPLE_STRIKE_GOLD_MULT` (1.25) for `synergy_id == "triple_strike" AND archetype == "armored"`
+- `1.0` for `synergy_id == "triple_strike" AND archetype != "armored"` (Triple Strike is conditional)
 - `TRIPLE_THREAT_GOLD_MULT` (1.15) for `synergy_id == "triple_threat"` (unconditional)
 - `1.0` for `synergy_id == "arcane_elite"` (Arcane Elite affects XP, not gold)
 
@@ -143,6 +147,8 @@ detect_active_synergy(formation: FormationSnapshot) -> String:
         return "arcane_elite"
     if class_ids == ["warrior", "warrior", "warrior"]:
         return "steel_wall"
+    if class_ids == ["rogue", "rogue", "rogue"]:
+        return "triple_strike"
     if class_ids == ["mage", "rogue", "warrior"]:  # sorted alphabetically
         return "triple_threat"
     return ""
@@ -165,6 +171,8 @@ _resolve_synergy_gold_multiplier(synergy_id: String, archetype: String) -> float
         return 1.0
     if synergy_id == "steel_wall":
         return STEEL_WALL_GOLD_MULT if archetype == "bruiser" else 1.0
+    if synergy_id == "triple_strike":
+        return TRIPLE_STRIKE_GOLD_MULT if archetype == "armored" else 1.0
     if synergy_id == "triple_threat":
         return TRIPLE_THREAT_GOLD_MULT  # Unconditional
     # arcane_elite affects XP only; gold is baseline
@@ -173,6 +181,7 @@ _resolve_synergy_gold_multiplier(synergy_id: String, archetype: String) -> float
 
 **Constants** (defined in `EconomyConfig.tres` per `economy-system.md` §G):
 - `STEEL_WALL_GOLD_MULT: float = 1.25` (safe range 1.0–1.5)
+- `TRIPLE_STRIKE_GOLD_MULT: float = 1.25` (safe range 1.0–1.5)
 - `TRIPLE_THREAT_GOLD_MULT: float = 1.15` (safe range 1.0–1.5)
 
 ### D.3 — XP multiplier resolution
@@ -229,7 +238,7 @@ Same scenario but the kill is a Skirmisher (not Bruiser): synergy_multiplier col
 
 9. **Reduce-motion accessibility flag**: per `scene-screen-manager.md` Story 009 reduce_motion support (user-toggleable per `settings-options-accessibility.md`), the formation panel's synergy-badge glow animation is suppressed (badge appears instantly without fade) when `reduce_motion = true`. The dispatch-time top-bar subtitle persists for the full 3.0 s (it's text, not motion).
 
-10. **Localization (tr() of synergy display name + effect text)**: all player-facing synergy strings route through `tr()` per `ADR-0008` localization-ready rule. Locale CSV keys: `class_synergy_badge_steel_wall`, `class_synergy_badge_arcane_elite`, `class_synergy_badge_triple_threat`, `class_synergy_effect_steel_wall`, `class_synergy_effect_arcane_elite`, `class_synergy_effect_triple_threat`. Six new keys total for V1.0 ship.
+10. **Localization (tr() of synergy display name + effect text)**: all player-facing synergy strings route through `tr()` per `ADR-0008` localization-ready rule. Locale CSV keys: `class_synergy_badge_steel_wall`, `class_synergy_badge_arcane_elite`, `class_synergy_badge_triple_strike`, `class_synergy_badge_triple_threat`, `class_synergy_effect_steel_wall`, `class_synergy_effect_arcane_elite`, `class_synergy_effect_triple_strike`, `class_synergy_effect_triple_threat`. Eight new keys total for V1.0 ship.
 
 11. **Player has only Theron (1 Warrior) + auto-fills slots 2,3 from recruit pool**: until the player has 3 of any class OR a 1+1+1 mix recruited, NO synergy can activate. The player runs baseline formations; the synergy system is silent. Discovery happens naturally as the recruit pool deepens. This is the cozy register working as intended (no synergy unlock pressure).
 
@@ -281,7 +290,7 @@ The following GDDs need 2026-05-09 amendments to acknowledge Class Synergy as a 
 - `class-vs-enemy-matchup-resolver.md` — add Class Synergy #32 to F (consumer; archetype string source)
 - `hero-class-database.md` — add Class Synergy #32 to F (consumer; class_id stable identifiers)
 
-These cross-GDD amendments are deferred to a single batch pass when the Class Synergy V1.0 implementation epic kicks off (Sprint 21+ scope per current cadence).
+These cross-GDD amendments are scheduled **inside Sprint 18 S18-M2** as a precondition to implementation work (one batch commit appending a "Class Synergy #32 — consumer of <surface>" entry to each consumer GDD's F.2 / consumers section). Per CLAUDE.md design-doc rules: dependencies must be bidirectional at amend-time. Prior plan had deferred this to Sprint 21+; revised 2026-05-14 review pass to fold the amendments into the live implementation sprint so the bidirectional rule holds when ClassSynergySystem.gd lands.
 
 ---
 
@@ -292,7 +301,8 @@ All knobs live in `assets/data/economy/economy_config.tres` (existing per `econo
 | Knob | Type | Default | Safe Range | Affects |
 |---|---|---|---|---|
 | `STEEL_WALL_GOLD_MULT` | float | 1.25 | 1.0 – 1.5 | Steel Wall's bruiser-conditional gold bonus. >1.5 risks dominant 3-Warrior strategy per E.12 anti-frustration. |
-| `TRIPLE_THREAT_GOLD_MULT` | float | 1.15 | 1.0 – 1.5 | Triple Threat's unconditional gold bonus. Lower than Steel Wall by design (unconditional vs conditional). |
+| `TRIPLE_STRIKE_GOLD_MULT` | float | 1.25 | 1.0 – 1.5 | Triple Strike's armored-conditional gold bonus. Structurally parallel to Steel Wall (same default + safe range); tune in lockstep unless playtest data signals an asymmetric balance need. |
+| `TRIPLE_THREAT_GOLD_MULT` | float | 1.15 | 1.0 – 1.5 | Triple Threat's unconditional gold bonus. Lower than mono-class conditional caps by design (unconditional vs conditional). |
 | `ARCANE_ELITE_XP_MULT` | float | 1.20 | 1.0 – 1.5 | Arcane Elite's XP bonus across all kills. >1.5 risks "level-cap rush" dominant strategy. |
 | `BASE_XP_PER_KILL` | int | 10 | 5 – 50 | Hero Leveling V1.0 base XP per tier-1 kill. Multiplied by tier in `attribute_kill_xp`. |
 | `audio_suppress_window_seconds` (re-uses audio-system) | float | 2.0 | 0.5 – 5.0 | Throttle window for the `sfx_class_synergy_detected` cue. **Owned by `audio-system.md` §F** — Class Synergy does NOT introduce a separate synergy-specific knob. The audio system's per-cue throttle is the single source of truth. Listed here for designer-tuning visibility only. |
@@ -377,15 +387,15 @@ All ACs are V1.0 implementation-targets (not MVP). They become BLOCKING on the V
 **When**: AudioRouter processes the signal stream.
 **Then**: `sfx_class_synergy_detected` plays once (per `audio-system.md` §F suppress_window_seconds = 2.0). Subsequent emissions within the window are throttled.
 
-### AC-CS-15 — Localization: all 6 synergy strings route through `tr()`
+### AC-CS-15 — Localization: all 8 synergy strings route through `tr()`
 **Given**: locale loader has English keys loaded.
 **When**: synergy badge + effect summary render.
-**Then**: text comes from `tr("class_synergy_badge_<id>")` + `tr("class_synergy_effect_<id>")` calls; CI grep enforces no hardcoded synergy display names anywhere in `assets/screens/formation_assignment/` or `assets/screens/dungeon_run_view/`.
+**Then**: text comes from `tr("class_synergy_badge_<id>")` + `tr("class_synergy_effect_<id>")` calls for all four synergies (steel_wall, arcane_elite, triple_strike, triple_threat — 8 keys total); CI grep enforces no hardcoded synergy display names anywhere in `assets/screens/formation_assignment/` or `assets/screens/dungeon_run_view/`.
 
 ### AC-CS-16 — Cozy-register hard floor: no PER-SYNERGY multiplier exceeds +50%
-**Given**: any tuned configuration of all three synergy multipliers.
+**Given**: any tuned configuration of all four synergy multipliers.
 **When**: `_resolve_synergy_*_multiplier` returns a value.
-**Then**: value is ≤ 1.5. Static-analysis CI test asserts that `STEEL_WALL_GOLD_MULT`, `TRIPLE_THREAT_GOLD_MULT`, `ARCANE_ELITE_XP_MULT` are all ≤ 1.5 in `economy_config.tres`. Per OQ-32-6 cozy register hard floor.
+**Then**: value is ≤ 1.5. Static-analysis CI test asserts that `STEEL_WALL_GOLD_MULT`, `TRIPLE_STRIKE_GOLD_MULT`, `TRIPLE_THREAT_GOLD_MULT`, `ARCANE_ELITE_XP_MULT` are all ≤ 1.5 in `economy_config.tres`. Per OQ-32-6 cozy register hard floor.
 
 > **Scope clarification**: the ≤+50% floor is **per-synergy**, not compound. The full per-kill product (BASE_KILL × matchup_mult × loot_factor × synergy_mult × prestige_mult — see J cross-system table) can legitimately exceed +50% over baseline; that compound product is bounded by each factor's own cap, not by AC-CS-16. Future synergies must be compared against the per-synergy 1.5 ceiling, never against the compound peak.
 
@@ -399,15 +409,30 @@ All ACs are V1.0 implementation-targets (not MVP). They become BLOCKING on the V
 **When**: V1.0 build's `_resolve_synergy_gold_multiplier("veteran_squad", ...)` runs.
 **Then**: returns 1.0 (unknown synergy_id falls through to default). NO crash, NO push_error. Forward-compat saves are gracefully degraded.
 
-### AC-CS-19 — Balance regression test: 3-Warrior dominance signal
+### AC-CS-19 — Balance regression test: no mono-class composition dominates
 **Given**: 100 simulated runs with random formations across the 10 possible 3-class compositions.
 **When**: gold output is aggregated per composition.
-**Then**: 3-Warrior formation's average gold output is within 30% of the mean across all compositions (i.e., does NOT dominate by >30% — anti-frustration check per E.12). If this AC fails, retune `STEEL_WALL_GOLD_MULT` per Tuning Knobs G.
+**Then**: NO single mono-class composition (3-Warrior, 3-Mage, or 3-Rogue) has an average gold output more than 30% above the mean across all compositions — anti-frustration check per E.12. If 3-Warrior dominance triggers, retune `STEEL_WALL_GOLD_MULT` down. If 3-Rogue dominance triggers, retune `TRIPLE_STRIKE_GOLD_MULT` down. Per Tuning Knobs G safe ranges.
 
 ### AC-CS-20 — Performance: detection runs in <1ms p99
 **Given**: any FormationSnapshot.
 **When**: `detect_active_synergy(snapshot)` runs 10 000 times.
 **Then**: p99 latency < 1 ms (function is pure + O(1); the 3-element sort is trivial). Required because detection runs every slot edit in the live-preview path.
+
+### AC-CS-21 — Detection accuracy: 3-Rogue formation returns "triple_strike"
+**Given**: HeroRoster contains 3 Rogues at formation slots 0/1/2.
+**When**: `detect_active_synergy(snapshot)` runs.
+**Then**: returns `"triple_strike"`. Order of slots does NOT matter (sort-based comparison per D.1).
+
+### AC-CS-22 — Triple Strike conditional gold: armored kill applies multiplier
+**Given**: RunSnapshot.synergy_id = "triple_strike"; tier-1 armored kill; matchup advantaged; not losing.
+**When**: `attribute_kill_gold(1, true, false, "triple_strike", "armored")` runs.
+**Then**: returns `floori(BASE_KILL[1] × 1.5 × 1.0 × 1.25)` (e.g., `floori(10 × 1.5 × 1.25) = 18`). Parallel to AC-CS-06 (Steel Wall vs bruiser).
+
+### AC-CS-23 — Triple Strike conditional gold: non-armored kill does NOT apply multiplier
+**Given**: same as AC-CS-22 except archetype = "skirmisher" (or any non-armored archetype).
+**When**: `attribute_kill_gold(1, true, false, "triple_strike", "skirmisher")` runs.
+**Then**: returns `floori(BASE_KILL[1] × 1.5 × 1.0 × 1.0)` (e.g., 15). Triple Strike does NOT apply to non-armored kills. Parallel to AC-CS-07 (Steel Wall vs skirmisher).
 
 ---
 
@@ -447,6 +472,6 @@ Class Synergy is one of two V1.0 progression layers; pairs with Prestige #31. Bo
 - First-pass GDD authored 2026-05-09 by Sprint 19 S19-M3 autonomous-execution session. Promoted from STUB DRAFT 2026-05-07. All 8 required GDD sections present (A Overview, B Player Fantasy, C Detailed Rules, D Formulas, E Edge Cases, F Dependencies, G Tuning Knobs, H Acceptance Criteria). Supplemental sections I (Open Questions) + J (Cross-System Cross-Reference) included per existing GDD pattern.
 - Awaiting `/design-review` for APPROVED status. Per Sprint 19 S19-M3 plan: "design pass is autonomous-doable; APPROVED verdict via /design-review is the user-gated portion." This draft expects 1-2 review cycles before APPROVED — typical for first-pass GDDs in this project (see hero-class-database, dungeon-run-orchestrator pass histories).
 - Closes systems-index.md row 32 status from "STUB DRAFT 2026-05-07" → "FIRST-PASS DRAFT 2026-05-09 (pending /design-review)".
-- Per CLAUDE.md design-doc rules, F.3 lists 8 GDDs that need bidirectional-dependency amendments to acknowledge Class Synergy as a consumer. Those edits are deferred to a single batch pass when the V1.0 Class Synergy implementation epic kicks off (currently Sprint 21+ scope).
-- The 3 first-pass synergies were chosen for **legibility** (3-of-a-kind + 1+1+1 mix are the most discoverable composition rules) and **coverage** (one synergy per the 3 distinct composition shapes that are reachable with 3 MVP classes). V1.5+ can add 2+1 mixes, tier-based synergies, and identity-based synergies as the design space expands.
+- Per CLAUDE.md design-doc rules, F.3 lists 8 GDDs that need bidirectional-dependency amendments to acknowledge Class Synergy as a consumer. Those edits are scheduled inside Sprint 18 S18-M2 (revised 2026-05-14 from the prior Sprint 21+ deferral; the bidirectional rule must hold at the moment ClassSynergySystem.gd lands).
+- The 4 first-pass synergies were chosen for **legibility** (3-of-a-kind + 1+1+1 mix are the most discoverable composition rules) and **symmetric coverage**: one synergy per mono-class composition (3W → Steel Wall, 3M → Arcane Elite, 3R → Triple Strike) plus the 1+1+1 mix (Triple Threat). This gives every player the same discovery moment regardless of which class their recruit pool deepens into first. V1.5+ can add 2+1 mixes, tier-based synergies, and identity-based synergies as the design space expands.
 - The cozy-register hard floor (≤+50% multiplier per OQ-32-6) is the load-bearing design constraint. AC-CS-16 enforces it via static analysis of `economy_config.tres`. Future synergies must respect this floor or the design is non-shippable per Pillar 2 (Cozy Pacing).
