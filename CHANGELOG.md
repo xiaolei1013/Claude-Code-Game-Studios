@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.43] - 2026-05-14
+
+### Changed
+- **Tilt-shift DoF activated (Sprint 19 S19-M4).** The HD-2D pipeline is now ON by default on Guild Hall + DungeonRunView. `shader_parameter/enabled` flipped from 0.0 → 1.0 in both `ShaderMaterial_tilt_shift` sub_resources. Per ADR-0019 §Decision 4; closes AC-26-13.
+- **Scene z-order restructured per ADR-0019 §Decision 1 layer-order contract.** BackBufferCopy + TiltShiftDof moved from z=0 (end of tree) to z=-1 (tree position 2 + 3, right after BiomeBackground). Result: BiomeBackground renders first → BackBufferCopy captures it → TiltShiftDof blurs only the captured background → UI labels (z=0) render sharp on top → WarmLanternOverlay (z=1) composites amber wash over everything. **The Sprint 18 N1 UI-ghost-smear bug is now structurally impossible** — tilt-shift cannot reach UI content because the back-buffer capture happens before UI renders.
+- **DungeonRunView no longer has a hardcoded `z_index = 0` on TiltShiftDof** — now z=-1 by scene structure. Same for Guild Hall.
+
+### Internal
+- 2 new contract tests in `tests/unit/shaders/tilt_shift_dof_test.gd` enforce the UI sharpness guard (AC-26-08): `test_guild_hall_tilt_shift_z_index_below_ui_labels` asserts `TiltShiftDof.z_index < GoldCounter.z_index`; same for `test_dungeon_run_view_tilt_shift_z_index_below_ui_labels` against `HeaderLabel`. If a future regression promotes tilt-shift to z=0 or higher, the test catches it before ship.
+- The 2 disabled-by-default tests (`test_*_tilt_shift_ships_disabled_by_default`) shipped Sprint 18 N1 were renamed + flipped to `test_*_tilt_shift_ships_enabled` (assert `enabled = 1.0`). They were valid only for the interim S18 state before BiomeBackground existed.
+- **Format-string bug fixed in test assertions.** `override_failure_message("a %d b %d" + "more" % [a, b])` binds wrong — only "more" gets the `%` operator, fails because "more" has no `%d`. Fix: wrap the concatenation in parens: `("a %d b %d" + "more") % [a, b]`. Documented inline so future tests don't repeat the mistake. The errors were silent because the assertions passed; only manifests if an assertion fails.
+
 ## [0.0.0.42] - 2026-05-14
 
 ### Added

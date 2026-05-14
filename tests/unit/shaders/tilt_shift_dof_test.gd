@@ -145,24 +145,21 @@ func test_dungeon_run_view_scene_resolves_tilt_shift_shader() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Test 6 — both scenes ship the tilt-shift DISABLED by default
+# Test 6 — both scenes ship the tilt-shift ACTIVATED (Sprint 19 S19-M4)
 # ---------------------------------------------------------------------------
 
-# Sprint 18 N1 landing decision (per S18-M4 playtest screenshot 2026-05-14):
-# the tilt-shift effect ships disabled (`enabled = 0.0`) on both Guild Hall
-# and DungeonRunView until biome background art lands. Reason: with the
-# current label-only screens, the BackBufferCopy captures the UI labels +
-# buttons themselves, and the 9-tap Gaussian smears them vertically into
-# ghost copies (the "Gold: 1824" ghost-stack artifact on first playtest).
-# This is structurally correct shader behavior on the wrong content — the
-# fix is real background sprites, not a different shader. Until then, the
-# infrastructure stays in place but inactive; designer flips
-# `enabled = 1.0` per-scene when background art lands.
+# Sprint 19 S19-M4 activation per ADR-0019 §Decision 4: the disabled-by-default
+# state shipped Sprint 18 N1 (S18 playtest revealed UI-text ghost-smear when no
+# background existed) is REPLACED by the proper architectural fix shipped
+# Sprint 19 M3: BiomeBackground at z=-1 gives the tilt-shift back-buffer
+# real content to sample. With the layer-order contract in place
+# (BiomeBackground z=-1 → BackBufferCopy z=-1 → TiltShiftDof z=-1 → UI z=0),
+# the shader cannot reach UI text — the diorama register fires correctly.
 #
-# Mirrors the Sprint 15 N2 warm-lantern "ships as ready-to-deploy
-# infrastructure" pattern. Test pins the disabled-by-default state so a
-# future tuning pass cannot silently re-enable it without context.
-func test_guild_hall_tilt_shift_ships_disabled_by_default() -> void:
+# These tests replace the prior disabled-by-default assertions
+# (test_*_tilt_shift_ships_disabled_by_default) which were valid only for the
+# Sprint 18 N1 interim state where no BiomeBackground existed.
+func test_guild_hall_tilt_shift_ships_enabled() -> void:
 	var packed: PackedScene = load("res://assets/screens/guild_hall/guild_hall.tscn") as PackedScene
 	var instance: Node = packed.instantiate()
 	auto_free(instance)
@@ -170,14 +167,14 @@ func test_guild_hall_tilt_shift_ships_disabled_by_default() -> void:
 	var mat: ShaderMaterial = overlay.material as ShaderMaterial
 	var enabled: float = float(mat.get_shader_parameter("enabled"))
 	assert_float(enabled).override_failure_message(
-		"TiltShiftDof must ship with `enabled = 0.0` until biome background "
-		+ "art lands. Re-enabling on the current label-only screens reintroduces "
-		+ "the UI-text ghost-smear artifact. See tilt_shift_dof.gdshader header "
-		+ "comment + 2026-05-14 playtest finding."
-	).is_equal(0.0)
+		"Guild Hall TiltShiftDof must ship with `enabled = 1.0` per Sprint 19 "
+		+ "S19-M4 activation (ADR-0019 §Decision 4). The disabled-by-default "
+		+ "state from S18-N1 is retired now that the BiomeBackground layer "
+		+ "exists at z=-1 (S19-M3). Got %f." % enabled
+	).is_equal(1.0)
 
 
-func test_dungeon_run_view_tilt_shift_ships_disabled_by_default() -> void:
+func test_dungeon_run_view_tilt_shift_ships_enabled() -> void:
 	var packed: PackedScene = load("res://assets/screens/dungeon_run_view/dungeon_run_view.tscn") as PackedScene
 	var instance: Node = packed.instantiate()
 	auto_free(instance)
@@ -185,7 +182,56 @@ func test_dungeon_run_view_tilt_shift_ships_disabled_by_default() -> void:
 	var mat: ShaderMaterial = overlay.material as ShaderMaterial
 	var enabled: float = float(mat.get_shader_parameter("enabled"))
 	assert_float(enabled).override_failure_message(
-		"DungeonRunView TiltShiftDof must ship with `enabled = 0.0` until "
-		+ "biome background art lands. See tilt_shift_dof.gdshader header + "
-		+ "2026-05-14 playtest finding."
-	).is_equal(0.0)
+		"DungeonRunView TiltShiftDof must ship with `enabled = 1.0` per Sprint "
+		+ "19 S19-M4 activation. Got %f." % enabled
+	).is_equal(1.0)
+
+
+# ---------------------------------------------------------------------------
+# Test 7 — UI sharpness guard (AC-26-08)
+# ---------------------------------------------------------------------------
+
+# Sprint 19 S19-M4 + ADR-0019 §Decision 1 layer-order contract: TiltShiftDof
+# at z=-1 must render BEFORE any UI content at z=0. The BackBufferCopy at
+# z=-1 (positioned after BiomeBackground but before TiltShiftDof) captures
+# the framebuffer state at z=-1 — which contains only BiomeBackground, NOT
+# the UI. So when the tilt-shift samples back-buffer, it cannot reach UI
+# labels. The S18-N1 ghost-smear bug is structurally prevented by this
+# layer-order contract.
+#
+# Test verifies the architectural invariant: TiltShiftDof.z_index < lowest
+# UI label z_index. If a future regression promotes TiltShiftDof to z=0 or
+# higher, this catches it before it ships.
+
+func test_guild_hall_tilt_shift_z_index_below_ui_labels() -> void:
+	var packed: PackedScene = load("res://assets/screens/guild_hall/guild_hall.tscn") as PackedScene
+	var instance: Node = packed.instantiate()
+	auto_free(instance)
+	var tilt_shift: ColorRect = instance.get_node_or_null("TiltShiftDof") as ColorRect
+	var gold_counter: Label = instance.get_node_or_null("GoldCounter") as Label
+
+	assert_object(tilt_shift).is_not_null()
+	assert_object(gold_counter).is_not_null()
+	assert_int(tilt_shift.z_index).override_failure_message(
+		("TiltShiftDof.z_index (%d) must be < GoldCounter.z_index (%d). The "
+		+ "Sprint 18 N1 ghost-smear bug surfaced because tilt-shift sat at "
+		+ "the same z as UI; the architectural fix (S19-M4 + ADR-0019 §Decision 1) "
+		+ "puts tilt-shift at z=-1 BELOW UI so the back-buffer copy cannot "
+		+ "capture UI text.") % [tilt_shift.z_index, gold_counter.z_index]
+	).is_less(gold_counter.z_index)
+
+
+func test_dungeon_run_view_tilt_shift_z_index_below_ui_labels() -> void:
+	var packed: PackedScene = load("res://assets/screens/dungeon_run_view/dungeon_run_view.tscn") as PackedScene
+	var instance: Node = packed.instantiate()
+	auto_free(instance)
+	var tilt_shift: ColorRect = instance.get_node_or_null("TiltShiftDof") as ColorRect
+	var header_label: Label = instance.get_node_or_null("HeaderLabel") as Label
+
+	assert_object(tilt_shift).is_not_null()
+	assert_object(header_label).is_not_null()
+	assert_int(tilt_shift.z_index).override_failure_message(
+		("TiltShiftDof.z_index (%d) must be < HeaderLabel.z_index (%d) (the "
+		+ "DRV UI sharpness guard from ADR-0019 §Decision 1).")
+		% [tilt_shift.z_index, header_label.z_index]
+	).is_less(header_label.z_index)
