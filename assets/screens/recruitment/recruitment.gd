@@ -157,10 +157,20 @@ func _render_pool_entry(entry: Control, pool_index: int, class_id: String) -> vo
 
 	# ClassNameLabel — locale-aware via display_name_key when present;
 	# fallback to capitalized class_id for MVP.
+	# Sprint 17 — append "· vs <archetype>" so the matchup signal is
+	# visible at the recruit decision (continues the chain from PR #84
+	# / #85 / #86 into the Recruit Screen). Defensive: class with empty
+	# counter_archetype falls back to the bare display name.
+	var class_display: String = ""
 	if "display_name_key" in class_data and String(class_data.display_name_key) != "":
-		class_name_label.text = tr(String(class_data.display_name_key))
+		class_display = tr(String(class_data.display_name_key))
 	else:
-		class_name_label.text = class_id.capitalize()
+		class_display = class_id.capitalize()
+	var counter_archetype: String = String(class_data.counter_archetype) if "counter_archetype" in class_data else ""
+	if counter_archetype != "":
+		class_name_label.text = "%s · vs %s" % [class_display, counter_archetype]
+	else:
+		class_name_label.text = class_display
 
 	# CostLabel via Recruitment.get_recruit_cost(pool_index).
 	var cost: int = Recruitment.get_recruit_cost(pool_index)

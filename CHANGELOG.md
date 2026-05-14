@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.36] - 2026-05-14
+
+### Changed
+- **Guild Hall HeroCard summary now shows "· vs <archetype>"** — `Theron · warrior · Lv 5 · vs bruiser`. Matchup signal visible directly on the player's home screen without needing a modal tap.
+- **Recruit Screen class label now shows "· vs <archetype>"** — `Warrior · vs bruiser` per pool entry. Player can pick recruits with intent against current/anticipated biome encounters.
+- **Matchup awareness chain — now surfaced on EVERY player-facing screen** showing class info:
+  - Matchup Assignment biome tab: `Recommended: Rogue, Mage` (PR #84)
+  - Hero Detail modal header: `Strong vs: armored` (PR #85)
+  - Formation Assignment roster button: `Theron (warrior Lv5 · vs bruiser)` (PR #86)
+  - **Guild Hall HeroCard: `Theron · warrior · Lv 5 · vs bruiser` (this PR)**
+  - **Recruit Screen pool entry: `Warrior · vs bruiser` (this PR)**
+  - The mechanic is now self-teaching at every screen the player can see class data on.
+
+### Notes
+- **Tests**: 2167/2167 PASS (unchanged; existing assertions check `contains("rogue")` / `contains("Lv 3")` substring patterns — preserved by the new "· vs <archetype>" suffix).
+- **Defensive**: future classes with empty `counter_archetype` fall back to the prior label format. No broken text.
+- **No new screens left** to surface the matchup signal on. The chain is fully wired.
+
 ## [0.0.0.35] - 2026-05-14
 
 ### Changed
