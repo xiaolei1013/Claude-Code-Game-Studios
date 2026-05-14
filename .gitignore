@@ -19,7 +19,14 @@ production/session-state/
 
 expansions/
 
-# === Runtime Artifacts (auto-generated, start empty on fresh clone) ===
+# === Third-party reference material (LOCAL ONLY — never commit) ===
+# Folders under assets/ containing third-party copyrighted material used
+# strictly as local visual/audio reference during pre-production. All
+# placeholder and ship art is authored under assets/art/, assets/audio/,
+# etc. — never sourced from these folders.
+# Do not remove these entries without first removing the referenced folders.
+assets/八方旅人1/
+assets/八方旅人2/
 # Created on first use by /consistency-check and /architecture-review
 docs/consistency-failures.md
 
