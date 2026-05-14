@@ -165,6 +165,29 @@ func test_synergy_badge_renders_arcane_elite_for_three_mages() -> void:
 	assert_str(screen._synergy_badge.text).contains("Arcane Elite")
 
 
+func test_synergy_badge_renders_triple_strike_for_three_rogues() -> void:
+	# AC-CS-21 screen-side rendering: 3-Rogue composition resolves to
+	# "triple_strike" synergy_id and the badge renders the localized
+	# display name + effect text. Added 2026-05-14 to close the 3-Rogue
+	# asymmetric-class-treatment gap (parallel to the steel_wall +
+	# arcane_elite rendering tests in this group).
+	_inject_hero(941, "rogue")
+	_inject_hero(942, "rogue")
+	_inject_hero(943, "rogue")
+	_set_formation(941, 942, 943)
+
+	var screen: Node = _make_screen()
+	screen.on_enter()
+
+	assert_bool(screen._synergy_badge.visible).is_true()
+	assert_str(screen._current_synergy_id).is_equal("triple_strike")
+	var text: String = screen._synergy_badge.text
+	# Locale en.csv: class_synergy_badge_triple_strike = "Triple Strike"
+	#                class_synergy_effect_triple_strike = "+25% gold vs armored"
+	assert_str(text).contains("Triple Strike")
+	assert_str(text).contains("armored")
+
+
 # ===========================================================================
 # Group C — State de-dup (composition stable → no re-trigger)
 # ===========================================================================

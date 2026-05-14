@@ -74,11 +74,11 @@ stories:
     name: "Class Synergy live preview in Formation Assignment screen"
     file: "assets/screens/formation_assignment/formation_assignment.gd"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 0.5
-    blocker: "S18-M2"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-14 — most of the screen integration was already shipped in Sprint 19 pre-emptive work (SynergyBadge Label node, _refresh_synergy_badge function, tween animation, reduce-motion variant, detect_active_synergy wiring). The actual M3 gap was 2 missing locale keys (class_synergy_badge_triple_strike, class_synergy_effect_triple_strike) + 1 new badge test for Triple Strike rendering. Bundled with S1 + S2 in the M3-S1-S2 closeout PR."
 
   - id: "S18-M4"
     name: "Sprint 18 playtest — class synergy validation"
@@ -106,21 +106,21 @@ stories:
     name: "Onboarding carry — final disposition (4-sprint carry; recommend retire)"
     file: "design/gdd/onboarding-first-session.md"
     priority: should-have
-    status: backlog
+    status: done
     owner: "game-designer + claude-code"
     estimate_days: 0.25
     blocker: ""
-    completed: ""
+    completed: "2026-05-14 — RETIRED as deferred-indefinitely. 4-sprint carry chain (S15-N3 → S16-N4 → S17-N2 → S18-S1) produced zero playtest signals demanding polish; the live first-session flow is shipped and working per S17-M6 playtest verdict. §J retirement note appended to onboarding-first-session.md. AC-29-01..14 remain the contract for any future onboarding changes."
 
   - id: "S18-S2"
     name: "ADR-amendment test-coverage audit pattern in PATTERNS.md §15"
     file: "tests/PATTERNS.md"
     priority: should-have
-    status: backlog
+    status: done
     owner: "claude-code"
     estimate_days: 0.25
     blocker: ""
-    completed: ""
+    completed: "2026-05-14 — §15 entry committed to tests/PATTERNS.md. Documents the canonical example (Sprint 17 PR #90 multi-biome ledger collision), detection heuristic (4-step audit checklist), test-contract template (P(x) → P(x,y) widening), and 'why this bug class is sneaky' closing rationale. Closes Sprint 17 retro action item #2."
 
   # ===== Nice to Have =====
 
