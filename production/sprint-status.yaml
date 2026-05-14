@@ -27,7 +27,7 @@
 #              M7 sprint-17 retro.
 #   Should Have: 2/2 DONE — S2 biome-cost re-baseline (PR #88 yaml); S1 Recruitment
 #              audit RETIRED (recruitment-system.md §J).
-#   Nice to Have: 0/1 — S18-N1 DoF shader carried to Sprint 18.
+#   Nice to Have: 1/1 DONE — S18-N1 tilt-shift DoF shader (v0.0.0.41).
 #   Critical mid-sprint bug: PR #90 Economy multi-biome ledger collision fix +
 #     ADR-0002 Amendment 1 (2190→2196 tests, +6 regression suite).
 #   Framework: upstream v1.0 synced via PR #95 (96 files, +2895/-720;
@@ -128,8 +128,8 @@ stories:
     name: "HD-2D tilt-shift DoF shader (3-sprint carry S16-N2 → S17-N4 → S18-N1)"
     file: "assets/shaders/tilt_shift_dof.gdshader"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: "godot-shader-specialist"
     estimate_days: 2.0
-    blocker: "S18-M4 signal"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-14"

@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.41] - 2026-05-14
+
+### Added
+- **HD-2D tilt-shift depth-of-field shader (Sprint 18 N1).** New `assets/shaders/tilt_shift_dof.gdshader` — a canvas_item screen-space shader that produces the "diorama on a tabletop" fake-miniature look: a horizontal sharp focus band with progressive Gaussian blur toward the top and bottom screen edges. Wired into Guild Hall and DungeonRunView via a `BackBufferCopy` + `TiltShiftDof` ColorRect pair, layered below the existing WarmLanternOverlay so the lantern wash composites over the already-blurred sample (verified by `test_guild_hall_tilt_shift_renders_below_warm_lantern` z_index assertion). Closes the 3-sprint carry chain S16-N2 → S17-N4 → S18-N1.
+- **Visual impact**: subtle on the current label-only screens (the tilt-shift bites into the warm-lantern vignette itself), substantial once real biome backgrounds and sprite content land. The shader ships as ready-to-deploy infrastructure per the same Sprint 15 N2 pattern that landed the warm-lantern shader before the Vertical Slice asset pass.
+
+### Internal
+- 5 contract uniforms: `focus_y` (sharp-band vertical center), `focus_height` (half-height of fully-sharp region), `blur_strength` (max blur sample offset at screen edges), `falloff_softness` (sharp→blur ramp gradient), `enabled` (runtime master toggle for accessibility / settings). Plus the Godot 4.x `sampler2D screen_texture : hint_screen_texture` binding — the 3.x `SCREEN_TEXTURE` builtin was removed in 4.0. 9-tap single-pass vertical Gaussian (sigma ≈ 1.5 sample units, pre-baked weights summing to 1.0). Pass-through short-circuit when computed blur radius < 0.0001 avoids 9 redundant texture taps on the sharp-band fragments — most fragments inside the focus rect take the cheap path. Vertical-only blur is sufficient for the tilt-shift register; horizontal blur would double cost without proportional perceived effect at this strength.
+- New regression suite `tests/unit/shaders/tilt_shift_dof_test.gd` (5 tests): shader resource loads, contract uniforms + Godot 4.x screen-texture binding are stable, Guild Hall scene resolves the shader, Guild Hall layer ordering puts tilt-shift below warm-lantern, DungeonRunView scene resolves the shader. Pure string-grep contract check independent of Godot's Shader introspection API (mirrors `warm_lantern_overlay_test.gd`'s S15 N2 strategy).
+- Also includes the warm-lantern overlay shader files (`assets/shaders/warm_lantern_overlay.gdshader` + `tests/unit/shaders/warm_lantern_overlay_test.gd`) that were authored in Sprint 15 N2 but lingered untracked in the working tree across 3 sprints — landed now alongside the tilt-shift work since they share the post-process pipeline contract.
+
 ## [0.0.0.40] - 2026-05-14
 
 ### Fixed

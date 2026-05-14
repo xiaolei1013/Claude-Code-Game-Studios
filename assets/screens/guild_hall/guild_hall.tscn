@@ -1,10 +1,14 @@
-[gd_scene load_steps=4 format=3 uid="uid://screen_guild_hall"]
+[gd_scene load_steps=6 format=3 uid="uid://screen_guild_hall"]
 
 [ext_resource type="Script" path="res://assets/screens/guild_hall/guild_hall.gd" id="1_guild_hall"]
 [ext_resource type="Shader" path="res://assets/shaders/warm_lantern_overlay.gdshader" id="2_warm_lantern"]
+[ext_resource type="Shader" path="res://assets/shaders/tilt_shift_dof.gdshader" id="3_tilt_shift"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_warm_lantern"]
 shader = ExtResource("2_warm_lantern")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_tilt_shift"]
+shader = ExtResource("3_tilt_shift")
 
 [node name="GuildHall" type="Control"]
 layout_mode = 3
@@ -153,6 +157,21 @@ grow_vertical = 0
 text = ""
 horizontal_alignment = 1
 autowrap_mode = 3
+
+[node name="BackBufferCopy" type="BackBufferCopy" parent="."]
+copy_mode = 2
+
+[node name="TiltShiftDof" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_tilt_shift")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+z_index = 0
+color = Color(1, 1, 1, 1)
 
 [node name="WarmLanternOverlay" type="ColorRect" parent="."]
 material = SubResource("ShaderMaterial_warm_lantern")
