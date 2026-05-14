@@ -142,3 +142,50 @@ func test_dungeon_run_view_scene_resolves_tilt_shift_shader() -> void:
 	var mat: ShaderMaterial = overlay.material as ShaderMaterial
 	assert_object(mat).is_not_null()
 	assert_object(mat.shader).is_not_null()
+
+
+# ---------------------------------------------------------------------------
+# Test 6 — both scenes ship the tilt-shift DISABLED by default
+# ---------------------------------------------------------------------------
+
+# Sprint 18 N1 landing decision (per S18-M4 playtest screenshot 2026-05-14):
+# the tilt-shift effect ships disabled (`enabled = 0.0`) on both Guild Hall
+# and DungeonRunView until biome background art lands. Reason: with the
+# current label-only screens, the BackBufferCopy captures the UI labels +
+# buttons themselves, and the 9-tap Gaussian smears them vertically into
+# ghost copies (the "Gold: 1824" ghost-stack artifact on first playtest).
+# This is structurally correct shader behavior on the wrong content — the
+# fix is real background sprites, not a different shader. Until then, the
+# infrastructure stays in place but inactive; designer flips
+# `enabled = 1.0` per-scene when background art lands.
+#
+# Mirrors the Sprint 15 N2 warm-lantern "ships as ready-to-deploy
+# infrastructure" pattern. Test pins the disabled-by-default state so a
+# future tuning pass cannot silently re-enable it without context.
+func test_guild_hall_tilt_shift_ships_disabled_by_default() -> void:
+	var packed: PackedScene = load("res://assets/screens/guild_hall/guild_hall.tscn") as PackedScene
+	var instance: Node = packed.instantiate()
+	auto_free(instance)
+	var overlay: ColorRect = instance.get_node_or_null("TiltShiftDof") as ColorRect
+	var mat: ShaderMaterial = overlay.material as ShaderMaterial
+	var enabled: float = float(mat.get_shader_parameter("enabled"))
+	assert_float(enabled).override_failure_message(
+		"TiltShiftDof must ship with `enabled = 0.0` until biome background "
+		+ "art lands. Re-enabling on the current label-only screens reintroduces "
+		+ "the UI-text ghost-smear artifact. See tilt_shift_dof.gdshader header "
+		+ "comment + 2026-05-14 playtest finding."
+	).is_equal(0.0)
+
+
+func test_dungeon_run_view_tilt_shift_ships_disabled_by_default() -> void:
+	var packed: PackedScene = load("res://assets/screens/dungeon_run_view/dungeon_run_view.tscn") as PackedScene
+	var instance: Node = packed.instantiate()
+	auto_free(instance)
+	var overlay: ColorRect = instance.get_node_or_null("TiltShiftDof") as ColorRect
+	var mat: ShaderMaterial = overlay.material as ShaderMaterial
+	var enabled: float = float(mat.get_shader_parameter("enabled"))
+	assert_float(enabled).override_failure_message(
+		"DungeonRunView TiltShiftDof must ship with `enabled = 0.0` until "
+		+ "biome background art lands. See tilt_shift_dof.gdshader header + "
+		+ "2026-05-14 playtest finding."
+	).is_equal(0.0)

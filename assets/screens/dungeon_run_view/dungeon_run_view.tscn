@@ -5,6 +5,7 @@
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_tilt_shift"]
 shader = ExtResource("2_tilt_shift")
+shader_parameter/enabled = 0.0
 
 ; DungeonRunView — full-rect anchored Control (extends Screen) per ADR-0007.
 ;

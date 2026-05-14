@@ -9,6 +9,7 @@ shader = ExtResource("2_warm_lantern")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_tilt_shift"]
 shader = ExtResource("3_tilt_shift")
+shader_parameter/enabled = 0.0
 
 [node name="GuildHall" type="Control"]
 layout_mode = 3
