@@ -49,6 +49,21 @@ See `docs/COLLABORATIVE-DESIGN-PRINCIPLE.md` for full protocol and examples.
 
 @.claude/docs/coding-standards.md
 
+## Design System
+
+Always read `DESIGN.md` before making any visual or UI decisions.
+All font choices, colors, spacing, border radii, motion easing, and component
+vocabulary are defined there.
+
+Do not deviate without explicit user approval. When the design system and the
+art bible (`design/art/art-bible.md`) disagree, the art bible wins on visual
+direction; DESIGN.md wins on precise tokens (specific font names, hex values,
+spacing tokens). The two are designed to compose.
+
+When implementing UI code, the canonical theme cascade is `assets/ui/parchment_theme.tres`
+per ADR-0008; design tokens translate to Godot Theme overrides per DESIGN.md
+§"Godot Theme implementation".
+
 ## Context Management
 
 @.claude/docs/context-management.md
