@@ -691,6 +691,19 @@ func dispatch(formation: Array, floor_index: int, biome_id: String) -> void:
 	# stored cache, never re-resolve.
 	_combat_snapshot = _build_combat_snapshot(formation, floor_index, biome_id)
 	run_snapshot = _build_run_snapshot(formation, floor_index, biome_id, _combat_snapshot)
+	# Sprint 18 (post-S18-M4 playtest): compute losing_run from the combat
+	# snapshot's hp_bonus_factor via the resolver's `survived` predicate
+	# (TR-combat-008, ADR-0002). Was always-false since S7-M13 because
+	# hp_bonus_factor was hardcoded to 1.0; now that _build_combat_snapshot
+	# wires the real formula, losing_run becomes a meaningful gameplay state.
+	# Per dungeon-run-orchestrator.md §B4 + §C R5: losing_run is set EXPLICITLY
+	# (not re-derived from hp_bonus_factor on save/load) — the assignment here
+	# is the authoritative write site.
+	if _combat_resolver != null and _combat_resolver.has_method("survived"):
+		var survived_run: bool = bool(
+			_combat_resolver.call("survived", _combat_snapshot.hp_bonus_factor)
+		)
+		run_snapshot.losing_run = not survived_run
 	# Sprint 8 S8-S3 (Story 006): capture dispatch context so the
 	# floor_cleared_first_time signal can carry biome_id + floor_index when
 	# the floor-clear marker fires later in the run.
@@ -1623,8 +1636,13 @@ func _build_combat_snapshot(formation: Array, floor_index: int, biome_id: String
 		snap.formation_dps_per_tick = float(_combat_resolver.call("formation_dps_per_tick", formation))
 	else:
 		snap.formation_dps_per_tick = 1.0
-	# hp_bonus_factor — placeholder 1.0 until Story 004 wires real floor data.
-	snap.hp_bonus_factor = 1.0
+	# hp_bonus_factor — computed below from formation_total_hp + floor_total_enemy_attack
+	# AFTER enemy_list resolution (so we can sum base_attack across enemies).
+	# Sprint 18 (post-S18-M4 playtest signal): wired the real LOSING-run computation
+	# per ADR-0002 + the explicit-bool semantics in dungeon-run-orchestrator.md §B4.
+	# Was hardcoded to 1.0 since the S7-M13 MVP harness; now reads through the
+	# combat resolver's existing hp_bonus_factor formula (TR-combat-008).
+	snap.hp_bonus_factor = 1.0  # provisional; overwritten below after enemy_list materializes
 	# enemy_list — fetched from Floor data via DataRegistry. Floor lookup is
 	# composite-keyed: biome_id + floor_index. The biome-dungeon-database
 	# epic Story 003 (Forest Reach MVP content) provides the data; for the
@@ -1669,6 +1687,21 @@ func _build_combat_snapshot(formation: Array, floor_index: int, biome_id: String
 	# loops_per_run: 1 for MVP (single rotation through enemy_list = floor clear).
 	# Story 004 will compute this from floor difficulty + formation throughput.
 	snap.loops_per_run = 1
+	# Sprint 18 (post-S18-M4 playtest): compute the real hp_bonus_factor via
+	# the combat resolver's existing TR-combat-008 formula. Replaces the
+	# S7-M13 placeholder 1.0. Drives the losing_run determination at dispatch.
+	# Fail-safe: if the resolver lacks either method (test spies), stays at
+	# the provisional 1.0 = always-survives, matching prior behavior.
+	if (
+		_combat_resolver != null
+		and _combat_resolver.has_method("formation_total_hp")
+		and _combat_resolver.has_method("hp_bonus_factor")
+	):
+		var formation_hp: int = int(_combat_resolver.call("formation_total_hp", formation))
+		var floor_enemy_attack: int = _floor_total_enemy_attack(snap.enemy_list)
+		snap.hp_bonus_factor = float(
+			_combat_resolver.call("hp_bonus_factor", formation_hp, floor_enemy_attack)
+		)
 	return snap
 
 
