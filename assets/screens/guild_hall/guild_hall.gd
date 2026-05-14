@@ -18,6 +18,14 @@ extends Screen
 @onready var _recruit_nav_button: Button = $RecruitNavButton
 @onready var _roster_list: VBoxContainer = $RosterPanel/RosterScroll/RosterList
 @onready var _settings_gear_button: Button = $SettingsGearButton
+# Sprint 19 S19-M3 — HD-2D pipeline background layer (GDD #26 + ADR-0019).
+# Set to the tavern preset on on_enter so the warm-amber backdrop renders
+# under the UI + tilt-shift + warm-lantern composition.
+# Typed as ColorRect (BiomeBackground's base class) because the `class_name
+# BiomeBackground` global registration is not guaranteed at script-parse time
+# in Godot 4.6 — the script registry can be cold-loaded after this file's
+# parse. Method calls (set_biome) dispatch dynamically and resolve correctly.
+@onready var _biome_background: ColorRect = $BiomeBackground
 
 const HeroDetailModalScene: PackedScene = preload(
 	"res://assets/screens/hero_detail/hero_detail_modal.tscn"
@@ -34,6 +42,12 @@ func on_enter() -> void:
 	if _dispatch_nav_button == null:
 		push_error("[GuildHall] _dispatch_nav_button is NULL — @onready did not resolve. Check .tscn node name 'DispatchNavButton'.")
 		return
+
+	# Sprint 19 S19-M3 — Guild Hall renders the tavern preset (warm amber wood
+	# baseline). Per GDD #26 §C.2 BiomeBackground node contract; ADR-0019
+	# §Decision 3 programmatic-placeholder strategy.
+	if _biome_background != null:
+		_biome_background.set_biome("guild_hall_tavern")
 	if not _dispatch_nav_button.pressed.is_connected(_on_dispatch_nav_pressed):
 		_dispatch_nav_button.pressed.connect(_on_dispatch_nav_pressed)
 

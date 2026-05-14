@@ -1,8 +1,9 @@
-[gd_scene load_steps=6 format=3 uid="uid://screen_guild_hall"]
+[gd_scene load_steps=7 format=3 uid="uid://screen_guild_hall"]
 
 [ext_resource type="Script" path="res://assets/screens/guild_hall/guild_hall.gd" id="1_guild_hall"]
 [ext_resource type="Shader" path="res://assets/shaders/warm_lantern_overlay.gdshader" id="2_warm_lantern"]
 [ext_resource type="Shader" path="res://assets/shaders/tilt_shift_dof.gdshader" id="3_tilt_shift"]
+[ext_resource type="PackedScene" path="res://assets/screens/_shared/biome_background.tscn" id="4_biome_background"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_warm_lantern"]
 shader = ExtResource("2_warm_lantern")
@@ -19,6 +20,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_guild_hall")
+
+[node name="BiomeBackground" parent="." instance=ExtResource("4_biome_background")]
 
 [node name="GoldCounter" type="Label" parent="."]
 layout_mode = 1
