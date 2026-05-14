@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.39] - 2026-05-14
+
+### Added
+- **LOSING-run state is now real.** Dispatching a formation that's too weak to survive a floor's threat now produces a LOSING run — half gold per kill via `LOSING_RUN_LOOT_FACTOR = 0.5`, and the floor still counts as first-cleared per Pillar 1 ("losing returns partial loot"). Previously, the LOSING-run scaffolding existed (`run_snapshot.losing_run` field, `LOSING_RUN_LOOT_FACTOR` constant, `attribute_kill_gold` parameter) but was unwired — `hp_bonus_factor` was hardcoded to `1.0` since the S7-M13 MVP harness, meaning every dispatch was implicitly a WIN. The S18-M4 playtest surfaced the question "do we have failed dispatch if defeated?" which led to discovering the gap.
+- **Cozy register preserved**: per FloorUnlock §C.1 R5, the Victory Moment fanfare is identical for WIN and LOSING runs — the player feels the difference through the gold rate, not through a punishing UX. The LOSING first-clear bonus remains reclaimable on a subsequent WIN per ADR-0002.
+
+### Internal
+- **Wired the real LOSING-run computation through the existing combat infrastructure.** `DungeonRunOrchestrator._build_combat_snapshot()` now reads `formation_total_hp` from the combat resolver, sums `base_attack` across the floor's `enemy_list` via the new `_floor_total_enemy_attack()` helper, and computes `hp_bonus_factor` via the resolver's existing TR-combat-008 formula. `DungeonRunOrchestrator.dispatch()` then sets `run_snapshot.losing_run = not _combat_resolver.survived(hp_bonus_factor)` at dispatch time (immutable for the run per ADR-0001 + §B4 explicit-bool serialization semantics). The combat resolver had `formation_total_hp`, `hp_bonus_factor`, and `survived` already implemented since Sprint 7; this PR just wires them through. New regression test `tests/unit/dungeon_run_orchestrator/losing_run_wiring_test.gd` (5 tests) pins the wiring across the weak/strong/boundary cases + the backward-compat resolver-lacks-survived path. Full test suite 2197/2197 effective pass (1 pre-existing matchup_resolver_perf flake, unrelated).
+
 ## [0.0.0.38] - 2026-05-14
 
 ### Added
