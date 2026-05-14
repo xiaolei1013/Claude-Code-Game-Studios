@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.44] - 2026-05-14
+
+### Added
+- **Lora + IM Fell English fonts (Sprint 20 S20-M2)** — both font families sourced from Google Fonts (SIL Open Font License) and committed to `res://assets/fonts/`. Lora ships as a variable font (weight axis 100-900) + Lora-Italic variable; IM Fell English ships as static Regular + Italic. Per DESIGN.md typography decisions: Lora is the information font (body copy, stats, labels at ≥16px); IM Fell English is the identity/display font (screen titles, biome names, ≥24px). Both OFL licenses copied alongside the TTFs.
+
+### Changed
+- **Parchment theme wired to real fonts**: `assets/ui/parchment_theme.tres` replaces the Sprint 10 S10-M1 interim SystemFont fallback chains (Iowan Old Style → Palatino → Georgia for body; Trajan Pro → Cinzel → Cardo for display) with `FontVariation` sub_resources pointing at the new TTF ext_resources. The theme's `info_font` and `identity_font` SubResource ids are preserved — no theme variation or screen needs a change. Default body weight set to 400 (Regular) via `variation_opentype = {"wght": 400}` on the Lora-backed FontVariation. Theme variations can override weight by wrapping additional FontVariation sub_resources (template shown inline in the .tres header comment).
+- **ADR-0008 two-font-max rule satisfied** at the asset layer for the first time. The font strategy interim flagged in the S10-M1 theme header ("These TTFs are not yet sourced") is now closed.
+
+### Internal
+- 4 TTF files committed (~800KB total): `Lora.ttf` (variable wght), `Lora-Italic.ttf` (variable wght), `IMFellEnglish-Regular.ttf`, `IMFellEnglish-Italic.ttf`. Plus Godot auto-generated `.ttf.import` sidecars and `OFL.txt` license per family.
+- Smoke test: Godot headless boot loads parchment theme without errors; full suite (834 cases) reports 0 errors / 0 failures with the new fonts in place. No regressions.
+
 ## [0.0.0.43] - 2026-05-14
 
 ### Changed
