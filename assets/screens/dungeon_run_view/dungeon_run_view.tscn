@@ -1,6 +1,11 @@
-[gd_scene load_steps=2 format=3 uid="uid://screen_dungeon_run_view"]
+[gd_scene load_steps=4 format=3 uid="uid://screen_dungeon_run_view"]
 
 [ext_resource type="Script" path="res://assets/screens/dungeon_run_view/dungeon_run_view.gd" id="1_dungeon_run_view"]
+[ext_resource type="Shader" path="res://assets/shaders/tilt_shift_dof.gdshader" id="2_tilt_shift"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_tilt_shift"]
+shader = ExtResource("2_tilt_shift")
+shader_parameter/enabled = 0.0
 
 ; DungeonRunView — full-rect anchored Control (extends Screen) per ADR-0007.
 ;
@@ -116,3 +121,18 @@ layout_mode = 2
 mouse_filter = 1
 horizontal_alignment = 1
 text = ""
+
+[node name="BackBufferCopy" type="BackBufferCopy" parent="."]
+copy_mode = 2
+
+[node name="TiltShiftDof" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_tilt_shift")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+z_index = 0
+color = Color(1, 1, 1, 1)
