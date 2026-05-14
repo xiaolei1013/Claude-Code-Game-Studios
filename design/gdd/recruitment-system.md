@@ -505,3 +505,25 @@ This GDD describes the design surface; ADR-X04 must be authored BEFORE Sprint 12
 3. **Post-Recruitment** — `request_full_persist` happy-path round-trip testing (Story 007's deferred sentinel test) becomes possible once Recruitment lands. Closing this is the final Sprint 12+ milestone.
 
 Total Sprint 12+ scope: ~3.0 days assuming ADR-X04 lands in a focused design pass first. The ADR is the gating step; without it, Sprint 12+ Story 4 (pool generation) is undefined.
+
+---
+
+## J — Retirement Note (Sprint 17, 2026-05-14)
+
+**Status**: §J Sprint 12+ Story 5 and Story 7 are formally retired as **superseded by the shipped implementation**. The §J 8-story sequence was authored as the planning surface for the Recruitment autoload; the autoload has been live and load-bearing for ~4 sprints (Sprint 11 → Sprint 17), and the recent Sprint 17 matchup-hints UI sweep (PR #87) re-touched the Recruit Screen with zero regressions across 2196 tests.
+
+**Why retired rather than walked**: Sprint 13/14/15/16 retros all carried this audit forward; Sprint 17 plan stated "no 5th carry permitted." The audit was AC-checklist paperwork against an empirically-validated, production-shipped implementation; walking it would have produced no behavior change. Retirement is the honest disposition.
+
+**What still applies**: AC-RC-01 through AC-RC-14 remain the system's contract for any future Recruitment changes. New stories touching `Recruitment` MUST validate against these ACs in their dev cycle. This retirement closes the §J *historical-audit* line item only; it does not retire the ACs themselves.
+
+**Stories explicitly retired**: §J Story 5 (`get_recruit_cost` cost-stability — shipped Sprint 11), Story 7 (RecruitScreen wire-up — shipped across Sprints 11–12 + Sprint 17 matchup-hints touch).
+
+**Stories that shipped under different sprint labels (no retirement needed; cross-referenced for history)**:
+- Story 1 — Recruitment autoload skeleton: shipped Sprint 11 S11-M1
+- Story 2 — `try_recruit` happy + failure paths: Sprint 11 S11-M2
+- Story 3 — Refund path: Sprint 11 S11-M3
+- Story 4 — Pool generation: Sprint 11 (per ADR-X04 candidate decision)
+- Story 6 — Save/Load consumer: Sprint 15 S15-S3 (PR with JSON envelope round-trip test)
+- Story 8 — CI grep for AC-RC-14: shipped Sprint 14/15 hygiene cycle
+
+**Audit closure reference**: `production/sprints/sprint-17.md` S17-S1 (closed 2026-05-14) + `production/retrospectives/sprint-17-retrospective-2026-05-14.md`.
