@@ -2,6 +2,8 @@
 
 ## Status
 
+**Superseded by ADR-0019 on 2026-05-14.** Sprint 19 activated the HD-2D pipeline per §Pivot Triggers #1 (Sprint capacity surplus + dev-machine profiling baseline — warm-lantern shipped Sprint 15 N2 at <1ms; tilt-shift shipped Sprint 18 N1 at <4ms). ADR-0019 records the activation decision + layer-order contract + BiomeBackground node contract. Historical record preserved below.
+
 **Accepted 2026-05-07** — user explicitly authorized creative-direction decisions on the autonomous session ("you can help to decide for me"). Defensible-default path chosen: defer HD-2D shader pass to Vertical Slice tier per the existing `game-concept.md` §Risks fallback. The decision can be revisited via the documented pivot triggers (§Pivot Triggers); this is a one-way door only in the sense that successor ADR authoring is required to revert.
 
 ## Date
