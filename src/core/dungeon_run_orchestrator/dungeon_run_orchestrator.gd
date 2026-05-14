@@ -261,6 +261,22 @@ var _dispatched_floor_index: int = 0
 var _dispatched_biome_id: String = ""
 
 
+## Returns the biome_id captured at dispatch() entry, or empty string if no
+## run is currently dispatched. Sprint 19 S19-M3: DungeonRunView reads this
+## in [code]on_enter[/code] to drive the BiomeBackground palette. The
+## underlying [code]_dispatched_biome_id[/code] stays private (write-once at
+## dispatch + reset on RUN_ENDED); this getter is the read-only public surface.
+##
+## Usage:
+## [codeblock]
+##   var biome: String = DungeonRunOrchestrator.get_dispatched_biome_id()
+##   if not biome.is_empty():
+##       biome_background.set_biome(biome)
+## [/codeblock]
+func get_dispatched_biome_id() -> String:
+	return _dispatched_biome_id
+
+
 # ---------------------------------------------------------------------------
 # Offline replay infrastructure — Sprint 11 S11-X7 / OfflineProgressionEngine
 # GDD §F + OQ-OE-6 lockstep. Mirrors the Economy shape from S11-X6 / ADR-0013

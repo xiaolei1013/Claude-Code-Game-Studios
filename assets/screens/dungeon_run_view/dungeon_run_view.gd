@@ -103,6 +103,17 @@ const LEVEL_UP_TOAST_FADE_START_SEC: float = 2.4
 ## Label inside the overlay that receives the final kill_count summary text.
 @onready var _run_end_label: Label = $RunEndOverlay/RunEndLabel
 
+## Sprint 19 S19-M3 — HD-2D pipeline biome background layer (GDD #26 + ADR-0019).
+## Set to the active run's biome on on_enter so the diorama register reflects
+## where the player is dispatched. Falls back to forest_reach if no run is
+## currently dispatched (idle DRV — possible via dev navigation).
+##
+## Typed as ColorRect (BiomeBackground's base class) because the `class_name
+## BiomeBackground` global registration is not guaranteed at script-parse time
+## in Godot 4.6 — the registry can be cold-loaded after this file's parse.
+## Method calls (set_biome) dispatch dynamically and resolve correctly.
+@onready var _biome_background: ColorRect = $BiomeBackground
+
 # ---------------------------------------------------------------------------
 # Private state
 # ---------------------------------------------------------------------------
@@ -162,6 +173,13 @@ func on_enter() -> void:
 	_overlay_shown = false
 	_routed = false
 	_run_end_overlay.visible = false
+
+	# Sprint 19 S19-M3 — set the biome background to match the active dispatch.
+	# DungeonRunOrchestrator.get_dispatched_biome_id() returns "" when no run
+	# is active (e.g. dev navigation into DRV); BiomeBackground.set_biome("")
+	# falls back to forest_reach per its own contract (GDD #26 §E + AC-26-12).
+	if _biome_background != null:
+		_biome_background.set_biome(DungeonRunOrchestrator.get_dispatched_biome_id())
 
 	# Subscribe to tick_fired — 20 Hz hot path.
 	# Idempotent via is_connected guard (defensive; SceneManager guarantees

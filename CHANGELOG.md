@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.42] - 2026-05-14
+
+### Added
+- **Biome background system (Sprint 19 S19-M3)** — the missing z=-1 background layer for the HD-2D pipeline. New `assets/screens/_shared/biome_background.tscn` + `biome_background.gd`: a palette-keyed full-rect ColorRect that ships 7 presets (`forest_reach`, `whispering_crags`, `sunken_ruins`, `hollow_stair`, `ember_wastes`, `frostmire`, `guild_hall_tavern`). Programmatic placeholders per ADR-0019 §Decision 3; real product art swaps in zero-code by replacing the ColorRect with a Sprite2D + Texture (preserves the `set_biome` / `get_biome` / `biome_changed` API surface). Mouse-filter IGNORE, full-rect anchors, z_index=-1 per GDD #26 §C.2 contract. Wired into Guild Hall (renders `guild_hall_tavern` preset on `on_enter`) and DungeonRunView (calls `DungeonRunOrchestrator.get_dispatched_biome_id()` on `on_enter`; falls back to `forest_reach` when idle).
+
+### Internal
+- New `DungeonRunOrchestrator.get_dispatched_biome_id() -> String` public getter — the read-only public surface for the BiomeBackground wiring. Returns `_dispatched_biome_id` (which is captured at `dispatch()` entry and reset on RUN_ENDED). Additive change; no existing test broken.
+- 21 contract tests `tests/unit/biome_background/biome_background_test.gd` covering: scene loads + node contract (z_index, mouse_filter, anchors), all 7 palette keys produce distinct colors, fallback to forest_reach on unknown / empty biome_id, get_biome semantics, biome_changed signal emission rules (fires once on transition, idempotent on same-biome re-set), Guild Hall + DungeonRunView scene integration, orchestrator getter exposure.
+- **Godot 4.6 class_name quirk caught**: `class_name BiomeBackground` global registration is not guaranteed at script-parse time when other scripts (`guild_hall.gd`, `dungeon_run_view.gd`) reference it. Workaround: type `@onready` vars as the base class (`ColorRect`) rather than the class_name global; method calls (`set_biome`) dispatch dynamically and resolve correctly. Documented inline in both screens.
+- **GDScript lambda capture quirk caught**: primitive-typed local variables (`var emit_count: int`) are captured by value in lambdas, so `emit_count += 1` inside a lambda modifies a copy rather than the outer variable. Workaround: wrap counters in Array (captured by reference). Pattern documented in the affected test.
+
 ## [0.0.0.41] - 2026-05-14
 
 ### Added
