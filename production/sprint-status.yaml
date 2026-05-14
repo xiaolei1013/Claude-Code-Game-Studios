@@ -54,21 +54,21 @@ stories:
     name: "Class Synergy GDD #32 design-review → APPROVED"
     file: "design/gdd/class-synergy-system.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "user + claude-code"
     estimate_days: 0.25
     blocker: ""
-    completed: ""
+    completed: "2026-05-14 — GDD #32 design-review completed; re-review surfaced 3-rogue asymmetric class treatment gap → Triple Strike synergy added structurally parallel to Steel Wall. APPROVED 2026-05-10 + revisions 2026-05-14 via PR #97."
 
   - id: "S18-M2"
     name: "Class Synergy V1.0 backend — detect_active_synergy() + orchestrator wiring + ADR-0018"
     file: "src/core/class_synergy_system/class_synergy_system.gd"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 1.0
     blocker: "S18-M1"
-    completed: ""
+    completed: "2026-05-14 — PR #98. 4 synergies live: Steel Wall (3W vs bruiser ×1.25 gold), Arcane Elite (3M ×1.20 XP), Triple Strike (3R vs armored ×1.25 gold), Triple Threat (1+1+1 ×1.15 gold). ADR-0018 locks 4-factor multiplicative composition: BASE_KILL × matchup × loot_factor × synergy → single floori. Per-synergy caps at resolver layer; snapshot immutability per AC-CS-13."
 
   - id: "S18-M3"
     name: "Class Synergy live preview in Formation Assignment screen"
@@ -82,23 +82,23 @@ stories:
 
   - id: "S18-M4"
     name: "Sprint 18 playtest — class synergy validation"
-    file: "production/playtests/playtest-10-class-synergy-validation-2026-05-??.md"
+    file: "production/playtests/playtest-10-class-synergy-validation-2026-05-14.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei (human)"
     estimate_days: 0.5
     blocker: "S18-M3"
-    completed: ""
+    completed: "2026-05-14 — multi-round playtest. Round 1 surfaced LOSING-run question (hp_bonus_factor hardcoded to 1.0 since S7-M13) → PR #100. Round 2 surfaced 'no defeat status, can't progress' (Floor.enemy_list never materialized; combat silently degenerate since Sprint 16) → PR #101. Round 3 (post-N1 visual landing) surfaced tilt-shift UI ghost-smear → PR #102's disable-by-default fix. Three critical bugs caught by playtest that 2386-test suite missed."
 
   - id: "S18-M5"
     name: "Sprint 18 retrospective"
-    file: "production/retrospectives/sprint-18-retrospective-2026-05-??.md"
+    file: "production/retrospectives/sprint-18-retrospective-2026-05-14.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "producer + claude-code"
     estimate_days: 0.25
-    blocker: "S18-M4"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-14 — sprint-18-retrospective-2026-05-14.md authored. Sprint 18 closes 7/7 Must Have + 2/2 Should Have + 1/1 Nice to Have, all done, no deferred items. Sprint goal MET. 5 action items for Sprint 19: scaffolded-but-unwired audit (highest priority), Sprint 19 theme decision, /review on rebased branches, accept visual-correctness gap as manual gate, tilt-shift activation timing."
 
   # ===== Should Have =====
 
