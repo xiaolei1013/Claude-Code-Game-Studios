@@ -266,6 +266,7 @@ func get_target() -> Dictionary:
 ## unknown synergy_ids per AC-CS-18 forward-compat.
 const SYNERGY_STEEL_WALL: String = "steel_wall"
 const SYNERGY_ARCANE_ELITE: String = "arcane_elite"
+const SYNERGY_TRIPLE_STRIKE: String = "triple_strike"
 const SYNERGY_TRIPLE_THREAT: String = "triple_threat"
 
 
@@ -367,6 +368,13 @@ func detect_active_synergy(formation_snapshot: Dictionary) -> String:
 	var sorted_mage: Array[String] = ["mage", "mage", "mage"]
 	if class_ids == sorted_mage:
 		return SYNERGY_ARCANE_ELITE
+	# Triple Strike: 3 Rogues. Added in the 2026-05-14 GDD re-review to close
+	# the 3-Rogue asymmetric-class-treatment gap; structurally parallel to
+	# Steel Wall (×1.25 gold, conditional on archetype counter — armored for
+	# Rogue per assets/data/classes/rogue.tres counter_archetype).
+	var sorted_rogue: Array[String] = ["rogue", "rogue", "rogue"]
+	if class_ids == sorted_rogue:
+		return SYNERGY_TRIPLE_STRIKE
 	# Triple Threat: 1 Warrior + 1 Mage + 1 Rogue. Sorted alphabetically:
 	# ["mage", "rogue", "warrior"].
 	var sorted_mix: Array[String] = ["mage", "rogue", "warrior"]

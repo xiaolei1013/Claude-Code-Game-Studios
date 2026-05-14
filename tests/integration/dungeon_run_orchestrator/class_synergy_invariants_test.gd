@@ -162,7 +162,11 @@ func test_three_warrior_gold_output_within_balance_window() -> void:
 	var compositions: Array = [
 		{"composition": ["warrior", "warrior", "warrior"], "synergy_id": "steel_wall"},
 		{"composition": ["mage", "mage", "mage"], "synergy_id": "arcane_elite"},
-		{"composition": ["rogue", "rogue", "rogue"], "synergy_id": ""},
+		# Triple Strike (3R): detection returns "triple_strike", but the
+		# conditional gold multiplier applies vs armored only — with
+		# ARCHETYPE=bruiser here the resolver collapses to 1.0, so gold
+		# output equals the no-synergy baseline for this test scenario.
+		{"composition": ["rogue", "rogue", "rogue"], "synergy_id": "triple_strike"},
 		{"composition": ["warrior", "warrior", "mage"], "synergy_id": ""},
 		{"composition": ["warrior", "warrior", "rogue"], "synergy_id": ""},
 		{"composition": ["warrior", "mage", "mage"], "synergy_id": ""},

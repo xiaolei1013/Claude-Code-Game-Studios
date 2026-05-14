@@ -134,6 +134,8 @@ var floor_was_valid: bool = true
 ##   - [code]""[/code] (no synergy)
 ##   - [code]"steel_wall"[/code] (3 Warriors; ×1.25 kill gold vs bruisers)
 ##   - [code]"arcane_elite"[/code] (3 Mages; ×1.20 kill XP unconditional)
+##   - [code]"triple_strike"[/code] (3 Rogues; ×1.25 kill gold vs armored) —
+##     added 2026-05-14 to close the 3-Rogue asymmetric-class-treatment gap
 ##   - [code]"triple_threat"[/code] (1W+1M+1R; ×1.15 kill gold unconditional)
 ##
 ## V1.5+ forward-compat: unknown synergy_id strings on load fall through

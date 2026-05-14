@@ -66,6 +66,63 @@ func test_attribute_kill_gold_steel_wall_higher_tier_bigger_bonus() -> void:
 
 
 # ===========================================================================
+# Group A2 — Triple Strike conditional gold (AC-CS-22 + AC-CS-23)
+#   Added 2026-05-14 to close the 3-Rogue asymmetric-class-treatment gap.
+#   Structurally parallel to Group A (Steel Wall vs bruiser): Triple Strike
+#   applies ×1.25 vs armored kills, baseline vs non-armored.
+# ===========================================================================
+
+func test_attribute_kill_gold_triple_strike_against_armored_applies_1_25() -> void:
+	# AC-CS-22: synergy_id = "triple_strike", archetype = "armored"
+	#   → ×1.25 multiplier on top of baseline (parallel to Steel Wall AC-CS-06).
+	# Tier-1 advantaged winning: BASE_KILL[1]=5 × 1.5 × 1.0 × 1.25 = 9.375 → 9
+	var orch: Node = _make_orch()
+
+	var without_synergy: int = orch.attribute_kill_gold(1, true, false)
+	var with_synergy: int = orch.attribute_kill_gold(1, true, false, "triple_strike", "armored")
+
+	assert_int(without_synergy).is_equal(7)  # floori(5 * 1.5 * 1.0) = 7
+	assert_int(with_synergy).is_equal(9)  # floori(5 * 1.5 * 1.0 * 1.25) = 9
+
+
+func test_attribute_kill_gold_triple_strike_against_skirmisher_no_multiplier() -> void:
+	# AC-CS-23: synergy_id = "triple_strike", archetype != "armored"
+	#   → multiplier collapses to 1.0; gold equals the no-synergy baseline.
+	#   (Parallel to Steel Wall AC-CS-07 against skirmisher.)
+	var orch: Node = _make_orch()
+
+	var without_synergy: int = orch.attribute_kill_gold(3, true, false)
+	var with_synergy: int = orch.attribute_kill_gold(3, true, false, "triple_strike", "skirmisher")
+
+	assert_int(with_synergy).is_equal(without_synergy)
+
+
+func test_attribute_kill_gold_triple_strike_against_bruiser_no_multiplier() -> void:
+	# AC-CS-23 boundary: Triple Strike (Rogue) does NOT apply to bruiser
+	#   archetype kills (Bruiser is Warrior's counter, not Rogue's).
+	#   Confirms the conditional path stays archetype-specific.
+	var orch: Node = _make_orch()
+
+	var without_synergy: int = orch.attribute_kill_gold(3, true, false)
+	var with_synergy: int = orch.attribute_kill_gold(3, true, false, "triple_strike", "bruiser")
+
+	assert_int(with_synergy).is_equal(without_synergy)
+
+
+func test_attribute_kill_gold_triple_strike_equals_steel_wall_at_matching_archetype() -> void:
+	# Symmetry check: Triple Strike (3R vs armored) and Steel Wall (3W vs
+	# bruiser) should produce IDENTICAL gold output for the same tier +
+	# matchup + losing flag, since both use ×1.25. Pins the symmetric design
+	# intent (TRIPLE_STRIKE_GOLD_MULT and STEEL_WALL_GOLD_MULT default 1.25).
+	var orch: Node = _make_orch()
+
+	var steel_wall_gold: int = orch.attribute_kill_gold(3, true, false, "steel_wall", "bruiser")
+	var triple_strike_gold: int = orch.attribute_kill_gold(3, true, false, "triple_strike", "armored")
+
+	assert_int(triple_strike_gold).is_equal(steel_wall_gold)
+
+
+# ===========================================================================
 # Group B — Triple Threat unconditional gold (AC-CS-08)
 # ===========================================================================
 
