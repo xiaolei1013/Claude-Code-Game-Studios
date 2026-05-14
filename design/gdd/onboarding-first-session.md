@@ -290,3 +290,17 @@ Total Sprint 14 scope: ~1.0d. Smaller than the typical first-pass GDD because mo
 - All ACs are testable via the patterns in `tests/PATTERNS.md`.
 - This GDD has NOT yet had a `/design-review` pass. Run before declaring APPROVED. Expect review to surface ~3–5 BLOCKING items (lower than first-pass GDDs because the implementation surface is mostly done; the GDD is reverse-documentation + integration spec).
 - Closes the design-coverage gap that's existed since project inception (systems-index row 29 has been "Not Started").
+
+---
+
+## J — Retirement Note for Onboarding UX Polish Carry (Sprint 18, 2026-05-14)
+
+**Status**: The "onboarding UX polish" carryover story is formally **RETIRED** as deferred-indefinitely. The 5-minute first-session flow specified in this GDD §A–§H is shipped and working; the carry chain (Sprint 15 S15-N3 → Sprint 16 S16-N4 → Sprint 17 S17-N2 → Sprint 18 S18-S1) was for *additional polish* on top of the working flow.
+
+**Why retired rather than pulled in**: across 4 sprints of carry, **zero playtest sessions produced a signal demanding onboarding polish**. The Sprint 17 S17-M6 progression-chain playtest validated the live game end-to-end and verdicted "works great" — onboarding included. The Sprint 16 retro identified content + mechanic variety as the load-bearing player ask, not polish on an already-working onboarding surface.
+
+**What still applies**: every AC in §H of this GDD (AC-29-01 through AC-29-14) remains the system's contract for any future onboarding changes. The retirement closes the *historical polish carry* line item only; it does not retire the ACs themselves.
+
+**Pull trigger** (V1.5+): if a future playtest, beta cohort, or onboarding-completion telemetry surfaces a measurable first-session drop-off or a player complaint about the 5-minute flow, re-open this story with the specific signal as the design brief. Until then, the existing flow is "good enough by the playtest-driven closure rule."
+
+**Audit closure reference**: `production/sprints/sprint-18.md` S18-S1 (closed 2026-05-14) + `production/retrospectives/sprint-17-retrospective-2026-05-14.md` action item #3 final disposition.

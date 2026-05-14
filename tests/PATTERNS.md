@@ -525,6 +525,68 @@ The visible symptom — overlapping text — looks like a font / theme bug or a 
 
 ---
 
+## 15. ADR-amendment test-coverage audit
+
+When an ADR is amended to widen its scope (e.g., single-biome → multi-biome, single-tier → multi-tier, single-archetype → multi-archetype), the **associated test suite must be re-audited against the new scope before the change ships**. Tests authored under the old scope can pass 100% green while a load-bearing-for-the-player feature is silently broken under the new scope.
+
+### Canonical example (Sprint 17 PR #90, ADR-0002 Amendment 1)
+
+Sprint 16 shipped 5 new biomes (Whispering Crags, Sunken Ruins, Frostmire, Ember Wastes, Hollow Stair) on top of the original Forest Reach. Each biome had its own F1–F5. The Economy autoload's `_floor_clear_bonus_credited: Dictionary[int, int]` ledger was designed under ADR-0002's original single-biome assumption — keyed by `floor_index` alone (range 1..5). The Sprint 16 content drop never triggered an ADR-0002 amendment, so the test suite stayed correct *for the old scope*.
+
+Result: clearing any biome's F5 first set `credited[5] = 2500`. Every subsequent F5 in another biome saw `bonus <= already` and returned `false`. Orchestrator's `awarded` flag stayed false. `floor_cleared_first_time` signal was never emitted. `FloorUnlockSystem` never advanced past F1 for non-starter biomes. Half the game's content was silently bricked from the Sprint 16 biome-2-whispering-crags merge until the S17-M6 playtest caught it ~24 hours later.
+
+**The 2190 unit + integration tests in the suite at that time all passed.** Every test was internally correct against the single-biome invariant the test author assumed. The invariant itself had silently shifted. The S17-M6 human-eye playtest was the only signal that could surface the gap (per project memory `feedback_playtest_driven_closure`).
+
+PR #90 fixed the bug by widening the ledger key from `int` to `String` (`"<biome_id>_f<floor_index>"`), bumping `SAVE_SCHEMA_VERSION` 1 → 2 with v1 auto-migration, and shipping a 6-test regression suite at `tests/integration/economy/multi_biome_floor_clear_ledger_test.gd` that explicitly exercises the cross-biome invariant.
+
+### Detection heuristic
+
+When reviewing or authoring an ADR amendment, ask:
+
+1. **Does this amendment widen an invariant's scope?** (e.g., "single biome" → "any biome", "single floor index" → "(biome_id, floor_index) tuple")
+2. **What tests existed that pinned the OLD invariant?** Run `grep -rn "<old-predicate-shape>" tests/` to find them.
+3. **Do those tests, RUN UNDER THE NEW SCOPE, still protect the player from regression?** If the tests only exercise the old scope, they will silently pass green while the new scope's failure mode goes undetected.
+4. **What new tests does the widened scope require?** At minimum, one test that exercises the cross-axis interaction — e.g., "clear F_N in biome A; then clear F_N in biome B; both must register as first-clear."
+
+If steps 3 or 4 surface gaps, the ADR amendment cannot ship until the regression coverage lands alongside it.
+
+### Test-contract template
+
+For an amendment widening predicate `P(x)` to `P(x, y)`:
+
+```gdscript
+# Regression test pinning the cross-axis interaction the amendment introduces.
+# Without this test, the widened predicate looks correct against any single-axis
+# query but breaks silently when the second axis varies.
+func test_P_invariant_holds_across_y_axis() -> void:
+    # Arrange — two distinct y values
+    var y1 = <one value>
+    var y2 = <another distinct value>
+    var x_value = <a shared x value that triggers P>
+
+    # Act — exercise P twice, varying y
+    var result1 = P(x_value, y1)
+    var result2 = P(x_value, y2)
+
+    # Assert — both invocations honor the predicate; the y-axis namespaces correctly
+    assert_<result1 valid for y1, independent of y2>()
+    assert_<result2 valid for y2, independent of y1>()
+```
+
+The template is the minimum bar. Add boundary, save-migration, and forward-compat tests as the amendment's scope dictates.
+
+### Why this bug class is sneaky
+
+Tests are an artifact of the scope under which they were authored. A widening amendment can be technically correct on its own — the new code handles the new scope correctly — while the old test suite stays passive because it never queries the new axis. The failure mode is invisible to CI (all green), invisible to code review (the diff looks clean), and only emerges when a player or playtester actively exercises the new scope. Trigger an explicit audit at amendment-time and the gap surfaces in design, not in production.
+
+### Pattern origin
+
+Surfaced in Sprint 17 PR #90 (2026-05-13) when the multi-biome ledger collision was caught by the S17-M6 progression-chain playtest. The Sprint 17 retro action item #2 ("ADR-amendment test-coverage audit pattern") formalized this lesson; documented here per Sprint 18 S18-S2.
+
+**See also**: `feedback_playtest_driven_closure` project memory, `docs/architecture/ADR-0002-losing-first-clear-reclaimable-on-win.md` Amendment 1, `tests/integration/economy/multi_biome_floor_clear_ledger_test.gd` (the regression suite that retroactively closed ADR-0002's amendment coverage).
+
+---
+
 ## Cross-references
 
 - `tests/README.md` — infrastructure (how to run, where files live, naming, coverage)
