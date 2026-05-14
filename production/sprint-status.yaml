@@ -9,6 +9,34 @@
 #   done           ↔  Complete
 #   blocked        ↔  Blocked
 #
+# UPDATED 2026-05-14 via Sprint 19 closeout (S19-M5 + S19-M6 bundle):
+#   - Sprint 19 closed: 6/6 Must Haves DONE; 0/2 Should Haves (deferred — S1
+#     pulled forward to Sprint 20 setup; S2+N1 retired pending real-art).
+#     5 PRs total: #104 sprint plan, #105 GDD #26 first-pass, #106 ADR-0019,
+#     #107 BiomeBackground system, #108 tilt-shift activation. Sprint goal MET.
+#     Cumulative tests at S19 close: 4446 PASS (most-comprehensive local run yet).
+#     0 regressions. 1 new ADR (ADR-0019); 1 GDD status transition (#26 APPROVED).
+#   - Sprint 20 theme: UI/HUD design (user-surfaced during S19-M5 playtest).
+#     Scope TBD via Sprint 20 planning conversation.
+#   - Solo review mode — no PR-SPRINT producer gate.
+#   - Sprint 19 final state archived in comment block below.
+#
+# Sprint 19 final state (archived 2026-05-14):
+#   sprint_status: CLOSED — 6/6 Must Haves DONE; Sprint goal MET
+#   actual_close: 2026-05-14 (sixth consecutive same-day-compressed sprint)
+#   Must Have: 6/6 DONE — M1 GDD #26 first-pass PR#105; M2 ADR-0019 PR#106;
+#              M3 BiomeBackground PR#107; M4 tilt-shift activation PR#108;
+#              M5 playtest-11 light-touch PASS; M6 sprint-19 retro.
+#   Should Have: 0/2 DONE — S1 scaffolds audit twice-deferred (S20 setup);
+#                S2 per-biome tilt-shift presets RETIRED pending real-art.
+#   Nice to Have: 0/1 DONE — N1 gradient shader RETIRED pending real-art.
+#   ADR authored: ADR-0019 (HD-2D Pipeline Activation, successor to ADR-0017).
+#   GDD status: #26 HD-2D Rendering Pipeline STUB DRAFT → APPROVED.
+#   New tests: +23 (21 BiomeBackground + 2 UI-sharpness guard).
+#   Critical bug class structurally prevented: S18-N1 UI-ghost-smear via
+#     layer-order contract (BiomeBackground z=-1 → BackBufferCopy z=-1 →
+#     TiltShiftDof z=-1 → UI z=0 → WarmLanternOverlay z=1).
+#
 # UPDATED 2026-05-14 via /sprint-plan new (Sprint 19 Day-0):
 #   - Sprint 18 closed: all 7 Must Haves DONE; both Should Haves DONE; 1 Nice to Have DONE.
 #     7 PRs total: #96 sprint plan, #97 GDD revisions, #98 synergy backend + ADR-0018,
@@ -54,61 +82,61 @@ stories:
     name: "HD-2D GDD #26 first-pass authoring (expand stub to 8 sections)"
     file: "design/gdd/hd-2d-rendering-pipeline.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "game-designer + claude-code"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-05-14 — PR #105. GDD #26 expanded from 3-section STUB DRAFT to full 8-section APPROVED first-pass. §C.1 layer-order contract, §C.2 BiomeBackground node contract, §D formulas, §G tuning knobs (5 tilt-shift uniforms + 4 warm-lantern uniforms + 7 biome palette mapping), §H 15 acceptance criteria, all 7 OQs resolved inline. systems-index.md row 26 status flipped."
 
   - id: "S19-M2"
     name: "ADR-0019 — HD-2D pipeline activation (successor to ADR-0017)"
     file: "docs/architecture/ADR-0019-hd2d-pipeline-activation.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "claude-code"
     estimate_days: 0.25
     blocker: "S19-M1"
-    completed: ""
+    completed: "2026-05-14 — PR #106. 4 architectural decisions locked: layer-order contract, per-screen composition (not MainRoot SubViewport), programmatic-placeholder strategy, activation strategy. ADR-0017 status: Accepted → Superseded by ADR-0019."
 
   - id: "S19-M3"
     name: "Biome background system — BiomeBackground node + 6 palette-keyed presets + Guild Hall tavern preset"
-    file: "assets/screens/dungeon_run_view/dungeon_run_view.tscn"
+    file: "assets/screens/_shared/biome_background.tscn"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 1.0
     blocker: "S19-M1"
-    completed: ""
+    completed: "2026-05-14 — PR #107. BiomeBackground scene + script with set_biome / get_biome / biome_changed surface; 7 palette presets (6 biomes + guild_hall_tavern); fallback to forest_reach on unknown/empty. New DungeonRunOrchestrator.get_dispatched_biome_id() public getter. Wired into Guild Hall + DungeonRunView. 21 contract tests. Two Godot 4.6 quirks documented inline: class_name parse-time registration + GDScript lambda primitive capture."
 
   - id: "S19-M4"
     name: "Tilt-shift re-wiring + activation (scene restructure + enabled=1.0 + z-order fix)"
     file: "assets/shaders/tilt_shift_dof.gdshader"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "godot-shader-specialist"
     estimate_days: 0.5
     blocker: "S19-M3"
-    completed: ""
+    completed: "2026-05-14 — PR #108. ShaderMaterial_tilt_shift sub_resource enabled flipped 0.0 → 1.0 in both Guild Hall + DRV. Scene trees restructured: BackBufferCopy + TiltShiftDof moved to z=-1 (right after BiomeBackground, before UI). 2 new UI-sharpness guard tests (AC-26-08) pin TiltShiftDof.z_index < UI label z_index — makes the S18-N1 ghost-smear bug structurally impossible."
 
   - id: "S19-M5"
     name: "Sprint 19 playtest — HD-2D visual validation (5 checks)"
     file: "production/playtests/playtest-11-hd2d-visual-2026-05-14.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "xiaolei (human)"
     estimate_days: 0.5
     blocker: "S19-M4"
-    completed: ""
+    completed: "2026-05-14 — light-touch PASS sign-off ('the functionality is working'). Diorama register fires correctly; no UI ghost-smear; warm-lantern composes on top. Concurrent strategic pivot to UI/HUD design surfaced — Sprint 20 theme."
 
   - id: "S19-M6"
     name: "Sprint 19 retrospective"
     file: "production/retrospectives/sprint-19-retrospective-2026-05-14.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "producer + claude-code"
     estimate_days: 0.25
     blocker: "S19-M5"
-    completed: ""
+    completed: "2026-05-14 — sprint-19-retrospective-2026-05-14.md authored. Sprint 19 closes 6/6 Must Have done, 0/2 Should Have (deferred), 0/1 Nice to Have (deferred). Sprint goal MET. 5 action items for Sprint 20: UI/HUD design theme (HIGH); S19-S1 scaffolds audit pulled into Sprint 20 (HIGH, twice-deferred — non-negotiable now); S19-S2 + S19-N1 retired pending real-art trigger; visual-correctness playtest checklist template (process improvement)."
 
   # ===== Should Have =====
 
@@ -116,20 +144,20 @@ stories:
     name: "Scaffolded-but-unwired audit (Sprint 18 retro action #1 — highest priority)"
     file: "production/sprint-19-scaffolds-audit.md"
     priority: should-have
-    status: backlog
+    status: blocked
     owner: "claude-code"
     estimate_days: 0.25
-    blocker: ""
+    blocker: "Sprint 20 reprioritization — twice-deferred; pulled forward as Sprint 20 setup task before UI/HUD implementation begins"
     completed: ""
 
   - id: "S19-S2"
     name: "Per-biome tilt-shift parameter presets (6 ShaderMaterial resources, tuned per biome depth)"
     file: "assets/shaders/biome_tilt_shift_presets/"
     priority: should-have
-    status: backlog
+    status: blocked
     owner: "godot-shader-specialist"
     estimate_days: 0.5
-    blocker: "S19-M4"
+    blocker: "RETIRED pending real-biome-art trigger — tuning placeholders against placeholders has diminishing return. Pull in if M5-style playtest signals a tuning need against real content."
     completed: ""
 
   # ===== Nice to Have =====
@@ -138,8 +166,8 @@ stories:
     name: "BiomeBackground 3-stop gradient shader (sky/midground/ground palette uniforms)"
     file: "assets/shaders/biome_background.gdshader"
     priority: nice-to-have
-    status: backlog
+    status: blocked
     owner: "godot-shader-specialist"
     estimate_days: 0.5
-    blocker: "S19-M3"
+    blocker: "RETIRED pending real-biome-art trigger — same logic as S19-S2."
     completed: ""
