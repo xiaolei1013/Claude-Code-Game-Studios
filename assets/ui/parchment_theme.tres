@@ -17,13 +17,13 @@
 ;   Ember Rust      #A84C2F  Color(0.6588, 0.2980, 0.1843, 1)  danger
 ;   Slate Ink       #2C2838  Color(0.1725, 0.1569, 0.2196, 1)  typography / shadow / outline
 ;
-; FONT STRATEGY (interim — pending TTF sourcing):
-;   ADR-0008 specifies info_font.ttf + identity_font.ttf at assets/ui/fonts/.
-;   These TTFs are not yet sourced. Theme uses SystemFont with humanist-serif and
-;   display-serif OS fallback chains so the visual identity reads correctly without
-;   a network/license dependency. When custom fonts are sourced (S10 follow-up or
-;   Sprint 12 polish), swap the SystemFont sub-resources for FontFile loads pointing
-;   at the new TTFs — no Theme key changes required.
+; FONT STRATEGY (Sprint 20 S20-M2, 2026-05-14):
+;   info_font (body)        = Lora variable font (Google Fonts, SIL OFL)
+;   identity_font (display) = IM Fell English Regular (Google Fonts, SIL OFL)
+;   Both TTFs ship at res://assets/fonts/<family>/ with OFL.txt copies.
+;   Theme variations can override the weight axis on Lora via additional
+;   FontVariation sub_resources (see in-file example above the font block).
+;   Per DESIGN.md §Typography + ADR-0008 two-font-max rule.
 ;
 ; THEME VARIATIONS:
 ;   ParchmentPanel    (PanelContainer)  warmer document panel with thicker border
@@ -32,21 +32,32 @@
 ;                                       on Parchment Cream with Slate Ink outline.
 ;                                       Referenced by formation_assignment.gd:245.
 
-[gd_resource type="Theme" load_steps=10 format=3]
+[gd_resource type="Theme" load_steps=12 format=3]
+
+[ext_resource type="FontFile" path="res://assets/fonts/Lora/Lora.ttf" id="1_lora"]
+[ext_resource type="FontFile" path="res://assets/fonts/IM_Fell_English/IMFellEnglish-Regular.ttf" id="2_imfell"]
 
 ; --------------------------------------------------------------------------
-; Fonts (SystemFont fallback chains — see header note)
+; Fonts — Sprint 20 S20-M2 (2026-05-14): real TTF assets sourced + wired.
 ; --------------------------------------------------------------------------
+; Per DESIGN.md:
+;   info_font (body)     = Lora (variable, weight axis); set to 400 for default body
+;   identity_font (display) = IM Fell English Regular (static, single face)
+; The S10-M1 SystemFont fallback chain (Iowan Old Style → Palatino → Georgia)
+; is retired now that the TTFs ship in res://assets/fonts/. Both fonts are
+; SIL OFL licensed; LICENSE.txt copies live alongside each font family.
+;
+; To override weight in a theme variation, wrap with another FontVariation:
+;   [sub_resource type="FontVariation" id="info_font_semibold"]
+;   base_font = ExtResource("1_lora")
+;   variation_opentype = {"wght": 600}
 
-[sub_resource type="SystemFont" id="info_font"]
-font_names = PackedStringArray("Iowan Old Style", "Palatino", "Palatino Linotype", "Georgia", "Cambria", "serif")
-subpixel_positioning = 1
-font_weight = 400
+[sub_resource type="FontVariation" id="info_font"]
+base_font = ExtResource("1_lora")
+variation_opentype = {"wght": 400}
 
-[sub_resource type="SystemFont" id="identity_font"]
-font_names = PackedStringArray("Trajan Pro", "Cinzel", "Cardo", "EB Garamond", "Baskerville", "Hoefler Text", "serif")
-subpixel_positioning = 1
-font_weight = 600
+[sub_resource type="FontVariation" id="identity_font"]
+base_font = ExtResource("2_imfell")
 
 ; --------------------------------------------------------------------------
 ; Panel styleboxes
