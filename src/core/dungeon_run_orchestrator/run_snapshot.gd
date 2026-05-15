@@ -41,8 +41,23 @@ var floor_id: String = ""
 var matchup_cache: Dictionary = {}
 
 ## Ordered tick events scheduled at DISPATCHING. Entries are dicts with
-## per-event payload (tick, archetype, kill_count, etc.). Walked sequentially
-## as `current_tick` advances; never reordered or rewritten mid-run.
+## per-event payload (tick, archetype, kill_count, etc.).
+##
+## DEFERRED — Sprint 20 S20-M1 scaffolds audit (2026-05-15) confirmed
+## this field is NOT YET populated by production code. The combat
+## resolver maintains its own per-loop kill schedule internally via
+## [code]DefaultCombatResolver._kill_schedule_for_loop[/code]; the
+## orchestrator's [code]_process_kill_events[/code] handler reads
+## kill events from the resolver directly via signal, not from this
+## field. Save/load + tests work because they exercise the persistence
+## shape, not the production wiring.
+##
+## Reserved for future replay-viewer / debug-tools work. When that
+## work lands, the orchestrator's dispatch path should populate this
+## field at DISPATCHING with the predicted kill schedule, and downstream
+## consumers (replay viewer, debug HUD) can walk it. Until then, the
+## field stays an empty array; do not introduce code that depends on
+## it being populated.
 var kill_schedule: Array = []
 
 
@@ -60,7 +75,22 @@ var current_tick: int = 0
 var last_emitted_tick: int = 0
 
 ## Number of times the formation has rotated through the floor's enemies.
-## Advanced by Combat Resolver on loop completion. Never decremented.
+##
+## DEFERRED — Sprint 20 S20-M1 scaffolds audit (2026-05-15) confirmed
+## this field is NOT YET advanced by production code. The combat
+## resolver tracks loop progress internally via [code]CombatRunSnapshot[/code]
+## (a separate snapshot class); it does not write to this field.
+## Set to 0 once at dispatch ([code]snap.loop_counter = 0[/code] in
+## [code]_build_run_snapshot[/code]); never incremented thereafter.
+## Save/load + tests work because they exercise the persistence shape,
+## not the production wiring.
+##
+## Reserved for future replay-progress visualization (e.g., a "loop 3
+## of 5" UI strip during long runs). When that work lands, either the
+## combat resolver advances this directly on loop completion, OR the
+## orchestrator's [code]_on_tick_fired[/code] handler reads loop progress
+## from the resolver and writes it here. Until then, the field stays
+## 0; do not introduce code that depends on it being non-zero.
 var loop_counter: int = 0
 
 ## Running total of enemies killed since DISPATCHING. Advanced by the
