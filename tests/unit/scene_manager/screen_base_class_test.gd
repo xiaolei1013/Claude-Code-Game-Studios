@@ -16,7 +16,6 @@ const SCREEN_SCRIPT_PATH: String = "res://src/core/scene_manager/screen.gd"
 const ScreenScript = preload("res://src/core/scene_manager/screen.gd")
 
 const PLACEHOLDER_SCREEN_NAMES: Array[String] = [
-	"main_menu",
 	"guild_hall",
 	"recruitment",
 	"formation_assignment",
