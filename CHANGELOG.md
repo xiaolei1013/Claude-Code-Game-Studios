@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.47] - 2026-05-15
+
+### Fixed
+- **CRITICAL: Parchment theme was never reaching screens (Sprint 21 mid-sprint hotfix)** — discovered via playtest screenshots showing demo-quality dark Godot defaults instead of the parchment-cream register the design system documents. Root cause: `MainRoot.tscn:18` declared `ScreenContainer` as `type="Node"`. Godot 4.6 theme inheritance only cascades through `Control` ancestors; non-Control nodes silently break the chain. Effect: every screen rendered via `SceneManager` since Sprint 10 used Godot's default Button theme (white text on dark grey), making all design-system work (Sprint 10 parchment theme + Sprint 18 N1 tilt-shift + Sprint 19 BiomeBackground + Sprint 20 DESIGN.md + Sprint 21 SlotButton/LedgerRow) functionally invisible to players. Verified empirically: pre-fix Button bg_color = `(0.1, 0.1, 0.1, 0.6)` (Godot default); post-fix Button font_color = `(0.1725, 0.1569, 0.2196, 1.0)` (exact Slate Ink). Fix: change `ScreenContainer` to `type="Control"` with full-rect anchors + `mouse_filter = IGNORE` (input passes through to children). One-line scene-file change; zero code change required.
+
+### Internal
+- 3 new contract tests in `tests/unit/scene_manager/screen_container_theme_inheritance_test.gd`: ScreenContainer must extend Control (regression guard); Button inherits parchment theme font_color via tree walk; PanelContainer inherits parchment bg_color. All 3 pass locally.
+- Full suite: 4474 cases / 0 errors / 0 failures. **No regressions** from the type change. ScreenContainer's `process_mode = 1` (PAUSABLE) preserved.
+- This fix retroactively activates every visual deliverable since Sprint 10. The Sprint 18 N1 "disabled-by-default" precedent is reaffirmed in spirit — infrastructure shipped earlier is now visible.
+
 ## [0.0.0.46] - 2026-05-15
 
 ### Added
