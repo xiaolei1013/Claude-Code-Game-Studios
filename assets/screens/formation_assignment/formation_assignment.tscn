@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://screen_formation_assignment"]
+[gd_scene load_steps=3 format=3 uid="uid://screen_formation_assignment"]
 
 [ext_resource type="Script" path="res://assets/screens/formation_assignment/formation_assignment.gd" id="1_formation_assignment"]
+[ext_resource type="PackedScene" path="res://assets/screens/_shared/biome_background.tscn" id="2_biome_background"]
 
 [node name="FormationAssignment" type="Control"]
 layout_mode = 3
@@ -11,6 +12,10 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_formation_assignment")
+
+; Sprint 22 S22-M3: BiomeBackground at z=-1 (cozy tavern preset). Per ADR-0019
+; §Decision 1 layer-order contract.
+[node name="BiomeBackground" parent="." instance=ExtResource("2_biome_background")]
 
 [node name="BackButton" type="Button" parent="."]
 layout_mode = 1

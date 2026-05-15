@@ -42,6 +42,8 @@ const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
 
 ## PanelContainer styled as parchment via UIFramework.apply_parchment_panel.
 @onready var _summary_panel: PanelContainer = $SummaryPanel
+# Sprint 22 S22-M3: BiomeBackground at z=-1 (cozy tavern preset).
+@onready var _biome_background: ColorRect = $BiomeBackground
 
 ## Screen title — tr("return_to_app_title").
 @onready var _header_label: Label = $SummaryPanel/VBoxContainer/HeaderLabel
@@ -103,6 +105,12 @@ func on_enter() -> void:
 	# Reset transient state for this visit.
 	_pending_seconds_clipped = 0
 	_cap_notice.visible = false
+
+	# Sprint 22 S22-M3: render the cozy tavern BiomeBackground. Return-to-App
+	# is the player coming back to the guild after offline time; the tavern
+	# warm-amber preset reinforces "welcome back, you are home."
+	if _biome_background != null:
+		_biome_background.set_biome("guild_hall_tavern")
 
 	# Connect to OfflineProgressionEngine signals for live re-render while active.
 	# Idempotent via is_connected guard — safe across screen re-use if SM keeps it

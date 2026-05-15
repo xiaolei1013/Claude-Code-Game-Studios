@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.49] - 2026-05-15
+
+### Added
+- **BiomeBackground wired onto every player-facing screen (Sprint 22 S22-M3)** — pure-black backgrounds were the dominant demo-quality signal in the 2026-05-15 playtest screenshots. Pre-S22-M3, only `guild_hall` + `dungeon_run_view` instanced BiomeBackground; every other screen rendered with Godot's default black `Control` background. Sprint 22 M3 adds BiomeBackground at z=-1 (per ADR-0019 §Decision 1 layer-order contract) to:
+  - `recruitment.tscn` — cozy `guild_hall_tavern` preset (guild-side activity)
+  - `formation_assignment.tscn` — cozy `guild_hall_tavern` preset (dispatch is a guild-side activity)
+  - `victory_moment.tscn` — cleared biome's preset (thematic continuity with the just-cleared run; falls back to tavern on defensive empty biome_id)
+  - `return_to_app.tscn` — cozy `guild_hall_tavern` preset (welcome-back is a guild-side moment)
+- **`@onready var _biome_background: ColorRect`** added to each screen's `.gd` (typed as `ColorRect` per the canonical Godot 4.6 pattern — `class_name BiomeBackground` global registration isn't guaranteed at script-parse time; `set_biome` dispatches dynamically).
+- **`_biome_background.set_biome(...)` call added to each screen's `on_enter`** with defensive null-check.
+
+### Internal
+- 2 new contract tests in `tests/unit/scene_manager/biome_background_on_every_screen_test.gd`:
+  - `test_every_player_facing_screen_has_biome_background_child` — asserts every screen in `SCREENS_REQUIRING_BIOME_BG` instances BiomeBackground as a direct child
+  - `test_biome_background_is_color_rect_subclass` — guards against accidental base-type swaps that would break the z=-1 layer contract
+- Hero Detail Modal (`hero_detail_modal.tscn`) intentionally does NOT receive a BiomeBackground — modals DIM the underlying screen via DimBackdrop; the caller's biome shows through (dimmed), and a modal-owned BG would be invisible or violate the modal-over-screen layer pattern. Documented in the contract test header.
+- Hall of Retired Heroes (`hall_of_retired_heroes`) is being folded into Guild Hall as a tab in S22-S2; not addressed in M3.
+- Focused regression check across `tests/unit/scene_manager` + `tests/integration/scene_manager` + `tests/integration/formation_assignment` + `tests/unit/formation_assignment` + `tests/unit/recruitment` + `tests/integration/recruit_screen` + `tests/integration/return_to_app`: **345 passed / 0 failed**. No regressions.
+
 ## [0.0.0.48] - 2026-05-15
 
 ### Changed

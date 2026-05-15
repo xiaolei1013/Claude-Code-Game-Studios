@@ -49,6 +49,9 @@ var _enter_time_msec: int = 0
 
 
 @onready var _dim_backdrop: ColorRect = $DimBackdrop
+# Sprint 22 S22-M3: BiomeBackground at z=-1, set to the cleared biome's
+# preset on on_enter for thematic continuity with the just-cleared run.
+@onready var _biome_background: ColorRect = $BiomeBackground
 ## Reserved for Sprint 17 S17-S2 visual polish — staggered reveal
 ## animation queries the center panel for size/position to drive
 ## tween targets. Read deferred until that work lands.
@@ -111,6 +114,17 @@ func on_enter() -> void:
 
 	# Gold delta via run_snapshot.pre_dispatch_gold (S15-S4 ✓).
 	_gold_delta = Economy.get_gold_balance() - snapshot.pre_dispatch_gold
+
+	# Sprint 22 S22-M3: render the cleared biome's BiomeBackground so the
+	# reward summary sits over the world the player just conquered. Falls
+	# back to tavern on missing biome_id (defensive — biome_id should always
+	# parse from snapshot.floor_id, but the empty path lands us at the warm
+	# guild preset rather than rendering with no biome at all).
+	if _biome_background != null:
+		if _biome_id != "":
+			_biome_background.set_biome(_biome_id)
+		else:
+			_biome_background.set_biome("guild_hall_tavern")
 
 	# Classify new-high vs re-clear via FloorUnlock.get_highest_cleared.
 	# A new-high clear means the run advanced the high water mark to

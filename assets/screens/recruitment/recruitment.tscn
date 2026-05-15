@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://screen_recruitment"]
+[gd_scene load_steps=3 format=3 uid="uid://screen_recruitment"]
 
 [ext_resource type="Script" path="res://assets/screens/recruitment/recruitment.gd" id="1_recruitment"]
+[ext_resource type="PackedScene" path="res://assets/screens/_shared/biome_background.tscn" id="2_biome_background"]
 
 [node name="Recruitment" type="Control"]
 layout_mode = 3
@@ -10,6 +11,10 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_recruitment")
+
+; Sprint 22 S22-M3: BiomeBackground at z=-1 (the cozy tavern preset). No
+; more pure-black backgrounds. Per ADR-0019 §Decision 1 layer-order contract.
+[node name="BiomeBackground" parent="." instance=ExtResource("2_biome_background")]
 
 [node name="HeaderBar" type="PanelContainer" parent="."]
 layout_mode = 1

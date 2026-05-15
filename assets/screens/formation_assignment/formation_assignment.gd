@@ -72,6 +72,8 @@ var _synergy_badge_tween: Tween = null
 
 @onready var _header_label: Label = $HeaderLabel
 @onready var _roster_list: VBoxContainer = $RosterPanel/RosterScroll/RosterList
+# Sprint 22 S22-M3: BiomeBackground at z=-1 (cozy tavern preset by default).
+@onready var _biome_background: ColorRect = $BiomeBackground
 @onready var _slots_hbox: HBoxContainer = $FormationPanel/SlotsHBox
 @onready var _floor_button: Button = $FloorSelectorPanel/FloorVBox/FloorButton
 @onready var _floor_context_label: Label = $FloorSelectorPanel/FloorVBox/FloorContextLabel
@@ -140,6 +142,12 @@ func _ready() -> void:
 	# player immediately understands the screen purpose without external explanation.
 	# Key: formation_assignment_instructional_header → "Send your guild to:"
 	_header_label.text = tr("formation_assignment_instructional_header")
+
+	# Sprint 22 S22-M3: render the cozy tavern BiomeBackground. The dispatch
+	# screen is a guild-side activity (planning the run); player isn't in a
+	# dungeon yet, so tavern reinforces "you are home, choosing where to go."
+	if _biome_background != null:
+		_biome_background.set_biome("guild_hall_tavern")
 
 	# Apply any pending matchup target the player set via the in-screen
 	# FloorPicker overlay (S22-M2 fold; previously the matchup_assignment
