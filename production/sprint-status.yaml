@@ -9,6 +9,38 @@
 #   done           ↔  Complete
 #   blocked        ↔  Blocked
 #
+# UPDATED 2026-05-15 via /sprint-plan new (Sprint 23 Day-0):
+#   - Sprint 22 closes; Sprint 23 Day-0 plan authored
+#     (tenth consecutive same-day-compressed sprint cadence).
+#   - Sprint 23 theme: SCENE CONSOLIDATION FINISH + PAUSE MODAL + SETTINGS SCAFFOLD.
+#     Retire hall_of_retired_heroes as standalone (→ tab on Guild Hall; registry 8→7).
+#     Pause Menu modal wired on all screens. Settings screen scaffold (audio + a11y).
+#     M4 deferred clarity items (c/d/e) per playtest-14 verdict.
+#   - Sprint 23 Must Haves (3 total, 2.0d):
+#     M1 hall retire→tab, M2 pause modal, M3 playtest+retro.
+#   - Pre-plan dispositions (must resolve BEFORE M1 begins):
+#     PR #126 (main_menu retire) — MERGE FIRST (closes 10→7 consolidation goal)
+#     playtest-14 — FILL IN verdict (drives S23-S1 scope)
+#     sprint-22 retro — FINALIZE once playtest-14 verdict lands
+#   - Solo review mode — no PR-SPRINT producer gate.
+#   - Sprint 22 final state archived in comment block below.
+#
+# Sprint 22 final state (archived 2026-05-15):
+#   sprint_status: CLOSED-WITH-PENDING — 3/5 Must Haves DONE (M2-M4); M1 (#126) OPEN at plan time;
+#                  M5 playtest PENDING; 1/3 Should Haves (S1 done); 0/1 Nice to Have.
+#   actual_close: 2026-05-15 (ninth consecutive same-day-compressed sprint)
+#   Must Have: M1 main_menu retire PR#126 (OPEN — merge as pre-S23 disposition);
+#              M2 matchup→Dispatch fold PR#127 (done, v0.0.0.48); M3 biome bg PR#128
+#              (done, v0.0.0.49); M4 clarity polish PR#129 (done, v0.0.0.50);
+#              M5 playtest-14 PENDING + retro DRAFT.
+#   Should Have: S1 playtest template DONE (bundled in M5 PR); S2 hall→tab deferred
+#                to S23-M1 (promoted Must Have); S3 pause modal deferred to S23-M2
+#                (promoted Must Have).
+#   Nice to Have: N1 settings scaffold carried to S23-S2.
+#   New tests: +2 (M3 BiomeBackground contract) + 1 (M4 IdentityHeader) = +3.
+#   Scene registry: 9 → 8 (M2 fold); pending → 7 after #126 merges.
+#   Version: 0.0.0.47 → 0.0.0.50 across sprint (4 PRs).
+#
 # UPDATED 2026-05-15 via /sprint-plan new (Sprint 22 Day-0):
 #   - Sprint 21 effectively closes; Sprint 22 Day-0 plan authored
 #     (ninth consecutive same-day-compressed sprint cadence).
@@ -170,112 +202,113 @@
 #   Critical mid-sprint bug: PR #90 Economy multi-biome ledger collision + ADR-0002 Amend 1.
 #
 
-sprint: 22
-goal: "Reduce 10 scenes to 7 by collapsing the redundant ones, fold the matchup picker into Formation Assignment as a unified Dispatch screen, then run a clarity pass on every screen with the now-visible parchment theme."
-start: "2026-05-15"
-end: "2026-05-28"
+sprint: 23
+goal: "Complete the scene consolidation gap (Hall of Retired Heroes → tab, Pause Menu modal), resolve deferred M4 clarity items per playtest-14 signal, and scaffold the Settings screen so the Pause Menu has somewhere to go."
+start: "2026-05-29"
+end: "2026-06-11"
 generated: "2026-05-15"
 updated: "2026-05-15"
 
-# Pre-plan dispositions (MUST resolve before Sprint 22 work begins):
-# PR #124 (theme inheritance fix — ScreenContainer Node → Control) — MERGE FIRST
-# PR #123 (S21-M2 Recruit Screen Affordability Gating + Cross-Fade Refresh) — MERGE after #124
-# Both PRs CI green; merging both restores Sprint 21 to a clean closeout state.
-# Sprint 21 retro is INLINE in sprint-22.md rather than its own PR.
+# Pre-plan dispositions (MUST resolve before Sprint 23 M1 begins):
+# PR #126 (S22-M1 main_menu retire) — MERGE FIRST (closes 10→7 registry claim)
+# playtest-14 — FILL IN verdict (drives S23-S1 scope)
+# sprint-22 retro — FINALIZE once playtest-14 verdict lands
 
 stories:
   # ===== Must Have =====
 
-  - id: "S22-M1"
-    name: "Retire main_menu screen — reroute RUN_ENDED + boot to guild_hall; migrate Redispatch button to Guild Hall; remove from SceneManager._screen_registry"
-    file: "src/core/scene_manager/scene_manager.gd + assets/screens/main_menu/ (deletion)"
+  - id: "S23-M1"
+    name: "Hall of Retired Heroes → tab on Guild Hall (Active | Retired tabs); remove standalone screen from registry (7→6 after PR #126 achieves 8→7)"
+    file: "assets/screens/guild_hall/guild_hall.tscn + .gd; assets/screens/hall_of_retired_heroes/ (deletion)"
     priority: must-have
     status: ready-for-dev
     owner: "godot-gdscript-specialist"
     estimate_days: 0.75
-    blocker: "PR #124 merged"
+    blocker: "PR #126 merged"
     completed: ""
 
-  - id: "S22-M2"
-    name: "Fold matchup_assignment into formation_assignment as Dispatch screen — single screen handles team + biome/floor selection"
-    file: "assets/screens/formation_assignment/formation_assignment.tscn + .gd"
-    priority: must-have
-    status: done
-    owner: "godot-gdscript-specialist"
-    estimate_days: 1.5
-    blocker: "S22-M1"
-    completed: ""
-
-  - id: "S22-M3"
-    name: "Wire BiomeBackground onto every screen (Recruit / Dispatch / DRV / Victory / Return-to-App / Hero Detail modal)"
-    file: "assets/screens/*/*.tscn"
+  - id: "S23-M2"
+    name: "Pause Menu modal scene — Esc key trigger; Resume / Settings / Quit-to-Guild-Hall; push_modal pattern on all screens"
+    file: "assets/screens/_modals/pause_menu.tscn + .gd"
     priority: must-have
     status: ready-for-dev
     owner: "godot-gdscript-specialist"
-    estimate_days: 0.5
-    blocker: "PR #124 merged"
+    estimate_days: 0.75
+    blocker: ""
     completed: ""
 
-  - id: "S22-M4"
-    name: "Per-screen clarity polish — visual hierarchy + empty states + label sizing + tap-target verification + Primary Button on CTAs"
-    file: "assets/screens/*/*.tscn"
-    priority: must-have
-    status: ready-for-dev
-    owner: "godot-gdscript-specialist"
-    estimate_days: 1.5
-    blocker: "S22-M1 + S22-M2 + S22-M3"
-    completed: ""
-
-  - id: "S22-M5"
-    name: "Sprint 22 visual playtest (use S22-S1 checklist template) + Sprint 22 retrospective"
-    file: "production/playtests/playtest-14-scene-consolidation-2026-05-??.md + production/retrospectives/sprint-22-retrospective-2026-05-??.md"
+  - id: "S23-M3"
+    name: "Sprint 23 visual playtest (using _template-visual-playtest.md for M1+M2) + Sprint 23 retrospective"
+    file: "production/playtests/playtest-15-sprint-23-*.md + production/retrospectives/sprint-23-retrospective-*.md"
     priority: must-have
     status: backlog
-    owner: "xiaolei (human) + producer + claude-code"
+    owner: "xiaolei (human) + claude-code"
     estimate_days: 0.5
-    blocker: "S22-M1 + S22-M2 + S22-M3 + S22-M4"
+    blocker: "S23-M1 + S23-M2"
     completed: ""
 
   # ===== Should Have =====
 
-  - id: "S22-S1"
-    name: "Visual-correctness playtest checklist template — FOURTH-time carry from S19/S20/S21 retros; non-negotiable"
-    file: "production/playtests/_template-visual-playtest.md"
+  - id: "S23-S1"
+    name: "M4 clarity follow-up — empty states + tap-target verification (≥44×44) + Primary Button on CTAs; scope conditional on playtest-14 verdict"
+    file: "assets/screens/*/*.tscn"
     priority: should-have
-    status: ready-for-dev
-    owner: "claude-code"
-    estimate_days: 0.1
-    blocker: ""
+    status: backlog
+    owner: "godot-gdscript-specialist"
+    estimate_days: 1.0
+    blocker: "playtest-14 verdict"
     completed: ""
 
-  - id: "S22-S2"
-    name: "Hall of Retired Heroes → tab on Guild Hall RosterPanel (Active | Retired tabs)"
-    file: "assets/screens/guild_hall/guild_hall.tscn + .gd; assets/screens/hall_of_retired_heroes/ (deletion)"
+  - id: "S23-S2"
+    name: "Settings screen scaffold — audio sliders + Reduce Motion toggle + version display + Quit-to-Desktop; navigable from Pause Menu"
+    file: "assets/screens/settings/settings.tscn + .gd"
     priority: should-have
-    status: ready-for-dev
+    status: backlog
     owner: "godot-gdscript-specialist"
-    estimate_days: 0.75
-    blocker: "S22-M1"
+    estimate_days: 1.0
+    blocker: "S23-M2"
     completed: ""
 
-  - id: "S22-S3"
-    name: "Pause Menu modal scene (currently spec-only at design/ux/pause-menu.md)"
-    file: "assets/screens/_modals/pause_menu.tscn + .gd"
+  - id: "S23-S3"
+    name: "ClassPortrait placeholder art — 96×96 colored-block per class ID; HeroClass.portrait_path populated; third carry from S20-N1 + S21-S2"
+    file: "assets/art/portraits/ + src/data/hero_class_database.gd"
     priority: should-have
-    status: ready-for-dev
+    status: backlog
     owner: "godot-gdscript-specialist"
-    estimate_days: 0.75
+    estimate_days: 0.5
     blocker: ""
     completed: ""
 
   # ===== Nice to Have =====
 
-  - id: "S22-N1"
-    name: "Settings screen scaffold — audio + accessibility + version + Quit (replaces main_menu's pretend role)"
-    file: "assets/screens/settings/"
+  - id: "S23-N1"
+    name: "Audio MVP bootstrap — AudioRouter autoload + guild_hall_ambient loop + ui_confirm cue; signal-driven per Audio System GDD"
+    file: "src/core/audio_router/ + assets/audio/"
     priority: nice-to-have
     status: backlog
     owner: "godot-gdscript-specialist"
-    estimate_days: 1.0
-    blocker: "S22-M1-M4 + S22-S1-S3"
+    estimate_days: 1.5
+    blocker: "S23-M1, S23-M2, S23-M3, S23-S2"
     completed: ""
+
+  - id: "S23-N2"
+    name: "Class Synergy V2 — passive synergy preview panel on Dispatch screen; live tier display as heroes are slotted"
+    file: "assets/screens/formation_assignment/formation_assignment.tscn + .gd"
+    priority: nice-to-have
+    status: backlog
+    owner: "godot-gdscript-specialist"
+    estimate_days: 2.0
+    blocker: "S23-M1, S23-M2, S23-M3, S23-N1 merged"
+    completed: ""
+
+# ===== Sprint 22 archived stories (for history) =====
+#
+#   S22-M1 main_menu retire: status: blocked (PR #126 OPEN — merge as pre-S23 disposition)
+#   S22-M2 matchup→Dispatch: status: done (PR #127, v0.0.0.48)
+#   S22-M3 biome backgrounds: status: done (PR #128, v0.0.0.49)
+#   S22-M4 clarity polish: status: done (PR #129, v0.0.0.50)
+#   S22-M5 playtest+retro: status: in-progress (playtest-14 PENDING; retro DRAFT)
+#   S22-S1 playtest template: status: done (bundled in M5 PR)
+#   S22-S2 hall→tab: status: carried → S23-M1
+#   S22-S3 pause modal: status: carried → S23-M2
+#   S22-N1 settings: status: carried → S23-S2
