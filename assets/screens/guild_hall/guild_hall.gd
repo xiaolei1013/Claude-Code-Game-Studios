@@ -27,6 +27,13 @@ extends Screen
 # parse. Method calls (set_biome) dispatch dynamically and resolve correctly.
 @onready var _biome_background: ColorRect = $BiomeBackground
 
+# Sprint 20 S20-M5 — Synergy badge per UX-GH-09 + interaction-patterns #11
+# (Conditional Strip). Shows the active class synergy when the player's
+# current formation has one; hidden otherwise. Reads from FormationAssignment
+# .detect_active_synergy() on on_enter + on roster signal changes.
+@onready var _synergy_badge: PanelContainer = $SynergyBadge
+@onready var _synergy_label: Label = $SynergyBadge/SynergyLabel
+
 const HeroDetailModalScene: PackedScene = preload(
 	"res://assets/screens/hero_detail/hero_detail_modal.tscn"
 )
@@ -65,6 +72,12 @@ func on_enter() -> void:
 		HeroRoster.hero_removed.connect(_on_roster_changed)
 	if not HeroRoster.hero_leveled.is_connected(_on_hero_leveled):
 		HeroRoster.hero_leveled.connect(_on_hero_leveled)
+
+	# Sprint 20 S20-M5 — refresh synergy badge per current formation.
+	# Re-evaluates on each roster change since recruits / removals / level-ups
+	# don't change the formation but the player may have returned from
+	# Formation Assignment with a different lineup.
+	_refresh_synergy_badge()
 	# Sprint 16 — biome progression gate. FloorUnlock emits biome_unlocked
 	# when a gated biome's prereq floor first-clears (e.g. clearing
 	# frostmire_f5 unlocks ember_wastes). Guild Hall surfaces a cozy toast.
@@ -228,6 +241,62 @@ func _on_gold_changed(new_balance: int, _delta: int, _reason: String) -> void:
 
 
 # ---------------------------------------------------------------------------
+# Synergy badge (UX-GH-09 + interaction-patterns #11 Conditional Strip)
+# ---------------------------------------------------------------------------
+
+## Computes the active class synergy for the player's current formation and
+## shows the SynergyBadge with localized "Display Name: Effect" text. When no
+## synergy is active, hides the badge (visible=false). Called from on_enter
+## and from roster signal handlers so the badge stays in sync with the live
+## state.
+##
+## The badge is a Conditional Strip per interaction-patterns.md pattern #11:
+## visible=false yields no layout impact (the badge's anchor preset places
+## it absolutely-positioned in the screen, so hiding has no shifting effect
+## on the roster panel or NavBar).
+##
+## Per design/ux/guild-hall.md UX-GH-09 + design/gdd/class-synergy-system.md
+## §C.2. Builds the same formation_snapshot shape that the Formation Assignment
+## screen builds (instance_ids + heroes Array[Dictionary] with class_id keys).
+func _refresh_synergy_badge() -> void:
+	if _synergy_badge == null or _synergy_label == null:
+		return
+
+	# Build hero_map from live roster (same pattern as Formation Assignment's
+	# _build_formation_snapshot).
+	var hero_map: Dictionary = {}
+	for hero: Variant in HeroRoster.get_all_heroes():
+		hero_map[hero.instance_id] = hero
+
+	# Build formation snapshot in the shape detect_active_synergy expects.
+	var heroes: Array[Dictionary] = []
+	var slot_count: int = HeroRoster.formation_size()
+	for i: int in range(slot_count):
+		var sid: int = HeroRoster.get_formation_slot(i)
+		var hero_dict: Dictionary = {"instance_id": sid}
+		if sid != 0 and hero_map.has(sid):
+			hero_dict["class_id"] = str(hero_map[sid].class_id)
+		else:
+			hero_dict["class_id"] = ""
+		heroes.append(hero_dict)
+
+	var synergy_id: String = FormationAssignment.detect_active_synergy(
+		{"heroes": heroes}
+	)
+
+	if synergy_id == "":
+		_synergy_badge.visible = false
+		return
+
+	# Render localized "Display Name: Effect" text. Both keys exist in
+	# en.csv per Sprint 18 S18-S2 locale closeout.
+	var display_name: String = tr("class_synergy_badge_" + synergy_id)
+	var effect_text: String = tr("class_synergy_effect_" + synergy_id)
+	_synergy_label.text = "%s: %s" % [display_name, effect_text]
+	_synergy_badge.visible = true
+
+
+# ---------------------------------------------------------------------------
 # Roster panel (Guild Hall GDD #19 §C.4 + Hero Detail GDD #22 §C.2 wire-up)
 # ---------------------------------------------------------------------------
 
@@ -269,6 +338,11 @@ func _build_hero_card(hero: RefCounted) -> Button:
 	card.text = ""
 	card.focus_mode = Control.FOCUS_NONE
 	card.custom_minimum_size = Vector2(0, 56)
+	# Sprint 20 S20-M5 — apply LedgerRow theme variation per
+	# design/ux/interaction-patterns.md pattern #10. Parchment sub-panel
+	# register: hairline Slate Ink border at 50% alpha + 2px corner radius
+	# + 8px padding. Defined in assets/ui/parchment_theme.tres.
+	card.theme_type_variation = &"LedgerRow"
 
 	var vbox: VBoxContainer = VBoxContainer.new()
 	vbox.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -330,6 +404,10 @@ func _build_hero_card(hero: RefCounted) -> Button:
 ## are ignored — we rebuild from current roster state.
 func _on_roster_changed(_a: Variant = null, _b: Variant = null, _c: Variant = null) -> void:
 	_refresh_roster_panel()
+	# Sprint 20 S20-M5 — recruit/remove may change formation composition
+	# (e.g. removing a hero from a slot via prestige clears that slot).
+	# Re-evaluate synergy so the badge stays in sync.
+	_refresh_synergy_badge()
 
 
 ## hero_leveled handler — refresh the roster (XP bar repaint) AND fire a
