@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.50] - 2026-05-15
+
+### Added
+- **Per-screen clarity polish — IdentityHeader screen titles + Dispatch GoldCounter (Sprint 22 S22-M4)** — the dominant clarity gap from the 2026-05-15 playtest screenshots was the absence of clear "you are here" anchors at the top of each screen. Pre-S22-M4, only 5 of 8 screens had an IdentityHeader-marked Label (32px IM Fell English in Lantern Gold with Slate Ink outline — readable on any background, colorblind-safe via outline). Sprint 22 M4 closes the gap:
+  - **Guild Hall**: new `ScreenTitleLabel` "Guild Hall" at top + GoldCounter now uses IdentityHeader styling for readability against the BiomeBackground vignette
+  - **Dungeon Run View**: existing HeaderLabel now applies `theme_type_variation = &"IdentityHeader"` (was unstyled)
+  - **Return-to-App**: existing HeaderLabel "Welcome back!" now uses IdentityHeader (was a 24px theme_override font-size hack)
+  - **Formation Assignment (Dispatch)**: existing HeaderLabel "Send your guild to:" now uses IdentityHeader
+- **GoldCounter added to Formation Assignment (Dispatch screen)** — player can now see their balance while planning recruits + biome choice without leaving the screen. Top-right corner placement, IdentityHeader styling, subscribed to `Economy.gold_changed` for live updates, uses `UIFrameworkScript.format_short_number` for cozy display thresholds (1.2K / 4.5M).
+
+### Internal
+- 1 new contract test in `tests/unit/scene_manager/screen_identity_header_test.gd`: `test_every_player_facing_screen_has_identity_header_label` walks the scene tree of each player-facing screen and asserts at least one Label with `theme_type_variation = &"IdentityHeader"` exists. Guards against accidental regression to unstyled headers.
+- Formation Assignment `.gd` updates: added `@onready var _gold_counter`, `_refresh_gold_counter()`, `_on_gold_changed()`; subscribed/unsubscribed `Economy.gold_changed` in `on_enter`/`on_exit`.
+- Focused regression check across `tests/unit/scene_manager` + `tests/integration/scene_manager` + `tests/integration/formation_assignment` + `tests/unit/formation_assignment` + `tests/unit/recruitment` + `tests/integration/return_to_app` + `tests/integration/victory_moment`: **358 passed / 0 failed**. No regressions.
+- This PR addresses the structural visibility items (a) GoldCounter on Dispatch + (b) IdentityHeader on every screen from the Sprint 22 plan's §M4 clarity checklist. Items (c) empty-state clarity, (d) tap-target verification, and (e) Primary Button on CTAs across all screens are deferred to S22-M5 playtest signal — if the M5 playtest surfaces specific gaps, address them in a follow-up M4 fixup PR before closing the sprint.
+
 ## [0.0.0.49] - 2026-05-15
 
 ### Added
