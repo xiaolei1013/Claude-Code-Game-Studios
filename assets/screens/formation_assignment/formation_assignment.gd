@@ -74,6 +74,10 @@ var _synergy_badge_tween: Tween = null
 @onready var _roster_list: VBoxContainer = $RosterPanel/RosterScroll/RosterList
 # Sprint 22 S22-M3: BiomeBackground at z=-1 (cozy tavern preset by default).
 @onready var _biome_background: ColorRect = $BiomeBackground
+# Sprint 22 S22-M4: GoldCounter on the Dispatch screen so the player can
+# see their balance while planning recruits + biome choice. Updates on
+# Economy.gold_changed signal.
+@onready var _gold_counter: Label = $GoldCounter
 @onready var _slots_hbox: HBoxContainer = $FormationPanel/SlotsHBox
 @onready var _floor_button: Button = $FloorSelectorPanel/FloorVBox/FloorButton
 @onready var _floor_context_label: Label = $FloorSelectorPanel/FloorVBox/FloorContextLabel
@@ -148,6 +152,14 @@ func _ready() -> void:
 	# dungeon yet, so tavern reinforces "you are home, choosing where to go."
 	if _biome_background != null:
 		_biome_background.set_biome("guild_hall_tavern")
+
+	# Sprint 22 S22-M4: GoldCounter — initial render + subscribe to
+	# gold_changed for live updates (player may recruit or trigger refresh
+	# from this screen and gold mutates accordingly).
+	if _gold_counter != null:
+		_refresh_gold_counter()
+		if not Economy.gold_changed.is_connected(_on_gold_changed):
+			Economy.gold_changed.connect(_on_gold_changed)
 
 	# Apply any pending matchup target the player set via the in-screen
 	# FloorPicker overlay (S22-M2 fold; previously the matchup_assignment
@@ -260,6 +272,9 @@ func on_exit() -> void:
 		DungeonRunOrchestrator.validation_failed.disconnect(_on_validation_failed)
 	if DungeonRunOrchestrator.state_changed.is_connected(_on_orchestrator_state_changed):
 		DungeonRunOrchestrator.state_changed.disconnect(_on_orchestrator_state_changed)
+	# S22-M4: GoldCounter live-update subscription cleanup.
+	if Economy.gold_changed.is_connected(_on_gold_changed):
+		Economy.gold_changed.disconnect(_on_gold_changed)
 
 	# Mirror on_enter button wiring. Static buttons are also freed with the
 	# screen, but explicit disconnect documents the lifecycle contract.
@@ -559,6 +574,21 @@ func _on_floor_button_pressed() -> void:
 func _refresh_floor_context_label() -> void:
 	_floor_context_label.text = _compose_target_label(_selected_biome_id, _selected_floor)
 	_floor_button.text = _floor_context_label.text
+
+
+## Sprint 22 S22-M4: refreshes the GoldCounter from Economy.get_gold_balance().
+## Uses the cozy-display short-number format (1.2K / 4.5M) per UIFramework.
+func _refresh_gold_counter() -> void:
+	if _gold_counter == null:
+		return
+	_gold_counter.text = "Gold: %s" % UIFrameworkScript.format_short_number(
+		Economy.get_gold_balance()
+	)
+
+
+## Sprint 22 S22-M4: gold_changed signal handler — re-renders GoldCounter.
+func _on_gold_changed(_new_balance: int, _delta: int, _reason: String) -> void:
+	_refresh_gold_counter()
 
 
 # ---------------------------------------------------------------------------
