@@ -9,7 +9,7 @@
 Copy this template to a new file when starting a visual playtest:
 `production/playtests/playtest-NN-<theme>-YYYY-MM-DD.md`.
 
-Fill in every cell of the 5-check table. Per-check PASS/FAIL/PARTIAL grading
+Fill in every cell of the 5-check table. Per-check PASS/PARTIAL/FAIL grading
 is the load-bearing protocol; aggregate verdicts are advisory only.
 
 ---

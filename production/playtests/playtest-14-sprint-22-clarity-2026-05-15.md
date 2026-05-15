@@ -1,7 +1,7 @@
 # Playtest 14 — Sprint 22 scene consolidation + clarity polish
 
 > **Sprint Mapping**: S22-M5 (`production/sprints/sprint-22.md`).
-> **Gate**: Sprint 22 Definition of Done — "Visual playtest PASS on all 7 final screens (M5) — using S22-S1 checklist template".
+> **Gate**: Sprint 22 Definition of Done — "Visual playtest PASS on all 5 clarity checks (M5) — using S22-S1 checklist template".
 > **Status**: PENDING — fill in after live playtest.
 > **Precedent**: Light-touch sign-off pattern (per project memory `feedback_playtest_driven_closure.md`); per-check granularity (template S22-S1 — 4th-time carry, finally non-negotiable this sprint).
 

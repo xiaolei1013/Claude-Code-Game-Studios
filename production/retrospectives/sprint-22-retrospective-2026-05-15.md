@@ -28,7 +28,7 @@ Preliminary status against the 6 success conditions defined in the plan (final v
 - **GDD status transitions**: 0.
 - **New contract tests**: 3 (M3 BiomeBackground on every screen + base-type drift guard + M4 IdentityHeader presence guard).
 - **Scene registry**: 9 → 8 entries (M2 fold; pending → 7 on M1 merge).
-- **Version**: 0.0.0.49 → 0.0.0.50 across the sprint (4 PRs each bumping by 1 — #127 → 48, #128 → 49, #129 → 50; #126 will be 51 post-merge).
+- **Version**: 0.0.0.47 → 0.0.0.50 across the sprint (3 implementation PRs — #127 → 48, #128 → 49, #129 → 50; #126 will be 51 post-merge; plan PR #125 does not bump version).
 - **Solo same-day cadence**: 9th consecutive sprint (S14 → S22).
 
 ## What Worked
