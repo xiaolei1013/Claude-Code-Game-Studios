@@ -98,57 +98,57 @@ stories:
     name: "Scaffolded-but-unwired audit (Sprint 18 retro #1 — twice-deferred; non-negotiable)"
     file: "production/sprint-20-scaffolds-audit.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "claude-code"
     estimate_days: 0.25
     blocker: ""
-    completed: ""
+    completed: "2026-05-14 — PR #116 merged. Audit found 2 confirmed ghosts in RunSnapshot (kill_schedule + loop_counter); both annotated DEFERRED rather than wired/deleted (low-risk path)."
 
   - id: "S20-M2"
     name: "Font sourcing — Lora + IM Fell English TTF files at res://assets/fonts/ + parchment theme wiring"
     file: "assets/fonts/"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "claude-code"
     estimate_days: 0.25
     blocker: ""
-    completed: ""
+    completed: "2026-05-14 — PR #115 merged. Lora-Regular + Lora-Italic + IMFellEnglish-Regular + IMFellEnglish-Italic (SIL OFL) wired into parchment_theme.tres via FontVariation sub_resources."
 
   - id: "S20-M3"
     name: "5 remaining UX specs — DRV / Return-to-App / Victory Moment / Hero Detail / Matchup Assignment"
     file: "design/ux/"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "claude-code"
     estimate_days: 1.25
     blocker: "S20-M2"
-    completed: ""
+    completed: "2026-05-14 — PR #117 merged. 5 specs at design/ux/ (dungeon-run-view.md, return-to-app.md, victory-moment.md, hero-detail-modal.md, matchup-assignment.md). Each: 14 required sections + ≥17 ACs."
 
   - id: "S20-M4"
     name: "Pattern library additions — 6 new patterns (Guild-Ledger-Entry, Conditional Strip, Slot Button, Two-Tap Assignment Flow, Affordability Gating, Pool Entry Card)"
     file: "design/ux/interaction-patterns.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "claude-code"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-05-14 — PR #118 merged. Library expanded 9 → 20 patterns (v0.1 → v0.2)."
 
   - id: "S20-M5"
     name: "Guild Hall theme implementation — apply DESIGN.md + UX spec to guild_hall.tscn + .gd"
     file: "assets/screens/guild_hall/guild_hall.tscn"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 0.75
     blocker: "S20-M2 + S20-M4"
-    completed: ""
+    completed: "2026-05-15 — PR #119 merged (v0.0.0.45). LedgerRow theme variation + SynergyBadge node + wiring shipped. 8 new contract tests pass; full suite 4462 / 0 / 0."
 
   - id: "S20-M6"
     name: "Sprint 20 playtest — visual validation of redesigned Guild Hall (5 checks)"
-    file: "production/playtests/playtest-12-guild-hall-refresh-2026-05-??.md"
+    file: "production/playtests/playtest-12-guild-hall-refresh-2026-05-15.md"
     priority: must-have
-    status: ready-for-dev
+    status: in-progress
     owner: "xiaolei (human)"
     estimate_days: 0.5
     blocker: "S20-M5"
