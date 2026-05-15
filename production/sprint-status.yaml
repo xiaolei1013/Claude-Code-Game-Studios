@@ -200,7 +200,7 @@ stories:
     name: "Fold matchup_assignment into formation_assignment as Dispatch screen — single screen handles team + biome/floor selection"
     file: "assets/screens/formation_assignment/formation_assignment.tscn + .gd"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 1.5
     blocker: "S22-M1"

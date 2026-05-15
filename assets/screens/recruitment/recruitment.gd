@@ -180,9 +180,14 @@ func _render_pool_entry(entry: Control, pool_index: int, class_id: String) -> vo
 	var copies: int = HeroRoster.get_copies_owned(class_id)
 	owned_label.text = tr("recruit_owned_format") % copies
 
-	# RecruitButton affordability gating.
+	# RecruitButton affordability gating per interaction-patterns #14
+	# (Affordability Gating). Sprint 21 S21-M2: opacity drops to 40% on
+	# unaffordable, full 100% on affordable — colorblind-safe (alpha-driven
+	# visual change, NOT color-only). The `disabled` property handles input
+	# gating; modulate.a handles the visual cue.
 	var affordable: bool = Economy.get_gold_balance() >= cost and cost > 0
 	recruit_button.disabled = not affordable
+	recruit_button.modulate.a = 1.0 if affordable else 0.4
 	recruit_button.text = tr("dispatch_button") if false else "Recruit"  # Placeholder; tr key is "recruit_button" candidate post-/design-review
 
 
@@ -192,7 +197,11 @@ func _refresh_refresh_button_cost() -> void:
 	var refreshes_today: int = Recruitment.get_refreshes_today()
 	var cost: int = Recruitment.refresh_cost(refreshes_today)
 	_refresh_pool_button.text = "Refresh Pool — %s gold" % UIFrameworkScript.format_short_number(cost)
-	_refresh_pool_button.disabled = Economy.get_gold_balance() < cost
+	var affordable: bool = Economy.get_gold_balance() >= cost
+	_refresh_pool_button.disabled = not affordable
+	# Sprint 21 S21-M2: Affordability Gating pattern #14 — 40% opacity on
+	# unaffordable; full 100% on affordable. Colorblind-safe alpha cue.
+	_refresh_pool_button.modulate.a = 1.0 if affordable else 0.4
 
 
 # ---------------------------------------------------------------------------
@@ -246,6 +255,45 @@ func _on_back_pressed() -> void:
 func _on_pool_refreshed(_new_pool: Array[String]) -> void:
 	_refresh_pool_panel()
 	_refresh_refresh_button_cost()
+	# Sprint 21 S21-M2: Cross-Fade Refresh per UX-RS-10 + UX-RS-11. Each
+	# PoolEntry fades from 0 → 1 alpha over 200ms with 50ms inter-entry
+	# stagger ("the ledger turning pages"). Reduce-motion: instant set.
+	_play_pool_cross_fade()
+
+
+## Cross-fade pool entries 0 → 1 alpha over 200ms with 50ms inter-entry
+## stagger. Per UX-RS-10 / UX-RS-11 visual treatment.
+##
+## Reduce-motion (per AccessibilitySettings.reduce_motion via SceneManager):
+## skip the tween, just ensure entries are fully visible.
+func _play_pool_cross_fade() -> void:
+	if _is_reduce_motion_enabled():
+		for i: int in range(POOL_SIZE):
+			if _pool_entries[i] != null:
+				_pool_entries[i].modulate.a = 1.0
+		return
+
+	for i: int in range(POOL_SIZE):
+		var entry: Control = _pool_entries[i]
+		if entry == null or not entry.visible:
+			continue
+		entry.modulate.a = 0.0
+		var tween: Tween = create_tween()
+		tween.tween_interval(i * 0.05)  # 50ms inter-entry stagger
+		tween.tween_property(entry, "modulate:a", 1.0, 0.2)  # 200ms fade
+
+
+## Reads [code]SceneManager.reduce_motion[/code] defensively. Test envs
+## without the SceneManager autoload registered get the false default
+## (full-motion). Mirrors the canonical pattern in
+## [code]formation_assignment.gd::_is_reduce_motion_enabled[/code].
+func _is_reduce_motion_enabled() -> bool:
+	var sm: Node = get_node_or_null("/root/SceneManager")
+	if sm == null:
+		return false
+	if not ("reduce_motion" in sm):
+		return false
+	return bool(sm.get("reduce_motion"))
 
 
 # Drift fix: subscribe to HeroRoster's 1-arg hero_recruited (NOT

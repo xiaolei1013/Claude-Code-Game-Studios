@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.47] - 2026-05-15
+
+### Added
+- **Recruit Screen theme implementation (Sprint 21 S21-M2)** — applied DESIGN.md tokens + pattern library to `recruitment.tscn`/`.gd`. Three pattern applications: Affordability Gating (#14), Cross-Fade Refresh on pool refresh (per UX-RS-10 + UX-RS-11), and infrastructure for Pool Entry Card container styling (LedgerRowPanel variation, deferred to Sprint 22 .tscn polish).
+- **`LedgerRowPanel` theme variation** in `parchment_theme.tres` — PanelContainer base_type using the existing `ledger_row` StyleBoxFlat sub_resource. Reuses the StyleBox shared with `LedgerRow` (Button base_type), giving the same visual register on container nodes. Per interaction-patterns #15 (Pool Entry Card container). **Infrastructure-only this PR** — the `.tscn` application (wrapping `PoolEntry` HBoxContainers in `PanelContainer` parents with `theme_type_variation = &"LedgerRowPanel"`) is deferred to Sprint 22 polish; ships ready-to-deploy mirroring the Sprint 18 N1 disabled-by-default precedent.
+
+### Changed
+- **RecruitButton applies Affordability Gating polish** in `recruitment.gd:_render_pool_entry` — `modulate.a = 1.0` when affordable, `0.4` when unaffordable. Pairs with `disabled` property for input gating; the alpha cue is the visual signal (per interaction-patterns #14: colorblind-safe via alpha-driven visual change, NOT color-only).
+- **RefreshPoolButton applies Affordability Gating polish** in `recruitment.gd:_refresh_refresh_button_cost` — same pattern as RecruitButton.
+- **Pool refresh now plays a 200ms cross-fade animation with 50ms inter-entry stagger** in `recruitment.gd:_on_pool_refreshed` via new `_play_pool_cross_fade()` method. Each `PoolEntry` fades from 0 → 1 alpha; the stagger makes the animation read as "the ledger turning pages" per UX-RS-10 visual treatment. Reduce-motion: instant set (no tween).
+- **Added `_is_reduce_motion_enabled()` helper** to `recruitment.gd` — canonical pattern mirroring `formation_assignment.gd::_is_reduce_motion_enabled` and `hero_detail_modal.gd::_is_reduce_motion_enabled`. Reads `SceneManager.reduce_motion` defensively (test envs without SceneManager get full-motion default).
+
+### Internal
+- 7 new contract tests in `tests/unit/recruitment/recruitment_theme_application_test.gd`: LedgerRowPanel variation has correct base_type + panel StyleBox slot populated; RecruitButton `modulate.a` reads 1.0 affordable + 0.4 unaffordable; RefreshPoolButton same; `_play_pool_cross_fade()` reduce-motion path sets entries to 1.0 immediately. All 7 pass locally.
+- Focused regression check: 222 passed / 0 failed across recruitment + economy + recruit_screen + recruitment integration tests.
+- Theme `load_steps` unchanged (15) — `LedgerRowPanel` reuses the existing `ledger_row` sub_resource shared with `LedgerRow`.
+- **Process trial #1 — sprint-status flip-on-merge**: this PR bundles the `S21-M2 status: ready-for-dev → done` flip into the same commit as the implementation.
+- **Process trial #2 — `.uid` sidecar tracking**: this PR commits `recruitment_theme_application_test.gd.uid` alongside its `.gd` parent.
+- **Process trial #3 — `git status --short` verification before commit**: applies the lesson from PR #122's missed-files bug (feedback memory `git_add_aborts_on_missing_pathspec`).
+
 ## [0.0.0.46] - 2026-05-15
 
 ### Added
