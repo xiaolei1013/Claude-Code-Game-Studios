@@ -78,7 +78,8 @@ const _SCREEN_FORMATION_ASSIGNMENT: PackedScene = preload("res://assets/screens/
 const _SCREEN_DUNGEON_RUN_VIEW: PackedScene = preload("res://assets/screens/dungeon_run_view/dungeon_run_view.tscn")
 const _SCREEN_VICTORY_MOMENT: PackedScene = preload("res://assets/screens/victory_moment/victory_moment.tscn")
 const _SCREEN_RETURN_TO_APP: PackedScene = preload("res://assets/screens/return_to_app/return_to_app.tscn")
-const _SCREEN_MATCHUP_ASSIGNMENT: PackedScene = preload("res://assets/screens/matchup_assignment/matchup_assignment.tscn")
+# Sprint 22 S22-M2: matchup_assignment folded into formation_assignment as
+# the in-screen Floor Picker overlay; standalone screen + registry entry removed.
 ## Sprint 21+ Prestige V1.0 / Story 3 UI (Slice B) — Hall of Retired Heroes.
 ## Reachable from Guild Hall when `HeroRoster.get_prestige_count() > 0`.
 ## Per `design/gdd/prestige-system.md` §F + AC-PR-13.
@@ -207,7 +208,6 @@ var _screen_registry: Dictionary = {
 	"dungeon_run_view": _SCREEN_DUNGEON_RUN_VIEW,
 	"victory_moment": _SCREEN_VICTORY_MOMENT,
 	"return_to_app": _SCREEN_RETURN_TO_APP,
-	"matchup_assignment": _SCREEN_MATCHUP_ASSIGNMENT,
 	"hall_of_retired_heroes": _SCREEN_HALL_OF_RETIRED_HEROES,
 }
 

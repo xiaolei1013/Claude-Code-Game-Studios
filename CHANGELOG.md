@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.48] - 2026-05-15
+
+### Changed
+- **Matchup Assignment folded into Formation Assignment as in-screen Floor Picker overlay (Sprint 22 S22-M2)** — the separate `matchup_assignment` screen is retired; its biome/floor-selection UX now appears as an overlay inside Formation Assignment when the player taps the FloorButton. Player presses Select to commit (via `FormationAssignment.set_target` — unchanged contract) and the overlay hides, returning to the same Formation Assignment screen with the updated FloorContextLabel + FloorButton text. Cancel hides the overlay without committing. **Player no longer leaves the Dispatch screen to change the floor** — saves one screen transition per dispatch decision.
+
+### Added
+- **FloorPickerOverlay node tree in `formation_assignment.tscn`** — full-rect Control with DimBackdrop + centered PickerPanel containing PickerCancelButton + PickerTitleLabel + PickerScroll → PickerBiomeVBox + PickerSelectButton. Hidden by default; mirrors the `MidRunReassignConfirmation` overlay pattern already in the scene.
+- **Floor Picker helpers in `formation_assignment.gd`** ported from the retired `matchup_assignment.gd`:
+  - `_show_floor_picker()` — resolves biomes + flattens dungeon→floor map; renders biome tabs; applies initial selection from current target; shows overlay
+  - `_hide_floor_picker()` — closes overlay without committing
+  - `_render_floor_picker_biome_tabs()` — dynamic per-biome layout with prescriptive "Recommended: <classes>" matchup hint
+  - `_select_floor_in_picker()` — updates internal selection state + Select button label/disabled
+  - `_on_floor_picker_floor_pressed()` — handles floor button taps (rejects locked floors via push_warning)
+  - `_on_floor_picker_select_pressed()` — commits via `FormationAssignment.set_target` + refreshes FloorContextLabel + closes overlay
+  - `_on_floor_picker_cancel_pressed()` — closes without committing
+  - `_on_floor_unlocked()` — re-renders picker if open during a mid-screen unlock advance (offline-replay flush)
+- **`_refresh_floor_context_label()` helper** — extracted from inline `on_enter` logic so the Floor Picker can call it on Select.
+
+### Removed
+- `assets/screens/matchup_assignment/matchup_assignment.tscn` (deleted)
+- `assets/screens/matchup_assignment/matchup_assignment.gd` (deleted)
+- `assets/screens/matchup_assignment/matchup_assignment.gd.uid` (deleted)
+- `_SCREEN_MATCHUP_ASSIGNMENT` preload constant in `scene_manager.gd`
+- `"matchup_assignment": _SCREEN_MATCHUP_ASSIGNMENT` entry in `_screen_registry` — **registry shrunk 9 → 8**
+- `tests/integration/matchup_assignment/` directory (2 test files + 2 .uid sidecars): `matchup_assignment_contract_test.gd` + `matchup_hint_label_test.gd`. The contract these tests covered (biome resolution, floor button states, set_target on Select) is now exercised through Formation Assignment screen tests; full migration of these assertions to the in-screen Floor Picker is deferred to S22-M4 clarity polish.
+
+### Internal
+- `_screen_registry` shrinks 9 → 8 entries (`matchup_assignment` removed).
+- `request_screen_and_node_swap_test.gd` updated: `matchup_assignment` dropped from `CANONICAL_SCREEN_IDS`; `test_screen_registry_has_nine_entries` renamed `_has_eight_entries` (count = 8 post-S22-M2).
+- Focused regression check on `tests/unit/scene_manager` + `tests/integration/scene_manager` + `tests/integration/formation_assignment` + `tests/unit/formation_assignment`: **293 passed / 0 failed**. No regressions in adjacent test surfaces.
+- Sprint 22 plan PR #125 merged; PR #126 (S22-M1 main_menu retire) is independent and orthogonal to this M2 fold. After both M1 and M2 merge, the scene registry reaches 7 entries.
+- Sprint 22 progress: M1 (main_menu retire) + M2 (matchup fold) together reduce scene count from 10 → 7 as planned.
+
 ## [0.0.0.47] - 2026-05-15
 
 ### Added
