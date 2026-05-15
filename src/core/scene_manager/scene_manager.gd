@@ -67,11 +67,12 @@ enum InputPolicy { BLOCK, QUEUE_ONE }
 # Screen PackedScene constants — preloaded at boot (<10MB total per TR-022)
 # ---------------------------------------------------------------------------
 
-## Preloaded PackedScene for each of the 7 MVP screens.
+## Preloaded PackedScene for each of the live MVP screens.
 ## These constants cause a parse-time error if any .tscn is missing — the hard fail
 ## mode per TR-scene-manager-022 (missing registry entries must assert-fail).
 ## ADR-0007 §screen_registry
-const _SCREEN_MAIN_MENU: PackedScene = preload("res://assets/screens/main_menu/main_menu.tscn")
+## Sprint 22 S22-M1: `main_menu` retired as dead code — boot routes to guild_hall;
+## RUN_ENDED routes to victory_moment; no remaining live navigation reached main_menu.
 const _SCREEN_GUILD_HALL: PackedScene = preload("res://assets/screens/guild_hall/guild_hall.tscn")
 const _SCREEN_RECRUITMENT: PackedScene = preload("res://assets/screens/recruitment/recruitment.tscn")
 const _SCREEN_FORMATION_ASSIGNMENT: PackedScene = preload("res://assets/screens/formation_assignment/formation_assignment.tscn")
@@ -200,7 +201,6 @@ var current_screen_id: String = ""
 ## Populated at _ready() from the preloaded constants above.
 ## TR-scene-manager-022 — ADR-0007
 var _screen_registry: Dictionary = {
-	"main_menu": _SCREEN_MAIN_MENU,
 	"guild_hall": _SCREEN_GUILD_HALL,
 	"recruitment": _SCREEN_RECRUITMENT,
 	"formation_assignment": _SCREEN_FORMATION_ASSIGNMENT,

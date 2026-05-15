@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.48] - 2026-05-15
+
+### Removed
+- **`main_menu` screen retired (Sprint 22 S22-M1)** — dead code. Investigation found no live navigation reached `main_menu`: boot routes directly to `guild_hall` (per `SceneManager._on_registry_ready` default route, line 1201); RUN_ENDED routes to `victory_moment` (per `dungeon_run_view.gd:_on_state_changed`, line 330). The Sprint 8 hotfix that originally added `main_menu` as a placeholder post-run landing has been functionally superseded since Sprint 12-era victory_moment work, with stale comments accumulating across files. Removed:
+  - `assets/screens/main_menu/main_menu.tscn`
+  - `assets/screens/main_menu/main_menu.gd`
+  - `assets/screens/main_menu/main_menu.gd.uid`
+  - `_SCREEN_MAIN_MENU` preload constant in `scene_manager.gd`
+  - `"main_menu": _SCREEN_MAIN_MENU` entry in `_screen_registry` (registry shrunk 9 → 8)
+- The `Redispatch` quick-action feature that lived on `main_menu` (Sprint 14 S14-N2) is **dropped** in this PR. If desired in Sprint 22+ M4 clarity work, it ports cleanly to Guild Hall (the implementation pattern is preserved in git history at `assets/screens/main_menu/main_menu.gd` HEAD~).
+
+### Changed
+- **`dungeon_run_view.gd` docstrings updated** — all references to `main_menu` in doc comments replaced with `victory_moment` (the actual current routing target). Code paths unchanged; this is documentation alignment with implementation.
+- **`scene_manager.gd` registry comment updated** — notes the S22-M1 main_menu retirement rationale inline.
+- **5 integration tests updated** to remove `main_menu` references:
+  - `tests/unit/scene_manager/screen_base_class_test.gd` — `main_menu` dropped from `PLACEHOLDER_SCREEN_NAMES`
+  - `tests/integration/scene_manager/crossfade_timing_test.gd` — replaced `main_menu` with `recruitment` as the first-transition target (any registered screen works for these ACs)
+  - `tests/integration/scene_manager/request_screen_and_node_swap_test.gd` — `main_menu` dropped from `CANONICAL_SCREEN_IDS` + expected_paths map; `test_screen_registry_has_nine_entries` renamed `test_screen_registry_has_eight_entries`; `hall_of_retired_heroes` added to canonical list (was missing); first-transition test target swapped to `recruitment`
+  - `tests/integration/scene_manager/scene_boundary_persist_emission_test.gd` — `main_menu` replaced with `recruitment` in 2 negative-case tests (testing that the boundary signal is NOT emitted; any pair of non-emitting screens works)
+- **Stale comment refs preserved** for git-history continuity in `run_end_to_main_menu_transition_test.gd`, `run_pacing_minimum_duration_test.gd`, and `dungeon_run_view_screen_test.gd` — these files have stale `main_menu` mentions in comments/docstrings but their ASSERTIONS already check `victory_moment` (the actual routing). The Sprint 14-era comment in `run_end_to_main_menu_transition_test.gd` explicitly notes "name keeps main_menu for git-history continuity" — following established precedent.
+
+### Internal
+- Screen registry shrinks 9 → 8 entries (`main_menu` removed).
+- Focused regression check on `tests/unit/scene_manager/` + `tests/integration/scene_manager/` + `tests/integration/formation_assignment/` + `tests/unit/formation_assignment/`: **293 passed / 0 failed**. No regressions in adjacent test surfaces.
+- Sprint 22 plan PR #125 is still open at S22-M1 ship time. The `production/sprint-status.yaml` S22-M1 status flip is deferred to a follow-up PR after #125 merges (avoiding sprint-status conflicts on this PR).
+
 ## [0.0.0.47] - 2026-05-15
 
 ### Added

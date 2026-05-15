@@ -31,8 +31,9 @@ const SceneManagerScript = preload("res://src/core/scene_manager/scene_manager.g
 const MAIN_ROOT_SCENE_PATH: String = "res://src/core/scene_manager/MainRoot.tscn"
 
 # Known canonical screen IDs (TR-scene-manager-022)
+# Sprint 22 S22-M1: "main_menu" removed — retired as dead code (no live navigation
+# reached it post-Sprint-9; victory_moment supersedes its RUN_ENDED landing role).
 const CANONICAL_SCREEN_IDS: Array[String] = [
-	"main_menu",
 	"guild_hall",
 	"recruitment",
 	"formation_assignment",
@@ -40,6 +41,7 @@ const CANONICAL_SCREEN_IDS: Array[String] = [
 	"victory_moment",
 	"return_to_app",
 	"matchup_assignment",  # Sprint 16 S16-M3 (pre-emptive scaffold) registered 2026-05-07
+	"hall_of_retired_heroes",  # Sprint 21+ Prestige V1.0 Story 3 (Slice B)
 ]
 
 # Default timeout for awaiting transition_complete in wired tests (ms).
@@ -473,13 +475,12 @@ func test_same_screen_request_does_not_free_current_screen() -> void:
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
-# E-01: _screen_registry has exactly 9 entries
-# (Sprint 21+ Prestige V1.0 / Story 3 UI Slice B added
-#  `hall_of_retired_heroes`, growing 8 → 9.)
+# E-01: _screen_registry has exactly 8 entries
+# Sprint 22 S22-M1: main_menu retired (dead code) — registry shrunk 9 → 8.
 # ---------------------------------------------------------------------------
-func test_screen_registry_has_nine_entries() -> void:
+func test_screen_registry_has_eight_entries() -> void:
 	var sm: Node = SceneManagerScript.new()
-	assert_int(sm._screen_registry.size()).is_equal(9)
+	assert_int(sm._screen_registry.size()).is_equal(8)
 	sm.free()
 
 
@@ -524,7 +525,6 @@ func test_screen_registry_resource_paths_match_canonical_layout() -> void:
 	var registry: Dictionary = sm._screen_registry
 
 	var expected_paths: Dictionary = {
-		"main_menu": "res://assets/screens/main_menu/main_menu.tscn",
 		"guild_hall": "res://assets/screens/guild_hall/guild_hall.tscn",
 		"recruitment": "res://assets/screens/recruitment/recruitment.tscn",
 		"formation_assignment": "res://assets/screens/formation_assignment/formation_assignment.tscn",
@@ -804,11 +804,14 @@ func test_screen_changed_signal_on_first_transition() -> void:
 	)
 
 	# Act — first ever transition; old_id should be ""
-	sm.request_screen("main_menu", SceneManagerScript.TransitionType.CROSS_FADE)
+	# Sprint 22 S22-M1: "main_menu" retired → use "recruitment" as the
+	# first-transition target instead (any registered screen suffices for this
+	# AC; recruitment is the simplest screen with a known registry entry).
+	sm.request_screen("recruitment", SceneManagerScript.TransitionType.CROSS_FADE)
 	await _await_transition(sm)
 
 	# Assert
-	assert_str(changed_args[0]).is_equal("main_menu")
+	assert_str(changed_args[0]).is_equal("recruitment")
 	assert_str(changed_args[1]).is_equal("")
 
 	# Cleanup
