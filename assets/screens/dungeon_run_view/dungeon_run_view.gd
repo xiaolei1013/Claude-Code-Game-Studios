@@ -6,7 +6,7 @@
 ##      labels O(1) from [member DungeonRunOrchestrator.run_snapshot] (no allocs).
 ##   2. [signal DungeonRunOrchestrator.state_changed] → detects RUN_ENDED,
 ##      shows the run-end overlay (Story 012 AC-6 preferred path), and
-##      auto-routes to main_menu via [method SceneManager.request_screen]
+##      auto-routes to victory_moment via [method SceneManager.request_screen]
 ##      (Story 013 AC-1 / AC-7).
 ##
 ## Acceptance Criteria (8 ACs from Story 012, Sprint 8 S8-M2):
@@ -24,7 +24,7 @@
 ##         no SceneTree.change_scene_to_* calls anywhere in this file.
 ##
 ## Acceptance Criteria (7 ACs from Story 013, Sprint 8 S8-M3):
-##   AC-1: Auto-route on RUN_ENDED — calls SceneManager.request_screen("main_menu",
+##   AC-1: Auto-route on RUN_ENDED — calls SceneManager.request_screen("victory_moment",
 ##         CROSS_FADE) exactly once after RUN_ENDED is detected.
 ##   AC-2: Transition completes within ≤500 ms total wall-clock time.
 ##   AC-3: RUN_END_DWELL_MS = 1500 ms (Sprint 9 S9-M2 polish; valid range [0, 2000]).
@@ -33,7 +33,7 @@
 ##   AC-4: Tick subscription disconnects cleanly after route fires (on_exit path).
 ##   AC-5: Idempotent — _routed flag prevents request_screen from being called twice.
 ##   AC-6: No bypass of SceneManager (no SceneTree.change_scene_to_*).
-##   AC-7: request_screen("main_menu", CROSS_FADE) is the sole screen-change call.
+##   AC-7: request_screen("victory_moment", CROSS_FADE) is the sole screen-change call.
 ##
 ## Governing ADRs:
 ##   ADR-0007: Screen lifecycle contract (on_enter/on_exit/on_pause/on_resume).
@@ -68,7 +68,7 @@ const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/d
 # ---------------------------------------------------------------------------
 
 ## Dwell duration in milliseconds between showing the run-end overlay and
-## auto-routing to main_menu.
+## auto-routing to victory_moment.
 ##
 ## Sprint 9 S9-M2 polish: bumped from 0 to 1500 ms to ensure ≥2 s perceived
 ## run duration (Story 013 AC-3 spec deviation). Playtest S8-M5 showed
@@ -123,7 +123,7 @@ const LEVEL_UP_TOAST_FADE_START_SEC: float = 2.4
 ## state_changed fires more than once with RUN_ENDED — defensive guard).
 var _overlay_shown: bool = false
 
-## Set to true after request_screen("main_menu") fires so _on_state_changed
+## Set to true after request_screen("victory_moment") fires so _on_state_changed
 ## is idempotent on the routing side (AC-5 Story 013). Guards against a second
 ## request_screen call if state_changed emits RUN_ENDED more than once while
 ## the transition is in flight (which would trigger a push_warning from
@@ -292,7 +292,7 @@ func _on_tick_fired(_tick_number: int) -> void:
 ## Handles [signal DungeonRunOrchestrator.state_changed].
 ##
 ## When [param new_state] == RUN_ENDED, shows the run-end overlay (Story 012)
-## and auto-routes to main_menu via SceneManager.request_screen (Story 013 AC-1).
+## and auto-routes to victory_moment via SceneManager.request_screen (Story 013 AC-1).
 ##
 ## Two distinct idempotency guards cooperate here:
 ##   [member _overlay_shown] — prevents the overlay from being shown twice.
@@ -304,9 +304,9 @@ func _on_tick_fired(_tick_number: int) -> void:
 ## call, making this handler async. The [member _routed] flag is set BEFORE
 ## the await so any re-entrant emission during the dwell is a no-op.
 ## Sprint 9 S9-M2: default RUN_END_DWELL_MS = 1500 — overlay holds for 1.5 s
-## before the cross-fade to main_menu fires.
+## before the cross-fade to victory_moment fires.
 ##
-## AC-7 Story 013: request_screen("main_menu", CROSS_FADE) is the sole
+## AC-7 Story 013: request_screen("victory_moment", CROSS_FADE) is the sole
 ## screen-change call — no SceneTree.change_scene_to_* call anywhere in
 ## this handler.
 func _on_state_changed(new_state: int, _old_state: int) -> void:

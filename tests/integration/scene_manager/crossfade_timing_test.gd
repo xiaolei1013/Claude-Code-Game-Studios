@@ -101,9 +101,9 @@ func test_scene_manager_crossfade_tween_duration_sums_to_150ms_structurally() ->
 	assert_int(sm._get_last_crossfade_total_duration_ms()).is_equal(0)
 
 	# Navigate to main_menu first so we have an outgoing screen
-	sm.request_screen("main_menu", SceneManagerScript.TransitionType.CROSS_FADE)
+	sm.request_screen("recruitment", SceneManagerScript.TransitionType.CROSS_FADE)
 	await _await_transition(sm)
-	assert_str(sm.current_screen_id).is_equal("main_menu")
+	assert_str(sm.current_screen_id).is_equal("recruitment")
 
 	# Clear probe to verify it's re-written on the next cross-fade
 	sm._last_crossfade_authored_ms = 0
@@ -148,7 +148,7 @@ func test_scene_manager_crossfade_completes_within_150ms_advisory_wall_clock() -
 	var main_root: Node = result[1]
 
 	# Navigate to main_menu to establish a starting screen
-	sm.request_screen("main_menu", SceneManagerScript.TransitionType.CROSS_FADE)
+	sm.request_screen("recruitment", SceneManagerScript.TransitionType.CROSS_FADE)
 	await _await_transition(sm)
 
 	# Act — capture start time, request cross-fade, await completion

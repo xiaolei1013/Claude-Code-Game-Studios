@@ -4,7 +4,7 @@
 #   - Signal declared on SceneManager (signature `(reason: String)`).
 #   - Emits "pre_dungeon_entry" before transitioning to dungeon_run_view.
 #   - Emits "post_victory_exit" after exiting victory_moment.
-#   - Does NOT emit on other transitions (e.g., guild_hall → main_menu).
+#   - Does NOT emit on other transitions (e.g., guild_hall → recruitment).
 #   - Both emissions fire on a victory_moment → dungeon_run_view transition
 #     (the case where both conditions apply).
 #
@@ -153,7 +153,7 @@ func test_scene_manager_scene_boundary_persist_emits_both_on_victory_to_dungeon_
 # Group C — non-emission on unrelated transitions
 # ===========================================================================
 
-func test_scene_manager_scene_boundary_persist_does_not_emit_on_guild_hall_to_main_menu() -> void:
+func test_scene_manager_scene_boundary_persist_does_not_emit_on_guild_hall_to_recruitment() -> void:
 	# Per the GDD: "Only these two transitions trigger it — no other
 	# transitions fire this signal."
 	var result: Array = await _make_wired_scene_manager()
@@ -165,7 +165,7 @@ func test_scene_manager_scene_boundary_persist_does_not_emit_on_guild_hall_to_ma
 	await get_tree().process_frame
 
 	_connect_spy(sm)
-	sm.request_screen("main_menu", SceneManagerScript.TransitionType.CROSS_FADE)
+	sm.request_screen("recruitment", SceneManagerScript.TransitionType.CROSS_FADE)
 	await sm.transition_complete
 	await get_tree().process_frame
 
@@ -174,14 +174,14 @@ func test_scene_manager_scene_boundary_persist_does_not_emit_on_guild_hall_to_ma
 	await _cleanup_wired(sm, main_root)
 
 
-func test_scene_manager_scene_boundary_persist_does_not_emit_on_main_menu_to_formation_assignment() -> void:
+func test_scene_manager_scene_boundary_persist_does_not_emit_on_recruitment_to_formation_assignment() -> void:
 	# Another negative case — neither end of the transition is a GDD-specified
 	# emission boundary.
 	var result: Array = await _make_wired_scene_manager()
 	var sm: Node = result[0]
 	var main_root: Node = result[1]
 
-	sm.request_screen("main_menu", SceneManagerScript.TransitionType.CROSS_FADE)
+	sm.request_screen("recruitment", SceneManagerScript.TransitionType.CROSS_FADE)
 	await sm.transition_complete
 	await get_tree().process_frame
 
