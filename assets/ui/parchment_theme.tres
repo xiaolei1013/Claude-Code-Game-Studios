@@ -33,6 +33,8 @@
 ;                                       Referenced by formation_assignment.gd:245.
 
 [gd_resource type="Theme" load_steps=15 format=3]
+; Note: load_steps unchanged from S21-M1 — LedgerRowPanel reuses the existing
+; `ledger_row` StyleBoxFlat sub_resource, no new sub_resources needed.
 
 [ext_resource type="FontFile" path="res://assets/fonts/Lora/Lora.ttf" id="1_lora"]
 [ext_resource type="FontFile" path="res://assets/fonts/IM_Fell_English/IMFellEnglish-Regular.ttf" id="2_imfell"]
@@ -365,6 +367,17 @@ SlotButtonSelected/styles/normal = SubResource("slot_button_selected")
 SlotButtonSelected/styles/hover = SubResource("slot_button_selected")
 SlotButtonSelected/styles/pressed = SubResource("slot_button_selected")
 SlotButtonSelected/styles/focus = SubResource("slot_button_selected")
+
+; LedgerRowPanel — Pool Entry Card container variant (pattern #15). Same
+; visual register as LedgerRow but base_type PanelContainer for non-button
+; containers (e.g., Recruit Screen PoolEntry rows that contain a portrait +
+; details + action button rather than acting as a single tappable row).
+; Reuses the existing `ledger_row` StyleBoxFlat — same hairline border + 2px
+; corner radius + 8px padding. Apply via panel.theme_type_variation =
+; &"LedgerRowPanel". Sprint 21 S21-M2 (2026-05-15) addition — infrastructure
+; only; .tscn application deferred to Sprint 22 polish per S21-M2 scope note.
+LedgerRowPanel/base_type = &"PanelContainer"
+LedgerRowPanel/styles/panel = SubResource("ledger_row")
 
 ; IdentityHeader — illuminated-manuscript display tier. Used for biome titles,
 ; victory banners, screen headers. ≥24px per Art Bible §7 typography floor;

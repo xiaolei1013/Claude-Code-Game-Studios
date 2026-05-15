@@ -162,11 +162,11 @@ stories:
     name: "Recruit Screen theme implementation — apply DESIGN.md + UX-RS spec; Pool Entry Card + Affordability Gating + Cross-Fade Refresh"
     file: "assets/screens/recruitment/recruitment.tscn"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-05-15 — v0.0.0.47. Affordability Gating polish on RecruitButton + RefreshPoolButton (modulate.a opacity gating); Cross-Fade Refresh on pool_refreshed signal (200ms tween + 50ms inter-entry stagger; reduce-motion bypass); LedgerRowPanel theme variation ships as deferred infrastructure (.tscn application defers to Sprint 22). 7 new contract tests; focused regression check 222 / 0. Process trials #1+#2+#3 ride along."
 
   - id: "S21-M3"
     name: "Sprint 21 playtest — visual validation of Formation Assignment + Recruit Screen (6 checks); process trial: playtest-branch verification"
