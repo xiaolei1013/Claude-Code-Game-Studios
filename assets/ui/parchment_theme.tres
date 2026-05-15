@@ -32,7 +32,7 @@
 ;                                       on Parchment Cream with Slate Ink outline.
 ;                                       Referenced by formation_assignment.gd:245.
 
-[gd_resource type="Theme" load_steps=12 format=3]
+[gd_resource type="Theme" load_steps=13 format=3]
 
 [ext_resource type="FontFile" path="res://assets/fonts/Lora/Lora.ttf" id="1_lora"]
 [ext_resource type="FontFile" path="res://assets/fonts/IM_Fell_English/IMFellEnglish-Regular.ttf" id="2_imfell"]
@@ -106,6 +106,29 @@ corner_radius_bottom_left = 6
 shadow_color = Color(0.7843, 0.5294, 0.1647, 0.18)
 shadow_size = 8
 shadow_offset = Vector2(0, 3)
+
+; LedgerRow — pattern #10 from interaction-patterns.md.
+; Parchment sub-panel register used INSIDE a larger panel (e.g., Guild Hall
+; HeroCards inside the RosterPanel). Visual register: a row in a guild
+; ledger book. Hairline 1px Slate Ink border at 50% alpha (subtle separator,
+; not full panel border); 2px corner radius (rigid ledger-row feel); compact
+; 8px padding. Apply via card.theme_type_variation = &"LedgerRow".
+; Sprint 20 S20-M5 (2026-05-15) addition.
+[sub_resource type="StyleBoxFlat" id="ledger_row"]
+content_margin_left = 8.0
+content_margin_top = 8.0
+content_margin_right = 8.0
+content_margin_bottom = 8.0
+bg_color = Color(0.9294, 0.8784, 0.7686, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.1725, 0.1569, 0.2196, 0.5)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
 
 ; Overlay dim plate — Slate Ink at low alpha, used by OverlayLayer / run-end overlay
 ; backgrounds. Per Art Bible §7 "lantern-underlit background": "60-70% opacity, desaturated".
@@ -269,6 +292,20 @@ ParchmentPanel/styles/panel = SubResource("panel_parchment")
 ; bg fills entire rect; child Control sets its own ParchmentPanel on top.
 OverlayDimPlate/base_type = &"PanelContainer"
 OverlayDimPlate/styles/panel = SubResource("overlay_dim")
+
+; LedgerRow — pattern #10 (Guild-Ledger-Entry). Parchment sub-panel register
+; for rows inside a larger parchment panel (e.g., HeroCards inside RosterPanel).
+; Reads as a line in a guild ledger book — hairline 1px Slate Ink border at
+; 50% alpha + compact 8px padding + 2px corner radius. Apply via:
+;   card.theme_type_variation = &"LedgerRow"
+; Sprint 20 S20-M5 addition. base_type is Button because HeroCards are
+; tappable (per GDD #22 AC-22-01 Hero Detail modal); the LedgerRow styling
+; applies to the Button's normal StyleBox.
+LedgerRow/base_type = &"Button"
+LedgerRow/styles/normal = SubResource("ledger_row")
+LedgerRow/styles/hover = SubResource("ledger_row")
+LedgerRow/styles/pressed = SubResource("ledger_row")
+LedgerRow/styles/focus = SubResource("ledger_row")
 
 ; IdentityHeader — illuminated-manuscript display tier. Used for biome titles,
 ; victory banners, screen headers. ≥24px per Art Bible §7 typography floor;

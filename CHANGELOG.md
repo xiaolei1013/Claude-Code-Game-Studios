@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.45] - 2026-05-15
+
+### Added
+- **Guild Hall synergy badge (Sprint 20 S20-M5)** — per UX-GH-09 + interaction-patterns #11 (Conditional Strip). New `SynergyBadge` PanelContainer node in `guild_hall.tscn` shows the active class synergy when the player's current formation has one ("Steel Wall: +25% gold vs bruisers"). Hidden by default; populated via `_refresh_synergy_badge()` in `on_enter` and on every roster signal (`hero_recruited`, `hero_removed`). Builds the formation snapshot in the same shape that Formation Assignment's badge uses, then delegates to `FormationAssignment.detect_active_synergy()` for the synergy id, then renders localized `"<name>: <effect>"` text from the existing en.csv keys (`class_synergy_badge_*` + `class_synergy_effect_*`).
+- **`LedgerRow` theme variation (Sprint 20 S20-M5)** — per interaction-patterns #10 (Guild-Ledger-Entry). New StyleBoxFlat `ledger_row` + theme variation in `assets/ui/parchment_theme.tres`: parchment-cream fill + 1px Slate Ink border at 50% alpha + 2px corner radius + 8px padding. Apply via `card.theme_type_variation = &"LedgerRow"`. base_type is `Button` because HeroCards are tappable (GDD #22 AC-22-01 → Hero Detail modal). Reusable for any future ledger-row content inside larger parchment panels.
+
+### Changed
+- **HeroCard now uses `LedgerRow` theme variation** in `guild_hall.gd:_build_hero_card`. Visual register shifts from default Button (parchment panel with full border + 4px radius) to ledger-row (compact 2px radius + hairline border) — reads as "a line in the guild ledger" inside the RosterPanel rather than a standalone card. Closes the Guild Hall UX spec's request for HeroCard ledger-entry styling.
+
+### Internal
+- 8 new contract tests in `tests/unit/guild_hall/guild_hall_theme_application_test.gd`: LedgerRow theme variation present + has normal StyleBox; SynergyBadge node exists in scene + has Label child; SynergyBadge hidden by default (Conditional Strip pattern); SynergyBadge visible with correct localized text on 3-warrior Steel Wall composition; SynergyBadge hidden on mixed-class composition; HeroCard Button has `theme_type_variation = &"LedgerRow"`. All 8 pass locally.
+- Full suite: 4462 cases / 0 errors / 0 failures. No regressions.
+- Theme `load_steps` bumped 12 → 13 to accommodate the new `ledger_row` StyleBoxFlat sub_resource.
+
 ## [0.0.0.44] - 2026-05-14
 
 ### Added

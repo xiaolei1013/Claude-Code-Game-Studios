@@ -178,6 +178,35 @@ text = ""
 horizontal_alignment = 1
 autowrap_mode = 3
 
+; SynergyBadge — Sprint 20 S20-M5 (per UX-GH-09 + interaction-patterns #11
+; Conditional Strip). Visible only when the player's current formation has
+; an active class synergy. Position: above the NavBar buttons; below the
+; RosterPanel. Hidden by default — Guild Hall's on_enter computes the
+; current synergy and sets visible + label text.
+[node name="SynergyBadge" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -240.0
+offset_top = -340.0
+offset_right = 240.0
+offset_bottom = -292.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+
+[node name="SynergyLabel" type="Label" parent="SynergyBadge"]
+layout_mode = 2
+mouse_filter = 2
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+
 [node name="WarmLanternOverlay" type="ColorRect" parent="."]
 material = SubResource("ShaderMaterial_warm_lantern")
 layout_mode = 1
