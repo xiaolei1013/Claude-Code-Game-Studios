@@ -323,6 +323,10 @@ func _refresh_roster_panel() -> void:
 		btn.custom_minimum_size = Vector2(120, 44)
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.mouse_filter = Control.MOUSE_FILTER_STOP
+		# Sprint 21 S21-M1: apply LedgerRow theme variation (pattern #10 —
+		# Guild-Ledger-Entry). Same register as Guild Hall HeroCards so the
+		# player reads roster lines consistently across screens.
+		btn.theme_type_variation = &"LedgerRow"
 		# Bind the hero's instance_id so the closure captures the correct value.
 		btn.pressed.connect(_on_hero_button_pressed.bind(hero.instance_id))
 		_roster_list.add_child(btn)
@@ -358,6 +362,14 @@ func _refresh_formation_panel() -> void:
 		btn.custom_minimum_size = Vector2(180, 80)
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.mouse_filter = Control.MOUSE_FILTER_STOP
+		# Sprint 21 S21-M1: apply Slot Button theme variation (pattern #12).
+		# Selected variant: 4px Guild Amber border (weight + color change —
+		# colorblind-safe). Default: 2px Slate Ink + 6px corner radius
+		# (panel-like content holder per pattern spec).
+		if i == _active_slot_index:
+			btn.theme_type_variation = &"SlotButtonSelected"
+		else:
+			btn.theme_type_variation = &"SlotButton"
 		btn.pressed.connect(_on_slot_button_pressed.bind(i))
 		_slots_hbox.add_child(btn)
 		UIFrameworkScript.assert_tap_target_min(btn)

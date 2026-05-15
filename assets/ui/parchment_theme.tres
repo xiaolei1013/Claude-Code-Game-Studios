@@ -32,7 +32,7 @@
 ;                                       on Parchment Cream with Slate Ink outline.
 ;                                       Referenced by formation_assignment.gd:245.
 
-[gd_resource type="Theme" load_steps=13 format=3]
+[gd_resource type="Theme" load_steps=15 format=3]
 
 [ext_resource type="FontFile" path="res://assets/fonts/Lora/Lora.ttf" id="1_lora"]
 [ext_resource type="FontFile" path="res://assets/fonts/IM_Fell_English/IMFellEnglish-Regular.ttf" id="2_imfell"]
@@ -106,6 +106,47 @@ corner_radius_bottom_left = 6
 shadow_color = Color(0.7843, 0.5294, 0.1647, 0.18)
 shadow_size = 8
 shadow_offset = Vector2(0, 3)
+
+; SlotButton — pattern #12 from interaction-patterns.md (Slot Button).
+; Large button-as-content-container for formation slots. Visual register:
+; parchment ground + 2px Slate Ink border + 6px corner radius (softer than
+; default Button's 4px — reads as panel-like content holder per pattern spec).
+; Sprint 21 S21-M1 (2026-05-15) addition.
+[sub_resource type="StyleBoxFlat" id="slot_button_normal"]
+content_margin_left = 8.0
+content_margin_top = 8.0
+content_margin_right = 8.0
+content_margin_bottom = 8.0
+bg_color = Color(0.9294, 0.8784, 0.7686, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.1725, 0.1569, 0.2196, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+; SlotButtonSelected — selected state of pattern #12. Per spec: 4px Guild
+; Amber border (border weight 2→4 + color shift, so the visual change reads
+; without relying solely on color — colorblind-safe).
+; Sprint 21 S21-M1 (2026-05-15) addition.
+[sub_resource type="StyleBoxFlat" id="slot_button_selected"]
+content_margin_left = 8.0
+content_margin_top = 8.0
+content_margin_right = 8.0
+content_margin_bottom = 8.0
+bg_color = Color(0.9294, 0.8784, 0.7686, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.7843, 0.5294, 0.1647, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 ; LedgerRow — pattern #10 from interaction-patterns.md.
 ; Parchment sub-panel register used INSIDE a larger panel (e.g., Guild Hall
@@ -306,6 +347,24 @@ LedgerRow/styles/normal = SubResource("ledger_row")
 LedgerRow/styles/hover = SubResource("ledger_row")
 LedgerRow/styles/pressed = SubResource("ledger_row")
 LedgerRow/styles/focus = SubResource("ledger_row")
+
+; SlotButton — pattern #12 (Slot Button). Large button-as-content-container
+; for formation slots. Apply via slot_btn.theme_type_variation = &"SlotButton"
+; (default state) or &"SlotButtonSelected" (when player has tapped to select).
+; Sprint 21 S21-M1 addition.
+SlotButton/base_type = &"Button"
+SlotButton/styles/normal = SubResource("slot_button_normal")
+SlotButton/styles/hover = SubResource("slot_button_normal")
+SlotButton/styles/pressed = SubResource("slot_button_normal")
+SlotButton/styles/focus = SubResource("slot_button_normal")
+
+; SlotButtonSelected — selected variant. Border weight 2→4 + Guild Amber
+; color (colorblind-safe: weight change AND color change).
+SlotButtonSelected/base_type = &"Button"
+SlotButtonSelected/styles/normal = SubResource("slot_button_selected")
+SlotButtonSelected/styles/hover = SubResource("slot_button_selected")
+SlotButtonSelected/styles/pressed = SubResource("slot_button_selected")
+SlotButtonSelected/styles/focus = SubResource("slot_button_selected")
 
 ; IdentityHeader — illuminated-manuscript display tier. Used for biome titles,
 ; victory banners, screen headers. ≥24px per Art Bible §7 typography floor;

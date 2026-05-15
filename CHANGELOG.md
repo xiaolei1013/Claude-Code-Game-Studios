@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.46] - 2026-05-15
+
+### Added
+- **Formation Assignment theme implementation (Sprint 21 S21-M1)** — applied DESIGN.md tokens + pattern library to `formation_assignment.tscn`/`.gd`. Two new theme variations landed in `parchment_theme.tres`: `SlotButton` (pattern #12 — large parchment-ground content container with 2px Slate Ink border + 6px corner radius) and `SlotButtonSelected` (4px Guild Amber border — colorblind-safe weight+color shift, not color-alone). Hero roster Buttons now apply `LedgerRow` (pattern #10) for parity with Guild Hall HeroCards — players read roster lines consistently across the two screens.
+
+### Changed
+- **Slot buttons in Formation Assignment now visualize selected state via theme variation swap** in `formation_assignment.gd:_refresh_formation_panel`. Active slot gets `theme_type_variation = &"SlotButtonSelected"`; non-active slots get `&"SlotButton"`. Replaces the prior implicit-selection-only-via-badge model; the slot button itself now visually changes register when selected. The "Selected" badge label (existing `SelectedSlotButton` Label theme variation) is retained and continues to label the active slot atop the button.
+- **Hero roster Buttons in Formation Assignment apply `LedgerRow` theme variation** in `formation_assignment.gd:_refresh_roster_panel`. Aligns visual register with Guild Hall HeroCards (pattern #10 Guild-Ledger-Entry).
+
+### Internal
+- 6 new contract tests in `tests/unit/formation_assignment/formation_assignment_theme_application_test.gd`: theme has SlotButton + SlotButtonSelected variations; SlotButtonSelected has thicker border than default (colorblind-safe weight delta); non-selected slot Button carries `theme_type_variation = &"SlotButton"`; selected slot Button carries `&"SlotButtonSelected"`; roster Button carries `&"LedgerRow"`. All 6 pass locally.
+- Full suite: 4474 cases / 0 errors / 0 failures. No regressions.
+- Theme `load_steps` bumped 13 → 15 (2 new StyleBoxFlat sub_resources: `slot_button_normal`, `slot_button_selected`).
+- **Process trial #1 — sprint-status flip-on-merge**: this PR bundles the `S21-M1 status: ready-for-dev → done` flip into the same commit as the implementation (rather than a separate retro-time bookkeeping pass per Sprint 20 retro action #3).
+- **Process trial #2 — `.uid` sidecar tracking**: this PR commits the `formation_assignment_theme_application_test.gd.uid` sibling alongside the `.gd` file (per Sprint 20 retro action #4).
+
 ## [0.0.0.45] - 2026-05-15
 
 ### Added
