@@ -9,6 +9,22 @@
 #   done           ↔  Complete
 #   blocked        ↔  Blocked
 #
+# UPDATED 2026-05-15 via Sprint 20 closeout (S20-M6 + S20-M7 bundle):
+#   - Sprint 20 closed: 7/7 Must Haves DONE; 0/2 Should Haves (S1+S2 theme
+#     implementations carried to Sprint 21 as HIGH priority); 0/1 Nice to
+#     Haves (N1 ClassPortrait placeholder art deferred pending real-art ETA).
+#     7 sprint-execution PRs total: #114 plan, #115 fonts, #116 scaffolds
+#     audit, #117 5 UX specs, #118 11 patterns, #119 Guild Hall theme,
+#     #120 bookkeeping + playtest skeleton. Plus 4 pre-plan PRs (#110-#113
+#     not counted in sprint execution). Sprint goal MET.
+#     Cumulative tests at S20 close: 4462 PASS / 0 errors / 0 failures.
+#     0 regressions. 0 new ADRs (design system in DESIGN.md, not ADR-shaped).
+#     0 GDD status transitions. +8 contract tests (Guild Hall theme).
+#     +11 patterns (library 9 → 20). Version: 0.0.0.44 → 0.0.0.45.
+#     Twice-deferred S18 retro #1 (scaffolds audit) FINALLY shipped as M1.
+#   - Solo review mode — no PR-SPRINT producer gate.
+#   - Sprint 20 final state archived in comment block below.
+
 # UPDATED 2026-05-14 via Sprint 20 plan authoring:
 #   - Sprint 20 theme: UI/HUD design (UX flows + visual system + per-screen
 #     layout + Guild Hall implementation + scaffolds audit).
@@ -148,21 +164,21 @@ stories:
     name: "Sprint 20 playtest — visual validation of redesigned Guild Hall (5 checks)"
     file: "production/playtests/playtest-12-guild-hall-refresh-2026-05-15.md"
     priority: must-have
-    status: in-progress
+    status: done
     owner: "xiaolei (human)"
     estimate_days: 0.5
     blocker: "S20-M5"
-    completed: ""
+    completed: "2026-05-15 — PASS on all 5 checks (typography / palette / synergy strip conditional / tap targets / cozy register). Tester verdict: 'playtest approved. let's move on'."
 
   - id: "S20-M7"
     name: "Sprint 20 retrospective"
-    file: "production/retrospectives/sprint-20-retrospective-2026-05-??.md"
+    file: "production/retrospectives/sprint-20-retrospective-2026-05-15.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "producer + claude-code"
     estimate_days: 0.25
     blocker: "S20-M6"
-    completed: ""
+    completed: "2026-05-15 — Sprint 20 retro committed. 7 action items for Sprint 21 (S1/S2 theme implementations as HIGH; sprint-status flip-on-merge + .uid tracking + playtest-branch verification as MED process changes)."
 
   # ===== Should Have =====
 

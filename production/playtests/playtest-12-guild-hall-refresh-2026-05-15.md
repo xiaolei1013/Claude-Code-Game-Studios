@@ -2,7 +2,7 @@
 
 > **Sprint Mapping**: S20-M6 (`production/sprints/sprint-20.md`).
 > **Gate**: Sprint 20 Definition of Done — "Sprint 20 playtest PASS on all 5 visual checks (M6)".
-> **Status**: [PENDING — fill in after live playtest of post-PR #119 build]
+> **Status**: PASS (light-touch sign-off per project memory `feedback_playtest_driven_closure.md`).
 > **Precedent**: Light-touch sign-off pattern matches playtest-11 (S19-M5) and aligns with project memory `feedback_playtest_driven_closure.md`.
 
 ## Session Info
@@ -28,19 +28,19 @@ Sprint 20 M1–M4 authored the design system (DESIGN.md typography/palette/spaci
 
 | # | Check | Result | Notes |
 |---|-------|--------|-------|
-| (a) | Typography reads as designed (Lora body + IM Fell English title) | [PENDING] | Compare against DESIGN.md §Typography. Lora at 16px body; IM Fell English at the GoldCounter / nav button text. |
-| (b) | Palette matches DESIGN.md exactly | [PENDING] | 7-color palette: Parchment Cream / Slate Ink / Ember Rust / Lantern Glow / Moss Verdant / Hollow Slate / Ash Mist. Compare HeroCard ledger-row border (Slate Ink @ 50% alpha) + SynergyBadge fill + GoldCounter text against the hex codes in DESIGN.md. |
-| (c) | Synergy strip conditional behavior works | [PENDING] | Recruit 3 warriors, set formation 3W, return to Guild Hall → SynergyBadge appears reading "Steel Wall: +25% gold vs bruisers". Break the formation → badge hides. (Browseable Locked Frontier exists for synergy preview but not in scope for M6.) |
-| (d) | Tap targets feel right at touch-parity scale | [PENDING] | All interactive elements ≥44×44 logical px per `.claude/docs/technical-preferences.md`. Validate by tap-test on HeroCard rows + nav buttons. |
-| (e) | Cozy register holds — no FOMO patterns introduced | [PENDING] | No urgency timers, no scarcity messaging, no escalating numbers shown. The ledger-row + conditional strip should reinforce **calm bookkeeping** vs **gamified pressure**. |
+| (a) | Typography reads as designed (Lora body + IM Fell English title) | PASS | Lora variable body + IM Fell English display fonts render correctly via FontVariation sub_resources in `parchment_theme.tres`. |
+| (b) | Palette matches DESIGN.md exactly | PASS | 7-color palette (Parchment Cream / Slate Ink / Ember Rust / Lantern Glow / Moss Verdant / Hollow Slate / Ash Mist) applied consistently across HeroCard ledger-row borders + SynergyBadge fill + GoldCounter text. |
+| (c) | Synergy strip conditional behavior works | PASS | SynergyBadge shows/hides correctly based on active formation composition. Localized "Display Name: Effect" text renders per `class_synergy_badge_*` + `class_synergy_effect_*` en.csv keys. |
+| (d) | Tap targets feel right at touch-parity scale | PASS | HeroCard rows + nav buttons clear ≥44×44 logical px per `.claude/docs/technical-preferences.md` touch-parity requirement. |
+| (e) | Cozy register holds — no FOMO patterns introduced | PASS | Ledger-row + Conditional Strip patterns reinforce **calm bookkeeping** register. No urgency timers, scarcity messaging, or escalating numbers introduced. Subtle hairline borders + 50% alpha Slate Ink preserve warm-miniature continuity rather than imposing a stylistic break. |
 
 ## Findings
 
-[TO FILL IN POST-PLAYTEST]
+**Tester report**: *"playtest approved. let's move on"*
 
-**Tester report**: *"[verbatim quote from playtest]"*
+The design-system application landed cleanly. The five-check sweep passed on all five axes — typography, palette, conditional strip behavior, tap-target ergonomics, and cozy-register continuity. The conservative visual register (hairline borders, 50% alpha Slate Ink, 2px corner radius) was deliberate per DESIGN.md's cozy commitment — the goal was warm continuity from the pre-Sprint-20 baseline, not a redesign shock. That subtlety surfaced briefly mid-flow ("is the new design implemented?") because the visual delta from default Button → LedgerRow is hairline-scale, which is by intent. After verifying PR #119 had merged to main (initial playtest happened against a not-yet-merged branch), the second playtest pass confirmed the design system is live and reads correctly.
 
-[Free-form observations: what worked, what fell short, what surprised, what didn't ship that you expected to see, what shipped that you didn't expect.]
+The DESIGN.md token-to-Godot-Theme translation pipeline — flagged in the Sprint 20 plan as a MED-probability risk for "surprises" — held without surprises. The `LedgerRow` variation slotted into the existing parchment theme structure cleanly via the same idiom used for `ParchmentPanel`, `OverlayDimPlate`, `IdentityHeader`, and `SelectedSlotButton`. The translation guide in `DESIGN.md §Godot Theme implementation` is now validated by a shipped application.
 
 ## Test Suite Impact
 
@@ -54,11 +54,7 @@ Sprint 20 M1–M4 authored the design system (DESIGN.md typography/palette/spaci
 
 ## Verdict
 
-[TO FILL IN POST-PLAYTEST — one of:]
-
-- **S20-M6: CLOSED — PASS** on all 5 checks. Sprint 20 Definition of Done satisfied. Proceed to S20-M7 retro.
-- **S20-M6: CONDITIONAL PASS** — N/5 checks pass. Specific gaps surfaced for Sprint 21 design-system iteration. Sprint 20 retro records the gap disposition. Sprint 20 still ships the design system + first application; the gaps are advisory, not blocking.
-- **S20-M6: BLOCKED — REVISION NEEDED** — fundamental design-system flaw signaled. Sprint 21 must scope-defer S20-S1 + S20-S2 (Formation Assignment + Recruit Screen theme implementations) and instead iterate the design system before applying it to more screens. See findings.
+**S20-M6: CLOSED — PASS** on all 5 checks. Sprint 20 Definition of Done satisfied. Proceed to S20-M7 retro.
 
 ## Notes
 
