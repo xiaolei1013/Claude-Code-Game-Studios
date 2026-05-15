@@ -9,6 +9,23 @@
 #   done           ↔  Complete
 #   blocked        ↔  Blocked
 #
+# UPDATED 2026-05-15 via /sprint-plan new (Sprint 21 Day-0):
+#   - Sprint 20 closed same-day; Sprint 21 Day-0 plan authored on top
+#     (eighth consecutive same-day-compressed sprint cadence).
+#   - Sprint 21 theme: design system sweep across remaining live screens.
+#     Apply DESIGN.md to Formation Assignment + Recruit Screen; trial 3
+#     process disciplines from Sprint 20 retro (sprint-status flip-on-
+#     merge + .uid sidecar tracking + playtest-branch verification).
+#   - Sprint 21 Must Haves (4 total, 2.75d): Formation Assignment theme
+#     (M1), Recruit Screen theme (M2), visual playtest (M3), retro (M4).
+#     Process trial items embedded in M1+M2, not separate Must Have.
+#   - Pre-plan deliverables already merged (NOT in sprint count): #111
+#     DESIGN.md, #112 Formation Assignment UX spec, #113 Recruit Screen UX
+#     spec, #115 fonts, #118 11 patterns, #119 Guild Hall theme impl, #120
+#     S20 closeout + lessons.
+#   - Solo review mode — no PR-SPRINT producer gate.
+#   - Sprint 20 final state archived in comment block below.
+
 # UPDATED 2026-05-15 via Sprint 20 closeout (S20-M6 + S20-M7 bundle):
 #   - Sprint 20 closed: 7/7 Must Haves DONE; 0/2 Should Haves (S1+S2 theme
 #     implementations carried to Sprint 21 as HIGH priority); 0/1 Nice to
@@ -24,6 +41,24 @@
 #     Twice-deferred S18 retro #1 (scaffolds audit) FINALLY shipped as M1.
 #   - Solo review mode — no PR-SPRINT producer gate.
 #   - Sprint 20 final state archived in comment block below.
+
+# Sprint 20 final state (archived 2026-05-15):
+#   sprint_status: CLOSED — 7/7 Must Haves DONE; Sprint goal MET
+#   actual_close: 2026-05-15 (seventh consecutive same-day-compressed sprint)
+#   Must Have: 7/7 DONE — M1 scaffolds audit PR#116 (twice-deferred from
+#              S18 retro #1); M2 fonts PR#115; M3 5 UX specs PR#117; M4 11
+#              patterns PR#118; M5 Guild Hall theme PR#119 (v0.0.0.45);
+#              M6 playtest-12 PASS on all 5 checks; M7 sprint-20 retro.
+#   Should Have: 0/2 DONE — S1 Formation Assignment theme + S2 Recruit
+#                Screen theme carried to Sprint 21 as HIGH (M1+M2).
+#   Nice to Have: 0/1 DONE — N1 ClassPortrait placeholder carried to
+#                Sprint 21 S2 (real-art ETA still pending).
+#   ADRs authored: 0 (design tokens in DESIGN.md, not ADR-shaped).
+#   New tests: +8 (Guild Hall theme application — LedgerRow + SynergyBadge).
+#   Pattern library: 9 → 20 patterns (v0.1 → v0.2); +11 new patterns.
+#   Process lessons surfaced for Sprint 21 trial: sprint-status flip-on-
+#   merge + .uid sidecar tracking + playtest-branch verification.
+#
 
 # UPDATED 2026-05-14 via Sprint 20 plan authoring:
 #   - Sprint 20 theme: UI/HUD design (UX flows + visual system + per-screen
@@ -94,122 +129,95 @@
 #   Critical mid-sprint bug: PR #90 Economy multi-biome ledger collision + ADR-0002 Amend 1.
 #
 
-sprint: 20
-goal: "Lock the UI/HUD design pass for the cozy register: finish the design system + all per-screen UX specs, implement Guild Hall to validate the system end-to-end, and ship the long-overdue scaffolds audit."
-start: "2026-05-14"
-end: "2026-05-27"
-generated: "2026-05-14"
-updated: "2026-05-14"
+sprint: 21
+goal: "Sweep the design system across the remaining live screens — apply DESIGN.md + the pattern library to Formation Assignment and Recruit Screen — and close the 3 process discipline items surfaced in the Sprint 20 retro."
+start: "2026-05-15"
+end: "2026-05-28"
+generated: "2026-05-15"
+updated: "2026-05-15"
 
 # Pre-plan deliverables already merged (NOT in sprint count):
-# PR #110 Guild Hall UX spec — design/ux/guild-hall.md
-# PR #111 DESIGN.md — design system source of truth
-# PR #112 Formation Assignment UX spec — design/ux/formation-assignment.md
-# PR #113 Recruit Screen UX spec — design/ux/recruit-screen.md
+# PR #111 DESIGN.md (S20 pre-plan)
+# PR #112 Formation Assignment UX spec (S20 pre-plan)
+# PR #113 Recruit Screen UX spec (S20 pre-plan)
+# PR #115 Font sourcing — Lora + IM Fell English (S20-M2)
+# PR #118 Pattern library 9 → 20 (S20-M4)
+# PR #119 Guild Hall theme implementation — pipeline validation (S20-M5)
+# PR #120 Sprint 20 close-out — process discipline lessons (S20-M6+M7)
 
 stories:
   # ===== Must Have =====
 
-  - id: "S20-M1"
-    name: "Scaffolded-but-unwired audit (Sprint 18 retro #1 — twice-deferred; non-negotiable)"
-    file: "production/sprint-20-scaffolds-audit.md"
+  - id: "S21-M1"
+    name: "Formation Assignment theme implementation — apply DESIGN.md + UX-FA spec; Slot Button + Two-Tap Flow patterns"
+    file: "assets/screens/formation_assignment/formation_assignment.tscn"
     priority: must-have
-    status: done
-    owner: "claude-code"
-    estimate_days: 0.25
-    blocker: ""
-    completed: "2026-05-14 — PR #116 merged. Audit found 2 confirmed ghosts in RunSnapshot (kill_schedule + loop_counter); both annotated DEFERRED rather than wired/deleted (low-risk path)."
-
-  - id: "S20-M2"
-    name: "Font sourcing — Lora + IM Fell English TTF files at res://assets/fonts/ + parchment theme wiring"
-    file: "assets/fonts/"
-    priority: must-have
-    status: done
-    owner: "claude-code"
-    estimate_days: 0.25
-    blocker: ""
-    completed: "2026-05-14 — PR #115 merged. Lora-Regular + Lora-Italic + IMFellEnglish-Regular + IMFellEnglish-Italic (SIL OFL) wired into parchment_theme.tres via FontVariation sub_resources."
-
-  - id: "S20-M3"
-    name: "5 remaining UX specs — DRV / Return-to-App / Victory Moment / Hero Detail / Matchup Assignment"
-    file: "design/ux/"
-    priority: must-have
-    status: done
-    owner: "claude-code"
-    estimate_days: 1.25
-    blocker: "S20-M2"
-    completed: "2026-05-14 — PR #117 merged. 5 specs at design/ux/ (dungeon-run-view.md, return-to-app.md, victory-moment.md, hero-detail-modal.md, matchup-assignment.md). Each: 14 required sections + ≥17 ACs."
-
-  - id: "S20-M4"
-    name: "Pattern library additions — 6 new patterns (Guild-Ledger-Entry, Conditional Strip, Slot Button, Two-Tap Assignment Flow, Affordability Gating, Pool Entry Card)"
-    file: "design/ux/interaction-patterns.md"
-    priority: must-have
-    status: done
-    owner: "claude-code"
-    estimate_days: 0.5
-    blocker: ""
-    completed: "2026-05-14 — PR #118 merged. Library expanded 9 → 20 patterns (v0.1 → v0.2)."
-
-  - id: "S20-M5"
-    name: "Guild Hall theme implementation — apply DESIGN.md + UX spec to guild_hall.tscn + .gd"
-    file: "assets/screens/guild_hall/guild_hall.tscn"
-    priority: must-have
-    status: done
+    status: ready-for-dev
     owner: "godot-gdscript-specialist"
-    estimate_days: 0.75
-    blocker: "S20-M2 + S20-M4"
-    completed: "2026-05-15 — PR #119 merged (v0.0.0.45). LedgerRow theme variation + SynergyBadge node + wiring shipped. 8 new contract tests pass; full suite 4462 / 0 / 0."
+    estimate_days: 1.0
+    blocker: ""
+    completed: ""
 
-  - id: "S20-M6"
-    name: "Sprint 20 playtest — visual validation of redesigned Guild Hall (5 checks)"
-    file: "production/playtests/playtest-12-guild-hall-refresh-2026-05-15.md"
+  - id: "S21-M2"
+    name: "Recruit Screen theme implementation — apply DESIGN.md + UX-RS spec; Pool Entry Card + Affordability Gating + Cross-Fade Refresh"
+    file: "assets/screens/recruitment/recruitment.tscn"
     priority: must-have
-    status: done
+    status: ready-for-dev
+    owner: "godot-gdscript-specialist"
+    estimate_days: 1.0
+    blocker: ""
+    completed: ""
+
+  - id: "S21-M3"
+    name: "Sprint 21 playtest — visual validation of Formation Assignment + Recruit Screen (6 checks); process trial: playtest-branch verification"
+    file: "production/playtests/playtest-13-formation-recruit-refresh-2026-05-??.md"
+    priority: must-have
+    status: backlog
     owner: "xiaolei (human)"
     estimate_days: 0.5
-    blocker: "S20-M5"
-    completed: "2026-05-15 — PASS on all 5 checks (typography / palette / synergy strip conditional / tap targets / cozy register). Tester verdict: 'playtest approved. let's move on'."
+    blocker: "S21-M1 + S21-M2"
+    completed: ""
 
-  - id: "S20-M7"
-    name: "Sprint 20 retrospective"
-    file: "production/retrospectives/sprint-20-retrospective-2026-05-15.md"
+  - id: "S21-M4"
+    name: "Sprint 21 retrospective"
+    file: "production/retrospectives/sprint-21-retrospective-2026-05-??.md"
     priority: must-have
-    status: done
+    status: backlog
     owner: "producer + claude-code"
     estimate_days: 0.25
-    blocker: "S20-M6"
-    completed: "2026-05-15 — Sprint 20 retro committed. 7 action items for Sprint 21 (S1/S2 theme implementations as HIGH; sprint-status flip-on-merge + .uid tracking + playtest-branch verification as MED process changes)."
+    blocker: "S21-M3"
+    completed: ""
 
   # ===== Should Have =====
 
-  - id: "S20-S1"
-    name: "Formation Assignment theme implementation"
-    file: "assets/screens/formation_assignment/formation_assignment.tscn"
+  - id: "S21-S1"
+    name: "Visual-correctness playtest checklist template (third-time carry from S19 retro #5 and S20 retro #6 — non-negotiable)"
+    file: "production/playtests/_template-visual-playtest.md"
     priority: should-have
-    status: backlog
-    owner: "godot-gdscript-specialist"
-    estimate_days: 0.75
-    blocker: "S20-M2 + S20-M5"
+    status: ready-for-dev
+    owner: "claude-code"
+    estimate_days: 0.1
+    blocker: ""
     completed: ""
 
-  - id: "S20-S2"
-    name: "Recruit Screen theme implementation"
-    file: "assets/screens/recruitment/recruitment.tscn"
+  - id: "S21-S2"
+    name: "ClassPortrait placeholder art — 6 parchment-cream squares with IM Fell English class first letter (carried from S20-N1)"
+    file: "assets/textures/class_portraits/"
     priority: should-have
     status: backlog
-    owner: "godot-gdscript-specialist"
-    estimate_days: 0.75
-    blocker: "S20-M2 + S20-M5"
+    owner: "claude-code + godot-shader-specialist"
+    estimate_days: 0.5
+    blocker: "S21-M2"
     completed: ""
 
   # ===== Nice to Have =====
 
-  - id: "S20-N1"
-    name: "ClassPortrait placeholder art — 6 parchment-cream squares with IM Fell English class first letter"
-    file: "assets/art/class_portraits/"
+  - id: "S21-N1"
+    name: "Proactive pattern application — DungeonRunView + Victory Moment partial theming (LedgerRow + Conditional Strip)"
+    file: "assets/screens/dungeon_run_view/ + assets/screens/victory_moment/"
     priority: nice-to-have
     status: backlog
-    owner: "claude-code + godot-shader-specialist"
-    estimate_days: 0.5
-    blocker: "S20-M2"
+    owner: "godot-gdscript-specialist"
+    estimate_days: 1.0
+    blocker: "S21-M1 + S21-M2 + S21-S1 + S21-S2"
     completed: ""
