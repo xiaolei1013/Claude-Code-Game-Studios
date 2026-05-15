@@ -152,11 +152,11 @@ stories:
     name: "Formation Assignment theme implementation — apply DESIGN.md + UX-FA spec; Slot Button + Two-Tap Flow patterns"
     file: "assets/screens/formation_assignment/formation_assignment.tscn"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 1.0
     blocker: ""
-    completed: ""
+    completed: "2026-05-15 — v0.0.0.46. SlotButton + SlotButtonSelected theme variations + LedgerRow on hero roster Buttons. 6 new contract tests; full suite 4474 / 0 / 0. Process trial #1 (sprint-status flip-on-merge) + #2 (.uid sidecar) ride along in same PR."
 
   - id: "S21-M2"
     name: "Recruit Screen theme implementation — apply DESIGN.md + UX-RS spec; Pool Entry Card + Affordability Gating + Cross-Fade Refresh"
