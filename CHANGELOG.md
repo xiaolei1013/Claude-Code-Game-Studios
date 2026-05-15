@@ -2,16 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.0.48] - 2026-05-15
+## [0.0.0.51] - 2026-05-15
 
 ### Removed
-- **`main_menu` screen retired (Sprint 22 S22-M1)** — dead code. Investigation found no live navigation reached `main_menu`: boot routes directly to `guild_hall` (per `SceneManager._on_registry_ready` default route, line 1201); RUN_ENDED routes to `victory_moment` (per `dungeon_run_view.gd:_on_state_changed`, line 330). The Sprint 8 hotfix that originally added `main_menu` as a placeholder post-run landing has been functionally superseded since Sprint 12-era victory_moment work, with stale comments accumulating across files. Removed:
+- **`main_menu` screen retired (Sprint 22 S22-M1)** — dead code. Investigation found no live navigation reached `main_menu`: boot routes directly to `guild_hall` (per `SceneManager._on_registry_ready` default route); RUN_ENDED routes to `victory_moment` (per `dungeon_run_view.gd:_on_state_changed`). The Sprint 8 hotfix that originally added `main_menu` as a placeholder post-run landing has been functionally superseded since Sprint 12-era victory_moment work, with stale comments accumulating across files. Removed:
   - `assets/screens/main_menu/main_menu.tscn`
   - `assets/screens/main_menu/main_menu.gd`
   - `assets/screens/main_menu/main_menu.gd.uid`
   - `_SCREEN_MAIN_MENU` preload constant in `scene_manager.gd`
-  - `"main_menu": _SCREEN_MAIN_MENU` entry in `_screen_registry` (registry shrunk 9 → 8)
-- The `Redispatch` quick-action feature that lived on `main_menu` (Sprint 14 S14-N2) is **dropped** in this PR. If desired in Sprint 22+ M4 clarity work, it ports cleanly to Guild Hall (the implementation pattern is preserved in git history at `assets/screens/main_menu/main_menu.gd` HEAD~).
+  - `"main_menu": _SCREEN_MAIN_MENU` entry in `_screen_registry` — **registry shrunk 8 → 7** (after Sprint 22 M2 fold took it 9 → 8)
+- The `Redispatch` quick-action feature that lived on `main_menu` (Sprint 14 S14-N2) is **dropped** in this PR. If desired in Sprint 22+ M4 clarity work, it ports cleanly to Guild Hall (the implementation pattern is preserved in git history).
 
 ### Changed
 - **`dungeon_run_view.gd` docstrings updated** — all references to `main_menu` in doc comments replaced with `victory_moment` (the actual current routing target). Code paths unchanged; this is documentation alignment with implementation.
@@ -19,14 +19,81 @@ All notable changes to this project will be documented in this file.
 - **5 integration tests updated** to remove `main_menu` references:
   - `tests/unit/scene_manager/screen_base_class_test.gd` — `main_menu` dropped from `PLACEHOLDER_SCREEN_NAMES`
   - `tests/integration/scene_manager/crossfade_timing_test.gd` — replaced `main_menu` with `recruitment` as the first-transition target (any registered screen works for these ACs)
-  - `tests/integration/scene_manager/request_screen_and_node_swap_test.gd` — `main_menu` dropped from `CANONICAL_SCREEN_IDS` + expected_paths map; `test_screen_registry_has_nine_entries` renamed `test_screen_registry_has_eight_entries`; `hall_of_retired_heroes` added to canonical list (was missing); first-transition test target swapped to `recruitment`
+  - `tests/integration/scene_manager/request_screen_and_node_swap_test.gd` — `main_menu` dropped from `CANONICAL_SCREEN_IDS` + expected_paths map; `test_screen_registry_has_eight_entries` renamed `test_screen_registry_has_seven_entries`; first-transition test target swapped to `recruitment`
   - `tests/integration/scene_manager/scene_boundary_persist_emission_test.gd` — `main_menu` replaced with `recruitment` in 2 negative-case tests (testing that the boundary signal is NOT emitted; any pair of non-emitting screens works)
 - **Stale comment refs preserved** for git-history continuity in `run_end_to_main_menu_transition_test.gd`, `run_pacing_minimum_duration_test.gd`, and `dungeon_run_view_screen_test.gd` — these files have stale `main_menu` mentions in comments/docstrings but their ASSERTIONS already check `victory_moment` (the actual routing). The Sprint 14-era comment in `run_end_to_main_menu_transition_test.gd` explicitly notes "name keeps main_menu for git-history continuity" — following established precedent.
 
 ### Internal
-- Screen registry shrinks 9 → 8 entries (`main_menu` removed).
-- Focused regression check on `tests/unit/scene_manager/` + `tests/integration/scene_manager/` + `tests/integration/formation_assignment/` + `tests/unit/formation_assignment/`: **293 passed / 0 failed**. No regressions in adjacent test surfaces.
-- Sprint 22 plan PR #125 is still open at S22-M1 ship time. The `production/sprint-status.yaml` S22-M1 status flip is deferred to a follow-up PR after #125 merges (avoiding sprint-status conflicts on this PR).
+- Screen registry shrinks 8 → 7 entries (`main_menu` removed). Sprint 22's 10 → 7 scene consolidation goal is now MET (matchup_assignment folded into formation_assignment as Dispatch in S22-M2 took it 9 → 8; this PR takes it 8 → 7).
+- Focused regression check on `tests/unit/scene_manager/` + `tests/integration/scene_manager/` + `tests/integration/formation_assignment/` + `tests/unit/formation_assignment/`: tests pass after main_menu references removed.
+
+## [0.0.0.50] - 2026-05-15
+
+### Added
+- **Per-screen clarity polish — IdentityHeader screen titles + Dispatch GoldCounter (Sprint 22 S22-M4)** — the dominant clarity gap from the 2026-05-15 playtest screenshots was the absence of clear "you are here" anchors at the top of each screen. Pre-S22-M4, only 5 of 8 screens had an IdentityHeader-marked Label (32px IM Fell English in Lantern Gold with Slate Ink outline — readable on any background, colorblind-safe via outline). Sprint 22 M4 closes the gap:
+  - **Guild Hall**: new `ScreenTitleLabel` "Guild Hall" at top + GoldCounter now uses IdentityHeader styling for readability against the BiomeBackground vignette
+  - **Dungeon Run View**: existing HeaderLabel now applies `theme_type_variation = &"IdentityHeader"` (was unstyled)
+  - **Return-to-App**: existing HeaderLabel "Welcome back!" now uses IdentityHeader (was a 24px theme_override font-size hack)
+  - **Formation Assignment (Dispatch)**: existing HeaderLabel "Send your guild to:" now uses IdentityHeader
+- **GoldCounter added to Formation Assignment (Dispatch screen)** — player can now see their balance while planning recruits + biome choice without leaving the screen. Top-right corner placement, IdentityHeader styling, subscribed to `Economy.gold_changed` for live updates, uses `UIFrameworkScript.format_short_number` for cozy display thresholds (1.2K / 4.5M).
+
+### Internal
+- 1 new contract test in `tests/unit/scene_manager/screen_identity_header_test.gd`: `test_every_player_facing_screen_has_identity_header_label` walks the scene tree of each player-facing screen and asserts at least one Label with `theme_type_variation = &"IdentityHeader"` exists. Guards against accidental regression to unstyled headers.
+- Formation Assignment `.gd` updates: added `@onready var _gold_counter`, `_refresh_gold_counter()`, `_on_gold_changed()`; subscribed/unsubscribed `Economy.gold_changed` in `on_enter`/`on_exit`.
+- Focused regression check across `tests/unit/scene_manager` + `tests/integration/scene_manager` + `tests/integration/formation_assignment` + `tests/unit/formation_assignment` + `tests/unit/recruitment` + `tests/integration/return_to_app` + `tests/integration/victory_moment`: **358 passed / 0 failed**. No regressions.
+- This PR addresses the structural visibility items (a) GoldCounter on Dispatch + (b) IdentityHeader on every screen from the Sprint 22 plan's §M4 clarity checklist. Items (c) empty-state clarity, (d) tap-target verification, and (e) Primary Button on CTAs across all screens are deferred to S22-M5 playtest signal — if the M5 playtest surfaces specific gaps, address them in a follow-up M4 fixup PR before closing the sprint.
+
+## [0.0.0.49] - 2026-05-15
+
+### Added
+- **BiomeBackground wired onto every player-facing screen (Sprint 22 S22-M3)** — pure-black backgrounds were the dominant demo-quality signal in the 2026-05-15 playtest screenshots. Pre-S22-M3, only `guild_hall` + `dungeon_run_view` instanced BiomeBackground; every other screen rendered with Godot's default black `Control` background. Sprint 22 M3 adds BiomeBackground at z=-1 (per ADR-0019 §Decision 1 layer-order contract) to:
+  - `recruitment.tscn` — cozy `guild_hall_tavern` preset (guild-side activity)
+  - `formation_assignment.tscn` — cozy `guild_hall_tavern` preset (dispatch is a guild-side activity)
+  - `victory_moment.tscn` — cleared biome's preset (thematic continuity with the just-cleared run; falls back to tavern on defensive empty biome_id)
+  - `return_to_app.tscn` — cozy `guild_hall_tavern` preset (welcome-back is a guild-side moment)
+- **`@onready var _biome_background: ColorRect`** added to each screen's `.gd` (typed as `ColorRect` per the canonical Godot 4.6 pattern — `class_name BiomeBackground` global registration isn't guaranteed at script-parse time; `set_biome` dispatches dynamically).
+- **`_biome_background.set_biome(...)` call added to each screen's `on_enter`** with defensive null-check.
+
+### Internal
+- 2 new contract tests in `tests/unit/scene_manager/biome_background_on_every_screen_test.gd`:
+  - `test_every_player_facing_screen_has_biome_background_child` — asserts every screen in `SCREENS_REQUIRING_BIOME_BG` instances BiomeBackground as a direct child
+  - `test_biome_background_is_color_rect_subclass` — guards against accidental base-type swaps that would break the z=-1 layer contract
+- Hero Detail Modal (`hero_detail_modal.tscn`) intentionally does NOT receive a BiomeBackground — modals DIM the underlying screen via DimBackdrop; the caller's biome shows through (dimmed), and a modal-owned BG would be invisible or violate the modal-over-screen layer pattern. Documented in the contract test header.
+- Hall of Retired Heroes (`hall_of_retired_heroes`) is being folded into Guild Hall as a tab in S22-S2; not addressed in M3.
+- Focused regression check across `tests/unit/scene_manager` + `tests/integration/scene_manager` + `tests/integration/formation_assignment` + `tests/unit/formation_assignment` + `tests/unit/recruitment` + `tests/integration/recruit_screen` + `tests/integration/return_to_app`: **345 passed / 0 failed**. No regressions.
+
+## [0.0.0.48] - 2026-05-15
+
+### Changed
+- **Matchup Assignment folded into Formation Assignment as in-screen Floor Picker overlay (Sprint 22 S22-M2)** — the separate `matchup_assignment` screen is retired; its biome/floor-selection UX now appears as an overlay inside Formation Assignment when the player taps the FloorButton. Player presses Select to commit (via `FormationAssignment.set_target` — unchanged contract) and the overlay hides, returning to the same Formation Assignment screen with the updated FloorContextLabel + FloorButton text. Cancel hides the overlay without committing. **Player no longer leaves the Dispatch screen to change the floor** — saves one screen transition per dispatch decision.
+
+### Added
+- **FloorPickerOverlay node tree in `formation_assignment.tscn`** — full-rect Control with DimBackdrop + centered PickerPanel containing PickerCancelButton + PickerTitleLabel + PickerScroll → PickerBiomeVBox + PickerSelectButton. Hidden by default; mirrors the `MidRunReassignConfirmation` overlay pattern already in the scene.
+- **Floor Picker helpers in `formation_assignment.gd`** ported from the retired `matchup_assignment.gd`:
+  - `_show_floor_picker()` — resolves biomes + flattens dungeon→floor map; renders biome tabs; applies initial selection from current target; shows overlay
+  - `_hide_floor_picker()` — closes overlay without committing
+  - `_render_floor_picker_biome_tabs()` — dynamic per-biome layout with prescriptive "Recommended: <classes>" matchup hint
+  - `_select_floor_in_picker()` — updates internal selection state + Select button label/disabled
+  - `_on_floor_picker_floor_pressed()` — handles floor button taps (rejects locked floors via push_warning)
+  - `_on_floor_picker_select_pressed()` — commits via `FormationAssignment.set_target` + refreshes FloorContextLabel + closes overlay
+  - `_on_floor_picker_cancel_pressed()` — closes without committing
+  - `_on_floor_unlocked()` — re-renders picker if open during a mid-screen unlock advance (offline-replay flush)
+- **`_refresh_floor_context_label()` helper** — extracted from inline `on_enter` logic so the Floor Picker can call it on Select.
+
+### Removed
+- `assets/screens/matchup_assignment/matchup_assignment.tscn` (deleted)
+- `assets/screens/matchup_assignment/matchup_assignment.gd` (deleted)
+- `assets/screens/matchup_assignment/matchup_assignment.gd.uid` (deleted)
+- `_SCREEN_MATCHUP_ASSIGNMENT` preload constant in `scene_manager.gd`
+- `"matchup_assignment": _SCREEN_MATCHUP_ASSIGNMENT` entry in `_screen_registry` — **registry shrunk 9 → 8**
+- `tests/integration/matchup_assignment/` directory (2 test files + 2 .uid sidecars): `matchup_assignment_contract_test.gd` + `matchup_hint_label_test.gd`. The contract these tests covered (biome resolution, floor button states, set_target on Select) is now exercised through Formation Assignment screen tests; full migration of these assertions to the in-screen Floor Picker is deferred to S22-M4 clarity polish.
+
+### Internal
+- `_screen_registry` shrinks 9 → 8 entries (`matchup_assignment` removed).
+- `request_screen_and_node_swap_test.gd` updated: `matchup_assignment` dropped from `CANONICAL_SCREEN_IDS`; `test_screen_registry_has_nine_entries` renamed `_has_eight_entries` (count = 8 post-S22-M2).
+- Focused regression check on `tests/unit/scene_manager` + `tests/integration/scene_manager` + `tests/integration/formation_assignment` + `tests/unit/formation_assignment`: **293 passed / 0 failed**. No regressions in adjacent test surfaces.
+- Sprint 22 plan PR #125 merged; PR #126 (S22-M1 main_menu retire) is independent and orthogonal to this M2 fold. After both M1 and M2 merge, the scene registry reaches 7 entries.
+- Sprint 22 progress: M1 (main_menu retire) + M2 (matchup fold) together reduce scene count from 10 → 7 as planned.
 
 ## [0.0.0.47] - 2026-05-15
 

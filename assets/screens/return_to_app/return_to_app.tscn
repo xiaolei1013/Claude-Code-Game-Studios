@@ -2,9 +2,10 @@
 ; UX/cozy aesthetic pass (animated reveal, parchment ornaments, coin icon,
 ; floor-by-floor carousel, celebration particles) deferred to Sprint 14+.
 ; See return_to_app.gd doc comment for the full deferred-UX list.
-[gd_scene load_steps=2 format=3 uid="uid://screen_return_to_app"]
+[gd_scene load_steps=3 format=3 uid="uid://screen_return_to_app"]
 
 [ext_resource type="Script" path="res://assets/screens/return_to_app/return_to_app.gd" id="1_return_to_app"]
+[ext_resource type="PackedScene" path="res://assets/screens/_shared/biome_background.tscn" id="2_biome_background"]
 
 [node name="ReturnToApp" type="Control"]
 layout_mode = 3
@@ -14,6 +15,10 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_return_to_app")
+
+; Sprint 22 S22-M3: BiomeBackground at z=-1 (cozy tavern preset — welcome-
+; back is a guild-side moment, not a dungeon one).
+[node name="BiomeBackground" parent="." instance=ExtResource("2_biome_background")]
 
 [node name="SummaryPanel" type="PanelContainer" parent="."]
 layout_mode = 1
@@ -37,7 +42,7 @@ theme_override_constants/separation = 12
 layout_mode = 2
 text = "Welcome back!"
 horizontal_alignment = 1
-theme_override_font_sizes/font_size = 24
+theme_type_variation = &"IdentityHeader"
 
 [node name="ElapsedSubhead" type="Label" parent="SummaryPanel/VBoxContainer"]
 layout_mode = 2

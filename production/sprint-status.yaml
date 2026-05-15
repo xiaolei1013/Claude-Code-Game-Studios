@@ -9,6 +9,47 @@
 #   done           ↔  Complete
 #   blocked        ↔  Blocked
 #
+# UPDATED 2026-05-15 via /sprint-plan new (Sprint 22 Day-0):
+#   - Sprint 21 effectively closes; Sprint 22 Day-0 plan authored
+#     (ninth consecutive same-day-compressed sprint cadence).
+#   - Sprint 22 theme: SCENE ARCHITECTURE CLEANUP + per-screen CLARITY PASS.
+#     Reduce 10 scenes to 7 (retire main_menu, fold matchup into formation
+#     as "Dispatch", make hall_of_retired_heroes a tab on guild_hall). In
+#     parallel, run per-screen clarity pass: biome backgrounds everywhere,
+#     visual hierarchy, empty states, label sizing.
+#   - Sprint 22 Must Haves (5 total, 4.75d):
+#     M1 main_menu retire, M2 matchup-into-dispatch fold, M3 biome backgrounds
+#     on every screen, M4 per-screen clarity polish, M5 playtest + retro.
+#   - Sprint 21 retro: INLINE in sprint-22.md (no separate retro PR).
+#     Theme-inheritance bug (PR #124) was the dominant Sprint 21 finding —
+#     5 sprints of theme work were functionally invisible to players.
+#   - Pre-plan dispositions (must resolve BEFORE M1 begins):
+#     #124 (theme inheritance fix) — MERGE FIRST
+#     #123 (S21-M2 Recruit Affordability) — MERGE after #124
+#   - Solo review mode — no PR-SPRINT producer gate.
+#   - Sprint 21 final state archived in comment block below.
+
+# Sprint 21 final state (archived 2026-05-15):
+#   sprint_status: CLOSED-WITH-FINDING — 2/4 Must Haves DONE (PR #122 + #123);
+#                  M3 + M4 superseded by Sprint 22 (theme-bug + new direction).
+#   actual_close: 2026-05-15 (eighth consecutive same-day-compressed sprint)
+#   Must Have: 2/4 DONE — M1 Formation theme PR#122 (v0.0.0.46); M2 Recruit
+#              theme PR#123 (v0.0.0.47, OPEN at S22 plan time — recommended
+#              merge as pre-S22-M1 disposition); M3 playtest superseded by
+#              S22-M5; M4 retro INLINE in sprint-22.md.
+#   Should Have: 0/2 — S1 playtest checklist 4th-time carry → S22-S1
+#                non-negotiable; S2 ClassPortrait deferred to Sprint 23.
+#   Nice to Have: 0/1 — N1 proactive theming dropped from S22 (M4 supersedes).
+#   Dominant finding: theme inheritance bug (PR #124). MainRoot.tscn ScreenContainer
+#   was type="Node"; Godot theme cascades only through Control ancestors. Result:
+#   5 sprints of theme work (Sprint 10 parchment + 18 tilt-shift + 19 BiomeBg + 20
+#   DESIGN.md + 21 SlotButton) were functionally invisible to players. One-line
+#   fix shipped as PR #124. 3 contract tests guard regression.
+#   ADRs authored: 0. New tests: +6 S21-M1 + 7 S21-M2 + 3 S21-fix = 16 tests.
+#   Version: 0.0.0.45 → 0.0.0.46 (S21-M1); will → 0.0.0.47 (S21-M2 + theme fix
+#   merge sequence).
+#
+
 # UPDATED 2026-05-15 via /sprint-plan new (Sprint 21 Day-0):
 #   - Sprint 20 closed same-day; Sprint 21 Day-0 plan authored on top
 #     (eighth consecutive same-day-compressed sprint cadence).
@@ -129,95 +170,112 @@
 #   Critical mid-sprint bug: PR #90 Economy multi-biome ledger collision + ADR-0002 Amend 1.
 #
 
-sprint: 21
-goal: "Sweep the design system across the remaining live screens — apply DESIGN.md + the pattern library to Formation Assignment and Recruit Screen — and close the 3 process discipline items surfaced in the Sprint 20 retro."
+sprint: 22
+goal: "Reduce 10 scenes to 7 by collapsing the redundant ones, fold the matchup picker into Formation Assignment as a unified Dispatch screen, then run a clarity pass on every screen with the now-visible parchment theme."
 start: "2026-05-15"
 end: "2026-05-28"
 generated: "2026-05-15"
 updated: "2026-05-15"
 
-# Pre-plan deliverables already merged (NOT in sprint count):
-# PR #111 DESIGN.md (S20 pre-plan)
-# PR #112 Formation Assignment UX spec (S20 pre-plan)
-# PR #113 Recruit Screen UX spec (S20 pre-plan)
-# PR #115 Font sourcing — Lora + IM Fell English (S20-M2)
-# PR #118 Pattern library 9 → 20 (S20-M4)
-# PR #119 Guild Hall theme implementation — pipeline validation (S20-M5)
-# PR #120 Sprint 20 close-out — process discipline lessons (S20-M6+M7)
+# Pre-plan dispositions (MUST resolve before Sprint 22 work begins):
+# PR #124 (theme inheritance fix — ScreenContainer Node → Control) — MERGE FIRST
+# PR #123 (S21-M2 Recruit Screen Affordability Gating + Cross-Fade Refresh) — MERGE after #124
+# Both PRs CI green; merging both restores Sprint 21 to a clean closeout state.
+# Sprint 21 retro is INLINE in sprint-22.md rather than its own PR.
 
 stories:
   # ===== Must Have =====
 
-  - id: "S21-M1"
-    name: "Formation Assignment theme implementation — apply DESIGN.md + UX-FA spec; Slot Button + Two-Tap Flow patterns"
-    file: "assets/screens/formation_assignment/formation_assignment.tscn"
+  - id: "S22-M1"
+    name: "Retire main_menu screen — reroute RUN_ENDED + boot to guild_hall; migrate Redispatch button to Guild Hall; remove from SceneManager._screen_registry"
+    file: "src/core/scene_manager/scene_manager.gd + assets/screens/main_menu/ (deletion)"
     priority: must-have
-    status: done
+    status: ready-for-dev
     owner: "godot-gdscript-specialist"
-    estimate_days: 1.0
-    blocker: ""
-    completed: "2026-05-15 — v0.0.0.46. SlotButton + SlotButtonSelected theme variations + LedgerRow on hero roster Buttons. 6 new contract tests; full suite 4474 / 0 / 0. Process trial #1 (sprint-status flip-on-merge) + #2 (.uid sidecar) ride along in same PR."
-
-  - id: "S21-M2"
-    name: "Recruit Screen theme implementation — apply DESIGN.md + UX-RS spec; Pool Entry Card + Affordability Gating + Cross-Fade Refresh"
-    file: "assets/screens/recruitment/recruitment.tscn"
-    priority: must-have
-    status: done
-    owner: "godot-gdscript-specialist"
-    estimate_days: 1.0
-    blocker: ""
-    completed: "2026-05-15 — v0.0.0.47. Affordability Gating polish on RecruitButton + RefreshPoolButton (modulate.a opacity gating); Cross-Fade Refresh on pool_refreshed signal (200ms tween + 50ms inter-entry stagger; reduce-motion bypass); LedgerRowPanel theme variation ships as deferred infrastructure (.tscn application defers to Sprint 22). 7 new contract tests; focused regression check 222 / 0. Process trials #1+#2+#3 ride along."
-
-  - id: "S21-M3"
-    name: "Sprint 21 playtest — visual validation of Formation Assignment + Recruit Screen (6 checks); process trial: playtest-branch verification"
-    file: "production/playtests/playtest-13-formation-recruit-refresh-2026-05-??.md"
-    priority: must-have
-    status: backlog
-    owner: "xiaolei (human)"
-    estimate_days: 0.5
-    blocker: "S21-M1 + S21-M2"
+    estimate_days: 0.75
+    blocker: "PR #124 merged"
     completed: ""
 
-  - id: "S21-M4"
-    name: "Sprint 21 retrospective"
-    file: "production/retrospectives/sprint-21-retrospective-2026-05-??.md"
+  - id: "S22-M2"
+    name: "Fold matchup_assignment into formation_assignment as Dispatch screen — single screen handles team + biome/floor selection"
+    file: "assets/screens/formation_assignment/formation_assignment.tscn + .gd"
     priority: must-have
-    status: backlog
-    owner: "producer + claude-code"
-    estimate_days: 0.25
-    blocker: "S21-M3"
+    status: done
+    owner: "godot-gdscript-specialist"
+    estimate_days: 1.5
+    blocker: "S22-M1"
+    completed: "2026-05-15 — PR #127 merged. FloorPickerOverlay node tree + ported logic from retired matchup_assignment.gd. Registry shrunk 9 → 8. Single Dispatch screen handles team + biome/floor. 293 / 0 focused regression."
+
+  - id: "S22-M3"
+    name: "Wire BiomeBackground onto every screen (Recruit / Dispatch / DRV / Victory / Return-to-App / Hero Detail modal)"
+    file: "assets/screens/*/*.tscn"
+    priority: must-have
+    status: done
+    owner: "godot-gdscript-specialist"
+    estimate_days: 0.5
+    blocker: "PR #124 merged"
+    completed: "2026-05-15 — PR #128 merged (v0.0.0.49). BiomeBackground at z=-1 on recruitment / formation_assignment / victory_moment / return_to_app. Hero Detail modal explicitly skipped (modal DIMs underlying screen; modal-owned BG would be invisible). 2 new contract tests; 345 / 0 focused regression."
+
+  - id: "S22-M4"
+    name: "Per-screen clarity polish — visual hierarchy + empty states + label sizing + tap-target verification + Primary Button on CTAs"
+    file: "assets/screens/*/*.tscn"
+    priority: must-have
+    status: done
+    owner: "godot-gdscript-specialist"
+    estimate_days: 1.5
+    blocker: "S22-M1 + S22-M2 + S22-M3"
+    completed: "2026-05-15 — PR #129 merged (v0.0.0.50). IdentityHeader screen titles added to Guild Hall + DRV + Return-to-App; GoldCounter added to Dispatch with live updates. Items (c) empty-state clarity + (d) tap-target verification + (e) Primary Button on CTAs deferred to S22-M5 playtest signal. 1 new contract test; 358 / 0 focused regression."
+
+  - id: "S22-M5"
+    name: "Sprint 22 visual playtest (use S22-S1 checklist template) + Sprint 22 retrospective"
+    file: "production/playtests/playtest-14-sprint-22-clarity-2026-05-15.md + production/retrospectives/sprint-22-retrospective-2026-05-15.md"
+    priority: must-have
+    status: in-progress
+    owner: "xiaolei (human) + producer + claude-code"
+    estimate_days: 0.5
+    blocker: "S22-M1 + S22-M2 + S22-M3 + S22-M4"
     completed: ""
 
   # ===== Should Have =====
 
-  - id: "S21-S1"
-    name: "Visual-correctness playtest checklist template (third-time carry from S19 retro #5 and S20 retro #6 — non-negotiable)"
+  - id: "S22-S1"
+    name: "Visual-correctness playtest checklist template — FOURTH-time carry from S19/S20/S21 retros; non-negotiable"
     file: "production/playtests/_template-visual-playtest.md"
     priority: should-have
-    status: ready-for-dev
+    status: done
     owner: "claude-code"
     estimate_days: 0.1
     blocker: ""
+    completed: "2026-05-15 — bundled into S22-M5 setup PR. Template lives at production/playtests/_template-visual-playtest.md. Per-check PASS/PARTIAL/FAIL protocol replaces the one-liner verdict failure mode from S19-S21."
+
+  - id: "S22-S2"
+    name: "Hall of Retired Heroes → tab on Guild Hall RosterPanel (Active | Retired tabs)"
+    file: "assets/screens/guild_hall/guild_hall.tscn + .gd; assets/screens/hall_of_retired_heroes/ (deletion)"
+    priority: should-have
+    status: ready-for-dev
+    owner: "godot-gdscript-specialist"
+    estimate_days: 0.75
+    blocker: "S22-M1"
     completed: ""
 
-  - id: "S21-S2"
-    name: "ClassPortrait placeholder art — 6 parchment-cream squares with IM Fell English class first letter (carried from S20-N1)"
-    file: "assets/textures/class_portraits/"
+  - id: "S22-S3"
+    name: "Pause Menu modal scene (currently spec-only at design/ux/pause-menu.md)"
+    file: "assets/screens/_modals/pause_menu.tscn + .gd"
     priority: should-have
-    status: backlog
-    owner: "claude-code + godot-shader-specialist"
-    estimate_days: 0.5
-    blocker: "S21-M2"
+    status: ready-for-dev
+    owner: "godot-gdscript-specialist"
+    estimate_days: 0.75
+    blocker: ""
     completed: ""
 
   # ===== Nice to Have =====
 
-  - id: "S21-N1"
-    name: "Proactive pattern application — DungeonRunView + Victory Moment partial theming (LedgerRow + Conditional Strip)"
-    file: "assets/screens/dungeon_run_view/ + assets/screens/victory_moment/"
+  - id: "S22-N1"
+    name: "Settings screen scaffold — audio + accessibility + version + Quit (replaces main_menu's pretend role)"
+    file: "assets/screens/settings/"
     priority: nice-to-have
     status: backlog
     owner: "godot-gdscript-specialist"
     estimate_days: 1.0
-    blocker: "S21-M1 + S21-M2 + S21-S1 + S21-S2"
+    blocker: "S22-M1-M4 + S22-S1-S3"
     completed: ""

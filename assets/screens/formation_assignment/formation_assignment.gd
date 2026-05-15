@@ -72,6 +72,12 @@ var _synergy_badge_tween: Tween = null
 
 @onready var _header_label: Label = $HeaderLabel
 @onready var _roster_list: VBoxContainer = $RosterPanel/RosterScroll/RosterList
+# Sprint 22 S22-M3: BiomeBackground at z=-1 (cozy tavern preset by default).
+@onready var _biome_background: ColorRect = $BiomeBackground
+# Sprint 22 S22-M4: GoldCounter on the Dispatch screen so the player can
+# see their balance while planning recruits + biome choice. Updates on
+# Economy.gold_changed signal.
+@onready var _gold_counter: Label = $GoldCounter
 @onready var _slots_hbox: HBoxContainer = $FormationPanel/SlotsHBox
 @onready var _floor_button: Button = $FloorSelectorPanel/FloorVBox/FloorButton
 @onready var _floor_context_label: Label = $FloorSelectorPanel/FloorVBox/FloorContextLabel
@@ -83,6 +89,24 @@ var _synergy_badge_tween: Tween = null
 @onready var _reassign_confirm_root: Control = $MidRunReassignConfirmation
 @onready var _reassign_confirm_button: Button = $MidRunReassignConfirmation/ConfirmPanel/ConfirmContent/ConfirmButtonRow/ConfirmButton
 @onready var _reassign_cancel_button: Button = $MidRunReassignConfirmation/ConfirmPanel/ConfirmContent/ConfirmButtonRow/CancelButton
+
+# S22-M2 — Floor Picker overlay (folded from retired matchup_assignment screen).
+# Hidden by default; shown when player taps FloorButton; closed on Cancel or
+# Select. Cancel preserves prior target; Select commits via
+# FormationAssignment.set_target then refreshes FloorContextLabel.
+@onready var _floor_picker_root: Control = $FloorPickerOverlay
+@onready var _floor_picker_biome_vbox: VBoxContainer = $FloorPickerOverlay/PickerPanel/PickerContent/PickerScroll/PickerBiomeVBox
+@onready var _floor_picker_cancel_button: Button = $FloorPickerOverlay/PickerPanel/PickerContent/PickerHeader/PickerCancelButton
+@onready var _floor_picker_select_button: Button = $FloorPickerOverlay/PickerPanel/PickerContent/PickerSelectButton
+
+# Floor Picker cached state — built in _show_floor_picker from DataRegistry.
+var _fp_biomes: Array[Resource] = []
+var _fp_floors_by_biome: Dictionary = {}  # biome_id (String) → Array[Resource] sorted by floor_index
+
+# Currently-selected target inside the Floor Picker. Distinct from
+# FormationAssignment.get_target() — only commits to that on Select press.
+var _fp_selected_biome_id: String = ""
+var _fp_selected_floor_index: int = 0
 
 # ---------------------------------------------------------------------------
 # AC-FA-13 (S15-M2) — Mid-run reassignment confirm dialog gating
@@ -123,9 +147,24 @@ func _ready() -> void:
 	# Key: formation_assignment_instructional_header → "Send your guild to:"
 	_header_label.text = tr("formation_assignment_instructional_header")
 
-	# Apply any pending matchup target the player set via the
-	# matchup_assignment screen (per S15-N1 contract). Empty target → keep
-	# the cold-launch defaults.
+	# Sprint 22 S22-M3: render the cozy tavern BiomeBackground. The dispatch
+	# screen is a guild-side activity (planning the run); player isn't in a
+	# dungeon yet, so tavern reinforces "you are home, choosing where to go."
+	if _biome_background != null:
+		_biome_background.set_biome("guild_hall_tavern")
+
+	# Sprint 22 S22-M4: GoldCounter — initial render + subscribe to
+	# gold_changed for live updates (player may recruit or trigger refresh
+	# from this screen and gold mutates accordingly).
+	if _gold_counter != null:
+		_refresh_gold_counter()
+		if not Economy.gold_changed.is_connected(_on_gold_changed):
+			Economy.gold_changed.connect(_on_gold_changed)
+
+	# Apply any pending matchup target the player set via the in-screen
+	# FloorPicker overlay (S22-M2 fold; previously the matchup_assignment
+	# screen per S15-N1 contract). Empty target → keep the cold-launch
+	# defaults.
 	var target: Dictionary = FormationAssignment.get_target()
 	if not target.is_empty():
 		var t_biome: String = String(target.get("biome_id", ""))
@@ -134,8 +173,7 @@ func _ready() -> void:
 			_selected_biome_id = t_biome
 			_selected_floor = t_floor
 
-	_floor_context_label.text = _compose_target_label(_selected_biome_id, _selected_floor)
-	_floor_button.text = _floor_context_label.text
+	_refresh_floor_context_label()
 
 	# Walk all Button descendants and assert the 44×44 tap-target floor.
 	# This is defense-in-depth: .tscn already sets custom_minimum_size on each
@@ -196,6 +234,13 @@ func on_enter() -> void:
 	_toast_label.mouse_filter = Control.MOUSE_FILTER_STOP
 	if not _toast_label.gui_input.is_connected(_on_toast_input):
 		_toast_label.gui_input.connect(_on_toast_input)
+	# S22-M2: Floor Picker overlay buttons (idempotent — buttons are static).
+	if not _floor_picker_cancel_button.pressed.is_connected(_on_floor_picker_cancel_pressed):
+		_floor_picker_cancel_button.pressed.connect(_on_floor_picker_cancel_pressed)
+	if not _floor_picker_select_button.pressed.is_connected(_on_floor_picker_select_pressed):
+		_floor_picker_select_button.pressed.connect(_on_floor_picker_select_pressed)
+	if not FloorUnlock.floor_unlocked.is_connected(_on_floor_unlocked):
+		FloorUnlock.floor_unlocked.connect(_on_floor_unlocked)
 
 	# Initial render from current game state.
 	_refresh_roster_panel()
@@ -227,6 +272,9 @@ func on_exit() -> void:
 		DungeonRunOrchestrator.validation_failed.disconnect(_on_validation_failed)
 	if DungeonRunOrchestrator.state_changed.is_connected(_on_orchestrator_state_changed):
 		DungeonRunOrchestrator.state_changed.disconnect(_on_orchestrator_state_changed)
+	# S22-M4: GoldCounter live-update subscription cleanup.
+	if Economy.gold_changed.is_connected(_on_gold_changed):
+		Economy.gold_changed.disconnect(_on_gold_changed)
 
 	# Mirror on_enter button wiring. Static buttons are also freed with the
 	# screen, but explicit disconnect documents the lifecycle contract.
@@ -243,6 +291,13 @@ func on_exit() -> void:
 		_reassign_confirm_button.pressed.disconnect(_on_reassign_confirm_pressed)
 	if _reassign_cancel_button != null and _reassign_cancel_button.pressed.is_connected(_on_reassign_cancel_pressed):
 		_reassign_cancel_button.pressed.disconnect(_on_reassign_cancel_pressed)
+	# S22-M2: mirror Floor Picker button wiring + FloorUnlock subscription.
+	if _floor_picker_cancel_button != null and _floor_picker_cancel_button.pressed.is_connected(_on_floor_picker_cancel_pressed):
+		_floor_picker_cancel_button.pressed.disconnect(_on_floor_picker_cancel_pressed)
+	if _floor_picker_select_button != null and _floor_picker_select_button.pressed.is_connected(_on_floor_picker_select_pressed):
+		_floor_picker_select_button.pressed.disconnect(_on_floor_picker_select_pressed)
+	if FloorUnlock.floor_unlocked.is_connected(_on_floor_unlocked):
+		FloorUnlock.floor_unlocked.disconnect(_on_floor_unlocked)
 
 	# Kill any in-flight toast tween to avoid modulating a freed node.
 	if _toast_tween != null and _toast_tween.is_valid():
@@ -505,12 +560,209 @@ func _on_reassign_cancel_pressed() -> void:
 	_reassign_confirm_root.visible = false
 
 
-## Routes to the Matchup Assignment Screen (#23) where the player can browse
-## biomes + select a floor. Selection is written back via
-## [code]FormationAssignment.set_target(biome_id, floor_index)[/code]; this
-## screen reads it on next on_enter via get_target.
+## Shows the Floor Picker overlay (S22-M2 fold of the retired
+## matchup_assignment screen). Reads the current target from
+## FormationAssignment.get_target() as the initial selection.
+## Player taps Cancel (no change) or Select (commits via set_target).
 func _on_floor_button_pressed() -> void:
-	SceneManager.request_screen("matchup_assignment", SceneManager.TransitionType.CROSS_FADE)
+	_show_floor_picker()
+
+
+## Refreshes the FloorContextLabel + FloorButton text from
+## [member _selected_biome_id] + [member _selected_floor]. Extracted as a
+## helper so the Floor Picker (S22-M2) can call it after Select commits.
+func _refresh_floor_context_label() -> void:
+	_floor_context_label.text = _compose_target_label(_selected_biome_id, _selected_floor)
+	_floor_button.text = _floor_context_label.text
+
+
+## Sprint 22 S22-M4: refreshes the GoldCounter from Economy.get_gold_balance().
+## Uses the cozy-display short-number format (1.2K / 4.5M) per UIFramework.
+func _refresh_gold_counter() -> void:
+	if _gold_counter == null:
+		return
+	_gold_counter.text = "Gold: %s" % UIFrameworkScript.format_short_number(
+		Economy.get_gold_balance()
+	)
+
+
+## Sprint 22 S22-M4: gold_changed signal handler — re-renders GoldCounter.
+func _on_gold_changed(_new_balance: int, _delta: int, _reason: String) -> void:
+	_refresh_gold_counter()
+
+
+# ---------------------------------------------------------------------------
+# Floor Picker overlay — Sprint 22 S22-M2 (fold of matchup_assignment)
+#
+# Per the retired Matchup Assignment Screen GDD #23 §C.1-§C.6, ported here
+# as private methods on formation_assignment to collapse two screens into
+# one Dispatch flow. All ACs UX-MA-01..18 are now satisfied inside this
+# overlay rather than a separate screen.
+# ---------------------------------------------------------------------------
+
+func _show_floor_picker() -> void:
+	# Step 1: resolve biomes + flatten dungeon → floors (per matchup_assignment.gd:78-103).
+	_fp_biomes = DataRegistry.get_all_by_type("biomes")
+	_fp_biomes.sort_custom(func(a: Resource, b: Resource) -> bool:
+		return String(a.id) < String(b.id)
+	)
+	_fp_floors_by_biome = {}
+	var all_dungeons: Array[Resource] = DataRegistry.get_all_by_type("dungeons")
+	for biome: Resource in _fp_biomes:
+		var biome_id: String = String(biome.id)
+		_fp_floors_by_biome[biome_id] = []
+		for dungeon: Resource in all_dungeons:
+			if String(dungeon.biome_id) == biome_id:
+				var dungeon_floors: Array = dungeon.floors as Array
+				for floor_data: Resource in dungeon_floors:
+					_fp_floors_by_biome[biome_id].append(floor_data)
+		(_fp_floors_by_biome[biome_id] as Array).sort_custom(func(a: Resource, b: Resource) -> bool:
+			return int(a.floor_index) < int(b.floor_index)
+		)
+
+	# Step 2: render biome tabs.
+	_render_floor_picker_biome_tabs()
+
+	# Step 3: apply initial selection from current FormationAssignment target.
+	var target: Dictionary = FormationAssignment.get_target()
+	var initial_biome: String = String(target.get("biome_id", ""))
+	var initial_floor: int = int(target.get("floor_index", 0))
+	if initial_biome == "" or initial_floor <= 0:
+		# Fallback: first biome, floor 1 (always unlocked per FloorUnlock §C).
+		if _fp_biomes.size() > 0:
+			initial_biome = String(_fp_biomes[0].id)
+			initial_floor = 1
+	if initial_biome != "" and initial_floor > 0:
+		_select_floor_in_picker(initial_biome, initial_floor)
+	else:
+		_floor_picker_select_button.disabled = true
+		_floor_picker_select_button.text = "No biomes available"
+
+	# Step 4: show the overlay.
+	_floor_picker_root.visible = true
+
+
+func _hide_floor_picker() -> void:
+	_floor_picker_root.visible = false
+
+
+func _render_floor_picker_biome_tabs() -> void:
+	# Clear existing biome tabs (idempotent re-entry).
+	for child: Node in _floor_picker_biome_vbox.get_children():
+		child.queue_free()
+
+	# Build archetype → recommended-class map (per matchup_assignment.gd:156-167).
+	var archetype_to_class: Dictionary[String, String] = {}
+	for class_id: String in HeroClassDatabase.get_all_ids():
+		var cls: HeroClass = HeroClassDatabase.get_by_id(class_id)
+		if cls == null:
+			continue
+		var counter: String = String(cls.counter_archetype)
+		if counter != "" and not archetype_to_class.has(counter):
+			archetype_to_class[counter] = String(cls.display_name)
+
+	# Per-biome tabs.
+	for biome: Resource in _fp_biomes:
+		var biome_id: String = String(biome.id)
+		var biome_tab: VBoxContainer = VBoxContainer.new()
+		biome_tab.name = "BiomeTab_%s" % biome_id
+		_floor_picker_biome_vbox.add_child(biome_tab)
+		# Biome name label.
+		var name_label: Label = Label.new()
+		name_label.name = "NameLabel"
+		name_label.text = String(biome.display_name) if "display_name" in biome and String(biome.display_name) != "" else biome_id.capitalize()
+		biome_tab.add_child(name_label)
+		# Matchup hint — prescriptive class recommendation.
+		var archetypes: Array[String] = []
+		if "dominant_archetypes" in biome:
+			var raw: Array = biome.get("dominant_archetypes") as Array
+			for a: Variant in raw:
+				if a is String and String(a) != "":
+					archetypes.append(String(a))
+		if not archetypes.is_empty():
+			var recommended: Array[String] = []
+			var seen: Dictionary = {}
+			for a: String in archetypes:
+				if archetype_to_class.has(a):
+					var class_name_for_a: String = archetype_to_class[a]
+					if not seen.has(class_name_for_a):
+						recommended.append(class_name_for_a)
+						seen[class_name_for_a] = true
+			var hint_label: Label = Label.new()
+			hint_label.name = "MatchupHintLabel"
+			if recommended.is_empty():
+				hint_label.text = "Common: %s" % ", ".join(archetypes)
+			else:
+				hint_label.text = "Recommended: %s" % ", ".join(recommended)
+			biome_tab.add_child(hint_label)
+		# Floor buttons row.
+		var floor_row: HBoxContainer = HBoxContainer.new()
+		floor_row.name = "FloorRow"
+		biome_tab.add_child(floor_row)
+		var floors: Array = _fp_floors_by_biome.get(biome_id, [])
+		for floor_data: Resource in floors:
+			var floor_index: int = int(floor_data.floor_index)
+			var floor_button: Button = Button.new()
+			floor_button.name = "FloorButton_%d" % floor_index
+			floor_button.text = "F%d" % floor_index
+			floor_button.custom_minimum_size = Vector2(60, 60)
+			floor_button.focus_mode = Control.FOCUS_NONE
+			floor_button.mouse_filter = Control.MOUSE_FILTER_STOP
+			floor_button.disabled = not FloorUnlock.is_unlocked_in_biome(biome_id, floor_index)
+			floor_button.pressed.connect(
+				_on_floor_picker_floor_pressed.bind(biome_id, floor_index)
+			)
+			UIFrameworkScript.wire_touch_feedback(floor_button)
+			floor_row.add_child(floor_button)
+
+
+func _select_floor_in_picker(biome_id: String, floor_index: int) -> void:
+	_fp_selected_biome_id = biome_id
+	_fp_selected_floor_index = floor_index
+	if FloorUnlock.is_unlocked_in_biome(biome_id, floor_index):
+		_floor_picker_select_button.disabled = false
+		_floor_picker_select_button.text = tr("matchup_select_format") % [floor_index, biome_id.capitalize()]
+	else:
+		_floor_picker_select_button.disabled = true
+		_floor_picker_select_button.text = "Select (locked)"
+
+
+func _on_floor_picker_floor_pressed(biome_id: String, floor_index: int) -> void:
+	if not FloorUnlock.is_unlocked_in_biome(biome_id, floor_index):
+		push_warning(
+			"[FloorPicker] toast: %s"
+			% (tr("matchup_floor_locked_format") % (floor_index - 1))
+		)
+		return
+	_select_floor_in_picker(biome_id, floor_index)
+
+
+func _on_floor_picker_select_pressed() -> void:
+	if _fp_selected_biome_id == "" or _fp_selected_floor_index <= 0:
+		push_warning("[FloorPicker] select press with no valid selection — defensive")
+		return
+	# Commit selection: push to FormationAssignment.set_target so it survives
+	# screen re-entry, then update local state so the FloorContextLabel +
+	# FloorButton reflect the new target, then close the overlay.
+	FormationAssignment.set_target(_fp_selected_biome_id, _fp_selected_floor_index)
+	_selected_biome_id = _fp_selected_biome_id
+	_selected_floor = _fp_selected_floor_index
+	_refresh_floor_context_label()
+	_hide_floor_picker()
+
+
+func _on_floor_picker_cancel_pressed() -> void:
+	# Cancel without committing — preserve prior target.
+	_hide_floor_picker()
+
+
+## Mid-screen unlock advance (rare; primarily during offline-replay flush).
+## Re-renders the picker if it's currently visible.
+func _on_floor_unlocked(_biome_id: String, _floor_index: int) -> void:
+	if _floor_picker_root != null and _floor_picker_root.visible:
+		_render_floor_picker_biome_tabs()
+		if _fp_selected_biome_id != "" and _fp_selected_floor_index > 0:
+			_select_floor_in_picker(_fp_selected_biome_id, _fp_selected_floor_index)
 
 
 ## Navigates back to Guild Hall.

@@ -31,7 +31,9 @@ const SceneManagerScript = preload("res://src/core/scene_manager/scene_manager.g
 const MAIN_ROOT_SCENE_PATH: String = "res://src/core/scene_manager/MainRoot.tscn"
 
 # Known canonical screen IDs (TR-scene-manager-022)
-# Sprint 22 S22-M1: "main_menu" removed — retired as dead code (no live navigation
+# Sprint 22 S22-M2: matchup_assignment removed — folded into
+# formation_assignment as the in-screen Floor Picker overlay.
+# Sprint 22 S22-M1: main_menu removed — retired as dead code (no live navigation
 # reached it post-Sprint-9; victory_moment supersedes its RUN_ENDED landing role).
 const CANONICAL_SCREEN_IDS: Array[String] = [
 	"guild_hall",
@@ -40,8 +42,6 @@ const CANONICAL_SCREEN_IDS: Array[String] = [
 	"dungeon_run_view",
 	"victory_moment",
 	"return_to_app",
-	"matchup_assignment",  # Sprint 16 S16-M3 (pre-emptive scaffold) registered 2026-05-07
-	"hall_of_retired_heroes",  # Sprint 21+ Prestige V1.0 Story 3 (Slice B)
 ]
 
 # Default timeout for awaiting transition_complete in wired tests (ms).
@@ -470,17 +470,20 @@ func test_same_screen_request_does_not_free_current_screen() -> void:
 
 
 # ===========================================================================
-# Group E: TR-scene-manager-022 — MVP screens preloaded (count expanded
-# 2026-05-07 from 7 → 8 with Sprint 16 S16-M3 matchup_assignment scaffold)
+# Group E: TR-scene-manager-022 — MVP screens preloaded (count adjusted
+# 2026-05-15: 9 → 8 with Sprint 22 S22-M2 matchup_assignment fold,
+# then 8 → 7 with Sprint 22 S22-M1 main_menu retirement)
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
-# E-01: _screen_registry has exactly 8 entries
-# Sprint 22 S22-M1: main_menu retired (dead code) — registry shrunk 9 → 8.
+# E-01: _screen_registry has exactly 7 entries
+# Sprint 22 S22-M2: matchup_assignment folded into formation_assignment as
+# the in-screen Floor Picker overlay; registry shrunk 9 → 8.
+# Sprint 22 S22-M1: main_menu retired as dead code; registry shrunk 8 → 7.
 # ---------------------------------------------------------------------------
-func test_screen_registry_has_eight_entries() -> void:
+func test_screen_registry_has_seven_entries() -> void:
 	var sm: Node = SceneManagerScript.new()
-	assert_int(sm._screen_registry.size()).is_equal(8)
+	assert_int(sm._screen_registry.size()).is_equal(7)
 	sm.free()
 
 

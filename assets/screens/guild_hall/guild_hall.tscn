@@ -39,18 +39,40 @@ mouse_filter = 2
 z_index = -1
 color = Color(1, 1, 1, 1)
 
+; Sprint 22 S22-M4: Guild Hall screen title — gives the player a clear "you
+; are here" anchor at the top of the screen. IdentityHeader variation =
+; 32px IM Fell English in Lantern Gold with Slate Ink outline (readable
+; on any background — colorblind- and contrast-safe).
+[node name="ScreenTitleLabel" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 16.0
+offset_right = 200.0
+offset_bottom = 64.0
+grow_horizontal = 2
+text = "Guild Hall"
+horizontal_alignment = 1
+theme_type_variation = &"IdentityHeader"
+
+; Sprint 22 S22-M4: GoldCounter now uses IdentityHeader styling for
+; readability against the BiomeBackground (Lantern Gold + Slate Ink
+; outline). Positioned BELOW the screen title.
 [node name="GoldCounter" type="Label" parent="."]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
 offset_left = -120.0
-offset_top = 16.0
+offset_top = 72.0
 offset_right = 120.0
-offset_bottom = 48.0
+offset_bottom = 112.0
 grow_horizontal = 2
 text = "Gold: 0"
 horizontal_alignment = 1
+theme_type_variation = &"IdentityHeader"
 
 [node name="SettingsGearButton" type="Button" parent="."]
 layout_mode = 1

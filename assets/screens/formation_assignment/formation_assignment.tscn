@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://screen_formation_assignment"]
+[gd_scene load_steps=3 format=3 uid="uid://screen_formation_assignment"]
 
 [ext_resource type="Script" path="res://assets/screens/formation_assignment/formation_assignment.gd" id="1_formation_assignment"]
+[ext_resource type="PackedScene" path="res://assets/screens/_shared/biome_background.tscn" id="2_biome_background"]
 
 [node name="FormationAssignment" type="Control"]
 layout_mode = 3
@@ -11,6 +12,10 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_formation_assignment")
+
+; Sprint 22 S22-M3: BiomeBackground at z=-1 (cozy tavern preset). Per ADR-0019
+; §Decision 1 layer-order contract.
+[node name="BiomeBackground" parent="." instance=ExtResource("2_biome_background")]
 
 [node name="BackButton" type="Button" parent="."]
 layout_mode = 1
@@ -30,13 +35,33 @@ layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -160.0
-offset_right = 160.0
+offset_left = -200.0
+offset_right = 200.0
 offset_top = 16.0
-offset_bottom = 44.0
+offset_bottom = 64.0
 grow_horizontal = 2
 mouse_filter = 2
+horizontal_alignment = 1
+theme_type_variation = &"IdentityHeader"
 text = "Send your guild to:"
+
+; Sprint 22 S22-M4: GoldCounter on Dispatch (Formation Assignment) so
+; the player can see their balance while planning recruits + biome
+; choice. Top-right corner, IdentityHeader styling for readability.
+[node name="GoldCounter" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -240.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 64.0
+grow_horizontal = 0
+mouse_filter = 2
+horizontal_alignment = 2
+text = "Gold: 0"
+theme_type_variation = &"IdentityHeader"
 
 [node name="RosterPanel" type="PanelContainer" parent="."]
 layout_mode = 1
@@ -231,3 +256,80 @@ custom_minimum_size = Vector2(200, 44)
 focus_mode = 0
 mouse_filter = 0
 text = "End Run & Change"
+
+; FloorPickerOverlay — Sprint 22 S22-M2 (matchup_assignment fold).
+; Hidden by default. Shown when player taps FloorButton; contains the
+; per-biome floor selection grid that was previously the standalone
+; matchup_assignment screen. Closed via Cancel (no change) or Select
+; (commits via FormationAssignment.set_target then refreshes the floor
+; context label and hides the overlay).
+[node name="FloorPickerOverlay" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="DimBackdrop" type="ColorRect" parent="FloorPickerOverlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.75)
+mouse_filter = 0
+
+[node name="PickerPanel" type="PanelContainer" parent="FloorPickerOverlay"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -360.0
+offset_top = -240.0
+offset_right = 360.0
+offset_bottom = 240.0
+grow_horizontal = 2
+grow_vertical = 2
+custom_minimum_size = Vector2(720, 480)
+
+[node name="PickerContent" type="VBoxContainer" parent="FloorPickerOverlay/PickerPanel"]
+layout_mode = 2
+
+[node name="PickerHeader" type="HBoxContainer" parent="FloorPickerOverlay/PickerPanel/PickerContent"]
+layout_mode = 2
+
+[node name="PickerCancelButton" type="Button" parent="FloorPickerOverlay/PickerPanel/PickerContent/PickerHeader"]
+layout_mode = 2
+custom_minimum_size = Vector2(120, 44)
+focus_mode = 0
+mouse_filter = 0
+text = "← Cancel"
+
+[node name="PickerTitleLabel" type="Label" parent="FloorPickerOverlay/PickerPanel/PickerContent/PickerHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Choose Your Run"
+horizontal_alignment = 1
+theme_type_variation = &"IdentityHeader"
+
+[node name="PickerScroll" type="ScrollContainer" parent="FloorPickerOverlay/PickerPanel/PickerContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="PickerBiomeVBox" type="VBoxContainer" parent="FloorPickerOverlay/PickerPanel/PickerContent/PickerScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PickerSelectButton" type="Button" parent="FloorPickerOverlay/PickerPanel/PickerContent"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 60)
+focus_mode = 0
+mouse_filter = 0
+text = "Select"
