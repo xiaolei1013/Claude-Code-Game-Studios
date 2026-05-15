@@ -38,6 +38,11 @@ var POOL_SIZE: int = RecruitmentScript.POOL_SIZE
 @onready var _gold_counter: Label = $HeaderBar/HeaderHBox/GoldCounter
 @onready var _back_button: Button = $HeaderBar/HeaderHBox/BackButton
 @onready var _refresh_pool_button: Button = $FooterBar/RefreshPoolButton
+# Sprint 22 S22-M3: BiomeBackground at z=-1 (cozy tavern preset). Typed as
+# ColorRect (base class) — `class_name BiomeBackground` global registration
+# isn't guaranteed at script-parse time in Godot 4.6; set_biome dispatches
+# dynamically at runtime.
+@onready var _biome_background: ColorRect = $BiomeBackground
 
 
 # Per-tier XP cache (engine-code-rule pattern — pre-cache instead of
@@ -84,6 +89,12 @@ func on_enter() -> void:
 
 	# Step 3: initial render.
 	_refresh_all()
+
+	# Sprint 22 S22-M3: render the cozy tavern BiomeBackground. The Recruit
+	# Screen is a guild-side activity (pool browsing); player isn't in a
+	# dungeon, so the tavern warm-amber preset reinforces "you are home."
+	if _biome_background != null:
+		_biome_background.set_biome("guild_hall_tavern")
 
 
 func on_exit() -> void:

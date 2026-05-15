@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://screen_victory_moment"]
+[gd_scene load_steps=3 format=3 uid="uid://screen_victory_moment"]
 
 [ext_resource type="Script" path="res://assets/screens/victory_moment/victory_moment.gd" id="1_victory_moment"]
+[ext_resource type="PackedScene" path="res://assets/screens/_shared/biome_background.tscn" id="2_biome_background"]
 
 [node name="VictoryMoment" type="Control"]
 layout_mode = 3
@@ -10,6 +11,11 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_victory_moment")
+
+; Sprint 22 S22-M3: BiomeBackground at z=-1, set to the cleared biome's
+; preset on on_enter so the reward summary sits over the world the player
+; just conquered (per ADR-0019 §Decision 1 layer-order contract).
+[node name="BiomeBackground" parent="." instance=ExtResource("2_biome_background")]
 
 [node name="DimBackdrop" type="ColorRect" parent="."]
 layout_mode = 1
