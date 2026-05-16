@@ -1044,17 +1044,25 @@ func _refresh_synergy_badge() -> void:
 func _refresh_synergy_preview_label(synergy_id: String) -> void:
 	if _synergy_preview_label == null:
 		return
-	# Sprint 24 S24-M3 — tier mapper + display name now sourced from
-	# UIFramework. Sprint 24 S24-M2's local _synergy_id_to_tier removed.
+	# Sprint 24 S24-M3 — tier mapper + display name sourced from UIFramework.
 	var tier_key: String = UIFrameworkScript.synergy_id_to_tier(synergy_id)
 	var tier_name: String = tr("synergy_tier_" + tier_key)
 	if synergy_id == "":
 		# No detection: format as just "Synergy: None" (single substitution).
 		_synergy_preview_label.text = tr("synergy_preview_none_format") % tier_name
 		return
-	# Tiered: "Synergy: Gold (Steel Wall)" — tier + V1 display name both visible.
+	# Sprint 27 M1 — appends effect text so the label answers BOTH
+	# "what synergy is active?" AND "what does it do?" in one line.
+	# Format: "Synergy: Gold (Steel Wall) — +25% gold vs bruisers"
+	# Effect text comes from class_synergy_effect_<id> locale keys; the
+	# canonical set is GDD §C.3's effect column (Sprint 21 V1.0 + Sprint 26
+	# M4 tier-2 additions).
 	var display_name: String = UIFrameworkScript.synergy_display_name(synergy_id)
-	_synergy_preview_label.text = tr("synergy_preview_tiered_format") % [tier_name, display_name]
+	var effect_text: String = tr("class_synergy_effect_" + synergy_id)
+	_synergy_preview_label.text = (
+		tr("synergy_preview_tiered_format_with_effect")
+		% [tier_name, display_name, effect_text]
+	)
 
 
 ## Builds the formation snapshot Dictionary for
