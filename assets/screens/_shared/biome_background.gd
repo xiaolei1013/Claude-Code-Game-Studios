@@ -63,15 +63,41 @@ const PALETTE: Dictionary[String, Color] = {
 ## biome" register per the cozy onboarding fantasy.
 const FALLBACK_BIOME_ID: String = "forest_reach"
 
+## Floor index that triggers boss-floor visual modulation. MVP biomes all
+## have exactly 5 floors (per Biome DB); this constant captures the
+## "biome's terminal floor" assumption explicitly. When a V1.0 biome ships
+## with a different floor count, replace this with a per-biome lookup via
+## FloorUnlock.BIOME_FLOOR_COUNT.
+const BOSS_FLOOR_INDEX_MVP: int = 5
+
+## Multiplier applied to the biome palette on the boss floor. 0.65 picks
+## the "dusk → night" transition that the parchment-warm palette tolerates
+## without losing the cozy-game register. Tested by eye on warrior + mage
+## + rogue compositions in forest_reach F5.
+const BOSS_FLOOR_DARKEN_FACTOR: float = 0.65
+
 
 ## Current biome_id this background represents. Empty string at boot;
 ## populated via [method set_biome].
 var _current_biome_id: String = ""
 
+## Floor context for the current render — 0 means "no floor context"
+## (Guild Hall tavern, Return-to-App). Tracked alongside _current_biome_id
+## so the same-state short-circuit covers both axes: a re-render at the
+## same biome+floor is a no-op, while a floor transition within the same
+## biome (e.g., F4 → F5 boss) is correctly detected and re-rendered.
+var _current_floor_index: int = 0
 
-## Updates the visible palette to match [param biome_id]. Emits
-## [signal biome_changed] when the resolved biome_id differs from the
-## current state.
+
+## Updates the visible palette to match [param biome_id], with optional
+## per-floor modulation. When [param floor_index] equals
+## [constant BOSS_FLOOR_INDEX_MVP], the resolved palette is darkened by
+## [constant BOSS_FLOOR_DARKEN_FACTOR] so the boss fight visually reads
+## as distinct from regular floors.
+##
+## [param floor_index] of 0 means "no floor context" (e.g., Guild Hall
+## tavern, Return-to-App screen) — no modulation applied. This is the
+## documented default for callers that don't track floor state.
 ##
 ## Failure handling: an unknown or empty biome_id falls back to
 ## FALLBACK_BIOME_ID + emits a [code]push_warning[/code]. Combat dispatch
@@ -79,7 +105,7 @@ var _current_biome_id: String = ""
 ## crash on a typo or a future biome that hasn't shipped its palette yet.
 ##
 ## Per GDD #26 §E (Edge Cases) + AC-26-11 + AC-26-12.
-func set_biome(biome_id: String) -> void:
+func set_biome(biome_id: String, floor_index: int = 0) -> void:
 	var resolved_id: String = biome_id
 	if biome_id.is_empty() or not PALETTE.has(biome_id):
 		if not biome_id.is_empty():
@@ -89,80 +115,26 @@ func set_biome(biome_id: String) -> void:
 			)
 		resolved_id = FALLBACK_BIOME_ID
 
-	if resolved_id == _current_biome_id:
+	# Short-circuit on same biome AND same floor — covers both the re-render
+	# path AND the floor-transition path within the same biome.
+	if resolved_id == _current_biome_id and floor_index == _current_floor_index:
 		return
+
+	var base_color: Color = PALETTE[resolved_id]
+	var modulated_color: Color = base_color
+	if floor_index == BOSS_FLOOR_INDEX_MVP:
+		modulated_color = base_color * BOSS_FLOOR_DARKEN_FACTOR
+		modulated_color.a = base_color.a
 
 	var old_id: String = _current_biome_id
 	_current_biome_id = resolved_id
-	color = PALETTE[resolved_id]
-	biome_changed.emit(old_id, resolved_id)
+	_current_floor_index = floor_index
+	color = modulated_color
+	if old_id != resolved_id:
+		biome_changed.emit(old_id, resolved_id)
 
 
 ## Returns the current biome_id, or empty string if [method set_biome]
 ## has not been called yet.
 func get_biome() -> String:
 	return _current_biome_id
-
-
-## Multiplier applied to the biome palette on the FINAL (boss) floor — F5
-## of a standard biome. Darkens the background so the boss fight visually
-## reads as a culmination, distinct from the daylight register of F1–F4.
-## Sprint 25 S25-M3-rev — per-floor visual differentiation; smallest
-## meaningful variant: only the boss floor diverges. Per-floor gradient
-## across F1–F4 deferred to a follow-up pass once playtest validates the
-## boss-floor moment.
-##
-## 0.65 picks the "dusk → night" transition that the parchment-warm
-## palette tolerates without losing the cozy-game register. Tested by
-## eye on warrior + mage + rogue compositions in forest_reach F5.
-const BOSS_FLOOR_DARKEN_FACTOR: float = 0.65
-
-
-## Updates the visible palette to match [param biome_id], with optional
-## per-floor modulation. Sprint 25 S25-M3-rev — when [param floor_index]
-## indicates a boss floor (currently floor 5 in MVP), the resolved palette
-## is darkened by [constant BOSS_FLOOR_DARKEN_FACTOR] so the player
-## visually reads the boss fight as distinct from regular floors.
-##
-## [param floor_index] of 0 means "no floor context" (e.g., Guild Hall
-## tavern, Return-to-App screen) — no modulation applied, identical to
-## [method set_biome].
-##
-## Compatibility: [method set_biome] is preserved as the no-floor-context
-## entry point. Callers that have a floor context (DungeonRunView,
-## Victory Moment) can opt into per-floor modulation via this method
-## without breaking screens that don't track floors.
-func set_biome_for_floor(biome_id: String, floor_index: int) -> void:
-	# Resolve biome_id with the same fallback policy as set_biome (DRY-violation
-	# avoidance — inlined here to keep the per-floor modulation in one place;
-	# extracting a shared helper would complicate signal-emit semantics).
-	var resolved_id: String = biome_id
-	if biome_id.is_empty() or not PALETTE.has(biome_id):
-		if not biome_id.is_empty():
-			push_warning(
-				"BiomeBackground.set_biome_for_floor: unknown biome_id '%s'; falling back to '%s'"
-				% [biome_id, FALLBACK_BIOME_ID]
-			)
-		resolved_id = FALLBACK_BIOME_ID
-
-	# Per-floor modulation: only the boss floor (5) currently diverges.
-	# Pre-MVP playtest can lift this to a per-floor gradient if the boss-only
-	# variant reads as too binary.
-	var base_color: Color = PALETTE[resolved_id]
-	var floor_modulated_color: Color = base_color
-	if floor_index == 5:
-		floor_modulated_color = Color(
-			base_color.r * BOSS_FLOOR_DARKEN_FACTOR,
-			base_color.g * BOSS_FLOOR_DARKEN_FACTOR,
-			base_color.b * BOSS_FLOOR_DARKEN_FACTOR,
-			base_color.a
-		)
-
-	# Always update color even on same biome_id — the floor may have changed
-	# without the biome changing (e.g., F4 → F5 in the same run). Set
-	# _current_biome_id BEFORE the signal emit so subscribers see consistent state.
-	var old_id: String = _current_biome_id
-	_current_biome_id = resolved_id
-	color = floor_modulated_color
-	if old_id != resolved_id:
-		biome_changed.emit(old_id, resolved_id)
