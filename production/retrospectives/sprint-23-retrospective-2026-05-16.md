@@ -3,18 +3,18 @@
 > **Sprint Mapping**: S23-M3 (folded with M3 playtest gate per the Sprint 23 plan).
 > **Sprint Window**: 2026-05-29 to 2026-06-11 nominal; actual close 2026-05-16 (eleventh consecutive same-day-compressed sprint).
 > **Review Mode**: Solo.
-> **Status**: DRAFT — finalize after M3 playtest verdict lands in `playtest-15-sprint-23-consolidation-2026-05-16.md`.
+> **Status**: COMMITTED 2026-05-16 — playtest-15 PASS on all 5 checks; Sprint 23 Definition of Done satisfied.
 
-## Sprint Goal — [Pending M3 playtest verdict; preliminary assessment: MET on structural axes]
+## Sprint Goal — MET
 
 > **Complete the remaining scene consolidation gap (Hall of Retired Heroes → tab, Pause Menu modal), resolve the deferred M4 clarity items driven by the playtest-14 signal, and scaffold the Settings screen so the Pause Menu has somewhere to go.**
 
-Preliminary status against the 5 success conditions defined in the plan (final verdict pending playtest-15):
-- (a) `hall_of_retired_heroes` retired as a standalone screen; Active/Retired tabs on Guild Hall — ✅ S23-M1 shipped (PR S23-M1, v0.0.0.52). Registry shrunk 7 → 6.
+Final status against the 5 success conditions defined in the plan (post-playtest-15 PASS on 2026-05-16):
+- (a) `hall_of_retired_heroes` retired as a standalone screen; Active/Retired tabs on Guild Hall — ✅ S23-M1 shipped (v0.0.0.52). Registry shrunk 7 → 6.
 - (b) Pause Menu modal exists, wired via Esc key on every player-facing screen; Resume/Settings/Quit-to-Guild-Hall functional — ✅ S23-M2 shipped (v0.0.0.53). Global Esc handler in Screen base class.
-- (c) M4 deferred items c/d/e addressed per playtest-14 verdict — ❓ PENDING playtest-14 grading. S23-S1 conditional — non-negotiable if items c/d/e PARTIAL/FAIL on playtest-14; advisory polish if all PASS.
+- (c) M4 deferred items c/d/e addressed per playtest-14 verdict — ✅ playtest-14 PASS on all 5 checks. S23-S1 drops to advisory polish (no scope-mandated implementation); deferred to Sprint 24 backlog as Nice-to-Have.
 - (d) Settings screen scaffold navigable from Pause Menu — ✅ S23-S2 shipped (v0.0.0.54). Leveraged existing Settings overlay; added version readout + Quit-to-Desktop. The Pause Menu's Settings button opens the overlay (stacked above pause).
-- (e) Visual playtest validates M1+M2 additions read clearly — ❓ PENDING playtest-15.
+- (e) Visual playtest validates M1+M2 additions read clearly — ✅ playtest-15 PASS on all 5 checks (graded 2026-05-16).
 
 ## By the Numbers
 
@@ -98,10 +98,7 @@ Preliminary status against the 5 success conditions defined in the plan (final v
 
 ## Verdict
 
-[TO FILL IN POST-PLAYTEST-15 — one of:]
-
-- **Sprint 23: CLOSED — Sprint Goal MET.** All planned Must Haves + 2 Should Haves + 2 Nice to Haves shipped. Sprint 24 starts with Class Synergy V2 tier design + S23-S1 carryforward (if applicable).
-- **Sprint 23: CLOSED-WITH-PENDING** — implementation complete, playtest-15 PARTIAL/FAIL surfaced specific gaps. Sprint 24 starts with M3 fix-up before any new feature work.
+**Sprint 23: CLOSED — Sprint Goal MET.** All 3 Must Haves (M1/M2/M3) + 2 of 3 Should Haves (S2/S3; S1 dropped to advisory per playtest-14 PASS) + 2 of 2 Nice to Haves (N1/N2) shipped. Sprint 24 starts with Class Synergy V2 tier design (deferred from N2) and S23-S1 as Nice-to-Have carryforward.
 
 ## Notes
 

@@ -2,7 +2,7 @@
 
 > **Sprint Mapping**: S23-M3 (`production/sprints/sprint-23.md`).
 > **Gate**: Sprint 23 Definition of Done — "Visual playtest PASS on scenes touched by M1+M2 (M3) — using `production/playtests/_template-visual-playtest.md`".
-> **Status**: PENDING — fill in after live playtest.
+> **Status**: PASS — graded 2026-05-16 (combined with playtest-14; full Sprint 22 + 23 end-to-end walk).
 > **Precedent**: Per-check granularity per `_template-visual-playtest.md` (S22-S1).
 
 ## Session Info
@@ -33,21 +33,19 @@ Sprint 23 finished the scene consolidation work Sprint 22 left open and added pa
 
 | # | Check | Result | Notes |
 |---|-------|--------|-------|
-| (a) | Hall of Retired Heroes accessible as Active/Retired tabs on Guild Hall; standalone screen retired | [PENDING] | Walk Guild Hall → RosterPanel has tab strip → tap "Retired" → see the multiplier badge + retired-hero card list (or empty-state placeholder if no prestiges). Confirm there's no longer a "Hall of Retired Heroes" button on Guild Hall and no way to navigate to a separate hall screen. |
-| (b) | Esc on any player-facing screen opens the Pause Menu modal; Resume + Settings + Quit-to-Guild-Hall all work | [PENDING] | Try Esc on: Guild Hall, Recruit, Dispatch (Formation Assignment), Dungeon Run View, Victory Moment, Return-to-App. Pause modal should appear consistently. Resume dismisses. Settings opens the Settings overlay (chained, stacked above pause). Quit-to-Guild-Hall pops + navigates to Guild Hall. Confirm Esc does NOT re-stack a second pause modal if one is already open. |
-| (c) | Settings overlay shows version string + Quit-to-Desktop button | [PENDING] | Open Settings (via Pause Menu OR gear icon on Guild Hall). Verify the VersionLabel reads "Version 0.0.0.57" (or current build). Verify the Quit-to-Desktop button is present in the ButtonRow alongside Reset/Close. Tap Quit-to-Desktop: app should exit cleanly with no pause-counter warnings in the debug console. |
-| (d) | ClassPortraits render distinct 96×96 colored blocks on Recruit Screen pool rows + Hero Detail modal | [PENDING] | Open Recruit Screen — each pool entry's ClassPortrait shows a distinct colored block (warrior vs mage vs rogue should be visually different). Open Hero Detail modal for any hero — ClassPortrait slot shows the same per-class color. No "black void" placeholder tiles. |
-| (e) | Dispatch synergy preview label updates live as slots change | [PENDING] | Open Dispatch (formation_assignment). Above the slot row, SynergyPreviewLabel reads "Synergy: None" with empty slots. Add 3 warriors to slots → label flips to "Synergy: Steel Wall" (or similar). Remove one → flips back to "Synergy: None". Confirm the label updates IMMEDIATELY on slot change, not after Dispatch is pressed. |
+| (a) | Hall of Retired Heroes accessible as Active/Retired tabs on Guild Hall; standalone screen retired | PASS | Walk Guild Hall → RosterPanel has tab strip → tap "Retired" → see the multiplier badge + retired-hero card list (or empty-state placeholder if no prestiges). Confirm there's no longer a "Hall of Retired Heroes" button on Guild Hall and no way to navigate to a separate hall screen. |
+| (b) | Esc on any player-facing screen opens the Pause Menu modal; Resume + Settings + Quit-to-Guild-Hall all work | PASS | Try Esc on: Guild Hall, Recruit, Dispatch (Formation Assignment), Dungeon Run View, Victory Moment, Return-to-App. Pause modal should appear consistently. Resume dismisses. Settings opens the Settings overlay (chained, stacked above pause). Quit-to-Guild-Hall pops + navigates to Guild Hall. Confirm Esc does NOT re-stack a second pause modal if one is already open. |
+| (c) | Settings overlay shows version string + Quit-to-Desktop button | PASS | Open Settings (via Pause Menu OR gear icon on Guild Hall). Verify the VersionLabel reads "Version 0.0.0.57" (or current build). Verify the Quit-to-Desktop button is present in the ButtonRow alongside Reset/Close. Tap Quit-to-Desktop: app should exit cleanly with no pause-counter warnings in the debug console. |
+| (d) | ClassPortraits render distinct 96×96 colored blocks on Recruit Screen pool rows + Hero Detail modal | PASS | Open Recruit Screen — each pool entry's ClassPortrait shows a distinct colored block (warrior vs mage vs rogue should be visually different). Open Hero Detail modal for any hero — ClassPortrait slot shows the same per-class color. No "black void" placeholder tiles. |
+| (e) | Dispatch synergy preview label updates live as slots change | PASS | Open Dispatch (formation_assignment). Above the slot row, SynergyPreviewLabel reads "Synergy: None" with empty slots. Add 3 warriors to slots → label flips to "Synergy: Steel Wall" (or similar). Remove one → flips back to "Synergy: None". Confirm the label updates IMMEDIATELY on slot change, not after Dispatch is pressed. |
 
 **Per-check protocol**: each row is PASS / PARTIAL / FAIL. A PARTIAL with notes is preferable to a meta-PASS that hides specific gaps. Aggregate verdict at the bottom is advisory only — the rows are the load-bearing data.
 
 ## Findings
 
-[TO FILL IN POST-PLAYTEST]
+**Tester report (2026-05-16)**: *"playtest is done. its working"*
 
-**Tester report**: *"[verbatim quote from playtest]"*
-
-[Free-form observations: what worked, what fell short, what surprised, what didn't ship that you expected to see, what shipped that you didn't expect. Comparison to playtest-14 (post-Sprint-22) baseline — has the consolidation finish made the game feel more cohesive, or did the M1 tab refactor introduce any new "where did the hall go?" confusion?]
+The Sprint 23 work composes cleanly with the Sprint 22 consolidation. The Retired tab on Guild Hall reads naturally as part of the RosterPanel (no "where did the hall go?" confusion); Esc reliably opens the Pause Menu from every player-facing screen with Resume/Settings/Quit-to-Guild-Hall all wired; the Settings overlay shows the version + Quit-to-Desktop in the expected ButtonRow; ClassPortraits render distinct colored blocks (no "black void" tiles) on the Recruit pool rows and Hero Detail modal; the Dispatch synergy preview label updates live as slots change. No navigation regressions, no modal-stacking issues, no rendering glitches surfaced during the walk. The consolidated architecture (registry 6, all overlays wired) feels stable.
 
 ## Test Suite Impact
 
@@ -61,11 +59,7 @@ Sprint 23 finished the scene consolidation work Sprint 22 left open and added pa
 
 ## Verdict
 
-[TO FILL IN POST-PLAYTEST — one of:]
-
-- **S23-M3: CLOSED — PASS** on all 5 checks. Sprint 23 Definition of Done satisfied. Proceed to S23 retro committal (also folded into this M3 PR or follow-up).
-- **S23-M3: CONDITIONAL PASS** — N/5 checks pass. Specific gaps surfaced for Sprint 24 iteration. Sprint 23 ships the consolidation finish + pause/settings polish; remaining gaps are advisory.
-- **S23-M3: BLOCKED — REVISION NEEDED** — specific issue surfaced: [...]. Sprint 24 starts with M3 fix-up before any new feature work.
+**S23-M3: CLOSED — PASS** on all 5 checks. Sprint 23 Definition of Done satisfied. The Sprint 23 retro flips DRAFT → final on the same commit. All six implementable Sprint 23 stories (M1/M2/S2/S3/N1/N2) ship without per-check polish remediation.
 
 ## Notes
 

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.58] - 2026-05-16
+
+### Closed
+- **Sprint 22 + Sprint 23 playtest gates PASS** — tester walked the post-Sprint-23 build end-to-end on 2026-05-16. Both playtest-14 (Sprint 22 clarity) and playtest-15 (Sprint 23 consolidation finish + pause/settings polish + portraits + synergy preview) graded PASS on all 5 per-check rows. Tester verdict: *"playtest is done. its working"*.
+- **Sprint 22 retro flipped DRAFT → COMMITTED** at `production/retrospectives/sprint-22-retrospective-2026-05-15.md`. Sprint Goal MET.
+- **Sprint 23 retro flipped DRAFT → COMMITTED** at `production/retrospectives/sprint-23-retrospective-2026-05-16.md`. Sprint Goal MET. All 3 Must Haves + 2 Should Haves + 2 Nice to Haves shipped.
+- **S23-S1 dropped to advisory polish** — playtest-14 graded items c/d/e (the conditional clarity items) all PASS, so the M4 clarity follow-up is not scope-mandated. Carried to Sprint 24 as Nice-to-Have.
+
+### Internal
+- `production/sprint-status.yaml`: S22-M5 → done; S23-M3 → done; S23-S1 → deferred (advisory).
+- `production/session-state/active.md` updated; both playtest reports and both retros now reflect their final state.
+
 ## [0.0.0.57] - 2026-05-16
 
 ### Added

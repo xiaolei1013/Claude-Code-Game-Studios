@@ -3,21 +3,21 @@
 > **Sprint Mapping**: S22-M5 (folded with M5 playtest gate per the Sprint 22 plan).
 > **Sprint Window**: 2026-05-15 to 2026-05-28 nominal; actual close 2026-05-15 (ninth consecutive same-day-compressed sprint).
 > **Review Mode**: Solo.
-> **Status**: DRAFT — finalize after M5 playtest verdict lands in `playtest-14`.
+> **Status**: COMMITTED 2026-05-16 — playtest-14 PASS on all 5 checks; Sprint 22 Definition of Done satisfied.
 
-## Sprint Goal — [Pending M5 playtest verdict; preliminary assessment: MET on structural axes]
+## Sprint Goal — MET
 
 > **Reduce 10 scenes to 7 by collapsing the redundant ones, fold the matchup picker into Formation Assignment as a unified Dispatch screen, then run a clarity pass on every screen with the now-visible parchment theme.**
 
-Preliminary status against the 6 success conditions defined in the plan (final verdict pending playtest-14):
-- (a) `main_menu` retired; run-end + boot route directly to Guild Hall — PR #126 OPEN (orthogonal). Code change is trivial; merge is the only step left.
-- (b) `matchup_assignment` folded into `formation_assignment` as a Dispatch screen — ✅ PR #127 merged. Player no longer leaves Dispatch to change floor.
-- (c) `hall_of_retired_heroes` → tab on Guild Hall — DEFERRED to Sprint 23 (was S22-S2; not landed).
-- (d) `pause_menu` modal scene built — DEFERRED to Sprint 23 (was S22-S3; not landed).
+Final status against the 6 success conditions defined in the plan (post-playtest-14 PASS on 2026-05-16):
+- (a) `main_menu` retired; run-end + boot route directly to Guild Hall — ✅ PR #126 merged before Sprint 23 M1.
+- (b) `matchup_assignment` folded into `formation_assignment` as a Dispatch screen — ✅ PR #127 merged.
+- (c) `hall_of_retired_heroes` → tab on Guild Hall — DEFERRED to Sprint 23 S23-M1 (which landed cleanly; registry now at 6).
+- (d) `pause_menu` modal scene built — DEFERRED to Sprint 23 S23-M2 (shipped with global Esc handler).
 - (e) BiomeBackground visible on Recruit, Dispatch, Victory, Return-to-App — ✅ PR #128 merged.
-- (f) Per-screen clarity pass: IdentityHeader on every screen + Dispatch GoldCounter — ✅ PR #129 merged. Items (c)(d)(e) from the M4 checklist (empty-state clarity, tap-target verification, Primary Button on CTAs) deferred to M5 playtest signal.
-- (g) Visual playtest validates the consolidated architecture — PENDING playtest-14.
-- (h) Sprint 22 retro committed — IN PROGRESS (this file).
+- (f) Per-screen clarity pass: IdentityHeader on every screen + Dispatch GoldCounter — ✅ PR #129 merged. Items (c)(d)(e) from the M4 checklist (empty-state clarity, tap-target verification, Primary Button on CTAs) all graded PASS in playtest-14; S23-S1 drops to advisory polish.
+- (g) Visual playtest validates the consolidated architecture — ✅ playtest-14 PASS on all 5 checks (graded 2026-05-16 against the post-Sprint-23 build).
+- (h) Sprint 22 retro committed — ✅ this commit.
 
 ## By the Numbers
 
