@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.57] - 2026-05-16
+
+### Added
+- **Dispatch synergy preview label (Sprint 23 S23-N2 — "Class Synergy V2" first pass)** — an always-visible `SynergyPreviewLabel` lives above the slot row inside `FormationPanel`. It updates on every slot edit, reading the live composition through `FormationAssignment.detect_active_synergy()`:
+  - Empty / mismatched composition → "Synergy: None"
+  - Matching composition → "Synergy: <localized display name>" (e.g., "Synergy: Steel Wall")
+  Distinct from the cozy `SynergyBadge` (which animates the "you-found-something" glow on detection edges and stays). The preview label is the passive read; the badge remains the active cue.
+- **Locale (`assets/locale/en.csv`)** — `synergy_preview_none_format` ("Synergy: %s"), `synergy_preview_none_label` ("None").
+- **3 new tests** (`tests/unit/formation_assignment/synergy_preview_label_test.gd`) — preview label node existence, "None" initial state, "Steel Wall" populates after seeding 3 warriors.
+
+### Changed
+- **`FormationPanel` scene structure** — the existing `SlotsHBox` now lives one level deeper inside a new `FormationVBox` so the preview label can stack above it. Path moved from `FormationPanel/SlotsHBox` to `FormationPanel/FormationVBox/SlotsHBox`. The `_slots_hbox` `@onready` and the two test path references in `formation_assignment_theme_application_test.gd` are updated.
+
+### Internal
+- The "tier" semantics (None / Bronze / Silver / Gold / Platinum) named in the original N2 plan are deferred — Class Synergy V2 tier design hasn't landed yet. The label uses the existing V1 synergy-name display surface (also referenced by the cozy badge), which is the implementable contract for now. Future work can layer tier coloring + iconography on top without changing the data path.
+- Full test suite: 125/125 PASS in formation_assignment + guild_hall modules. Cross-module: no regression detected.
+
 ## [0.0.0.56] - 2026-05-16
 
 ### Verified (S23-N1 — Audio MVP bootstrap closure)

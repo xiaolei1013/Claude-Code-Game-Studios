@@ -102,7 +102,7 @@ func test_formation_assignment_slot_buttons_get_slot_button_variation() -> void:
 	instance.on_enter()
 	await get_tree().process_frame
 
-	var slots_hbox: HBoxContainer = instance.get_node("FormationPanel/SlotsHBox") as HBoxContainer
+	var slots_hbox: HBoxContainer = instance.get_node("FormationPanel/FormationVBox/SlotsHBox") as HBoxContainer
 	assert_object(slots_hbox).is_not_null()
 	# Slot 1 (index 1) is NOT the default active slot → carries SlotButton.
 	var slot_btn_1: Button = slots_hbox.get_child(1) as Button
@@ -128,7 +128,7 @@ func test_formation_assignment_selected_slot_gets_selected_variation() -> void:
 	instance.on_enter()
 	await get_tree().process_frame
 
-	var slots_hbox: HBoxContainer = instance.get_node("FormationPanel/SlotsHBox") as HBoxContainer
+	var slots_hbox: HBoxContainer = instance.get_node("FormationPanel/FormationVBox/SlotsHBox") as HBoxContainer
 	var slot_btn_0: Button = slots_hbox.get_child(0) as Button
 	assert_object(slot_btn_0).is_not_null()
 	assert_str(str(slot_btn_0.theme_type_variation)).override_failure_message(
