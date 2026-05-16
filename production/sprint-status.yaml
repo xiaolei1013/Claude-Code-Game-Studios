@@ -275,14 +275,14 @@ stories:
     completed: "2026-05-16 (v0.0.0.54); 4 new tests; project.godot config/version declared; 2239/2239 PASS"
 
   - id: "S23-S3"
-    name: "ClassPortrait placeholder art — 96×96 colored-block per class ID; HeroClass.portrait_path populated; third carry from S20-N1 + S21-S2"
-    file: "assets/art/portraits/ + src/data/hero_class_database.gd"
+    name: "ClassPortrait placeholder art — 96×96 programmatic colored blocks via ClassPortraitFactory; wired in Recruit Screen + Hero Detail modal; third carry from S20-N1 + S21-S2"
+    file: "src/ui/class_portrait_factory.gd (NEW); assets/screens/recruitment/recruitment.gd + tscn; assets/screens/hero_detail/hero_detail_modal.gd; tests/unit/class_portrait_factory/ (NEW)"
     priority: should-have
-    status: backlog
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-05-16 (v0.0.0.55); 7 new tests; 2246/2246 PASS"
 
   # ===== Nice to Have =====
 

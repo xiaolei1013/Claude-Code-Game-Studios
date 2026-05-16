@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.55] - 2026-05-16
+
+### Added
+- **ClassPortrait programmatic placeholders (Sprint 23 S23-S3 — third carry from S20-N1 → S21-S2)** — `src/ui/class_portrait_factory.gd` generates a deterministic 96×96 colored-block texture per `class_id`. Each MVP class (warrior / mage / rogue) gets a distinct dusty-warm color (hash-derived hue, saturation 0.45, value 0.65 to stay in the parchment palette) with an inset 4px border and a centered diamond mark. Cached per `class_id` so repeat calls are O(1).
+- **Recruit Screen pool rows** now show the placeholder portrait on each PoolEntry's `ClassPortrait` TextureRect — closes the "black void" issue the playtest-08 / playtest-09 / playtest-11 reports surfaced.
+- **Hero Detail modal** ClassPortrait slot now renders the same placeholder, keyed by the hero's `class_id`. The `@warning_ignore("unused_private_class_variable")` annotation on `_class_portrait` (carve-out since Sprint 17) is removed — the field is now an active consumer.
+- **7 new tests** (`tests/unit/class_portrait_factory/class_portrait_factory_test.gd`) covering 96×96 dimensions, per-class color distinctness (warrior vs mage, vs rogue, mage vs rogue), defensive empty-id degrade to neutral grey, and cache identity-equality on repeat calls.
+
+### Internal
+- ClassPortraitFactory is a pure RefCounted utility (no scene-tree dependency, no autoload). Static method API: `get_portrait_texture(class_id) -> Texture2D`, `get_portrait_color(class_id) -> Color`. Cache is module-level, cleared between tests via `_clear_cache_for_tests()`.
+- When real product art arrives, consumers can prefer `HeroClass.portrait_path` and fall back to the factory texture — the API surface won't change.
+- Full test suite: 2246/2246 PASS.
+
 ## [0.0.0.54] - 2026-05-16
 
 ### Added
