@@ -709,11 +709,27 @@ func _render_floor_picker_biome_tabs() -> void:
 			var floor_index: int = int(floor_data.floor_index)
 			var floor_button: Button = Button.new()
 			floor_button.name = "FloorButton_%d" % floor_index
-			floor_button.text = "F%d" % floor_index
+			var is_unlocked: bool = FloorUnlock.is_unlocked_in_biome(biome_id, floor_index)
+			# Sprint 25 S25-N2-rev — locked floors show 🔒 prefix + tooltip
+			# explaining the unlock prerequisite. Per FloorUnlock GDD #16 §F
+			# locked-affordance hints. The lock emoji reads at the same size
+			# as the F# text + clearly communicates "blocked" without needing
+			# extra visual hierarchy (no separate icon node + asset).
+			if is_unlocked:
+				floor_button.text = "F%d" % floor_index
+				floor_button.tooltip_text = ""
+			else:
+				floor_button.text = "🔒 F%d" % floor_index
+				# Tooltip: tells the player WHICH floor to clear to unlock this.
+				# floor_index - 1 is always the predecessor in MVP (no skip-ahead
+				# unlock paths); for floor 1 of a chained biome, the unlock
+				# predicate is the biome chain (Biome.unlock_after), so the
+				# tooltip is intentionally floor-of-this-biome-focused.
+				floor_button.tooltip_text = tr("floor_locked_tooltip_format") % (floor_index - 1)
 			floor_button.custom_minimum_size = Vector2(60, 60)
 			floor_button.focus_mode = Control.FOCUS_NONE
 			floor_button.mouse_filter = Control.MOUSE_FILTER_STOP
-			floor_button.disabled = not FloorUnlock.is_unlocked_in_biome(biome_id, floor_index)
+			floor_button.disabled = not is_unlocked
 			floor_button.pressed.connect(
 				_on_floor_picker_floor_pressed.bind(biome_id, floor_index)
 			)
