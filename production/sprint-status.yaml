@@ -248,122 +248,145 @@
 #   Critical mid-sprint bug: PR #90 Economy multi-biome ledger collision + ADR-0002 Amend 1.
 #
 
-sprint: 24
-goal: "Land the Class Synergy V2 tier ladder design + tier-aware preview label, ship UIFramework hygiene helpers consolidating Sprint 23's deferred duplication, author the Onboarding First-Session GDD, and clear the S23-S1 advisory polish that was deferred when playtest-14 passed."
-start: "2026-06-12"
-end: "2026-06-25"
+sprint: 25
+goal: "Ship implementation of two already-authored GDDs — Floor Unlock System (#16) and Onboarding First-Session Flow (#29) — so the player sees actual depth (multiple floors gated by progression) and a guided first-session, not a bare Guild Hall on cold launch."
+start: "2026-06-26"
+end: "2026-07-09"
 generated: "2026-05-16"
 updated: "2026-05-16"
 
-# Pre-plan dispositions: NONE — Sprint 23 fully closed (recovery PR #139 merged;
-# main is at 87d9307; all Sprint 23 work landed including review-cleanup fixes).
+# Pre-plan dispositions: NONE — Sprint 24 fully closed.
+# Sprint 25 is a STRATEGIC PIVOT — see production/retrospectives/sprint-24-retrospective-2026-05-16.md
+# and memory entry feedback_infrastructure_debt_drift.md. Sprint 25 focuses on player-visible
+# content + mechanics; new GDD authoring, test fixture refactors, hygiene polish, and engine
+# refinement are explicitly deferred.
 
 stories:
   # ===== Must Have =====
 
-  - id: "S24-M1"
-    name: "Class Synergy V2 tier ladder GDD — amend class-synergy-system.md §V2 with tier mapping (None/Bronze/Silver/Gold/Platinum) + 5 locale keys"
-    file: "design/gdd/class-synergy-system.md (§V2 section); assets/locale/en.csv (5 new keys); design/gdd/systems-index.md (status update)"
+  - id: "S25-M1"
+    name: "Floor Unlock System autoload implementation — 15 BLOCKING ACs (AC-FU-01..15) per GDD #16; _ready + _on_floor_cleared_first_time handler + save/load with clamp guards + DI of loggers"
+    file: "src/core/floor_unlock_system/floor_unlock_system.gd (NEW); tests/unit/floor_unlock_system/*_test.gd (NEW); project.godot (autoload rank 4)"
     priority: must-have
     status: ready-for-dev
-    owner: "game-designer"
-    estimate_days: 0.5
+    owner: "godot-gdscript-specialist"
+    estimate_days: 2.0
     blocker: ""
     completed: ""
 
-  - id: "S24-M2"
-    name: "Tier-aware SynergyPreviewLabel — render tier names per S24-M1 GDD; format 'Synergy: {tier} ({display_name})'"
-    file: "assets/screens/formation_assignment/formation_assignment.gd; tests/unit/formation_assignment/synergy_preview_label_test.gd"
+  - id: "S25-M2"
+    name: "Wire Orchestrator → FloorUnlockSystem signal + Dispatch floor picker UI gating — locked floors render as LOCKED per GDD §F"
+    file: "src/core/dungeon_run_orchestrator/ (subscribe wiring); assets/screens/formation_assignment/formation_assignment.gd (floor picker UI); tests/integration/floor_unlock/ (NEW)"
+    priority: must-have
+    status: ready-for-dev
+    owner: "godot-gdscript-specialist"
+    estimate_days: 1.0
+    blocker: "S25-M1"
+    completed: ""
+
+  - id: "S25-M3"
+    name: "Replay-on-load offline replay correctness — verify floor_cleared_first_time emits during compute_offline_run; AC-FU-13 + AC-FU-14 integration tests"
+    file: "src/core/dungeon_run_orchestrator/ (verify offline emit); tests/integration/floor_unlock/offline_replay_test.gd (NEW)"
     priority: must-have
     status: ready-for-dev
     owner: "godot-gdscript-specialist"
     estimate_days: 0.5
-    blocker: "S24-M1"
+    blocker: "S25-M2"
     completed: ""
 
-  - id: "S24-M3"
-    name: "UIFramework hygiene helpers — clear_children_immediate(container) + synergy_display_name(synergy_id); refactor ~9 call sites"
-    file: "src/ui/ui_framework.gd; tests/unit/ui_framework/ui_framework_helpers_test.gd; refactor: guild_hall.gd, formation_assignment.gd"
+  - id: "S25-M4"
+    name: "Onboarding First-Session Flow implementation — 14 ACs (AC-29-01..14) per GDD #29; onboarding_state autoload + onboarding_overlay modal + skip + persistent flag"
+    file: "src/core/onboarding/onboarding_state.gd (NEW); assets/screens/_modals/onboarding_overlay.tscn + .gd (NEW); tests/unit/onboarding/ (NEW); src/core/scene_manager/scene_manager.gd (first-launch routing)"
     priority: must-have
     status: ready-for-dev
     owner: "godot-gdscript-specialist"
-    estimate_days: 0.5
-    blocker: "S24-M2"
+    estimate_days: 1.5
+    blocker: ""
     completed: ""
 
-  - id: "S24-M4"
-    name: "Sprint 24 visual playtest + retrospective"
-    file: "production/playtests/playtest-16-sprint-24-*.md; production/retrospectives/sprint-24-retrospective-*.md"
+  - id: "S25-M5"
+    name: "Sprint 25 visual playtest + retrospective — TWO grading axes: Floor Unlock readability + Onboarding readability"
+    file: "production/playtests/playtest-17-sprint-25-*.md; production/retrospectives/sprint-25-retrospective-*.md"
     priority: must-have
     status: backlog
     owner: "xiaolei (human) + claude-code"
     estimate_days: 0.5
-    blocker: "S24-M1 + S24-M2 + S24-M3 + S24-S1"
+    blocker: "S25-M1 + S25-M2 + S25-M3 + S25-M4"
     completed: ""
 
   # ===== Should Have =====
 
-  - id: "S24-S1"
-    name: "M4 clarity polish — empty-state copy + tap-target audit (>=44x44) + Primary Button on all primary CTAs (S23-S1 carryforward)"
-    file: "assets/screens/*/*.tscn; assets/locale/en.csv (empty-state keys)"
+  - id: "S25-S1"
+    name: "Add second biome 'moonlit_glade' — 5 floors of content + biome background + LOCKED-until-forest_reach-cleared chain"
+    file: "assets/data/biomes/moonlit_glade.tres (NEW); src/core/floor_unlock_system/ (BIOME_FLOOR_COUNT update); assets/screens/formation_assignment/ (2nd biome tab); tests/unit/floor_unlock_system/biome_chain_test.gd (NEW)"
     priority: should-have
     status: ready-for-dev
-    owner: "godot-gdscript-specialist"
-    estimate_days: 1.0
-    blocker: ""
+    owner: "game-designer + godot-gdscript-specialist"
+    estimate_days: 1.5
+    blocker: "S25-M2"
     completed: ""
 
-  - id: "S24-S2"
-    name: "Onboarding First-Session GDD — 8-section design doc; implementation deferred to Sprint 25+"
-    file: "design/gdd/onboarding-first-session.md (NEW); design/gdd/systems-index.md (new entry); assets/locale/en.csv (key sketch)"
+  - id: "S25-S2"
+    name: "Add new class 'paladin' (warrior tier-2 variant) — cozy-tank archetype (high HP, low DMG); recruitable from pool; portrait via ClassPortraitFactory"
+    file: "assets/data/classes/paladin.tres (NEW); src/core/recruitment/ (pool generation); tests/unit/recruitment/paladin_recruit_test.gd (NEW)"
     priority: should-have
     status: ready-for-dev
-    owner: "game-designer"
+    owner: "game-designer + godot-gdscript-specialist"
     estimate_days: 1.0
-    blocker: ""
-    completed: ""
-
-  - id: "S24-S3"
-    name: "Test fixture helper for HeroRoster — reset/seed/snapshot/restore; refactor ~5 test files"
-    file: "tests/helpers/hero_roster_test_fixture.gd (NEW); refactor: retired_tab_render_test, synergy_preview_label_test, roster_panel_test, synergy_badge_test"
-    priority: should-have
-    status: ready-for-dev
-    owner: "godot-gdscript-specialist"
-    estimate_days: 0.5
     blocker: ""
     completed: ""
 
   # ===== Nice to Have =====
 
-  - id: "S24-N1"
-    name: "ClassPortraitFactory fill_rect optimization — replace nested set_pixel loops with Image.fill_rect for border strips"
-    file: "src/ui/class_portrait_factory.gd"
+  - id: "S25-N1"
+    name: "First-time biome unlock fanfare — toast + audio cue on new-biome unlock; locale key biome_unlocked_toast_format"
+    file: "assets/screens/_overlays/biome_unlock_toast.tscn (NEW or extend existing toast); assets/locale/en.csv (1 new key); src/core/audio_router/ (cue wiring)"
     priority: nice-to-have
     status: backlog
     owner: "godot-gdscript-specialist"
     estimate_days: 0.5
-    blocker: ""
+    blocker: "S25-S1"
     completed: ""
 
-  - id: "S24-N2"
-    name: "Floor Unlock System GDD — 8-section design doc; implementation deferred to Sprint 26+"
-    file: "design/gdd/floor-unlock-system.md (NEW); design/gdd/systems-index.md (new entry)"
+  - id: "S25-N2"
+    name: "Floor lock indicator UX polish — 🔒 icon + tooltip 'Clear floor N first' replacing the grayed-out button"
+    file: "assets/screens/formation_assignment/formation_assignment.gd (floor picker render); assets/locale/en.csv (1 new key)"
     priority: nice-to-have
     status: backlog
-    owner: "game-designer"
-    estimate_days: 1.0
-    blocker: ""
-    completed: ""
-
-  - id: "S24-N3"
-    name: "Real product art ingestion — placeholder for art workstream landing; ClassPortraitFactory becomes explicit fallback"
-    file: "assets/art/portraits/ (TBD); assets/data/classes/*.tres (portrait_path updates)"
-    priority: nice-to-have
-    status: backlog
-    owner: "claude-code + asset-pipeline"
+    owner: "godot-gdscript-specialist"
     estimate_days: 0.5
-    blocker: "art workstream ETA"
+    blocker: "S25-M2"
     completed: ""
+
+# ===== Sprint 24 archived stories (for history) =====
+#
+#   sprint_status: CLOSED — 10/10 PRs shipped (9 sprint + 1 chore cleanup);
+#                  TECHNICAL Definition of Done MET; STRATEGIC verdict FAILED
+#                  per playtest 2026-05-16 ("uiux and functions are not progressing too much").
+#                  See production/retrospectives/sprint-24-retrospective-2026-05-16.md §"What Could Be Better".
+#   actual_close: 2026-05-16 (twelfth consecutive same-day-compressed sprint)
+#   Must Have: M1 V2 tier GDD PR#141 (done, v0.0.0.58); M2 tier-aware preview PR#142
+#              (done, v0.0.0.59); M3 UIFramework helpers PR#143 (done, v0.0.0.60);
+#              M4 playtest+retro DONE 2026-05-16.
+#   Should Have: S1 polish PARTIAL — only Recruit pool placeholder landed (PR#148);
+#                Guild Hall empty-state + Dispatch hints + tap-target audit DEFERRED;
+#                S2 Onboarding GDD VERIFIED-IN-PLACE (GDD #29 already existed; PR#144
+#                appended §K audit note); S3 HeroRoster test fixture PARTIAL — helper
+#                shipped + 2 of 5 sites refactored (PR#145).
+#   Nice to Have: N1 fill_rect optimization (PR#146, v0.0.0.64); N2 Floor Unlock GDD
+#                 VERIFIED-IN-PLACE (GDD #16 already existed with 9-pass review history;
+#                 PR#147 appended §K audit note); N3 real-art-ingestion DEFERRED
+#                 pending art workstream ETA.
+#   Chore cleanup: .uid sidecars committed via PR#149.
+#   New tests: +20 across 4 new test files (UIFramework helpers, fixture, fill_rect
+#              regression, Recruit pool empty-state).
+#   Locale keys: +7 (6 synergy tier + 1 recruit pool empty-state).
+#   Scene/overlay registry: unchanged (6 screens + 1 overlay).
+#   Version: 0.0.0.57 → ~0.0.0.65 across the sprint.
+#   Player-visible PR count: 2 of 10 (M1+M2 tier label + S1 pool placeholder).
+#   Load-bearing finding: feedback_infrastructure_debt_drift memory entry written.
+#   Process learning: grep-first GDD-existence check fired correctly on both S2 + N2
+#                     pre-existing GDDs; the check should land in /sprint-plan new itself.
 
 # ===== Sprint 22 archived stories (for history) =====
 #
