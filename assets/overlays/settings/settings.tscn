@@ -166,6 +166,14 @@ layout_mode = 2
 [node name="Separator2" type="HSeparator" parent="Panel/VBox"]
 layout_mode = 2
 
+; Sprint 23 S23-S2: version label + Quit-to-Desktop button. Version
+; string is read from ProjectSettings("application/config/version") at
+; _ready time; falls back to "unknown" if the project hasn't set it.
+[node name="VersionLabel" type="Label" parent="Panel/VBox"]
+layout_mode = 2
+text = "Version —"
+horizontal_alignment = 1
+
 [node name="ButtonRow" type="HBoxContainer" parent="Panel/VBox"]
 layout_mode = 2
 
@@ -176,6 +184,14 @@ size_flags_horizontal = 3
 focus_mode = 0
 mouse_filter = 0
 text = "Reset to Defaults"
+
+[node name="QuitToDesktopButton" type="Button" parent="Panel/VBox/ButtonRow"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+mouse_filter = 0
+text = "Quit to Desktop"
 
 [node name="CloseButton" type="Button" parent="Panel/VBox/ButtonRow"]
 custom_minimum_size = Vector2(0, 44)

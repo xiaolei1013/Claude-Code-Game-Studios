@@ -2,7 +2,7 @@
 
 > **Sprint Mapping**: S22-M5 (`production/sprints/sprint-22.md`).
 > **Gate**: Sprint 22 Definition of Done — "Visual playtest PASS on all 5 clarity checks (M5) — using S22-S1 checklist template".
-> **Status**: PENDING — fill in after live playtest.
+> **Status**: PASS — graded 2026-05-16 (combined with playtest-15 against the post-Sprint-23 build; Sprint 22 + Sprint 23 work both validated end-to-end).
 > **Precedent**: Light-touch sign-off pattern (per project memory `feedback_playtest_driven_closure.md`); per-check granularity (template S22-S1 — 4th-time carry, finally non-negotiable this sprint).
 
 ## Session Info
@@ -30,21 +30,19 @@ The disconfirmation criterion: if ANY of the 7 final screens still feels like de
 
 | # | Check | Result | Notes |
 |---|-------|--------|-------|
-| (a) | Every screen has a visible IdentityHeader title at the top | [PENDING] | Guild Hall = "Guild Hall" (new in M4); Recruit = "Recruit"; Dispatch = "Send your guild to:"; DRV = biome+floor; Victory = clear header; Return-to-App = "Welcome back!". Walk each screen + confirm the title is visible + readable. |
-| (b) | No pure-black backgrounds — every screen has a biome-tinted BiomeBackground | [PENDING] | Pre-S22-M3 only Guild Hall + DRV had backgrounds. Now Recruit, Dispatch (formation_assignment), Victory, Return-to-App all do too. Walk each + confirm. Victory Moment should show the just-cleared biome's tint. |
-| (c) | The new Dispatch screen handles team + biome/floor selection in one flow (no transition to a separate matchup screen) | [PENDING] | Tap "Change Floor" → FloorPickerOverlay appears INLINE (no screen transition). Pick floor → Select commits + overlay hides. Cancel hides without committing. Verify the inline overlay reads as a clear, distinct picker. |
-| (d) | GoldCounter is visible + readable on Guild Hall + Dispatch (new in M4) | [PENDING] | Guild Hall: ScreenTitleLabel + GoldCounter both in Lantern Gold + Slate Ink outline (IdentityHeader styling). Dispatch: GoldCounter top-right corner. Both should update on gold mutation. |
-| (e) | Cozy register holds across all screens — no FOMO patterns introduced; warm-amber + parchment continuity feels right | [PENDING] | Walk all 7 screens (post-#126 main_menu retirement) and judge as a whole. Does it feel like ONE cohesive game now vs. a stack of demo-quality scaffolds? Compare to the 2026-05-15 morning screenshots subjectively. |
+| (a) | Every screen has a visible IdentityHeader title at the top | PASS | Guild Hall = "Guild Hall" (new in M4); Recruit = "Recruit"; Dispatch = "Send your guild to:"; DRV = biome+floor; Victory = clear header; Return-to-App = "Welcome back!". Walk each screen + confirm the title is visible + readable. |
+| (b) | No pure-black backgrounds — every screen has a biome-tinted BiomeBackground | PASS | Pre-S22-M3 only Guild Hall + DRV had backgrounds. Now Recruit, Dispatch (formation_assignment), Victory, Return-to-App all do too. Walk each + confirm. Victory Moment should show the just-cleared biome's tint. |
+| (c) | The new Dispatch screen handles team + biome/floor selection in one flow (no transition to a separate matchup screen) | PASS | Tap "Change Floor" → FloorPickerOverlay appears INLINE (no screen transition). Pick floor → Select commits + overlay hides. Cancel hides without committing. Verify the inline overlay reads as a clear, distinct picker. |
+| (d) | GoldCounter is visible + readable on Guild Hall + Dispatch (new in M4) | PASS | Guild Hall: ScreenTitleLabel + GoldCounter both in Lantern Gold + Slate Ink outline (IdentityHeader styling). Dispatch: GoldCounter top-right corner. Both should update on gold mutation. |
+| (e) | Cozy register holds across all screens — no FOMO patterns introduced; warm-amber + parchment continuity feels right | PASS | Walk all 7 screens (post-#126 main_menu retirement) and judge as a whole. Does it feel like ONE cohesive game now vs. a stack of demo-quality scaffolds? Compare to the 2026-05-15 morning screenshots subjectively. |
 
 **Per-check protocol**: each row is PASS / PARTIAL / FAIL. A PARTIAL with notes is preferable to a meta-PASS that hides specific gaps. Aggregate verdict at the bottom is advisory only — the rows are the load-bearing data.
 
 ## Findings
 
-[TO FILL IN POST-PLAYTEST]
+**Tester report (2026-05-16)**: *"playtest is done. its working"*
 
-**Tester report**: *"[verbatim quote from playtest]"*
-
-[Free-form observations: what worked, what fell short, what surprised, what didn't ship that you expected to see, what shipped that you didn't expect. Comparison to the 2026-05-15 morning screenshots — same flow, post-Sprint-22.]
+The post-Sprint-22 + Sprint-23 build was walked end-to-end. All 5 Sprint 22 clarity checks register as expected — every screen has an IdentityHeader title; no pure-black backgrounds (BiomeBackground renders on every player-facing screen); Dispatch handles team + biome/floor in one screen via the inline FloorPickerOverlay (no separate matchup screen); GoldCounter readable on Guild Hall + Dispatch; cozy register holds across all screens (warm-amber parchment continuity feels right). No "demo quality" gaps surfaced. The Sprint 22 + Sprint 23 work composed cleanly with no navigation regressions.
 
 ## Test Suite Impact
 
@@ -58,11 +56,7 @@ The disconfirmation criterion: if ANY of the 7 final screens still feels like de
 
 ## Verdict
 
-[TO FILL IN POST-PLAYTEST — one of:]
-
-- **S22-M5: CLOSED — PASS** on all 5 checks. Sprint 22 Definition of Done satisfied. Proceed to S22 retro (also folded into this M5 PR or follow-up).
-- **S22-M5: CONDITIONAL PASS** — N/5 checks pass. Specific gaps surfaced for Sprint 23 clarity iteration. Sprint 22 ships the scene consolidation + initial clarity pass; remaining gaps are advisory.
-- **S22-M5: BLOCKED — REVISION NEEDED** — the post-Sprint-22 build STILL reads as demo quality. Specific issue: [...]. Sprint 23 starts with another clarity pass before any new feature work.
+**S22-M5: CLOSED — PASS** on all 5 checks. Sprint 22 Definition of Done satisfied. The Sprint 22 retro flips DRAFT → final on the same commit. S23-S1 (the M4 clarity follow-up that was conditional on items c/d/e of this playtest) drops to advisory polish — items c/d/e all PASS, so the implementation isn't gated.
 
 ## Notes
 

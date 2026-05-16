@@ -40,6 +40,11 @@ const _DEFAULT_TELEMETRY_OPT_IN: bool = false
 @onready var _telemetry_check: CheckButton = $Panel/VBox/TelemetryRow/TelemetryCheck
 @onready var _reset_button: Button = $Panel/VBox/ButtonRow/ResetButton
 @onready var _close_button: Button = $Panel/VBox/ButtonRow/CloseButton
+# Sprint 23 S23-S2 — Settings scaffold additions: version readout +
+# Quit-to-Desktop button. Version string sources from
+# ProjectSettings("application/config/version"); falls back to "unknown".
+@onready var _version_label: Label = $Panel/VBox/VersionLabel
+@onready var _quit_to_desktop_button: Button = $Panel/VBox/ButtonRow/QuitToDesktopButton
 
 
 func _ready() -> void:
@@ -75,6 +80,12 @@ func _ready() -> void:
 	# Wire close button + tap-outside.
 	_close_button.pressed.connect(_on_close_pressed)
 	_dim_backdrop.gui_input.connect(_on_backdrop_input)
+
+	# Sprint 23 S23-S2 — Quit-to-Desktop + version readout. Button label
+	# routes through tr() for locale parity with other Settings rows.
+	_quit_to_desktop_button.text = tr("settings_quit_to_desktop_button")
+	_quit_to_desktop_button.pressed.connect(_on_quit_to_desktop_pressed)
+	_refresh_version_label()
 
 	# Seed dB display labels from current state.
 	_refresh_db_label(_master_db_label, AudioRouter.get_master_volume_db())
@@ -217,3 +228,36 @@ func _on_reset_pressed() -> void:
 			_locale_option.select(i)
 			_locale_option.item_selected.emit(i)
 			break
+
+
+# ---------------------------------------------------------------------------
+# Sprint 23 S23-S2 — Version readout + Quit-to-Desktop
+# ---------------------------------------------------------------------------
+
+## Reads the application version from ProjectSettings("application/config/version")
+## and renders it on the version label. Defensive: missing setting renders
+## "Version unknown" rather than crashing.
+func _refresh_version_label() -> void:
+	if _version_label == null:
+		return
+	var version_value: Variant = ProjectSettings.get_setting("application/config/version", "")
+	var version_text: String = String(version_value).strip_edges()
+	if version_text.is_empty():
+		version_text = "unknown"
+	# tr() with %s substitution; the locale key fallback returns the key
+	# verbatim and still renders cleanly.
+	_version_label.text = tr("settings_version_label_format") % version_text
+
+
+## Quits the game application. SceneTree.quit() is the canonical Godot 4.6
+## exit path; the OS shell receives normal exit code 0. SaveLoadSystem's
+## standard shutdown autosave fires through its own _notification(
+## NOTIFICATION_WM_CLOSE_REQUEST) handler — no explicit save call needed
+## here.
+func _on_quit_to_desktop_pressed() -> void:
+	# Pop the settings overlay first so the pause state unwinds cleanly
+	# before the tree exits. Without this, the modal pause counter would
+	# stay incremented through the exit handler — harmless in practice
+	# but produces a noisy warning in debug builds.
+	SceneManager.pop_overlay("settings")
+	get_tree().quit()

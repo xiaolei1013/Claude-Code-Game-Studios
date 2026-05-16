@@ -77,3 +77,35 @@ func on_pause() -> void:
 ## paused in on_pause().
 func on_resume() -> void:
 	pass
+
+
+# ---------------------------------------------------------------------------
+# Global Esc → Pause Menu (Sprint 23 S23-M2)
+# ---------------------------------------------------------------------------
+
+## Routes the `ui_cancel` action (default Esc) into the Pause Menu overlay.
+## This applies to every Screen subclass — no per-screen wiring required.
+##
+## Guard conditions:
+## - SceneManager state must be IDLE (no Esc handling mid-transition)
+## - No freestanding modal (e.g., HeroDetail, MidRunReassignConfirmation)
+##   already active — those modals own the Esc semantics for their context
+## - Pause Menu must not already be in the overlay stack — avoids
+##   re-pushing on a held key
+##
+## The Pause Menu's own `_unhandled_input` handles Esc-to-dismiss; calling
+## get_viewport().set_input_as_handled() inside the modal stops the event
+## from bubbling back here.
+func _unhandled_input(event: InputEvent) -> void:
+	if not event.is_action_pressed("ui_cancel"):
+		return
+	if SceneManager == null or SceneManager.state != SceneManager.State.IDLE:
+		return
+	# Freestanding modals (Hero Detail, MidRunReassign, …) own Esc themselves.
+	if SceneManager.active_freestanding_modal_count() > 0:
+		return
+	# Don't re-push if pause_menu (or any overlay) is already active.
+	if SceneManager.active_overlay_count() > 0:
+		return
+	get_viewport().set_input_as_handled()
+	SceneManager.push_overlay("pause_menu", true)

@@ -106,6 +106,11 @@ const _OVERLAY_CONFIRM_SAVE: PackedScene = preload("res://assets/overlays/confir
 ## Preloaded PackedScene for the Hero Detail overlay.
 const _OVERLAY_HERO_DETAIL: PackedScene = preload("res://assets/overlays/hero_detail/hero_detail.tscn")
 
+## Preloaded PackedScene for the Pause Menu overlay (Sprint 23 S23-M2).
+## Esc-key triggered from the Screen base class. Modal with Resume /
+## Settings / Quit-to-Guild-Hall actions.
+const _OVERLAY_PAUSE_MENU: PackedScene = preload("res://assets/screens/_modals/pause_menu.tscn")
+
 # ---------------------------------------------------------------------------
 # Transition timing constants (milliseconds → seconds for Tween API).
 #
@@ -367,6 +372,7 @@ func _ready() -> void:
 		"settings": _OVERLAY_SETTINGS,
 		"confirm_save": _OVERLAY_CONFIRM_SAVE,
 		"hero_detail": _OVERLAY_HERO_DETAIL,
+		"pause_menu": _OVERLAY_PAUSE_MENU,
 	}
 
 	DataRegistry.registry_ready.connect(_on_registry_ready)
@@ -621,6 +627,41 @@ func hide_modal(modal: Control) -> void:
 ##   SceneManager.set_reduce_motion(true)   # called from Settings overlay (GDD #30)
 ##
 ## TR-scene-manager-027 — ADR-0007
+## Returns the count of registry-pushed overlays currently active (settings,
+## hero_detail, pause_menu, …). Use this as the cheap "is any overlay open"
+## probe instead of reading `_active_overlays` via reflection.
+##
+## Returned shape: `_active_overlays.size()` — strictly read-only access.
+func active_overlay_count() -> int:
+	return _active_overlays.size()
+
+
+## Returns the count of freestanding modals (caller-owned, instantiated via
+## [method show_modal] rather than [method push_overlay]) currently in the
+## scene tree. The Esc-to-pause-menu handler in [Screen] gates on this to
+## defer to whatever freestanding modal owns the Esc context.
+##
+## Returned shape: `_active_freestanding_modals.size()` — strictly read-only.
+func active_freestanding_modal_count() -> int:
+	return _active_freestanding_modals.size()
+
+
+## Returns the overlay_id of the most-recently-pushed registry overlay, or
+## empty string if no overlay is active. Used by overlays themselves (e.g.,
+## the Pause Menu) to check "am I the topmost overlay?" before dismissing
+## on Esc — without this, a chained overlay (pause → settings) lets the
+## pause-menu Esc handler fire underneath and pop pause while settings
+## stays orphaned on top.
+##
+## Iteration order is insertion order (Dictionary.keys() in Godot 4 preserves
+## insertion order); the last key is the topmost overlay.
+func topmost_overlay_id() -> String:
+	var keys: Array = _active_overlays.keys()
+	if keys.is_empty():
+		return ""
+	return str(keys[-1])
+
+
 func set_reduce_motion(value: bool) -> void:
 	if reduce_motion == value:
 		return

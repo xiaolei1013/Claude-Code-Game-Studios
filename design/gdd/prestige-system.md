@@ -303,7 +303,7 @@ vs. pre-prestige: `floori(50 × 1.5 × 1.0) = 75`. Bonus is +3 gold per tier-3 b
 | System | Consumed surface | Why |
 |---|---|---|
 | **Hero Detail Modal** (#22) | `HeroRoster.is_prestige_eligible` + `HeroRoster.prestige_hero` | "Prestige Hero" button visibility + action |
-| **Guild Hall Screen** (#19) | `HeroRoster._retired_hero_records.size()` + Hall view route | "Hall of Retired Heroes" button visibility + navigation target |
+| **Guild Hall Screen** (#19) | `HeroRoster.get_retired_hero_records()` + `HeroRoster.get_prestige_multiplier()` | Retired tab content (multiplier badge + retired-hero card list) on the RosterPanel TabContainer — always visible, empty-state placeholder when no retirees. Sprint 23 S23-M1 retired the standalone Hall screen + visibility-gated button. |
 | **DungeonRunOrchestrator** (#13) | `HeroRoster.get_prestige_multiplier()` | Per-kill formula extension (C.3) |
 | **Audio Router** (#28) | Two new cue triggers | Prestige completed + Hall card reveal chimes |
 | **Onboarding System** (#29) | (V1.5+) Prestige introduction subsection | V1.5+ tutorial expansion if first-prestige confusion surfaces in playtest |
@@ -322,7 +322,7 @@ The following GDDs need 2026-05-09 amendments to acknowledge Prestige as a consu
 - `class-synergy-system.md` — add Prestige #31 to F.cross-reference (V1.0 sibling; 5-factor product stacking)
 - `hero-class-database.md` — add Prestige #31 to F (consumer; class_id resolver for Hall portraits)
 - `roster-hero-detail-modal.md` — add Prestige #31 to F (consumer; new button + action surface)
-- `guild-hall-screen.md` — add Prestige #31 to F (consumer; new Hall button + view)
+- `guild-hall-screen.md` — add Prestige #31 to F (consumer; Retired tab content on RosterPanel — Sprint 23 S23-M1 retired the standalone Hall screen)
 
 These cross-GDD amendments are **deferred to a single batch pass** when the Prestige V1.0 implementation epic kicks off (Sprint 22+ scope per Sprint 20 plan), bundled with the Class Synergy F.3 amendments from PR #20 if not already shipped.
 
@@ -446,7 +446,7 @@ Prestige is one of two V1.0 progression layers; pairs with Class Synergy #32 (PR
 | **Hero Leveling #15** | Forward dep | LEVEL_CAP=15 is the prestige eligibility threshold. No semantic change to leveling. |
 | **Hero Roster #9** | Forward dep + central API host | Adds 3 public methods, 3 private fields, 1 signal. Schema migration V1→V2. |
 | **Hero Detail Modal #22** | Reverse dep | New "Prestige Hero" button + confirmation modal. Per `roster-hero-detail-modal.md` §C.5 step 1, the LevelUpButton hides at cap; this GDD adds the Prestige button visibility logic. |
-| **Guild Hall Screen #19** | Reverse dep | New "Hall of Retired Heroes" button + view. Per `guild-hall-screen.md` §F, button visibility gated on `_retired_hero_records.size() > 0`. |
+| **Guild Hall Screen #19** | Reverse dep | Retired tab on the RosterPanel TabContainer (always visible, with empty-state placeholder when no retirees). Sprint 23 S23-M1 retired the standalone Hall screen + the visibility-gated button. Per `guild-hall-screen.md` §F. |
 
 ---
 

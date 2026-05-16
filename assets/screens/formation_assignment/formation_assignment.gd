@@ -78,7 +78,11 @@ var _synergy_badge_tween: Tween = null
 # see their balance while planning recruits + biome choice. Updates on
 # Economy.gold_changed signal.
 @onready var _gold_counter: Label = $GoldCounter
-@onready var _slots_hbox: HBoxContainer = $FormationPanel/SlotsHBox
+@onready var _slots_hbox: HBoxContainer = $FormationPanel/FormationVBox/SlotsHBox
+# Sprint 23 S23-N2 — always-visible synergy preview label above the slot row.
+# Distinct from SynergyBadge: this is the passive "what would this team get?"
+# read; SynergyBadge stays as the cozy detection-moment glow.
+@onready var _synergy_preview_label: Label = $FormationPanel/FormationVBox/SynergyPreviewLabel
 @onready var _floor_button: Button = $FloorSelectorPanel/FloorVBox/FloorButton
 @onready var _floor_context_label: Label = $FloorSelectorPanel/FloorVBox/FloorContextLabel
 @onready var _dispatch_button: Button = $DispatchButton
@@ -930,6 +934,12 @@ func _refresh_synergy_badge() -> void:
 	var snapshot: Dictionary = _build_formation_snapshot()
 	var synergy_id: String = FormationAssignment.detect_active_synergy(snapshot)
 
+	# Sprint 23 S23-N2 — passive preview label (always visible). Updates
+	# every refresh, independent of the cozy detection-moment de-dup below.
+	# Players see "Synergy: None" until the slot composition matches a known
+	# synergy, at which point the label flips to the synergy's display name.
+	_refresh_synergy_preview_label(synergy_id)
+
 	# State de-dup: only re-render + re-fire signal when synergy CHANGES.
 	if synergy_id == _current_synergy_id:
 		return
@@ -969,6 +979,30 @@ func _refresh_synergy_badge() -> void:
 	# Notify the audio path. notify_synergy_detected is a no-op for "" so
 	# the empty-synergy path above never reaches this line.
 	FormationAssignment.notify_synergy_detected(synergy_id)
+
+
+## Sprint 23 S23-N2 — passive synergy preview label.
+##
+## Updates the always-visible "Synergy: X" label above the slot row to
+## reflect [param synergy_id]:
+##   - empty string → "Synergy: None" (no detection yet)
+##   - non-empty    → "Synergy: <localized display name>"
+##
+## Distinct from `_refresh_synergy_badge` which animates the cozy "you-
+## found-something" glow on detection-edge transitions only. This label
+## updates on EVERY slot edit so players see the live preview as they
+## experiment with composition before pressing Dispatch.
+func _refresh_synergy_preview_label(synergy_id: String) -> void:
+	if _synergy_preview_label == null:
+		return
+	if synergy_id == "":
+		_synergy_preview_label.text = tr("synergy_preview_none_format") % tr("synergy_preview_none_label")
+		return
+	# tr() with the writer-locked "class_synergy_badge_<id>" key returns the
+	# synergy's display name (e.g., "Steel Wall"). Falls back to the key
+	# verbatim if locale didn't load — still non-empty + readable.
+	var display_name: String = tr("class_synergy_badge_" + synergy_id)
+	_synergy_preview_label.text = tr("synergy_preview_none_format") % display_name
 
 
 ## Builds the formation snapshot Dictionary for

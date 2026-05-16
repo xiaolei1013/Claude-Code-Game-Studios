@@ -2,6 +2,103 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.59] - 2026-05-16
+
+### Fixed (post-`/simplify + /review` pass on the Sprint 23 stack)
+- **`project.godot config/version` bumped to `0.0.0.59`** — was stale at `0.0.0.53` (the value declared when S23-S2 first added the setting), which would have rendered "Version 0.0.0.53" in the Settings overlay to every player.
+- **Pause Menu Esc no longer dismisses pause when Settings is chained on top** — added a `SceneManager.topmost_overlay_id() != "pause_menu"` guard so the pause-menu Esc handler defers to whatever overlay sits above it. Prior behavior: opening Settings from the pause menu and pressing Esc popped pause first, orphaning Settings on a resumed game.
+- **`Screen._unhandled_input` no longer reads SceneManager privates via string reflection** — replaced `.get("_active_freestanding_modals")` / `.get("_active_overlays")` with new typed getters `SceneManager.active_freestanding_modal_count()` / `active_overlay_count()` / `topmost_overlay_id()`. Renaming the privates now fails the compile rather than silently breaking the Esc gate.
+- **`settings_quit_to_desktop_button` locale key is now wired** — `_quit_to_desktop_button.text = tr(...)` in `settings.gd._ready`. Key was previously defined in `en.csv` but unused (button text was hardcoded in the .tscn).
+- **`prestige-system.md` §F.2 + §J cross-reference rows updated** — was still describing the removed "Hall of Retired Heroes button + visibility gating"; now references the Retired tab on the RosterPanel (always visible, empty-state placeholder when no retirees).
+
+### Changed (post-`/simplify` quality polish)
+- **`ROSTER_LIST_PATH` constant hoisted in `tests/integration/guild_hall/roster_panel_test.gd`** — was duplicated literally 8 times; future scene reshuffles now touch one location.
+- **`_clear_container_immediate(container)` helper extracted in `guild_hall.gd`** — `_refresh_roster_panel` and `_refresh_retired_card_list` both implemented the same `for child in get_children: remove_child + queue_free` idiom; consolidated to one private helper. The 5-line "queue_free is deferred" comment moved onto the helper itself.
+
+### Internal
+- `tests/integration/scene_manager/formation_assignment_screen_test.gd` — path collateral from S23-N2's `FormationVBox` wrapper (one `FormationPanel/SlotsHBox` → `FormationPanel/FormationVBox/SlotsHBox`); brought to parity with the other two formation tests.
+- New SceneManager public API: `active_overlay_count() -> int`, `active_freestanding_modal_count() -> int`, `topmost_overlay_id() -> String`. All three are pure read-only accessors over existing private state.
+- Full test suite: 2253/2253 PASS (0 errors, 0 failures, 0 flaky).
+
+## [0.0.0.58] - 2026-05-16
+
+### Closed
+- **Sprint 22 + Sprint 23 playtest gates PASS** — tester walked the post-Sprint-23 build end-to-end on 2026-05-16. Both playtest-14 (Sprint 22 clarity) and playtest-15 (Sprint 23 consolidation finish + pause/settings polish + portraits + synergy preview) graded PASS on all 5 per-check rows. Tester verdict: *"playtest is done. its working"*.
+- **Sprint 22 retro flipped DRAFT → COMMITTED** at `production/retrospectives/sprint-22-retrospective-2026-05-15.md`. Sprint Goal MET.
+- **Sprint 23 retro flipped DRAFT → COMMITTED** at `production/retrospectives/sprint-23-retrospective-2026-05-16.md`. Sprint Goal MET. All 3 Must Haves + 2 Should Haves + 2 Nice to Haves shipped.
+- **S23-S1 dropped to advisory polish** — playtest-14 graded items c/d/e (the conditional clarity items) all PASS, so the M4 clarity follow-up is not scope-mandated. Carried to Sprint 24 as Nice-to-Have.
+
+### Internal
+- `production/sprint-status.yaml`: S22-M5 → done; S23-M3 → done; S23-S1 → deferred (advisory).
+- `production/session-state/active.md` updated; both playtest reports and both retros now reflect their final state.
+
+## [0.0.0.57] - 2026-05-16
+
+### Added
+- **Dispatch synergy preview label (Sprint 23 S23-N2 — "Class Synergy V2" first pass)** — an always-visible `SynergyPreviewLabel` lives above the slot row inside `FormationPanel`. It updates on every slot edit, reading the live composition through `FormationAssignment.detect_active_synergy()`:
+  - Empty / mismatched composition → "Synergy: None"
+  - Matching composition → "Synergy: <localized display name>" (e.g., "Synergy: Steel Wall")
+  Distinct from the cozy `SynergyBadge` (which animates the "you-found-something" glow on detection edges and stays). The preview label is the passive read; the badge remains the active cue.
+- **Locale (`assets/locale/en.csv`)** — `synergy_preview_none_format` ("Synergy: %s"), `synergy_preview_none_label` ("None").
+- **3 new tests** (`tests/unit/formation_assignment/synergy_preview_label_test.gd`) — preview label node existence, "None" initial state, "Steel Wall" populates after seeding 3 warriors.
+
+### Changed
+- **`FormationPanel` scene structure** — the existing `SlotsHBox` now lives one level deeper inside a new `FormationVBox` so the preview label can stack above it. Path moved from `FormationPanel/SlotsHBox` to `FormationPanel/FormationVBox/SlotsHBox`. The `_slots_hbox` `@onready` and the two test path references in `formation_assignment_theme_application_test.gd` are updated.
+
+### Internal
+- The "tier" semantics (None / Bronze / Silver / Gold / Platinum) named in the original N2 plan are deferred — Class Synergy V2 tier design hasn't landed yet. The label uses the existing V1 synergy-name display surface (also referenced by the cozy badge), which is the implementable contract for now. Future work can layer tier coloring + iconography on top without changing the data path.
+- Full test suite: 125/125 PASS in formation_assignment + guild_hall modules. Cross-module: no regression detected.
+
+## [0.0.0.56] - 2026-05-16
+
+### Verified (S23-N1 — Audio MVP bootstrap closure)
+- **AudioRouter MVP wiring** was implemented in Sprint 12 S12-M6 (Stories 3–5). Sprint 23 S23-N1 closes the story as **verified-in-place** rather than reauthored — all three MVP contract surfaces are wired and the integration test asserts them end-to-end:
+  - `AudioRouter._on_screen_changed("guild_hall")` → `play_music(&"music_guild_hall_bed")` (silent in MVP until the music asset lands; the routing call is on the play log)
+  - `UIFramework.wire_touch_feedback(button)` → press-time `play_sfx(&"sfx_ui_tap")` (the "ui_confirm" surface in the N1 plan)
+  - Settings volume sliders (`set_music_volume_db` / `set_sfx_volume_db`) round-trip through AudioRouter getters; the Master/Music/SFX bus volumes are observable
+- **4 new tests** (`tests/integration/audio_router/n1_mvp_contract_test.gd`) lock in the N1 contract. The pre-existing AudioRouter test suite (`tests/unit/audio_router/`) covers the per-signal handler behavior; this new file is the explicit end-to-end gate.
+
+### Internal
+- Sprint 23 N1 documented as a verification-only closure in `production/sprint-status.yaml`. The AudioRouter subsystem is unchanged.
+- Full test suite: 2250/2250 PASS.
+
+## [0.0.0.55] - 2026-05-16
+
+### Added
+- **ClassPortrait programmatic placeholders (Sprint 23 S23-S3 — third carry from S20-N1 → S21-S2)** — `src/ui/class_portrait_factory.gd` generates a deterministic 96×96 colored-block texture per `class_id`. Each MVP class (warrior / mage / rogue) gets a distinct dusty-warm color (hash-derived hue, saturation 0.45, value 0.65 to stay in the parchment palette) with an inset 4px border and a centered diamond mark. Cached per `class_id` so repeat calls are O(1).
+- **Recruit Screen pool rows** now show the placeholder portrait on each PoolEntry's `ClassPortrait` TextureRect — closes the "black void" issue the playtest-08 / playtest-09 / playtest-11 reports surfaced.
+- **Hero Detail modal** ClassPortrait slot now renders the same placeholder, keyed by the hero's `class_id`. The `@warning_ignore("unused_private_class_variable")` annotation on `_class_portrait` (carve-out since Sprint 17) is removed — the field is now an active consumer.
+- **7 new tests** (`tests/unit/class_portrait_factory/class_portrait_factory_test.gd`) covering 96×96 dimensions, per-class color distinctness (warrior vs mage, vs rogue, mage vs rogue), defensive empty-id degrade to neutral grey, and cache identity-equality on repeat calls.
+
+### Internal
+- ClassPortraitFactory is a pure RefCounted utility (no scene-tree dependency, no autoload). Static method API: `get_portrait_texture(class_id) -> Texture2D`, `get_portrait_color(class_id) -> Color`. Cache is module-level, cleared between tests via `_clear_cache_for_tests()`.
+- When real product art arrives, consumers can prefer `HeroClass.portrait_path` and fall back to the factory texture — the API surface won't change.
+- Full test suite: 2246/2246 PASS.
+
+## [0.0.0.54] - 2026-05-16
+
+### Added
+- **Settings scaffold additions (Sprint 23 S23-S2)** — the existing Settings overlay (volume sliders + reduce-motion toggle + locale + telemetry) now also displays the **app version** (read from `ProjectSettings("application/config/version")`) and offers a **Quit-to-Desktop button**. Reachable from the new Pause Menu's Settings button.
+- **`config/version="0.0.0.53"` declared in `project.godot`** — single source of truth for the runtime version string. The Settings overlay reads this at `_ready` and renders it via the writer-locked `settings_version_label_format` locale key.
+- **Locale (`assets/locale/en.csv`)** — `settings_version_label_format`, `settings_quit_to_desktop_button`.
+- **4 new tests** (`tests/unit/settings_overlay/version_and_quit_test.gd`) covering version label presence + content + quit button presence + pressed-signal wiring.
+
+### Internal
+- `_on_quit_to_desktop_pressed` pops the Settings overlay first (unwinds the modal-pause counter cleanly) before calling `get_tree().quit()` — defensive against debug-build warnings about pause-counter leakage at exit.
+- Full test suite: 2239/2239 PASS.
+
+## [0.0.0.53] - 2026-05-16
+
+### Added
+- **Pause Menu modal (Sprint 23 S23-M2)** — Esc key on any player-facing screen opens a pause overlay with Resume / Settings / Quit-to-Guild-Hall actions. Modal lives at `assets/screens/_modals/pause_menu.tscn` and is registered as overlay_id `pause_menu` per ADR-0007 §push_overlay. Stacks cleanly with other modals (counter-based pause) — opens above gameplay screens, chains into the existing Settings overlay, and uses the canonical `request_screen("guild_hall")` for the quit action so save-on-transition pathways trigger naturally.
+- **Global Esc handler in `Screen` base class** — `_unhandled_input(ui_cancel)` routes Esc into the pause modal for every Screen subclass without per-screen plumbing. Guards: SceneManager must be IDLE, no freestanding modal already active, no overlay already pushed. The Pause Menu's own `_unhandled_input` handles Esc-to-dismiss and consumes the event so the base-class handler doesn't re-push.
+- **Locale (`assets/locale/en.csv`)** — `pause_menu_title`, `pause_menu_resume_button`, `pause_menu_settings_button`, `pause_menu_quit_to_guild_hall_button`.
+- **5 new tests** (`tests/unit/pause_menu/pause_menu_render_test.gd`) covering scene structure, dim backdrop, localized button text, overlay registry membership, and pressed-signal wiring.
+
+### Internal
+- `_OVERLAY_PAUSE_MENU` preload constant added to `scene_manager.gd`; `_overlay_registry` entry added under `pause_menu`.
+- Full test suite: 2235/2235 PASS.
+
 ## [0.0.0.52] - 2026-05-16
 
 ### Changed

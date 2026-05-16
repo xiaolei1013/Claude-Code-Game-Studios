@@ -228,78 +228,98 @@ stories:
     completed: "2026-05-16 (v0.0.0.52); 13 new retired-tab tests + 8 path-update test fixes; 2230/2230 PASS; registry shrunk 7 → 6"
 
   - id: "S23-M2"
-    name: "Pause Menu modal scene — Esc key trigger; Resume / Settings / Quit-to-Guild-Hall; push_modal pattern on all screens"
-    file: "assets/screens/_modals/pause_menu.tscn + .gd"
+    name: "Pause Menu modal scene — Esc key trigger; Resume / Settings / Quit-to-Guild-Hall; push_overlay pattern wired in Screen base class"
+    file: "assets/screens/_modals/pause_menu.tscn + .gd; src/core/scene_manager/screen.gd (Esc handler); src/core/scene_manager/scene_manager.gd (registry); tests/unit/pause_menu/ (NEW)"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 0.75
     blocker: ""
-    completed: ""
+    completed: "2026-05-16 (v0.0.0.53); 5 new pause-menu tests; global Esc handler in Screen base class; 2235/2235 PASS"
 
   - id: "S23-M3"
-    name: "Sprint 23 visual playtest (using _template-visual-playtest.md for M1+M2) + Sprint 23 retrospective"
-    file: "production/playtests/playtest-15-sprint-23-*.md + production/retrospectives/sprint-23-retrospective-*.md"
+    name: "Sprint 23 visual playtest + retrospective"
+    file: "production/playtests/playtest-15-sprint-23-consolidation-2026-05-16.md (PASS); production/retrospectives/sprint-23-retrospective-2026-05-16.md (COMMITTED)"
     priority: must-have
-    status: backlog
+    status: done
     owner: "xiaolei (human) + claude-code"
     estimate_days: 0.5
-    blocker: "S23-M1 + S23-M2"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-16 — playtest-15 PASS on all 5 checks; tester verdict: \"playtest is done. its working\"; Sprint 23 retro committed (DRAFT → final)"
 
   # ===== Should Have =====
 
+  # NOTE: S23-S1 dropped to advisory polish 2026-05-16 — playtest-14 graded
+  # all 5 clarity checks PASS (including items c/d/e), so the M4 clarity
+  # follow-up is NOT scope-mandated. Carried to Sprint 24 as Nice-to-Have.
   - id: "S23-S1"
-    name: "M4 clarity follow-up — empty states + tap-target verification (≥44×44) + Primary Button on CTAs; scope conditional on playtest-14 verdict"
+    name: "M4 clarity follow-up — DROPPED TO ADVISORY per playtest-14 PASS (items c/d/e all graded PASS); carried to Sprint 24 as Nice-to-Have"
     file: "assets/screens/*/*.tscn"
-    priority: should-have
-    status: backlog
+    priority: nice-to-have
+    status: deferred
     owner: "godot-gdscript-specialist"
     estimate_days: 1.0
-    blocker: "playtest-14 verdict"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-16 — DEFERRED to Sprint 24 backlog (advisory polish, not gated)"
 
+  # NOTE: S23-S2 done 2026-05-16 — leveraged existing settings OVERLAY rather
+  # than authoring a separate Settings SCREEN. The overlay already had the
+  # volume sliders + reduce-motion toggle (Sprint 12 work); this story added
+  # version readout + Quit-to-Desktop + project.godot config/version setting.
+  # See CHANGELOG v0.0.0.54.
   - id: "S23-S2"
-    name: "Settings screen scaffold — audio sliders + Reduce Motion toggle + version display + Quit-to-Desktop; navigable from Pause Menu"
-    file: "assets/screens/settings/settings.tscn + .gd"
+    name: "Settings scaffold — version readout + Quit-to-Desktop appended to existing settings overlay (volume sliders + Reduce Motion already shipped Sprint 12)"
+    file: "assets/overlays/settings/settings.tscn + .gd; project.godot (config/version); tests/unit/settings_overlay/version_and_quit_test.gd (NEW)"
     priority: should-have
-    status: backlog
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 1.0
-    blocker: "S23-M2"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-16 (v0.0.0.54); 4 new tests; project.godot config/version declared; 2239/2239 PASS"
 
   - id: "S23-S3"
-    name: "ClassPortrait placeholder art — 96×96 colored-block per class ID; HeroClass.portrait_path populated; third carry from S20-N1 + S21-S2"
-    file: "assets/art/portraits/ + src/data/hero_class_database.gd"
+    name: "ClassPortrait placeholder art — 96×96 programmatic colored blocks via ClassPortraitFactory; wired in Recruit Screen + Hero Detail modal; third carry from S20-N1 + S21-S2"
+    file: "src/ui/class_portrait_factory.gd (NEW); assets/screens/recruitment/recruitment.gd + tscn; assets/screens/hero_detail/hero_detail_modal.gd; tests/unit/class_portrait_factory/ (NEW)"
     priority: should-have
-    status: backlog
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-05-16 (v0.0.0.55); 7 new tests; 2246/2246 PASS"
 
   # ===== Nice to Have =====
 
+  # NOTE: S23-N1 closed 2026-05-16 as verification-only — AudioRouter MVP
+  # wiring (screen_changed → music_guild_hall_bed, wire_touch_feedback →
+  # sfx_ui_tap, Settings slider round-trip) was already implemented in
+  # Sprint 12 S12-M6. New integration test n1_mvp_contract_test.gd locks in
+  # the end-to-end contract. See CHANGELOG v0.0.0.56.
   - id: "S23-N1"
-    name: "Audio MVP bootstrap — AudioRouter autoload + guild_hall_ambient loop + ui_confirm cue; signal-driven per Audio System GDD"
-    file: "src/core/audio_router/ + assets/audio/"
+    name: "Audio MVP bootstrap — VERIFIED-IN-PLACE; AudioRouter (S12-M6) already wires screen_changed → guild_hall_bed + wire_touch_feedback → sfx_ui_tap + Settings slider round-trip"
+    file: "src/core/audio_router/ (no-change); tests/integration/audio_router/n1_mvp_contract_test.gd (NEW)"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 1.5
-    blocker: "S23-M1, S23-M2, S23-M3, S23-S2"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-16 (v0.0.0.56); verification-only closure; 4 new end-to-end contract tests; 2250/2250 PASS"
 
+  # NOTE: S23-N2 closed 2026-05-16 — added always-visible SynergyPreviewLabel
+  # above the slot row, reading FormationAssignment.detect_active_synergy() on
+  # every slot edit. The "tier" terminology in the original plan (None/Bronze/
+  # Silver/Gold/Platinum) is deferred — Class Synergy V2 tier design hasn't
+  # been authored yet. Implemented version uses V1 synergy names (Steel Wall,
+  # Arcane Elite, Triple Strike) plus "None" — implementable contract for now.
+  # See CHANGELOG v0.0.0.57.
   - id: "S23-N2"
-    name: "Class Synergy V2 — passive synergy preview panel on Dispatch screen; live tier display as heroes are slotted"
-    file: "assets/screens/formation_assignment/formation_assignment.tscn + .gd"
+    name: "Class Synergy V2 first-pass — always-visible SynergyPreviewLabel on Dispatch; tier ladder deferred to V2 design"
+    file: "assets/screens/formation_assignment/formation_assignment.tscn + .gd; tests/unit/formation_assignment/synergy_preview_label_test.gd (NEW)"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 2.0
-    blocker: "S23-M1, S23-M2, S23-M3, S23-N1 merged"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-16 (v0.0.0.57); 3 new tests + path update for 1 existing test; 125/125 PASS in affected modules"
 
 # ===== Sprint 22 archived stories (for history) =====
 #
@@ -307,7 +327,7 @@ stories:
 #   S22-M2 matchup→Dispatch: status: done (PR #127, v0.0.0.48)
 #   S22-M3 biome backgrounds: status: done (PR #128, v0.0.0.49)
 #   S22-M4 clarity polish: status: done (PR #129, v0.0.0.50)
-#   S22-M5 playtest+retro: status: in-progress (playtest-14 PENDING; retro DRAFT)
+#   S22-M5 playtest+retro: status: done 2026-05-16 (playtest-14 PASS on all 5 checks; sprint-22 retro DRAFT → final)
 #   S22-S1 playtest template: status: done (bundled in M5 PR)
 #   S22-S2 hall→tab: status: carried → S23-M1
 #   S22-S3 pause modal: status: carried → S23-M2
