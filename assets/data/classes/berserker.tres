@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="HeroClass" format=3 uid="uid://b2berserkermvp001"]
+
+[ext_resource type="Script" uid="uid://dvm75u02lhnb8" path="res://src/core/hero_class_database/hero_class.gd" id="1_hcber"]
+
+[resource]
+script = ExtResource("1_hcber")
+id = "berserker"
+display_name = "Berserker"
+tier = 2
+role = "brawler"
+counter_archetype = "bruiser"
+base_attack = 16
+base_hp = 90
+base_speed = 11
+attack_per_level = 3
+hp_per_level = 13
+speed_per_level = 1
+tick_output_contribution_l1 = 2
+tick_output_per_level = 1
+sprite_path = "assets/art/classes/berserker/sprite.png"
+portrait_path = "assets/art/classes/berserker/portrait.png"
+icon_path = "assets/art/classes/berserker/icon.png"
+flavor_text = "Where the warrior holds the line, the berserker breaks it. Wields rage like a lantern — bright, brief, useful."
