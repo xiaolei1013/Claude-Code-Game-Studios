@@ -340,9 +340,10 @@ func on_resume() -> void:
 ##
 ## Called once in on_enter() and again on hero_recruited / hero_removed.
 func _refresh_roster_panel() -> void:
-	# Clear existing hero buttons.
-	for child: Node in _roster_list.get_children():
-		child.queue_free()
+	# Clear existing hero buttons. Sprint 24 S24-M3 uses
+	# UIFramework.clear_children_immediate to avoid the deferred-queue_free
+	# flake surfaced in Sprint 23 S23-M1.
+	UIFrameworkScript.clear_children_immediate(_roster_list)
 
 	var heroes: Array = HeroRoster.get_all_heroes(HeroRoster.SortMode.BY_CLASS)
 
@@ -401,9 +402,9 @@ func _refresh_roster_panel() -> void:
 ##
 ## Called once in on_enter() and after any slot mutation.
 func _refresh_formation_panel() -> void:
-	# Clear existing slot buttons.
-	for child: Node in _slots_hbox.get_children():
-		child.queue_free()
+	# Clear existing slot buttons. Sprint 24 S24-M3 uses
+	# UIFramework.clear_children_immediate.
+	UIFrameworkScript.clear_children_immediate(_slots_hbox)
 
 	# Build instance_id → display_name lookup from the full hero list.
 	var hero_map: Dictionary = {}
@@ -651,9 +652,9 @@ func _hide_floor_picker() -> void:
 
 
 func _render_floor_picker_biome_tabs() -> void:
-	# Clear existing biome tabs (idempotent re-entry).
-	for child: Node in _floor_picker_biome_vbox.get_children():
-		child.queue_free()
+	# Clear existing biome tabs (idempotent re-entry). Sprint 24 S24-M3
+	# uses UIFramework.clear_children_immediate.
+	UIFrameworkScript.clear_children_immediate(_floor_picker_biome_vbox)
 
 	# Build archetype → recommended-class map (per matchup_assignment.gd:156-167).
 	var archetype_to_class: Dictionary[String, String] = {}
@@ -953,8 +954,10 @@ func _refresh_synergy_badge() -> void:
 		return
 
 	# Show path: render localized "Display Name: Effect" text.
-	# Both keys exist in en.csv per Sprint 21 S21-S2 (AC-CS-15).
-	var display_name: String = tr("class_synergy_badge_" + synergy_id)
+	# Both keys exist in en.csv per Sprint 21 S21-S2 (AC-CS-15). Sprint 24
+	# S24-M3 uses UIFramework.synergy_display_name for the writer-locked
+	# badge name lookup.
+	var display_name: String = UIFrameworkScript.synergy_display_name(synergy_id)
 	var effect_text: String = tr("class_synergy_effect_" + synergy_id)
 	_synergy_badge.text = "%s: %s" % [display_name, effect_text]
 
@@ -1002,40 +1005,17 @@ func _refresh_synergy_badge() -> void:
 func _refresh_synergy_preview_label(synergy_id: String) -> void:
 	if _synergy_preview_label == null:
 		return
-	var tier_key: String = _synergy_id_to_tier(synergy_id)
+	# Sprint 24 S24-M3 — tier mapper + display name now sourced from
+	# UIFramework. Sprint 24 S24-M2's local _synergy_id_to_tier removed.
+	var tier_key: String = UIFrameworkScript.synergy_id_to_tier(synergy_id)
 	var tier_name: String = tr("synergy_tier_" + tier_key)
 	if synergy_id == "":
 		# No detection: format as just "Synergy: None" (single substitution).
 		_synergy_preview_label.text = tr("synergy_preview_none_format") % tier_name
 		return
 	# Tiered: "Synergy: Gold (Steel Wall)" — tier + V1 display name both visible.
-	# tr() with the writer-locked "class_synergy_badge_<id>" key returns the
-	# synergy's display name. Falls back to the key verbatim if locale didn't
-	# load — still non-empty + readable.
-	var display_name: String = tr("class_synergy_badge_" + synergy_id)
+	var display_name: String = UIFrameworkScript.synergy_display_name(synergy_id)
 	_synergy_preview_label.text = tr("synergy_preview_tiered_format") % [tier_name, display_name]
-
-
-## Maps V1 `synergy_id` to V2 tier key per `class-synergy-system.md` §C.6.
-## Pure function — safe to call every UI refresh. O(1) string switch.
-##
-## Returns the lowercase tier key (used as suffix for `synergy_tier_<key>`
-## locale lookups): `"none"` | `"bronze"` | `"silver"` | `"gold"` | `"platinum"`.
-## Defensive: unknown `synergy_id` degrades to `"none"`.
-##
-## AC-CS-22..25 — see class-synergy-system.md §H acceptance criteria.
-##
-## Will be hoisted to `UIFramework.synergy_id_to_tier` in Sprint 24 S24-M3
-## alongside `UIFramework.synergy_display_name` (the locale-key consolidation
-## helper). Kept private here for the M2 implementation pass.
-static func _synergy_id_to_tier(synergy_id: String) -> String:
-	match synergy_id:
-		"":               return "none"
-		"steel_wall":     return "gold"
-		"arcane_elite":   return "gold"
-		"triple_strike":  return "gold"
-		"triple_threat":  return "platinum"
-		_:                return "none"
 
 
 ## Builds the formation snapshot Dictionary for
