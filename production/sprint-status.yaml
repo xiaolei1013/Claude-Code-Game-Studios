@@ -248,83 +248,59 @@
 #   Critical mid-sprint bug: PR #90 Economy multi-biome ledger collision + ADR-0002 Amend 1.
 #
 
-sprint: 26
-goal: "Continue the content-pivot from Sprint 25 — expand the class roster (berserker + cleric, total 5→7), surface progression-gated biomes correctly in Dispatch (R7 compliance: show only unlocked biomes), and close the synergy gap created by new tier-2 classes (Bastion/Volley/Frenzy/Vigil)."
-start: "2026-07-10"
-end: "2026-07-23"
+sprint: 27
+goal: "Close the synergy teaching loop by surfacing effect text on the Dispatch SynergyPreviewLabel so the player sees BOTH 'what synergy is active' AND 'what does it do' in one line."
+start: "2026-07-24"
+end: "2026-08-06"
 generated: "2026-05-16"
 updated: "2026-05-16"
 
-# Pre-plan dispositions: NONE — Sprint 25 closure pending playtest-16 grading
-# (independent from Sprint 26's playtest-17). Sprint 26 work continued the
-# content-pivot direction established by Sprint 25's addendum + memory entries
-# feedback_infrastructure_debt_drift and feedback_grep_first_check_must_run_pre_planning.
+# Pre-plan dispositions: playtest backlog from S25 + S26 still DRAFT.
+# Single deep playthrough recommended to cover playtests 16 + 17 + 18.
+# Sprint 27 single-Must-Have direction came from Sprint 26 retro § Sprint 27 Recommendations
+# (top item: synergy effect-text on Dispatch label).
 
 stories:
   # ===== Must Have =====
 
-  - id: "S26-M1"
-    name: "Dispatch floor picker honors FloorUnlock.get_available_biomes() (R7 compliance) — fresh save shows 4 starter biomes, chained biomes appear after gates fire"
-    file: "assets/screens/formation_assignment/formation_assignment.gd (_show_floor_picker refactor + _on_biome_unlocked handler); tests/unit/formation_assignment/floor_picker_available_biomes_filter_test.gd (NEW)"
+  - id: "S27-M1"
+    name: "Synergy preview label appends effect text — 'Synergy: Gold (Bastion) — +25% gold vs casters'; routes through new UIFramework.synergy_effect_text helper"
+    file: "assets/screens/formation_assignment/formation_assignment.gd (_refresh_synergy_preview_label); assets/locale/en.csv (4 tier-2 effect keys + 1 format key); tests/unit/formation_assignment/synergy_preview_label_test.gd (Group D, NEW)"
     priority: must-have
     status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 0.5
     blocker: ""
-    completed: "2026-05-16 (PR #158); +3 tests; closes R7 violation"
+    completed: "2026-05-16 (PR #166); +3 tests in Group D; closes teaching gap from S26 retro"
 
-  - id: "S26-M2"
-    name: "Berserker class (6th class, brawler archetype) — high DMG / low HP / fast; counters bruiser like warrior with distinct play pattern"
-    file: "assets/data/classes/berserker.tres (NEW); tests/unit/hero_class_database/berserker_registration_test.gd (NEW)"
-    priority: must-have
-    status: done
-    owner: "godot-gdscript-specialist"
-    estimate_days: 0.5
-    blocker: ""
-    completed: "2026-05-16 (PR #159); class count 5 → 6"
-
-  - id: "S26-M3"
-    name: "Cleric class (7th class, support archetype) — 2x tick_output_contribution; new 'support' role; counters armored (shared with rogue)"
-    file: "assets/data/classes/cleric.tres (NEW); tests/unit/hero_class_database/cleric_registration_test.gd (NEW)"
-    priority: must-have
-    status: done
-    owner: "godot-gdscript-specialist"
-    estimate_days: 0.5
-    blocker: ""
-    completed: "2026-05-16 (PR #161); class count 6 → 7"
-
-  - id: "S26-M4"
-    name: "Tier-2 class synergies — Bastion (3 paladins) / Volley (3 archers) / Frenzy (3 berserkers) / Vigil (3 clerics); detection + multiplier resolution + locale + tier mapping + GDD §C.6 amendment"
-    file: "src/core/formation_assignment/formation_assignment.gd; src/core/dungeon_run_orchestrator/dungeon_run_orchestrator.gd; src/ui/ui_framework.gd; assets/locale/en.csv; design/gdd/class-synergy-system.md §C.6; tests (tier2_synergy_detection_test.gd + tier2_synergy_multipliers_test.gd, NEW)"
-    priority: must-have
-    status: done
-    owner: "godot-gdscript-specialist"
-    estimate_days: 1.0
-    blocker: "S26-M2 + S26-M3"
-    completed: "2026-05-16 (PR #164); +23 tests; closes synergy gap for tier-2 roster"
-
-  - id: "S26-M5"
-    name: "Sprint 26 visual playtest + retrospective — TWO grading axes (Sprint 25 + 26 stacked); deep playthrough through forest_reach F1-F5 + 3-paladin / 3-cleric formations"
-    file: "production/playtests/playtest-17-sprint-26-content-pivot-2026-05-16.md; production/retrospectives/sprint-26-retrospective-2026-05-16.md"
+  - id: "S27-M2"
+    name: "Sprint 27 visual playtest + retrospective — 5-axis grading on effect text format; foldable into single deep playthrough alongside playtest-16 + 17"
+    file: "production/playtests/playtest-18-sprint-27-synergy-effect-text-2026-05-16.md; production/retrospectives/sprint-27-retrospective-2026-05-16.md"
     priority: must-have
     status: blocked
     owner: "xiaolei (human) + claude-code"
     estimate_days: 0.5
-    blocker: "human playtest execution"
+    blocker: "human playtest execution (single deep playthrough covers all 3 sprints)"
     completed: ""
 
-  # ===== Nice to Have =====
-
-  - id: "S26-N1"
-    name: "ClassRegistrationTestHelper — Rule-of-Three refactor extracting class-registration assertion boilerplate; each future class test now ~50 LOC vs ~100 LOC"
-    file: "tests/helpers/class_registration_test_helper.gd (NEW); tests/unit/helpers/class_registration_test_helper_test.gd (NEW); refactor paladin/archer/berserker/cleric tests"
-    priority: nice-to-have
-    status: done
-    owner: "godot-gdscript-specialist"
-    estimate_days: 0.5
-    blocker: "S26-M2 (3rd tier-2 class triggers Rule-of-Three)"
-    completed: "2026-05-16 (PR #160); 4 class tests refactored; helper has 8 self-tests + canary"
-
+# ===== Sprint 26 archived stories (for history) =====
+#
+#   sprint_status: CLOSED-PENDING-PLAYTEST — 7/7 plannable items shipped;
+#                  Day-0 plan retroactive + 5 content/UX PRs + 1 refactor + 1 hotfix.
+#   actual_close: 2026-05-16 (thirteenth consecutive same-day-compressed sprint)
+#   PRs: #158 M1 Dispatch biome filter (R7 compliance); #159 M2 berserker class (6th);
+#        #160 N1 ClassRegistrationTestHelper (Rule-of-Three refactor); #161 M3 cleric
+#        class (7th, support); #162 /simplify+/review cleanup (BiomeBackground API
+#        collapse + stat-name guard + naming + comments); #163 const PackedStringArray
+#        parse error hotfix + Godot-regenerated UIDs + .uid sidecars; #164 M4 tier-2
+#        class synergies (Bastion / Volley / Frenzy / Vigil); #165 closure docs.
+#   Player-visible PRs: 5 of 7 sprint PRs (71%).
+#   Content shipped: +2 classes (berserker, cleric = 5 → 7); +4 synergies
+#                    (Bastion/Volley/Frenzy/Vigil); Dispatch R7 compliance fix.
+#   New tests: +42 across 4 new test files.
+#   Process learnings recorded: parse-check before merge; skip hand-written UIDs.
+#   Retro: DRAFT, pending playtest-17 verdict (5 axes).
+#
 # ===== Sprint 25 archived stories (for history) =====
 #
 #   sprint_status: CLOSED-PENDING-PLAYTEST — 6/6 plannable items shipped;
