@@ -245,6 +245,12 @@ func on_enter() -> void:
 		_floor_picker_select_button.pressed.connect(_on_floor_picker_select_pressed)
 	if not FloorUnlock.floor_unlocked.is_connected(_on_floor_unlocked):
 		FloorUnlock.floor_unlocked.connect(_on_floor_unlocked)
+	# Newly-unlocked biomes must appear in the floor picker tab list during
+	# the same session. The biome_unlocked signal fires when a chained biome's
+	# Biome.unlock_after gate clears; the picker rebuilds via _show_floor_picker
+	# if currently visible.
+	if FloorUnlock.has_signal("biome_unlocked") and not FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked_dispatch):
+		FloorUnlock.biome_unlocked.connect(_on_biome_unlocked_dispatch)
 
 	# Initial render from current game state.
 	_refresh_roster_panel()
@@ -302,6 +308,8 @@ func on_exit() -> void:
 		_floor_picker_select_button.pressed.disconnect(_on_floor_picker_select_pressed)
 	if FloorUnlock.floor_unlocked.is_connected(_on_floor_unlocked):
 		FloorUnlock.floor_unlocked.disconnect(_on_floor_unlocked)
+	if FloorUnlock.has_signal("biome_unlocked") and FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked_dispatch):
+		FloorUnlock.biome_unlocked.disconnect(_on_biome_unlocked_dispatch)
 
 	# Kill any in-flight toast tween to avoid modulating a freed node.
 	if _toast_tween != null and _toast_tween.is_valid():
@@ -606,8 +614,20 @@ func _on_gold_changed(_new_balance: int, _delta: int, _reason: String) -> void:
 # ---------------------------------------------------------------------------
 
 func _show_floor_picker() -> void:
-	# Step 1: resolve biomes + flatten dungeon → floors (per matchup_assignment.gd:78-103).
-	_fp_biomes = DataRegistry.get_all_by_type("biomes")
+	# Step 1: resolve biomes via FloorUnlock.get_available_biomes() — the
+	# authoritative source per GDD #16 R7. UI consumers MUST NOT read
+	# DataRegistry.get_all_by_type("biomes") directly, because that returns
+	# every biome regardless of unlock state — including chained biomes that
+	# the player has not yet unlocked. Honoring R7 keeps the tab list aligned
+	# with the player's actual progression: 4 starter biomes on a fresh save;
+	# chained biomes (ember_wastes, hollow_stair) appear only after their
+	# Biome.unlock_after gate fires.
+	var available_biome_ids: Array[String] = FloorUnlock.get_available_biomes()
+	_fp_biomes = []
+	for biome_id: String in available_biome_ids:
+		var biome: Resource = DataRegistry.resolve("biomes", biome_id) as Resource
+		if biome != null:
+			_fp_biomes.append(biome)
 	_fp_biomes.sort_custom(func(a: Resource, b: Resource) -> bool:
 		return String(a.id) < String(b.id)
 	)
@@ -778,6 +798,15 @@ func _on_floor_unlocked(_biome_id: String, _floor_index: int) -> void:
 		_render_floor_picker_biome_tabs()
 		if _fp_selected_biome_id != "" and _fp_selected_floor_index > 0:
 			_select_floor_in_picker(_fp_selected_biome_id, _fp_selected_floor_index)
+
+
+## Biome chain gate fired — a previously-locked biome is now unlocked.
+## If the floor picker is visible, fully rebuild it so the new biome
+## appears as a tab. Distinct from _on_floor_unlocked (which only
+## re-renders the existing tabs for floor frontier changes).
+func _on_biome_unlocked_dispatch(_biome_id: String) -> void:
+	if _floor_picker_root != null and _floor_picker_root.visible:
+		_show_floor_picker()
 
 
 ## Navigates back to Guild Hall.
