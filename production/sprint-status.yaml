@@ -248,116 +248,105 @@
 #   Critical mid-sprint bug: PR #90 Economy multi-biome ledger collision + ADR-0002 Amend 1.
 #
 
-sprint: 25
-goal: "Ship implementation of two already-authored GDDs — Floor Unlock System (#16) and Onboarding First-Session Flow (#29) — so the player sees actual depth (multiple floors gated by progression) and a guided first-session, not a bare Guild Hall on cold launch."
-start: "2026-06-26"
-end: "2026-07-09"
+sprint: 26
+goal: "Continue the content-pivot from Sprint 25 — expand the class roster (berserker + cleric, total 5→7), surface progression-gated biomes correctly in Dispatch (R7 compliance: show only unlocked biomes), and close the synergy gap created by new tier-2 classes (Bastion/Volley/Frenzy/Vigil)."
+start: "2026-07-10"
+end: "2026-07-23"
 generated: "2026-05-16"
 updated: "2026-05-16"
 
-# Pre-plan dispositions: NONE — Sprint 24 fully closed.
-# Sprint 25 is a STRATEGIC PIVOT — see production/retrospectives/sprint-24-retrospective-2026-05-16.md
-# and memory entry feedback_infrastructure_debt_drift.md. Sprint 25 focuses on player-visible
-# content + mechanics; new GDD authoring, test fixture refactors, hygiene polish, and engine
-# refinement are explicitly deferred.
+# Pre-plan dispositions: NONE — Sprint 25 closure pending playtest-16 grading
+# (independent from Sprint 26's playtest-17). Sprint 26 work continued the
+# content-pivot direction established by Sprint 25's addendum + memory entries
+# feedback_infrastructure_debt_drift and feedback_grep_first_check_must_run_pre_planning.
 
 stories:
   # ===== Must Have =====
 
-  - id: "S25-M1"
-    name: "Floor Unlock System autoload implementation — 15 BLOCKING ACs (AC-FU-01..15) per GDD #16; _ready + _on_floor_cleared_first_time handler + save/load with clamp guards + DI of loggers"
-    file: "src/core/floor_unlock_system/floor_unlock_system.gd (NEW); tests/unit/floor_unlock_system/*_test.gd (NEW); project.godot (autoload rank 4)"
+  - id: "S26-M1"
+    name: "Dispatch floor picker honors FloorUnlock.get_available_biomes() (R7 compliance) — fresh save shows 4 starter biomes, chained biomes appear after gates fire"
+    file: "assets/screens/formation_assignment/formation_assignment.gd (_show_floor_picker refactor + _on_biome_unlocked handler); tests/unit/formation_assignment/floor_picker_available_biomes_filter_test.gd (NEW)"
     priority: must-have
-    status: ready-for-dev
-    owner: "godot-gdscript-specialist"
-    estimate_days: 2.0
-    blocker: ""
-    completed: ""
-
-  - id: "S25-M2"
-    name: "Wire Orchestrator → FloorUnlockSystem signal + Dispatch floor picker UI gating — locked floors render as LOCKED per GDD §F"
-    file: "src/core/dungeon_run_orchestrator/ (subscribe wiring); assets/screens/formation_assignment/formation_assignment.gd (floor picker UI); tests/integration/floor_unlock/ (NEW)"
-    priority: must-have
-    status: ready-for-dev
-    owner: "godot-gdscript-specialist"
-    estimate_days: 1.0
-    blocker: "S25-M1"
-    completed: ""
-
-  - id: "S25-M3"
-    name: "Replay-on-load offline replay correctness — verify floor_cleared_first_time emits during compute_offline_run; AC-FU-13 + AC-FU-14 integration tests"
-    file: "src/core/dungeon_run_orchestrator/ (verify offline emit); tests/integration/floor_unlock/offline_replay_test.gd (NEW)"
-    priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 0.5
-    blocker: "S25-M2"
-    completed: ""
-
-  - id: "S25-M4"
-    name: "Onboarding First-Session Flow implementation — 14 ACs (AC-29-01..14) per GDD #29; onboarding_state autoload + onboarding_overlay modal + skip + persistent flag"
-    file: "src/core/onboarding/onboarding_state.gd (NEW); assets/screens/_modals/onboarding_overlay.tscn + .gd (NEW); tests/unit/onboarding/ (NEW); src/core/scene_manager/scene_manager.gd (first-launch routing)"
-    priority: must-have
-    status: ready-for-dev
-    owner: "godot-gdscript-specialist"
-    estimate_days: 1.5
     blocker: ""
-    completed: ""
+    completed: "2026-05-16 (PR #158); +3 tests; closes R7 violation"
 
-  - id: "S25-M5"
-    name: "Sprint 25 visual playtest + retrospective — TWO grading axes: Floor Unlock readability + Onboarding readability"
-    file: "production/playtests/playtest-17-sprint-25-*.md; production/retrospectives/sprint-25-retrospective-*.md"
+  - id: "S26-M2"
+    name: "Berserker class (6th class, brawler archetype) — high DMG / low HP / fast; counters bruiser like warrior with distinct play pattern"
+    file: "assets/data/classes/berserker.tres (NEW); tests/unit/hero_class_database/berserker_registration_test.gd (NEW)"
     priority: must-have
-    status: backlog
+    status: done
+    owner: "godot-gdscript-specialist"
+    estimate_days: 0.5
+    blocker: ""
+    completed: "2026-05-16 (PR #159); class count 5 → 6"
+
+  - id: "S26-M3"
+    name: "Cleric class (7th class, support archetype) — 2x tick_output_contribution; new 'support' role; counters armored (shared with rogue)"
+    file: "assets/data/classes/cleric.tres (NEW); tests/unit/hero_class_database/cleric_registration_test.gd (NEW)"
+    priority: must-have
+    status: done
+    owner: "godot-gdscript-specialist"
+    estimate_days: 0.5
+    blocker: ""
+    completed: "2026-05-16 (PR #161); class count 6 → 7"
+
+  - id: "S26-M4"
+    name: "Tier-2 class synergies — Bastion (3 paladins) / Volley (3 archers) / Frenzy (3 berserkers) / Vigil (3 clerics); detection + multiplier resolution + locale + tier mapping + GDD §C.6 amendment"
+    file: "src/core/formation_assignment/formation_assignment.gd; src/core/dungeon_run_orchestrator/dungeon_run_orchestrator.gd; src/ui/ui_framework.gd; assets/locale/en.csv; design/gdd/class-synergy-system.md §C.6; tests (tier2_synergy_detection_test.gd + tier2_synergy_multipliers_test.gd, NEW)"
+    priority: must-have
+    status: done
+    owner: "godot-gdscript-specialist"
+    estimate_days: 1.0
+    blocker: "S26-M2 + S26-M3"
+    completed: "2026-05-16 (PR #164); +23 tests; closes synergy gap for tier-2 roster"
+
+  - id: "S26-M5"
+    name: "Sprint 26 visual playtest + retrospective — TWO grading axes (Sprint 25 + 26 stacked); deep playthrough through forest_reach F1-F5 + 3-paladin / 3-cleric formations"
+    file: "production/playtests/playtest-17-sprint-26-content-pivot-2026-05-16.md; production/retrospectives/sprint-26-retrospective-2026-05-16.md"
+    priority: must-have
+    status: blocked
     owner: "xiaolei (human) + claude-code"
     estimate_days: 0.5
-    blocker: "S25-M1 + S25-M2 + S25-M3 + S25-M4"
-    completed: ""
-
-  # ===== Should Have =====
-
-  - id: "S25-S1"
-    name: "Add second biome 'moonlit_glade' — 5 floors of content + biome background + LOCKED-until-forest_reach-cleared chain"
-    file: "assets/data/biomes/moonlit_glade.tres (NEW); src/core/floor_unlock_system/ (BIOME_FLOOR_COUNT update); assets/screens/formation_assignment/ (2nd biome tab); tests/unit/floor_unlock_system/biome_chain_test.gd (NEW)"
-    priority: should-have
-    status: ready-for-dev
-    owner: "game-designer + godot-gdscript-specialist"
-    estimate_days: 1.5
-    blocker: "S25-M2"
-    completed: ""
-
-  - id: "S25-S2"
-    name: "Add new class 'paladin' (warrior tier-2 variant) — cozy-tank archetype (high HP, low DMG); recruitable from pool; portrait via ClassPortraitFactory"
-    file: "assets/data/classes/paladin.tres (NEW); src/core/recruitment/ (pool generation); tests/unit/recruitment/paladin_recruit_test.gd (NEW)"
-    priority: should-have
-    status: ready-for-dev
-    owner: "game-designer + godot-gdscript-specialist"
-    estimate_days: 1.0
-    blocker: ""
+    blocker: "human playtest execution"
     completed: ""
 
   # ===== Nice to Have =====
 
-  - id: "S25-N1"
-    name: "First-time biome unlock fanfare — toast + audio cue on new-biome unlock; locale key biome_unlocked_toast_format"
-    file: "assets/screens/_overlays/biome_unlock_toast.tscn (NEW or extend existing toast); assets/locale/en.csv (1 new key); src/core/audio_router/ (cue wiring)"
+  - id: "S26-N1"
+    name: "ClassRegistrationTestHelper — Rule-of-Three refactor extracting class-registration assertion boilerplate; each future class test now ~50 LOC vs ~100 LOC"
+    file: "tests/helpers/class_registration_test_helper.gd (NEW); tests/unit/helpers/class_registration_test_helper_test.gd (NEW); refactor paladin/archer/berserker/cleric tests"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 0.5
-    blocker: "S25-S1"
-    completed: ""
+    blocker: "S26-M2 (3rd tier-2 class triggers Rule-of-Three)"
+    completed: "2026-05-16 (PR #160); 4 class tests refactored; helper has 8 self-tests + canary"
 
-  - id: "S25-N2"
-    name: "Floor lock indicator UX polish — 🔒 icon + tooltip 'Clear floor N first' replacing the grayed-out button"
-    file: "assets/screens/formation_assignment/formation_assignment.gd (floor picker render); assets/locale/en.csv (1 new key)"
-    priority: nice-to-have
-    status: backlog
-    owner: "godot-gdscript-specialist"
-    estimate_days: 0.5
-    blocker: "S25-M2"
-    completed: ""
-
+# ===== Sprint 25 archived stories (for history) =====
+#
+#   sprint_status: CLOSED-PENDING-PLAYTEST — 6/6 plannable items shipped;
+#                  Day-0 plan + addendum + 4 player-visible PRs + playtest template + retro skeleton.
+#                  Original Day-0 M1-M3 (Floor Unlock implementation) + M4 (Onboarding overlay)
+#                  CLOSED as VERIFIED-IN-PLACE per the addendum's grep audit; revised M-tasks
+#                  shipped as actual content.
+#   actual_close: 2026-05-16 (twelfth consecutive same-day-compressed sprint)
+#   PRs: #150 Day-0 plan + S24 closure retro; #151 addendum (grep audit / content pivot);
+#        #152 S25-M2-rev paladin class; #153 S25-M3-rev boss floor visual differentiation;
+#        #154 S25-S2-rev archer class; #155 S25-N2-rev floor lock 🔒 indicator;
+#        #156 S25-M5-rev playtest template + retro skeleton; #157 /simplify+/review cleanup
+#        (BiomeBackground API collapse + magic number + naming + comments).
+#   Player-visible PRs: 4 of 6 sprint PRs (66%; improvement vs Sprint 24's 20%).
+#   Day-0 Mistakes: scoped Floor Unlock + Onboarding overlay as if NEW — both already shipped.
+#                   Caught by addendum's grep audit minutes after Day-0 plan merged.
+#                   Memory entry feedback_grep_first_check_must_run_pre_planning written.
+#   Content shipped: +2 classes (paladin, archer = 3 → 5); +1 boss floor visual (F5 65% RGB);
+#                    +1 lock indicator (🔒 + tooltip).
+#   New tests: +23 across 4 new test files.
+#   Retro: DRAFT, pending playtest-16 verdict (5 axes).
+#
 # ===== Sprint 24 archived stories (for history) =====
 #
 #   sprint_status: CLOSED — 10/10 PRs shipped (9 sprint + 1 chore cleanup);
