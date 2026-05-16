@@ -138,13 +138,13 @@ The V1.0 detection surface returns a `synergy_id` string ("steel_wall" / "arcane
 | **None** | `""` (no detection) | No matching composition. Cozy degrade — render `"Synergy: None"` rather than hiding. | `synergy_tier_none` → "None" |
 | **Bronze** | (reserved for V2.5+) | Future: 2-of-a-kind without matching counter archetype. Documented for V2 GDD expansion; not yet emitted by `detect_active_synergy`. | `synergy_tier_bronze` → "Bronze" |
 | **Silver** | (reserved for V2.5+) | Future: 2-of-a-kind WITH matching counter archetype (the partial-mono-class pattern that teaches matchup awareness without requiring 3-of-a-kind commitment). Not yet emitted. | `synergy_tier_silver` → "Silver" |
-| **Gold** | `steel_wall`, `arcane_elite`, `triple_strike` | 3-of-a-kind mono-class synergies. The current V1 first-pass mono-class roster. Strong but specialized (Steel Wall/Triple Strike conditional on archetype; Arcane Elite unconditional XP). | `synergy_tier_gold` → "Gold" |
+| **Gold** | `steel_wall`, `arcane_elite`, `triple_strike`, `bastion`, `volley`, `frenzy`, `vigil` | 3-of-a-kind mono-class synergies. Tier-2 additions (Sprint 26 M4) follow the same mono-class shape as the V1 set. Strong but specialized (Steel Wall/Triple Strike/Bastion/Volley/Frenzy conditional on counter archetype; Arcane Elite + Vigil unconditional XP). | `synergy_tier_gold` → "Gold" |
 | **Platinum** | `triple_threat` | 1+1+1 balanced composition. Highest categorical tier because it represents full class-diversity coverage (unlocks every counter-archetype matchup simultaneously). Lower numerical bonus (+15% gold) but unconditional — the "balanced excellence" beat. | `synergy_tier_platinum` → "Platinum" |
 
 **Tier-mapping function**:
 
 ```gdscript
-# Returns the V2 tier name (lowercase enum string) for a V1 synergy_id.
+# Returns the V2 tier name (lowercase enum string) for a V1 + tier-2 synergy_id.
 # Pure function — safe to call every UI refresh. O(1) string switch.
 static func synergy_id_to_tier(synergy_id: String) -> String:
     match synergy_id:
@@ -153,6 +153,12 @@ static func synergy_id_to_tier(synergy_id: String) -> String:
         "arcane_elite":   return "gold"
         "triple_strike":  return "gold"
         "triple_threat":  return "platinum"
+        # Sprint 26 M4 — tier-2 mono-class synergies (3-of-a-kind for each
+        # tier-2 class). Same Gold tier as the V1 mono-class set.
+        "bastion":        return "gold"  # 3 paladins, conditional gold vs caster
+        "volley":         return "gold"  # 3 archers, conditional gold vs swarm
+        "frenzy":         return "gold"  # 3 berserkers, conditional gold vs bruiser
+        "vigil":          return "gold"  # 3 clerics, unconditional XP
         _:                return "none"  # defensive: unknown synergy_id degrades to None
 ```
 

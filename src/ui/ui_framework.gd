@@ -443,4 +443,11 @@ static func synergy_id_to_tier(synergy_id: String) -> String:
 		"arcane_elite":   return "gold"
 		"triple_strike":  return "gold"
 		"triple_threat":  return "platinum"
+		# Sprint 26 M4 — tier-2 mono-class synergies. Same Gold tier as the
+		# V1 mono-class set (3-of-a-kind shape). Vigil is XP-only (mirrors
+		# Arcane Elite); the other three are conditional gold.
+		"bastion":        return "gold"
+		"volley":         return "gold"
+		"frenzy":         return "gold"
+		"vigil":          return "gold"
 		_:                return "none"

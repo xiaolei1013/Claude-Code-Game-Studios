@@ -226,6 +226,10 @@ const LOSING_RUN_LOOT_FACTOR: float = 0.5
 ## Conditional — applies only when the formation is 3 Warriors AND the kill
 ## archetype is bruiser. Per GDD §C.1 + §D.2 + AC-CS-06/07.
 const STEEL_WALL_GOLD_MULT: float = 1.25
+const BASTION_GOLD_MULT: float = 1.25
+const VOLLEY_GOLD_MULT: float = 1.25
+const FRENZY_GOLD_MULT: float = 1.25
+const VIGIL_XP_MULT: float = 1.20
 
 ## Triple Strike (3 Rogues) gold multiplier vs `archetype = "armored"`.
 ## Conditional — applies only when the formation is 3 Rogues AND the kill
@@ -1247,6 +1251,23 @@ func _resolve_synergy_gold_multiplier(synergy_id: String, archetype: String) -> 
 		"arcane_elite":
 			# Arcane Elite affects XP only (per GDD §C.1 effect type column).
 			return 1.0
+		"bastion":
+			# 3 Paladins: conditional gold vs caster (paladin counter_archetype).
+			# Same teaches-matchup pattern as Steel Wall, defender shape.
+			return BASTION_GOLD_MULT if archetype == "caster" else 1.0
+		"volley":
+			# 3 Archers: conditional gold vs swarm. Archer is the MVP roster's
+			# only swarm-counter class; Volley is the load-bearing teach for
+			# swarm-archetype enemy introductions.
+			return VOLLEY_GOLD_MULT if archetype == "swarm" else 1.0
+		"frenzy":
+			# 3 Berserkers: conditional gold vs bruiser. Mirrors Steel Wall —
+			# gives the brawler path the same discovery moment Warriors get.
+			return FRENZY_GOLD_MULT if archetype == "bruiser" else 1.0
+		"vigil":
+			# Vigil affects XP, not gold (support→investment theme, mirrors
+			# Arcane Elite for the support class shape).
+			return 1.0
 		_:
 			# AC-CS-18 forward-compat: unknown synergy_id (e.g., V1.5
 			# "veteran_squad") falls back to no multiplier. Graceful
@@ -1266,10 +1287,13 @@ func _resolve_synergy_xp_multiplier(synergy_id: String) -> float:
 		"arcane_elite":
 			# Unconditional XP boost.
 			return ARCANE_ELITE_XP_MULT
-		"steel_wall", "triple_strike", "triple_threat":
-			# Gold-only synergies (XP path is baseline). Triple Strike
-			# added 2026-05-14 alongside Steel Wall as the second
-			# conditional gold synergy.
+		"vigil":
+			# 3 Clerics: unconditional XP boost (support→investment theme,
+			# mirrors Arcane Elite's caster-investment shape).
+			return VIGIL_XP_MULT
+		"steel_wall", "triple_strike", "triple_threat", "bastion", "volley", "frenzy":
+			# Gold-only synergies (XP path is baseline). Tier-2 conditionals
+			# Bastion / Volley / Frenzy added Sprint 26 M4.
 			return 1.0
 		_:
 			# AC-CS-18 forward-compat fallback.
