@@ -150,7 +150,12 @@ static func assert_class_flavor_text_non_empty(
 ## would silently `cls.get(...) → null → int(null) == 0` and produce a
 ## confusing "expected 0 > 0" failure mode. Update this set when adding
 ## new int fields to HeroClass.
-const VALID_STAT_NAMES: PackedStringArray = PackedStringArray([
+##
+## NOTE: bare typed array literal — wrapping in `PackedStringArray([...])`
+## is a constructor call, NOT a constant expression, and produces a
+## parse error. The typed annotation + bare literal IS valid (see e.g.
+## save_load_system.gd::CONSUMER_PATHS for the canonical pattern).
+const VALID_STAT_NAMES: PackedStringArray = [
 	"base_attack",
 	"base_hp",
 	"base_speed",
@@ -160,7 +165,7 @@ const VALID_STAT_NAMES: PackedStringArray = PackedStringArray([
 	"tick_output_contribution_l1",
 	"tick_output_per_level",
 	"tier",
-])
+]
 
 
 ## Asserts class_a's [param stat_name] is greater than class_b's same
