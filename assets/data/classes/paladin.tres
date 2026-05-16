@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="HeroClass" format=3 uid="uid://b2paladinmvp001"]
+
+[ext_resource type="Script" uid="uid://dvm75u02lhnb8" path="res://src/core/hero_class_database/hero_class.gd" id="1_hcpal"]
+
+[resource]
+script = ExtResource("1_hcpal")
+id = "paladin"
+display_name = "Paladin"
+tier = 2
+role = "defender"
+counter_archetype = "caster"
+base_attack = 9
+base_hp = 180
+base_speed = 4
+attack_per_level = 2
+hp_per_level = 22
+speed_per_level = 1
+tick_output_contribution_l1 = 2
+tick_output_per_level = 1
+sprite_path = "assets/art/classes/paladin/sprite.png"
+portrait_path = "assets/art/classes/paladin/portrait.png"
+icon_path = "assets/art/classes/paladin/icon.png"
+flavor_text = "Vowed to outlast every blow the dark sends. Where the warrior strikes first, the paladin stands longest."
