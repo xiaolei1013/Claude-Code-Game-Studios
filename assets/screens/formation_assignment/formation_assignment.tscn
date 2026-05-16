@@ -93,26 +93,39 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 1
 
-[node name="SlotsHBox" type="HBoxContainer" parent="FormationPanel"]
+; Sprint 23 S23-N2: SynergyPreviewLabel sits above the slot row inside the
+; formation panel, always visible. Shows the predicted synergy tier ("None"
+; or the active synergy display name) for the pending slot composition.
+; Distinct from SynergyBadge (anchored at 0.66) which retains the cozy
+; "you-found-something" detection-moment glow.
+[node name="FormationVBox" type="VBoxContainer" parent="FormationPanel"]
+layout_mode = 2
+
+[node name="SynergyPreviewLabel" type="Label" parent="FormationPanel/FormationVBox"]
+layout_mode = 2
+text = "Synergy: None"
+horizontal_alignment = 1
+
+[node name="SlotsHBox" type="HBoxContainer" parent="FormationPanel/FormationVBox"]
 layout_mode = 2
 alignment = 1
 mouse_filter = 1
 
-[node name="Slot0Button" type="Button" parent="FormationPanel/SlotsHBox"]
+[node name="Slot0Button" type="Button" parent="FormationPanel/FormationVBox/SlotsHBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(180, 80)
 focus_mode = 0
 mouse_filter = 0
 text = "Empty"
 
-[node name="Slot1Button" type="Button" parent="FormationPanel/SlotsHBox"]
+[node name="Slot1Button" type="Button" parent="FormationPanel/FormationVBox/SlotsHBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(180, 80)
 focus_mode = 0
 mouse_filter = 0
 text = "Empty"
 
-[node name="Slot2Button" type="Button" parent="FormationPanel/SlotsHBox"]
+[node name="Slot2Button" type="Button" parent="FormationPanel/FormationVBox/SlotsHBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(180, 80)
 focus_mode = 0

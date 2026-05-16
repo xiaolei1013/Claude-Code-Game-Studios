@@ -301,15 +301,22 @@ stories:
     blocker: ""
     completed: "2026-05-16 (v0.0.0.56); verification-only closure; 4 new end-to-end contract tests; 2250/2250 PASS"
 
+  # NOTE: S23-N2 closed 2026-05-16 — added always-visible SynergyPreviewLabel
+  # above the slot row, reading FormationAssignment.detect_active_synergy() on
+  # every slot edit. The "tier" terminology in the original plan (None/Bronze/
+  # Silver/Gold/Platinum) is deferred — Class Synergy V2 tier design hasn't
+  # been authored yet. Implemented version uses V1 synergy names (Steel Wall,
+  # Arcane Elite, Triple Strike) plus "None" — implementable contract for now.
+  # See CHANGELOG v0.0.0.57.
   - id: "S23-N2"
-    name: "Class Synergy V2 — passive synergy preview panel on Dispatch screen; live tier display as heroes are slotted"
-    file: "assets/screens/formation_assignment/formation_assignment.tscn + .gd"
+    name: "Class Synergy V2 first-pass — always-visible SynergyPreviewLabel on Dispatch; tier ladder deferred to V2 design"
+    file: "assets/screens/formation_assignment/formation_assignment.tscn + .gd; tests/unit/formation_assignment/synergy_preview_label_test.gd (NEW)"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 2.0
-    blocker: "S23-M1, S23-M2, S23-M3, S23-N1 merged"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-16 (v0.0.0.57); 3 new tests + path update for 1 existing test; 125/125 PASS in affected modules"
 
 # ===== Sprint 22 archived stories (for history) =====
 #
