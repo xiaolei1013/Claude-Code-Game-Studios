@@ -92,17 +92,23 @@ static func _build_portrait(class_id: String) -> Texture2D:
 	var img: Image = Image.create(size, size, false, Image.FORMAT_RGBA8)
 	img.fill(bg)
 
-	# Inset border — 4px frame inside the 96×96 block.
-	for x: int in range(size):
-		for y: int in range(size):
-			var on_border: bool = (
-				x < _BORDER_WIDTH_PX
-				or x >= size - _BORDER_WIDTH_PX
-				or y < _BORDER_WIDTH_PX
-				or y >= size - _BORDER_WIDTH_PX
-			)
-			if on_border:
-				img.set_pixel(x, y, border)
+	# Inset border — 4px frame inside the 96×96 block. Drawn as 4 strip fills
+	# rather than a nested set_pixel loop: the nested loop iterates size×size
+	# (9216) times to write 1472 border pixels — the strip-fill path makes
+	# zero wasted iterations + each fill_rect is a single C++ memset. Diamond
+	# glyph below remains set_pixel because the mask test is non-rectangular.
+	var inner_size: int = size - _BORDER_WIDTH_PX * 2
+	# Top strip: full width × border height.
+	img.fill_rect(Rect2i(0, 0, size, _BORDER_WIDTH_PX), border)
+	# Bottom strip: full width × border height at bottom.
+	img.fill_rect(Rect2i(0, size - _BORDER_WIDTH_PX, size, _BORDER_WIDTH_PX), border)
+	# Left strip: border width × inner height (corners already filled by top/bottom).
+	img.fill_rect(Rect2i(0, _BORDER_WIDTH_PX, _BORDER_WIDTH_PX, inner_size), border)
+	# Right strip: same on the right edge.
+	img.fill_rect(
+		Rect2i(size - _BORDER_WIDTH_PX, _BORDER_WIDTH_PX, _BORDER_WIDTH_PX, inner_size),
+		border
+	)
 
 	# Initial-letter "mark" — a brightened diamond at the center of the
 	# block. Distinct enough to differentiate from a flat color swatch
