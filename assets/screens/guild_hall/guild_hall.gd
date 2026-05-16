@@ -178,7 +178,7 @@ func _refresh_multiplier_label() -> void:
 func _refresh_retired_card_list() -> void:
 	if _retired_card_list == null:
 		return
-	_clear_container_immediate(_retired_card_list)
+	UIFrameworkScript.clear_children_immediate(_retired_card_list)
 
 	var records: Array = HeroRoster.get_retired_hero_records()
 	if records.is_empty():
@@ -341,8 +341,9 @@ func _refresh_synergy_badge() -> void:
 		return
 
 	# Render localized "Display Name: Effect" text. Both keys exist in
-	# en.csv per Sprint 18 S18-S2 locale closeout.
-	var display_name: String = tr("class_synergy_badge_" + synergy_id)
+	# en.csv per Sprint 18 S18-S2 locale closeout. Sprint 24 S24-M3 uses
+	# UIFramework.synergy_display_name for the writer-locked badge name.
+	var display_name: String = UIFrameworkScript.synergy_display_name(synergy_id)
 	var effect_text: String = tr("class_synergy_effect_" + synergy_id)
 	_synergy_label.text = "%s: %s" % [display_name, effect_text]
 	_synergy_badge.visible = true
@@ -360,7 +361,7 @@ func _refresh_synergy_badge() -> void:
 func _refresh_roster_panel() -> void:
 	if _roster_list == null:
 		return
-	_clear_container_immediate(_roster_list)
+	UIFrameworkScript.clear_children_immediate(_roster_list)
 	var heroes: Array = HeroRoster.get_all_heroes()
 	heroes.sort_custom(func(a: Variant, b: Variant) -> bool:
 		var la: int = int(a.get("current_level"))
@@ -531,13 +532,6 @@ func _on_settings_gear_pressed() -> void:
 	SceneManager.push_overlay("settings", false)
 
 
-## Detaches every child of [param container] from the tree IMMEDIATELY,
-## then queue_frees it. queue_free alone is deferred to the next idle
-## frame, which lets a rebuild within the same frame stack stale children
-## on top of fresh ones (e.g., add_hero → hero_recruited → _on_roster_changed
-## before queue_free has run). Used by both _refresh_roster_panel and
-## _refresh_retired_card_list.
-func _clear_container_immediate(container: Node) -> void:
-	for child: Node in container.get_children():
-		container.remove_child(child)
-		child.queue_free()
+# Sprint 24 S24-M3: _clear_container_immediate hoisted to
+# UIFramework.clear_children_immediate. Call sites updated to use the
+# UIFramework helper directly. Local wrapper removed.

@@ -21,9 +21,6 @@ extends GdUnitTestSuite
 const FormationAssignmentScene = preload(
 	"res://assets/screens/formation_assignment/formation_assignment.tscn"
 )
-const FormationAssignmentScript = preload(
-	"res://assets/screens/formation_assignment/formation_assignment.gd"
-)
 const HeroInstanceScript = preload("res://src/core/hero_roster/hero_instance.gd")
 
 
@@ -148,36 +145,6 @@ func test_synergy_preview_label_renders_gold_tier_for_three_warriors() -> void:
 	).is_true()
 
 
-# ===========================================================================
-# Group D — synergy_id_to_tier mapping (AC-CS-22..25)
-# ===========================================================================
-
-func test_synergy_id_to_tier_empty_returns_none() -> void:
-	# AC-CS-22: empty synergy_id → "none"
-	assert_str(FormationAssignmentScript._synergy_id_to_tier("")).is_equal("none")
-
-
-func test_synergy_id_to_tier_steel_wall_returns_gold() -> void:
-	# AC-CS-23: steel_wall → "gold"
-	assert_str(FormationAssignmentScript._synergy_id_to_tier("steel_wall")).is_equal("gold")
-
-
-func test_synergy_id_to_tier_arcane_elite_returns_gold() -> void:
-	# AC-CS-23: arcane_elite → "gold"
-	assert_str(FormationAssignmentScript._synergy_id_to_tier("arcane_elite")).is_equal("gold")
-
-
-func test_synergy_id_to_tier_triple_strike_returns_gold() -> void:
-	# AC-CS-23: triple_strike → "gold"
-	assert_str(FormationAssignmentScript._synergy_id_to_tier("triple_strike")).is_equal("gold")
-
-
-func test_synergy_id_to_tier_triple_threat_returns_platinum() -> void:
-	# AC-CS-24: triple_threat → "platinum" (the 1+1+1 balanced "completeness" tier)
-	assert_str(FormationAssignmentScript._synergy_id_to_tier("triple_threat")).is_equal("platinum")
-
-
-func test_synergy_id_to_tier_unknown_returns_none_defensive() -> void:
-	# AC-CS-25: unknown synergy_id → "none" (defensive degrade)
-	assert_str(FormationAssignmentScript._synergy_id_to_tier("nonexistent_synergy")).is_equal("none")
-	assert_str(FormationAssignmentScript._synergy_id_to_tier("some_v2_5_future_id")).is_equal("none")
+# Note (Sprint 24 S24-M3): tier-mapper tests (AC-CS-22..25) moved to
+# tests/unit/ui_framework/ui_framework_helpers_test.gd Groups F+G, where
+# the synergy_id_to_tier helper now lives.

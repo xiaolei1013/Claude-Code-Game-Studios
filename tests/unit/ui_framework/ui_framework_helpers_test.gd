@@ -306,3 +306,99 @@ func test_ui_framework_wire_touch_feedback_full_tap_produces_exactly_one_chime()
 
 	# Assert
 	assert_int(_count_ui_tap_plays()).is_equal(1)
+
+
+# ===========================================================================
+# Group E — Sprint 24 S24-M3: clear_children_immediate
+# ===========================================================================
+
+func test_clear_children_immediate_detaches_all_children_synchronously() -> void:
+	# Arrange — container with 5 child labels.
+	var container: VBoxContainer = auto_free(VBoxContainer.new())
+	add_child(container)
+	for i: int in range(5):
+		var lbl: Label = Label.new()
+		lbl.text = "child %d" % i
+		container.add_child(lbl)
+	assert_int(container.get_child_count()).is_equal(5)
+
+	# Act
+	UIFrameworkScript.clear_children_immediate(container)
+
+	# Assert — synchronous: get_child_count is 0 immediately, no idle-frame wait needed.
+	assert_int(container.get_child_count()).is_equal(0)
+
+
+func test_clear_children_immediate_handles_null_container_defensively() -> void:
+	# Arrange + Act — no-op, must not crash on null.
+	UIFrameworkScript.clear_children_immediate(null)
+	# Assert — reaching here = pass (no exception).
+
+
+func test_clear_children_immediate_handles_empty_container() -> void:
+	# Arrange — empty container.
+	var container: VBoxContainer = auto_free(VBoxContainer.new())
+	add_child(container)
+
+	# Act
+	UIFrameworkScript.clear_children_immediate(container)
+
+	# Assert
+	assert_int(container.get_child_count()).is_equal(0)
+
+
+# ===========================================================================
+# Group F — Sprint 24 S24-M3: synergy_display_name
+# ===========================================================================
+
+func test_synergy_display_name_returns_localized_for_known_synergy() -> void:
+	# Arrange + Act — known synergy_id routes through tr() with the
+	# class_synergy_badge_<id> key set.
+	var result: String = UIFrameworkScript.synergy_display_name("steel_wall")
+
+	# Assert — non-empty (tr returns the en.csv value or the key verbatim).
+	assert_bool(result.length() > 0).is_true()
+
+
+func test_synergy_display_name_returns_empty_for_empty_synergy_id() -> void:
+	# Arrange + Act — defensive: empty input returns empty string.
+	var result: String = UIFrameworkScript.synergy_display_name("")
+
+	# Assert
+	assert_str(result).is_equal("")
+
+
+# ===========================================================================
+# Group G — Sprint 24 S24-M3: synergy_id_to_tier (hoisted from S24-M2)
+# ===========================================================================
+# AC-CS-22..25 — see class-synergy-system.md §H acceptance criteria.
+
+func test_synergy_id_to_tier_empty_returns_none() -> void:
+	# AC-CS-22
+	assert_str(UIFrameworkScript.synergy_id_to_tier("")).is_equal("none")
+
+
+func test_synergy_id_to_tier_steel_wall_returns_gold() -> void:
+	# AC-CS-23
+	assert_str(UIFrameworkScript.synergy_id_to_tier("steel_wall")).is_equal("gold")
+
+
+func test_synergy_id_to_tier_arcane_elite_returns_gold() -> void:
+	# AC-CS-23
+	assert_str(UIFrameworkScript.synergy_id_to_tier("arcane_elite")).is_equal("gold")
+
+
+func test_synergy_id_to_tier_triple_strike_returns_gold() -> void:
+	# AC-CS-23
+	assert_str(UIFrameworkScript.synergy_id_to_tier("triple_strike")).is_equal("gold")
+
+
+func test_synergy_id_to_tier_triple_threat_returns_platinum() -> void:
+	# AC-CS-24
+	assert_str(UIFrameworkScript.synergy_id_to_tier("triple_threat")).is_equal("platinum")
+
+
+func test_synergy_id_to_tier_unknown_returns_none_defensive() -> void:
+	# AC-CS-25
+	assert_str(UIFrameworkScript.synergy_id_to_tier("nonexistent_synergy")).is_equal("none")
+	assert_str(UIFrameworkScript.synergy_id_to_tier("future_v25_id")).is_equal("none")

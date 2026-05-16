@@ -376,3 +376,71 @@ static func _play_touch_pulse(control: Control) -> void:
 	var tween: Tween = control.create_tween()
 	tween.tween_property(control, "scale", TOUCH_PULSE_SCALE, TOUCH_PULSE_EXPAND_SEC)
 	tween.tween_property(control, "scale", Vector2.ONE, TOUCH_PULSE_RETURN_SEC)
+
+
+# ---------------------------------------------------------------------------
+# Sprint 24 S24-M3 — Hygiene helpers (container refresh + synergy display)
+# ---------------------------------------------------------------------------
+
+## Detaches every child of [param container] from the tree IMMEDIATELY,
+## then queue_frees it. queue_free alone is deferred to the next idle
+## frame, which lets a rebuild within the same frame stack stale children
+## on top of fresh ones (e.g., add_hero → hero_recruited → refresh handler
+## before queue_free has run). Sprint 23 S23-M1 surfaced this as a latent
+## flake in Guild Hall's roster panel; Sprint 24 S24-M3 hoists the pattern
+## here so every screen-refresh call site uses the same idiom.
+##
+## Defensive: silently no-ops on a null container.
+static func clear_children_immediate(container: Node) -> void:
+	if container == null:
+		return
+	for child: Node in container.get_children():
+		container.remove_child(child)
+		child.queue_free()
+
+
+## Returns the localized display name for a V1 synergy_id, e.g.
+## `"Steel Wall"` for `"steel_wall"`. Routes through `tr()` with the
+## writer-locked `class_synergy_badge_<id>` key set defined in
+## `assets/locale/en.csv`.
+##
+## Defensive: empty `synergy_id` returns an empty string (caller is
+## expected to short-circuit before calling). Unknown synergy_id returns
+## the verbatim key — non-empty and readable, matching the existing
+## `tr()` fallback semantics.
+##
+## Sprint 24 S24-M3 — consolidates 3 pre-existing call sites of the
+## `tr("class_synergy_badge_" + synergy_id)` idiom across `guild_hall.gd`
+## (synergy badge), `formation_assignment.gd` (badge), and
+## `formation_assignment.gd` (preview label).
+static func synergy_display_name(synergy_id: String) -> String:
+	if synergy_id.is_empty():
+		return ""
+	# Static method context — uses TranslationServer.translate, not tr()
+	# (tr() requires a Node context). Matches the pattern established by
+	# `format_localized` above.
+	return TranslationServer.translate("class_synergy_badge_" + synergy_id)
+
+
+## Maps V1 `synergy_id` to V2 tier key per `class-synergy-system.md` §C.6.
+## Pure function — safe to call every UI refresh. O(1) string switch.
+##
+## Returns the lowercase tier key (used as suffix for `synergy_tier_<key>`
+## locale lookups): `"none"` | `"bronze"` | `"silver"` | `"gold"` | `"platinum"`.
+##
+## Defensive: unknown `synergy_id` degrades to `"none"`.
+##
+## Sprint 24 S24-M3 — hoisted from `formation_assignment.gd::_synergy_id_to_tier`
+## (added in S24-M2) so future tier-aware UI surfaces (Guild Hall synergy
+## summary, toast variants, badge color treatment) can reuse the mapping
+## without duplicating the switch logic.
+##
+## AC-CS-22..25 — see `class-synergy-system.md` §H.
+static func synergy_id_to_tier(synergy_id: String) -> String:
+	match synergy_id:
+		"":               return "none"
+		"steel_wall":     return "gold"
+		"arcane_elite":   return "gold"
+		"triple_strike":  return "gold"
+		"triple_threat":  return "platinum"
+		_:                return "none"

@@ -224,8 +224,8 @@ func _render_stats() -> void:
 
 
 func _render_level_ups() -> void:
-	for child: Node in _level_ups_block.get_children():
-		child.queue_free()
+	# Sprint 24 S24-M3 uses UIFramework.clear_children_immediate.
+	UIFrameworkScript.clear_children_immediate(_level_ups_block)
 	if _hero_level_deltas.is_empty():
 		_level_ups_block.visible = false
 		return
