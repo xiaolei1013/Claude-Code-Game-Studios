@@ -25,6 +25,8 @@
 extends Screen
 
 const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
+# Sprint 23 S23-S3 — programmatic ClassPortrait placeholders (third carry).
+const ClassPortraitFactoryScript = preload("res://src/ui/class_portrait_factory.gd")
 
 # ---------------------------------------------------------------------------
 # Pre-show setter (per GDD §C.2)
@@ -81,10 +83,10 @@ var _cached_level_up_cost: int = -1
 ## Sprint 17 S17-M2 modal slide-in animation polish; the prestige
 ## fade is the first live consumer.
 @onready var _detail_panel: PanelContainer = $DetailPanel
-## Reserved for class-portrait sourcing decision (carve-out per Sprint 17
-## S17-M1 known scope) — placeholder while ClassPortrait sourcing follows
-## the ADR-0016 silent-MVP precedent or an art-asset binding lands.
-@warning_ignore("unused_private_class_variable")
+## Class portrait — Sprint 23 S23-S3 wires the programmatic 96×96 placeholder
+## per `class_id` via `ClassPortraitFactory`. When real product art arrives
+## (HeroClass.portrait_path → actual PNG), `_refresh_header` will prefer the
+## file path and fall back to the factory texture if absent.
 @onready var _class_portrait: TextureRect = $DetailPanel/ContentVBox/HeaderRow/ClassPortrait
 @onready var _display_name_label: Label = $DetailPanel/ContentVBox/HeaderRow/HeaderLabels/DisplayNameLabel
 @onready var _class_name_label: Label = $DetailPanel/ContentVBox/HeaderRow/HeaderLabels/ClassNameLabel
@@ -255,6 +257,11 @@ func _refresh_all() -> void:
 func _refresh_header() -> void:
 	if _hero == null or _class_data == null:
 		return
+	# Sprint 23 S23-S3 — ClassPortrait placeholder. 96×96 programmatic
+	# colored block per class_id; the .tscn has no texture set, so this is
+	# the first surface to render the class identity visually.
+	if _class_portrait != null:
+		_class_portrait.texture = ClassPortraitFactoryScript.get_portrait_texture(_hero.class_id)
 	# DisplayNameLabel — immutable per ADR-0012.
 	_display_name_label.text = _hero.display_name
 	# ClassNameLabel — locale-aware via display_name_key (when class.tres
