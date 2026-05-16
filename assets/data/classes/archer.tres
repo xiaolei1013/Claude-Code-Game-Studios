@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="HeroClass" format=3 uid="uid://b2archermvp001"]
+
+[ext_resource type="Script" uid="uid://dvm75u02lhnb8" path="res://src/core/hero_class_database/hero_class.gd" id="1_hcarc"]
+
+[resource]
+script = ExtResource("1_hcarc")
+id = "archer"
+display_name = "Archer"
+tier = 2
+role = "ranged"
+counter_archetype = "swarm"
+base_attack = 18
+base_hp = 65
+base_speed = 13
+attack_per_level = 3
+hp_per_level = 9
+speed_per_level = 2
+tick_output_contribution_l1 = 3
+tick_output_per_level = 1
+sprite_path = "assets/art/classes/archer/sprite.png"
+portrait_path = "assets/art/classes/archer/portrait.png"
+icon_path = "assets/art/classes/archer/icon.png"
+flavor_text = "Trained on the cliff-paths above Whispering Crags. The first arrow lands before the enemy knows the line was crossed."
