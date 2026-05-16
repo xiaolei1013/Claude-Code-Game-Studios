@@ -109,3 +109,99 @@ func test_repeat_calls_return_same_texture_instance() -> void:
 
 	# Assert — same instance (cache hit), not just equal value.
 	assert_object(second).is_same(first)
+
+
+# ===========================================================================
+# Group E — Border pixel-accuracy (Sprint 24 S24-N1 fill_rect refactor)
+#
+# These tests are the regression net for the strip-fill optimization in
+# `_build_portrait`. The optimization replaces a nested set_pixel loop with
+# 4 `fill_rect` calls (top, bottom, left, right). If a future refactor
+# breaks the strip math, the border pixels would render with the wrong
+# color or wrong location — these tests catch that.
+#
+# Logic-level test (not visual-fidelity): we verify the border pixel sample
+# at each canonical location matches the darkened-border color, and the
+# inside-the-border sample matches the bg color.
+# ===========================================================================
+
+func _make_image_for_class(class_id: String) -> Image:
+	# Pull the texture, then extract its backing Image for pixel-level inspection.
+	var tex: Texture2D = ClassPortraitFactoryScript.get_portrait_texture(class_id)
+	var img: Image = tex.get_image()
+	# get_image() returns a fresh copy — safe to read without mutating cache.
+	return img
+
+
+func _expected_border_color(class_id: String) -> Color:
+	# Mirrors the `border = bg * 0.5` derivation in `_build_portrait`. Kept
+	# inline rather than exposing a helper because the formula is part of
+	# the visual contract, not a reusable derivation.
+	var bg: Color = ClassPortraitFactoryScript.get_portrait_color(class_id)
+	return Color(bg.r * 0.5, bg.g * 0.5, bg.b * 0.5, 1.0)
+
+
+func test_border_top_left_corner_pixel_is_border_color() -> void:
+	# Arrange
+	var img: Image = _make_image_for_class("warrior")
+	var expected: Color = _expected_border_color("warrior")
+
+	# Act — pixel (0, 0) is in the top-left corner of the top strip.
+	var actual: Color = img.get_pixel(0, 0)
+
+	# Assert
+	assert_float(actual.r).is_equal_approx(expected.r, 0.005)
+	assert_float(actual.g).is_equal_approx(expected.g, 0.005)
+	assert_float(actual.b).is_equal_approx(expected.b, 0.005)
+
+
+func test_border_bottom_right_corner_pixel_is_border_color() -> void:
+	# Arrange
+	var img: Image = _make_image_for_class("warrior")
+	var expected: Color = _expected_border_color("warrior")
+
+	# Act — pixel (95, 95) is the bottom-right corner; covered by the bottom strip.
+	var actual: Color = img.get_pixel(95, 95)
+
+	# Assert
+	assert_float(actual.r).is_equal_approx(expected.r, 0.005)
+	assert_float(actual.g).is_equal_approx(expected.g, 0.005)
+	assert_float(actual.b).is_equal_approx(expected.b, 0.005)
+
+
+func test_border_left_edge_inner_pixel_is_border_color() -> void:
+	# Arrange — Y=48 is mid-height; X=0 is the leftmost column of the left strip.
+	var img: Image = _make_image_for_class("warrior")
+	var expected: Color = _expected_border_color("warrior")
+
+	# Act
+	var actual: Color = img.get_pixel(0, 48)
+
+	# Assert — should be border-color, not bg-color (verifies left strip wrote here).
+	assert_float(actual.r).is_equal_approx(expected.r, 0.005)
+	assert_float(actual.g).is_equal_approx(expected.g, 0.005)
+	assert_float(actual.b).is_equal_approx(expected.b, 0.005)
+
+
+func test_pixel_just_inside_border_is_background_color_not_border() -> void:
+	# Arrange — (4, 4) is the first pixel JUST inside the 4px frame. Should
+	# be bg color, NOT border color. Catches off-by-one strip-width bugs.
+	var img: Image = _make_image_for_class("warrior")
+	var bg: Color = ClassPortraitFactoryScript.get_portrait_color("warrior")
+	var border: Color = _expected_border_color("warrior")
+
+	# Act
+	var actual: Color = img.get_pixel(4, 4)
+
+	# Assert — matches bg, NOT border.
+	assert_float(actual.r).is_equal_approx(bg.r, 0.005).override_failure_message(
+		"Pixel at (4,4) should be bg %s but got %s — likely an off-by-one in the border strip width."
+		% [str(bg), str(actual)]
+	)
+	# Sanity: must NOT match the border color either.
+	var matches_border: bool = (
+		absf(actual.r - border.r) < 0.005
+		and absf(actual.g - border.g) < 0.005
+		and absf(actual.b - border.b) < 0.005
+	)
+	assert_bool(matches_border).is_false()
