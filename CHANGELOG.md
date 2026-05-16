@@ -2,12 +2,81 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] - Sprint 24 Day-0 (2026-05-16)
+## [0.0.0.74] - 2026-05-16 — Sprints 24-27 content pivot consolidation
 
-### Internal
-- **Sprint 24 plan authored** at `production/sprints/sprint-24.md`. Eleventh consecutive same-day-compressed sprint (S14 → S24). Theme: Class Synergy V2 tier ladder + UIFramework hygiene + Onboarding GDD + S23-S1 advisory polish carryforward. 4 Must Have stories (2.0d), 3 Should Have (2.5d), 3 Nice to Have (2.0d).
-- **Process rule (Sprint 24+)**: per-task PR with `base=main` ALWAYS. No stacked PRs. Sprint 23 stacked-PR cascade lost 6 PRs to GitHub merge semantics and required a recovery PR (#139) to clean up. This rule is encoded in sprint-24.md §"Sprint 24 Process Rules" item #1.
-- **Sprint 23 final state archived** in `sprint-status.yaml` comment block. Sprint Goal MET. All 6 implementable stories shipped (M1/M2/S2/S3/N1/N2 via PRs #132–#137); M3 closure (playtest verdicts + retros) + post-`/simplify+/review` cleanup in PR #138; recovery merge in PR #139 brought stranded content onto main.
+> This entry consolidates the content-pivot work shipped across Sprints 24-27 (PRs #140-#168). Individual sprint retros document the per-PR breakdown; this CHANGELOG captures the player-visible delta from `0.0.0.59` (post-Sprint-23 cleanup) to `0.0.0.74` (post-Sprint-27 closure).
+
+### Added — Class roster expansion (3 → 7 classes)
+
+- **Paladin** (PR #152) — tier-2 cozy-tank, role `defender`, counters caster. Stats: HP 180, ATK 9, SPEED 4.
+- **Archer** (PR #154) — tier-2 ranged DPS, role `ranged`, counters swarm (only swarm-counter in roster). Stats: HP 65, ATK 18, SPEED 13.
+- **Berserker** (PR #159) — tier-2 brawler, role `brawler`, shares bruiser counter with warrior for triple-bruiser-counter formations. Stats: HP 90, ATK 16, SPEED 11.
+- **Cleric** (PR #161) — tier-2 support, role `support`, counters armored. 2x `tick_output_contribution` shape (4 base + 2/level). First class whose identity comes from the tick economy.
+
+### Added — Class synergies (4 → 8 detectable)
+
+- **V2 Tier Ladder** (PR #141) — `class-synergy-system.md` §C.6 maps synergy_id → tier (None/Bronze/Silver/Gold/Platinum). V1 mono-class set → Gold; Triple Threat → Platinum.
+- **Tier-aware SynergyPreviewLabel** (PR #142) — format: "Synergy: Gold (Steel Wall)".
+- **Bastion** (3 Paladins, PR #164) — ×1.25 gold vs caster.
+- **Volley** (3 Archers) — ×1.25 gold vs swarm.
+- **Frenzy** (3 Berserkers) — ×1.25 gold vs bruiser (mirrors Steel Wall).
+- **Vigil** (3 Clerics) — ×1.20 XP unconditional (mirrors Arcane Elite).
+- **Effect text on preview label** (PR #166) — format: "Synergy: Gold (Bastion) — +25% gold vs casters" via new `UIFramework.synergy_effect_text()` helper.
+
+### Added — Player-visible UX
+
+- **Boss floor visual differentiation** (PR #153) — F5 renders at 65% RGB intensity (`BOSS_FLOOR_DARKEN_FACTOR`). New `set_biome(biome_id, floor_index = 0)` API with default parameter for backward compat.
+- **🔒 lock indicator on locked floors** (PR #155) — locked floors show `🔒 F<N>` + tooltip "Clear floor <N-1> first" instead of silent grayed-out button.
+- **Dispatch R7 compliance** (PR #158) — picker reads `FloorUnlock.get_available_biomes()` instead of `DataRegistry.get_all_by_type("biomes")`. Fresh-save players see **4 starter biomes** instead of 6 confusing tabs. Chained biomes (ember_wastes, hollow_stair) appear as new tabs in-session when gates fire.
+- **Recruit pool empty-state placeholder** (PR #148) — pool panel renders cozy "The pool is rebuilding. Refresh to scout new heroes." instead of an empty panel.
+
+### Added — Test infrastructure
+
+- **HeroRoster test fixture** (PR #145) — `tests/helpers/hero_roster_test_fixture.gd` centralizes the snapshot+restore pattern per `feedback_test_isolation_live_autoload`.
+- **ClassRegistrationTestHelper** (PR #160) — Rule-of-Three hoist; future class tests are ~50 LOC vs ~100 LOC.
+- **UIFramework helpers** — `clear_children_immediate`, `synergy_display_name`, `synergy_id_to_tier` (PR #143), `synergy_effect_text` (PR #167).
+
+### Changed
+
+- Class content fully data-driven: adding a class is `.tres` + tests only. DataRegistry, ClassPortraitFactory, Recruitment all auto-pick up new classes.
+
+### Fixed
+
+- **ClassPortraitFactory border rendering** (PR #146) — replaced 9216-iteration nested set_pixel loop with 4 strip `fill_rect` calls. Net effect: zero wasted-iteration branch evaluations per first-paint per class.
+- **Stale comment reference** (PR #167) — `formation_assignment.gd` referenced `matchup_assignment.gd` lines but that file retired in Sprint 22 M2.
+- **Handler naming** (PR #167) — `_on_biome_unlocked_dispatch` → `_on_biome_unlocked` (suffix unnecessary; screen-scope disambiguates).
+- **const PackedStringArray parse error** (PR #163) — `PackedStringArray([...])` is a constructor call, not a constant expression. Replaced with bare typed array literal.
+
+### Locale keys added
+
+- `synergy_tier_{none,bronze,silver,gold,platinum}`, `synergy_preview_tiered_format`, `synergy_preview_tiered_format_with_effect`
+- `class_synergy_badge_{bastion,volley,frenzy,vigil}` + `class_synergy_effect_{bastion,volley,frenzy,vigil}`
+- `recruit_pool_empty_placeholder`, `matchup_floor_locked_tooltip_format`
+
+### Process rules codified
+
+- Per-task PR with `base=main` ALWAYS (Sprint 24+)
+- Grep-first GDD-existence check before "author GDD X" stories (Sprint 25+)
+- Player-visible surface check at mid-sprint (Sprint 25+)
+- Parse-check before merging test-helper changes (Sprint 26+)
+- Skip hand-written UIDs on new .tres files (Sprint 26+)
+- Bundle Day-0 plan into first content PR — no retroactive plans (Sprint 27+)
+- Cap playtest backlog at 1 sprint (Sprint 27+)
+
+### Memory entries written
+
+- `feedback_infrastructure_debt_drift` — recent sprints landed cleanup with no player-visible progress; prefer content + mechanics + implementation-of-existing-GDDs over new GDD authoring + hygiene refactors.
+- `feedback_grep_first_check_must_run_pre_planning` — agent committed infrastructure-debt-drift mistake within minutes of writing the warning memory; lesson is memory entries don't self-enforce.
+
+### Test count
+
+- Pre-Sprint-24: ~2253 tests
+- Post-Sprint-27: ~2340 tests (+87 net across 4 sprints)
+
+### Pending playtests (compounded backlog)
+
+- **playtest-16** (Sprint 25, 5 axes), **playtest-17** (Sprint 26, 5 axes), **playtest-18** (Sprint 27, 5 axes)
+- Single deep playthrough recommended to cover all 15 axes naturally.
 
 ## [0.0.0.59] - 2026-05-16
 
