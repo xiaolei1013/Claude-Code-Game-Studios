@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="HeroClass" format=3 uid="uid://b2clericmvp001"]
+
+[ext_resource type="Script" uid="uid://dvm75u02lhnb8" path="res://src/core/hero_class_database/hero_class.gd" id="1_hccle"]
+
+[resource]
+script = ExtResource("1_hccle")
+id = "cleric"
+display_name = "Cleric"
+tier = 2
+role = "support"
+counter_archetype = "armored"
+base_attack = 11
+base_hp = 110
+base_speed = 8
+attack_per_level = 2
+hp_per_level = 14
+speed_per_level = 1
+tick_output_contribution_l1 = 4
+tick_output_per_level = 2
+sprite_path = "assets/art/classes/cleric/sprite.png"
+portrait_path = "assets/art/classes/cleric/portrait.png"
+icon_path = "assets/art/classes/cleric/icon.png"
+flavor_text = "Reads the cracks in the armor that nobody else sees. Where the rogue strikes, the cleric finds the seam first."
