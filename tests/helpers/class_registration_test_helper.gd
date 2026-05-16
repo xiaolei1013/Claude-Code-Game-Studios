@@ -146,19 +146,36 @@ static func assert_class_flavor_text_non_empty(
 # Cross-class stat comparisons
 # ---------------------------------------------------------------------------
 
+## Whitelisted stat names. Guards against typos like "base_atack" which
+## would silently `cls.get(...) → null → int(null) == 0` and produce a
+## confusing "expected 0 > 0" failure mode. Update this set when adding
+## new int fields to HeroClass.
+const VALID_STAT_NAMES: PackedStringArray = PackedStringArray([
+	"base_attack",
+	"base_hp",
+	"base_speed",
+	"attack_per_level",
+	"hp_per_level",
+	"speed_per_level",
+	"tick_output_contribution_l1",
+	"tick_output_per_level",
+	"tier",
+])
+
+
 ## Asserts class_a's [param stat_name] is greater than class_b's same
 ## stat. Used to anchor tier-2 class identity vs an MVP class (e.g.,
 ## "paladin has more HP than warrior" or "archer is faster than warrior").
 ##
-## [param stat_name] must be a HeroClass property: base_attack, base_hp,
-## base_speed, attack_per_level, hp_per_level, speed_per_level,
-## tick_output_contribution_l1, tick_output_per_level, or tier.
+## [param stat_name] must be a member of [constant VALID_STAT_NAMES] —
+## typos fail loudly rather than degrading to a `0 > 0` false negative.
 static func assert_class_stat_greater(
 	suite: GdUnitTestSuite,
 	class_a: String,
 	class_b: String,
 	stat_name: String
 ) -> void:
+	_assert_valid_stat_name(suite, stat_name)
 	var a: HeroClass = HeroClassDatabase.get_by_id(class_a)
 	var b: HeroClass = HeroClassDatabase.get_by_id(class_b)
 	suite.assert_object(a).is_not_null()
@@ -178,6 +195,7 @@ static func assert_class_stat_less(
 	class_b: String,
 	stat_name: String
 ) -> void:
+	_assert_valid_stat_name(suite, stat_name)
 	var a: HeroClass = HeroClassDatabase.get_by_id(class_a)
 	var b: HeroClass = HeroClassDatabase.get_by_id(class_b)
 	suite.assert_object(a).is_not_null()
@@ -187,4 +205,14 @@ static func assert_class_stat_less(
 	suite.assert_int(stat_a).is_less(stat_b).override_failure_message(
 		"Expected %s.%s (%d) < %s.%s (%d)"
 		% [class_a, stat_name, stat_a, class_b, stat_name, stat_b]
+	)
+
+
+## Loud-fail guard against stat_name typos. A typo would otherwise reduce
+## to `cls.get("base_atack") → null → int(null) == 0` and produce a
+## misleading "expected 0 > 0" assertion failure.
+static func _assert_valid_stat_name(suite: GdUnitTestSuite, stat_name: String) -> void:
+	suite.assert_bool(VALID_STAT_NAMES.has(stat_name)).is_true().override_failure_message(
+		"stat_name '%s' is not in VALID_STAT_NAMES. Valid: %s"
+		% [stat_name, str(VALID_STAT_NAMES)]
 	)
