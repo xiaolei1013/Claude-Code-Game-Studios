@@ -1293,7 +1293,7 @@ func _resolve_synergy_xp_multiplier(synergy_id: String) -> float:
 			return VIGIL_XP_MULT
 		"steel_wall", "triple_strike", "triple_threat", "bastion", "volley", "frenzy":
 			# Gold-only synergies (XP path is baseline). Tier-2 conditionals
-			# Bastion / Volley / Frenzy added Sprint 26 M4.
+			# Bastion / Volley / Frenzy are tier-2 conditional-gold synergies.
 			return 1.0
 		_:
 			# AC-CS-18 forward-compat fallback.

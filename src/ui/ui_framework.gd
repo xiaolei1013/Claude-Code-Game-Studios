@@ -443,11 +443,30 @@ static func synergy_id_to_tier(synergy_id: String) -> String:
 		"arcane_elite":   return "gold"
 		"triple_strike":  return "gold"
 		"triple_threat":  return "platinum"
-		# Sprint 26 M4 — tier-2 mono-class synergies. Same Gold tier as the
-		# V1 mono-class set (3-of-a-kind shape). Vigil is XP-only (mirrors
+		# Tier-2 mono-class synergies (3-of-a-kind for each tier-2 class).
+		# Same Gold tier as the V1 mono-class set. Vigil is XP-only (mirrors
 		# Arcane Elite); the other three are conditional gold.
 		"bastion":        return "gold"
 		"volley":         return "gold"
 		"frenzy":         return "gold"
 		"vigil":          return "gold"
 		_:                return "none"
+
+
+## Resolves the writer-locked effect text for [param synergy_id]. Returns
+## the localized string from the `class_synergy_effect_<id>` locale key
+## (e.g., "+25% gold vs bruisers"), or an empty string when no synergy is
+## active.
+##
+## Rule-of-Three hoist: this lookup is performed at 3 call sites
+## (formation_assignment screen's synergy badge + synergy preview label,
+## plus Guild Hall's synergy summary if/when it lands). Centralizing here
+## keeps the locale-key convention in one place and parallels the existing
+## [method synergy_display_name] helper next door.
+##
+## Defensive: empty [param synergy_id] returns empty string (no effect to
+## render).
+static func synergy_effect_text(synergy_id: String) -> String:
+	if synergy_id == "":
+		return ""
+	return TranslationServer.translate("class_synergy_effect_" + synergy_id)

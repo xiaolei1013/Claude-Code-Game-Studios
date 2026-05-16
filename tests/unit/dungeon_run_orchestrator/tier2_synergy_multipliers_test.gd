@@ -117,24 +117,7 @@ func test_vigil_gold_path_is_baseline() -> void:
 	assert_int(vigil_gold).is_equal(baseline_gold)
 
 
-# ===========================================================================
-# Group E — UIFramework tier mapping (S24-M3 helper)
-# ===========================================================================
-
-const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
-
-
-func test_bastion_maps_to_gold_tier() -> void:
-	assert_str(UIFrameworkScript.synergy_id_to_tier("bastion")).is_equal("gold")
-
-
-func test_volley_maps_to_gold_tier() -> void:
-	assert_str(UIFrameworkScript.synergy_id_to_tier("volley")).is_equal("gold")
-
-
-func test_frenzy_maps_to_gold_tier() -> void:
-	assert_str(UIFrameworkScript.synergy_id_to_tier("frenzy")).is_equal("gold")
-
-
-func test_vigil_maps_to_gold_tier() -> void:
-	assert_str(UIFrameworkScript.synergy_id_to_tier("vigil")).is_equal("gold")
+# Group E (UIFramework tier-2 tier mapping) hoisted to
+# tests/unit/ui_framework/ui_framework_helpers_test.gd Group H. The mapping
+# is a pure-function helper that doesn't exercise the orchestrator — it
+# belongs with the other synergy_id_to_tier tests, not here.
