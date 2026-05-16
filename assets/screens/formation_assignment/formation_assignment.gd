@@ -249,8 +249,8 @@ func on_enter() -> void:
 	# the same session. The biome_unlocked signal fires when a chained biome's
 	# Biome.unlock_after gate clears; the picker rebuilds via _show_floor_picker
 	# if currently visible.
-	if FloorUnlock.has_signal("biome_unlocked") and not FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked_dispatch):
-		FloorUnlock.biome_unlocked.connect(_on_biome_unlocked_dispatch)
+	if FloorUnlock.has_signal("biome_unlocked") and not FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked):
+		FloorUnlock.biome_unlocked.connect(_on_biome_unlocked)
 
 	# Initial render from current game state.
 	_refresh_roster_panel()
@@ -308,8 +308,8 @@ func on_exit() -> void:
 		_floor_picker_select_button.pressed.disconnect(_on_floor_picker_select_pressed)
 	if FloorUnlock.floor_unlocked.is_connected(_on_floor_unlocked):
 		FloorUnlock.floor_unlocked.disconnect(_on_floor_unlocked)
-	if FloorUnlock.has_signal("biome_unlocked") and FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked_dispatch):
-		FloorUnlock.biome_unlocked.disconnect(_on_biome_unlocked_dispatch)
+	if FloorUnlock.has_signal("biome_unlocked") and FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked):
+		FloorUnlock.biome_unlocked.disconnect(_on_biome_unlocked)
 
 	# Kill any in-flight toast tween to avoid modulating a freed node.
 	if _toast_tween != null and _toast_tween.is_valid():
@@ -676,7 +676,7 @@ func _render_floor_picker_biome_tabs() -> void:
 	# uses UIFramework.clear_children_immediate.
 	UIFrameworkScript.clear_children_immediate(_floor_picker_biome_vbox)
 
-	# Build archetype → recommended-class map (per matchup_assignment.gd:156-167).
+	# Build archetype → recommended-class map for the matchup-hint label.
 	var archetype_to_class: Dictionary[String, String] = {}
 	for class_id: String in HeroClassDatabase.get_all_ids():
 		var cls: HeroClass = HeroClassDatabase.get_by_id(class_id)
@@ -804,7 +804,7 @@ func _on_floor_unlocked(_biome_id: String, _floor_index: int) -> void:
 ## If the floor picker is visible, fully rebuild it so the new biome
 ## appears as a tab. Distinct from _on_floor_unlocked (which only
 ## re-renders the existing tabs for floor frontier changes).
-func _on_biome_unlocked_dispatch(_biome_id: String) -> void:
+func _on_biome_unlocked(_biome_id: String) -> void:
 	if _floor_picker_root != null and _floor_picker_root.visible:
 		_show_floor_picker()
 
