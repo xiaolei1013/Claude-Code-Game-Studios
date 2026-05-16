@@ -259,15 +259,20 @@ stories:
     blocker: "playtest-14 verdict"
     completed: ""
 
+  # NOTE: S23-S2 done 2026-05-16 — leveraged existing settings OVERLAY rather
+  # than authoring a separate Settings SCREEN. The overlay already had the
+  # volume sliders + reduce-motion toggle (Sprint 12 work); this story added
+  # version readout + Quit-to-Desktop + project.godot config/version setting.
+  # See CHANGELOG v0.0.0.54.
   - id: "S23-S2"
-    name: "Settings screen scaffold — audio sliders + Reduce Motion toggle + version display + Quit-to-Desktop; navigable from Pause Menu"
-    file: "assets/screens/settings/settings.tscn + .gd"
+    name: "Settings scaffold — version readout + Quit-to-Desktop appended to existing settings overlay (volume sliders + Reduce Motion already shipped Sprint 12)"
+    file: "assets/overlays/settings/settings.tscn + .gd; project.godot (config/version); tests/unit/settings_overlay/version_and_quit_test.gd (NEW)"
     priority: should-have
-    status: backlog
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 1.0
-    blocker: "S23-M2"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-16 (v0.0.0.54); 4 new tests; project.godot config/version declared; 2239/2239 PASS"
 
   - id: "S23-S3"
     name: "ClassPortrait placeholder art — 96×96 colored-block per class ID; HeroClass.portrait_path populated; third carry from S20-N1 + S21-S2"
