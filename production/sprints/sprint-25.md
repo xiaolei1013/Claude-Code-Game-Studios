@@ -126,3 +126,83 @@ Sprint 26 candidates (in priority order — provisional):
 - **Equipment / Items system** (NOT YET DESIGNED — would need a Sprint 26 GDD authoring stretch only if Sprint 25 surfaces "what's missing is item depth" as the playtest signal).
 
 **Anti-pattern to actively avoid in Sprint 26 planning**: scoping more "GDD authoring" or "test fixture hygiene" or "engine optimization" stories. The infrastructure-debt-drift memory entry is the canonical guardrail.
+
+
+---
+
+## ADDENDUM — Re-Scope After Day-0 Grep Audit (2026-05-16)
+
+**Status**: The Sprint 25 Day-0 plan above was authored 2026-05-16 with the explicit intent of "pivot to player-visible content + mechanics." However, the post-merge grep audit immediately surfaced a self-inflicted infrastructure-debt-drift mistake: **both S25-M1 (Floor Unlock implementation) and S25-M4 (Onboarding implementation) are already shipped.**
+
+### Self-audit findings
+
+**S25-M1..M3 Floor Unlock — VERIFIED-IN-PLACE**:
+- `src/core/floor_unlock_system/floor_unlock_system.gd` exists (576 lines)
+- 4 unit test files in `tests/unit/floor_unlock_system/`
+- Autoload registered as `FloorUnlock` in `project.godot`
+- Dispatch screen (`assets/screens/formation_assignment/formation_assignment.gd`) wires `FloorUnlock.is_unlocked_in_biome(biome_id, floor_index)` for floor picker button enable/disable + subscribes to `floor_unlocked` signal for live UI update + handles `"floor_locked"` validation toast
+- Orchestrator emits `floor_cleared_first_time` (verified by integration tests)
+
+**S25-M4 Onboarding — VERIFIED-IN-PLACE-BUT-DIFFERENT-SHAPE**:
+- GDD #29 §A explicitly states "**strictly diegetic** — no tutorial overlays, no 'click here' arrows, no skippable splash text."
+- The implementation that exists matches the GDD: a `first_launch` signal from `SaveLoadSystem` triggers seed states (Theron warrior, starting gold, recruitable pool, first biome unlocked). NO overlay flow. The cozy register IS the onboarding.
+- Integration test `tests/integration/onboarding/first_launch_flow_test.gd` covers the diegetic flow end-to-end.
+- A unit test `tests/unit/onboarding/no_tutorial_copy_grep_test.gd` enforces the no-overlay constraint by grepping for forbidden tutorial copy.
+
+**The Sprint 25 Day-0 plan made the exact mistake `feedback_infrastructure_debt_drift.md` warns about** — scoping "implement system X" stories without grep-first checking whether system X already exists. The plan also got Onboarding's design intent backwards: it scoped a step-paged overlay flow, which is the OPPOSITE of what GDD #29 §A specifies.
+
+### What this means
+
+The user's playtest signal ("uiux and functions are not progressing too much") was NOT about Floor Unlock or Onboarding being missing — those are working as designed. The signal is about **the existing depth not being enough to feel like progression**:
+- 1 biome with 5 floors that all use the same biome background
+- 3 classes that all play similarly
+- Programmatic-placeholder portraits/visuals
+- Repetitive matchup interactions across floors of the same biome
+- No "wow, new content" moment between floor 1 and floor 5
+
+The actual remaining work is **content expansion + visual differentiation**, not system implementation.
+
+### Revised Sprint 25 Must Haves (CONTENT ONLY)
+
+| ID (Revised) | Task | Owner | Est. | Status of Day-0 Equivalent |
+|--------------|------|-------|------|---------------------------|
+| **S25-M1-rev** | **Add second biome `moonlit_glade`** — 5 floors of content (enemies + visuals); biome background (cozy night register); LOCKED-until-forest_reach-completed gate using existing FloorUnlock biome-availability path. **Was S25-S1 in Day-0 plan; promoted to Must Have.** | game-designer + godot-gdscript-specialist | 1.5d | (Day-0 S25-S1 stays as-is) |
+| **S25-M2-rev** | **Add new class `paladin`** — cozy-tank archetype (warrior tier-2 variant); recruitable from pool; portrait via ClassPortraitFactory; updates synergy interaction space. **Was S25-S2 in Day-0 plan; promoted to Must Have.** | game-designer + godot-gdscript-specialist | 1.0d | (Day-0 S25-S2 stays as-is) |
+| **S25-M3-rev** | **Per-floor visual differentiation in `forest_reach`** — F1 is daytime forest, F2 is dusk forest, F3 is evening forest, F4 is night forest, F5 is bossfight-overcast. Same `BiomeBackground` ColorRect approach as Sprint 22 S22-M3; one color palette per floor instead of one per biome. Tests update the BiomeBackground contract test to assert per-floor selection. | game-designer + godot-gdscript-specialist | 1.0d | NEW — fills the "every floor feels the same" gap |
+| **S25-M4-rev** | **Floor unlock celebration moment** — when a player clears floor N and unlocks floor N+1, the Victory Moment screen shows a "🎉 Floor N+1 unlocked!" callout above the gold rewards block. Uses the existing `floor_unlocked` signal + `_show_toast` pattern. | godot-gdscript-specialist | 0.5d | NEW — gives the implicit "I made progress" beat a visible celebration |
+| **S25-M5-rev** | **Sprint 25 visual playtest + retro** — TWO grading axes: "I feel like the game grew between sprints" (qualitative content-progression) + "Floor 3 looks/feels different from floor 1" (per-floor differentiation). | xiaolei (human) + claude-code | 0.5d | Updated playtest axes |
+
+**Must Have total (revised)**: 4.5 days
+
+### Revised Should Have (still in scope)
+
+| ID (Revised) | Task | Est. |
+|--------------|------|------|
+| S25-S1-rev | **Add third biome `crystal_caverns`** — same shape as `moonlit_glade`; LOCKED-until-moonlit_glade-cleared. | 1.5d |
+| S25-S2-rev | **Add new class `archer`** — DPS / ranged archetype (mage tier-2 variant); recruitable; new synergy combinations. | 1.0d |
+
+### Revised Nice to Have
+
+| ID (Revised) | Task | Est. |
+|--------------|------|------|
+| S25-N1-rev | **Biome unlock fanfare** (toast + audio cue on new-biome unlock). Same as Day-0 N1. | 0.5d |
+| S25-N2-rev | **Floor lock indicator UX polish** — 🔒 icon + tooltip per GDD #16 §F. Same as Day-0 N2. | 0.5d |
+| S25-N3-rev | **First-floor differentiation in `moonlit_glade` + `crystal_caverns`** — same per-floor visual approach as S25-M3-rev applied to the new biomes. Only ship if Sprint 25 has capacity. | 1.0d |
+
+### What this addendum DEFERS (formal closure)
+
+**Day-0 S25-M1..M3 (Floor Unlock implementation)**: CLOSED as VERIFIED-IN-PLACE. The system exists, is tested, is wired to Dispatch. No further implementation work in Sprint 25.
+
+**Day-0 S25-M4 (Onboarding overlay)**: CLOSED as DESIGN-MISALIGNED. GDD #29 explicitly forbids overlay-based onboarding (diegetic-only per §A). The first-launch seed pathway IS the onboarding implementation, already shipped. No overlay work in Sprint 25.
+
+### Memory entry update
+
+Adding a new memory entry `feedback_grep_first_check_must_run_pre_planning.md`: the Sprint 25 Day-0 plan committed the exact mistake the `feedback_infrastructure_debt_drift.md` memory entry warns about, despite the entry being written in the same session by the same agent. This indicates the grep-first check needs to be a HARD step in `/sprint-plan new` (skill-level enforcement), not a soft process rule that the planner is expected to remember.
+
+### Sprint 25 Process Rule Update
+
+Adding Process Rule #6: **Before writing "implement system X" into a sprint plan, run `grep -rn "<system snake_case name>\|<SystemPascalCase>" src/ tests/` and verify NO existing implementation appears.** If results appear, the story is VERIFIED-IN-PLACE or DESIGN-MISALIGNED, not Implement-Net-New.
+
+### Acknowledgment
+
+This addendum is uncomfortable to author — it documents that I, the agent, made the exact mistake I just wrote a memory entry warning about, within minutes of writing the entry. The user's playtest signal stands: the game isn't growing. The path forward is content expansion (more biomes, classes, floor differentiation, visible progression beats), not system implementation. Sprint 25's revised Must Haves all touch content + visual surfaces the player will see.
