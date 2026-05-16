@@ -228,14 +228,14 @@ stories:
     completed: "2026-05-16 (v0.0.0.52); 13 new retired-tab tests + 8 path-update test fixes; 2230/2230 PASS; registry shrunk 7 → 6"
 
   - id: "S23-M2"
-    name: "Pause Menu modal scene — Esc key trigger; Resume / Settings / Quit-to-Guild-Hall; push_modal pattern on all screens"
-    file: "assets/screens/_modals/pause_menu.tscn + .gd"
+    name: "Pause Menu modal scene — Esc key trigger; Resume / Settings / Quit-to-Guild-Hall; push_overlay pattern wired in Screen base class"
+    file: "assets/screens/_modals/pause_menu.tscn + .gd; src/core/scene_manager/screen.gd (Esc handler); src/core/scene_manager/scene_manager.gd (registry); tests/unit/pause_menu/ (NEW)"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 0.75
     blocker: ""
-    completed: ""
+    completed: "2026-05-16 (v0.0.0.53); 5 new pause-menu tests; global Esc handler in Screen base class; 2235/2235 PASS"
 
   - id: "S23-M3"
     name: "Sprint 23 visual playtest (using _template-visual-playtest.md for M1+M2) + Sprint 23 retrospective"

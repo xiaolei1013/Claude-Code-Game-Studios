@@ -56,3 +56,7 @@ prestige_disabled_active_run_tooltip,Prestige a hero between runs.
 hall_empty_state_placeholder,No retired heroes yet.
 guild_hall_roster_tab_active,Active
 guild_hall_roster_tab_retired,Retired
+pause_menu_title,Paused
+pause_menu_resume_button,Resume
+pause_menu_settings_button,Settings
+pause_menu_quit_to_guild_hall_button,Quit to Guild Hall

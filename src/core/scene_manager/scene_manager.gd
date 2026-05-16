@@ -106,6 +106,11 @@ const _OVERLAY_CONFIRM_SAVE: PackedScene = preload("res://assets/overlays/confir
 ## Preloaded PackedScene for the Hero Detail overlay.
 const _OVERLAY_HERO_DETAIL: PackedScene = preload("res://assets/overlays/hero_detail/hero_detail.tscn")
 
+## Preloaded PackedScene for the Pause Menu overlay (Sprint 23 S23-M2).
+## Esc-key triggered from the Screen base class. Modal with Resume /
+## Settings / Quit-to-Guild-Hall actions.
+const _OVERLAY_PAUSE_MENU: PackedScene = preload("res://assets/screens/_modals/pause_menu.tscn")
+
 # ---------------------------------------------------------------------------
 # Transition timing constants (milliseconds → seconds for Tween API).
 #
@@ -367,6 +372,7 @@ func _ready() -> void:
 		"settings": _OVERLAY_SETTINGS,
 		"confirm_save": _OVERLAY_CONFIRM_SAVE,
 		"hero_detail": _OVERLAY_HERO_DETAIL,
+		"pause_menu": _OVERLAY_PAUSE_MENU,
 	}
 
 	DataRegistry.registry_ready.connect(_on_registry_ready)

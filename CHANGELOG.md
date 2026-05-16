@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.53] - 2026-05-16
+
+### Added
+- **Pause Menu modal (Sprint 23 S23-M2)** — Esc key on any player-facing screen opens a pause overlay with Resume / Settings / Quit-to-Guild-Hall actions. Modal lives at `assets/screens/_modals/pause_menu.tscn` and is registered as overlay_id `pause_menu` per ADR-0007 §push_overlay. Stacks cleanly with other modals (counter-based pause) — opens above gameplay screens, chains into the existing Settings overlay, and uses the canonical `request_screen("guild_hall")` for the quit action so save-on-transition pathways trigger naturally.
+- **Global Esc handler in `Screen` base class** — `_unhandled_input(ui_cancel)` routes Esc into the pause modal for every Screen subclass without per-screen plumbing. Guards: SceneManager must be IDLE, no freestanding modal already active, no overlay already pushed. The Pause Menu's own `_unhandled_input` handles Esc-to-dismiss and consumes the event so the base-class handler doesn't re-push.
+- **Locale (`assets/locale/en.csv`)** — `pause_menu_title`, `pause_menu_resume_button`, `pause_menu_settings_button`, `pause_menu_quit_to_guild_hall_button`.
+- **5 new tests** (`tests/unit/pause_menu/pause_menu_render_test.gd`) covering scene structure, dim backdrop, localized button text, overlay registry membership, and pressed-signal wiring.
+
+### Internal
+- `_OVERLAY_PAUSE_MENU` preload constant added to `scene_manager.gd`; `_overlay_registry` entry added under `pause_menu`.
+- Full test suite: 2235/2235 PASS.
+
 ## [0.0.0.52] - 2026-05-16
 
 ### Changed
