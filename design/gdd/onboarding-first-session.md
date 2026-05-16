@@ -304,3 +304,20 @@ Total Sprint 14 scope: ~1.0d. Smaller than the typical first-pass GDD because mo
 **Pull trigger** (V1.5+): if a future playtest, beta cohort, or onboarding-completion telemetry surfaces a measurable first-session drop-off or a player complaint about the 5-minute flow, re-open this story with the specific signal as the design brief. Until then, the existing flow is "good enough by the playtest-driven closure rule."
 
 **Audit closure reference**: `production/sprints/sprint-18.md` S18-S1 (closed 2026-05-14) + `production/retrospectives/sprint-17-retrospective-2026-05-14.md` action item #3 final disposition.
+
+---
+
+## K — Sprint 24 S24-S2 Re-Discovery Audit (2026-05-16)
+
+**Status**: VERIFIED-IN-PLACE. Sprint 24 S24-S2 was scoped as "author the Onboarding First-Session GDD per 8-section template; implementation deferred to Sprint 25+." Grep before authoring (per Sprint 24 Process Rule #3 — "honest dependency status check") surfaced this existing GDD: 8 sections + 2 supplemental sections + 14 ACs + 6 OQs + 4-story implementation sequencing, authored 2026-05-06, and the §J retirement note confirms the system is shipped and working as of Sprint 18.
+
+**Sprint 24 S24-S2 closure**: design-only scope already satisfied by this pre-existing GDD. No new authoring needed. The S24-M3 process rule fired correctly — without the grep-first check, S24-S2 would have produced a duplicate GDD that drifted from the live spec.
+
+**What this closure does NOT do**:
+- Does NOT retroactively re-validate the existing ACs against current code (those were validated when shipped + reaffirmed by the Sprint 17 S17-M6 playtest).
+- Does NOT trigger any code changes. S24-S2 was design-only by design; this audit confirms the design exists.
+- Does NOT change the Sprint 25+ epic recommendation. If Sprint 25 picks up onboarding work, the existing §H ACs are the contract.
+
+**Lesson for future planning**: GDD authoring stories should grep `design/gdd/*.md` first to verify the GDD doesn't already exist. The systems-index.md row 29 has been showing "DRAFT 2026-05-06" since the original authoring — that's the canonical signal. The Sprint 24 plan missed this signal when scoping S24-S2.
+
+**Sprint 24 retro carries this as a process learning**: "Before scoping a 'author GDD X' story, grep `design/gdd/` for the slug and check systems-index.md for the row. If the GDD exists at any draft status, the story is verification-only, not authorship."
