@@ -81,10 +81,9 @@ const _SCREEN_VICTORY_MOMENT: PackedScene = preload("res://assets/screens/victor
 const _SCREEN_RETURN_TO_APP: PackedScene = preload("res://assets/screens/return_to_app/return_to_app.tscn")
 # Sprint 22 S22-M2: matchup_assignment folded into formation_assignment as
 # the in-screen Floor Picker overlay; standalone screen + registry entry removed.
-## Sprint 21+ Prestige V1.0 / Story 3 UI (Slice B) — Hall of Retired Heroes.
-## Reachable from Guild Hall when `HeroRoster.get_prestige_count() > 0`.
-## Per `design/gdd/prestige-system.md` §F + AC-PR-13.
-const _SCREEN_HALL_OF_RETIRED_HEROES: PackedScene = preload("res://assets/screens/hall_of_retired_heroes/hall_of_retired_heroes.tscn")
+# Sprint 23 S23-M1: hall_of_retired_heroes folded into guild_hall as the
+# Retired tab on the RosterPanel TabContainer; standalone screen + registry
+# entry removed. Per `design/gdd/prestige-system.md` §F + AC-PR-13.
 
 ## Path to the scene manager tuning-knob config resource.
 ## Loaded at _ready() time; consumed by Stories 005/009.
@@ -208,7 +207,6 @@ var _screen_registry: Dictionary = {
 	"dungeon_run_view": _SCREEN_DUNGEON_RUN_VIEW,
 	"victory_moment": _SCREEN_VICTORY_MOMENT,
 	"return_to_app": _SCREEN_RETURN_TO_APP,
-	"hall_of_retired_heroes": _SCREEN_HALL_OF_RETIRED_HEROES,
 }
 
 ## Placeholder queue slot for requests arriving while in UNINITIALIZED state.

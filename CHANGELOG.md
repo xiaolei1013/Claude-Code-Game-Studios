@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.52] - 2026-05-16
+
+### Changed
+- **Hall of Retired Heroes → Retired tab on Guild Hall (Sprint 23 S23-M1)** — retired the standalone `hall_of_retired_heroes` screen and folded its content into a new Active/Retired TabContainer on Guild Hall's RosterPanel. Behavior preserved verbatim: multiplier badge (`×N.NN`, AC-PR-13), retired-hero card list with the writer-locked `%s · %s · Lv %d · Retired Day %d` format, cozy empty-state ("No retired heroes yet."), and live re-render on `prestige_completed_signal`.
+  - `_screen_registry` shrunk **7 → 6 entries** (`hall_of_retired_heroes` removed). Sprint 22's 10 → 7 consolidation continues 7 → 6 in Sprint 23.
+  - `_SCREEN_HALL_OF_RETIRED_HEROES` preload constant removed from `scene_manager.gd`.
+  - Hall visibility gating dropped — the Retired tab is always visible, with an empty-state placeholder when no heroes have been prestiged. Removes a "feature exists but never wired"-class gap and lets the player discover the prestige reward surface.
+- **Locale (`assets/locale/en.csv`)** — added `guild_hall_roster_tab_active`, `guild_hall_roster_tab_retired`. Removed `hall_back_button_label` and `guild_hall_open_hall_button_label` (no longer reachable). Existing keys (`hall_of_retired_heroes_title`, `hall_card_metadata_format`, `hall_empty_state_placeholder`) carry over to the tab rendering.
+- **`_refresh_roster_panel` immediate detach pattern** — switched from `queue_free`-only to `remove_child + queue_free` so back-to-back rebuilds within a single frame (e.g., `hero_recruited` firing during `on_enter`) don't double-stack cards. Mirrors the pattern used in the new `_refresh_retired_card_list`. This also fixes the latent intermittent flake in `tests/integration/guild_hall/roster_panel_test.gd::test_hero_recruited_signal_refreshes_roster_panel`.
+
+### Removed
+- `assets/screens/hall_of_retired_heroes/hall_of_retired_heroes.tscn`
+- `assets/screens/hall_of_retired_heroes/hall_of_retired_heroes.gd` (+ .uid sidecar)
+- `tests/unit/hall_of_retired_heroes/hall_render_test.gd` (+ .uid sidecar) — content ported into `tests/unit/guild_hall/retired_tab_render_test.gd` (13 tests covering tab structure, multiplier rendering, card list rebuild, empty-state, live re-render, and toast behavior)
+- `tests/unit/guild_hall/hall_button_visibility_test.gd` (+ .uid sidecar) — visibility gating no longer applies; toast tests ported into `retired_tab_render_test.gd`
+
+### Internal
+- `tests/integration/scene_manager/request_screen_and_node_swap_test.gd` — `test_screen_registry_has_seven_entries` renamed to `_has_six_entries`; assertion 7 → 6; `hall_of_retired_heroes` removed from `expected_paths` dict
+- `tests/integration/guild_hall/roster_panel_test.gd` — 8 path strings updated to `RosterPanel/RosterTabs/Active/RosterScroll/RosterList`; `test_hero_card_has_xp_progress_bar_with_correct_fraction` hardened to clear default heroes first (the prior version relied on `sort_custom` tie-break ordering, which is not stable in Godot 4 — exposed by the structural M1 change)
+- `tests/unit/guild_hall/guild_hall_theme_application_test.gd` — path updated to the new Active-tab structure
+- GDD `design/gdd/prestige-system.md` §C.4 updated to reflect the tab-on-Guild-Hall surface
+- GDD `design/gdd/guild-hall-screen.md` §F.V1.0 progression-layer additions updated accordingly
+- Full test suite: 2230/2230 PASS (no errors, no failures, no flakes).
+
 ## [0.0.0.51] - 2026-05-15
 
 ### Removed
