@@ -49,6 +49,10 @@ class_synergy_effect_steel_wall,+25% gold vs bruisers
 class_synergy_effect_arcane_elite,+20% XP from all kills
 class_synergy_effect_triple_strike,+25% gold vs armored
 class_synergy_effect_triple_threat,+15% gold from all kills
+class_synergy_effect_bastion,+25% gold vs casters
+class_synergy_effect_volley,+25% gold vs swarm
+class_synergy_effect_frenzy,+25% gold vs bruisers
+class_synergy_effect_vigil,+20% XP from all kills
 prestige_button_label,Prestige Hero
 prestige_confirmation_modal_body,"%s has earned their retirement. They'll join the Hall of Retired Heroes — your guild will remember them, and every future run will earn +5% more gold and XP, forever."
 prestige_confirmation_button_confirm,Prestige Hero
@@ -76,3 +80,4 @@ synergy_tier_silver,Silver
 synergy_tier_gold,Gold
 synergy_tier_platinum,Platinum
 synergy_preview_tiered_format,Synergy: %s (%s)
+synergy_preview_tiered_format_with_effect,Synergy: %s (%s) — %s

@@ -134,3 +134,70 @@ func test_synergy_preview_label_renders_gold_tier_for_three_warriors() -> void:
 # Note (Sprint 24 S24-M3): tier-mapper tests (AC-CS-22..25) moved to
 # tests/unit/ui_framework/ui_framework_helpers_test.gd Groups F+G, where
 # the synergy_id_to_tier helper now lives.
+
+
+# ===========================================================================
+# Group D — Effect text rendering (Sprint 27 M1)
+#
+# The preview label now answers BOTH "what synergy is active?" AND "what
+# does it do?" in one line. Effect text comes from class_synergy_effect_<id>
+# locale keys (already shipped in en.csv since V1; surfaced in UI here).
+# ===========================================================================
+
+func test_synergy_preview_label_renders_steel_wall_effect_text() -> void:
+	# Arrange — 3 warriors → Steel Wall
+	_seed_three_warriors()
+
+	# Act
+	var screen: Node = FormationAssignmentScene.instantiate()
+	add_child(screen)
+	auto_free(screen)
+	screen.on_enter()
+
+	# Assert — label contains the effect text (writer-locked: "+25% gold vs bruisers")
+	var label_text: String = screen._synergy_preview_label.text
+	var expected_effect: String = tr("class_synergy_effect_steel_wall")
+	assert_bool(label_text.contains(expected_effect)).override_failure_message(
+		"Expected preview to contain effect text '%s' for Steel Wall; got '%s'"
+		% [expected_effect, label_text]
+	).is_true()
+
+
+func test_synergy_preview_label_includes_em_dash_separator_for_effect() -> void:
+	# Arrange — 3 warriors → Steel Wall fires
+	_seed_three_warriors()
+
+	# Act
+	var screen: Node = FormationAssignmentScene.instantiate()
+	add_child(screen)
+	auto_free(screen)
+	screen.on_enter()
+
+	# Assert — separator "—" appears between display name and effect
+	# Format: "Synergy: Gold (Steel Wall) — +25% gold vs bruisers"
+	assert_bool(screen._synergy_preview_label.text.contains("—")).override_failure_message(
+		"Expected preview to contain em-dash separator '—' between display name and effect; "
+		+ "got '%s'" % screen._synergy_preview_label.text
+	).is_true()
+
+
+func test_synergy_preview_label_no_effect_text_when_no_synergy() -> void:
+	# Arrange — clear the roster so no synergy is possible
+	for h_v: Variant in HeroRoster.get_all_heroes():
+		HeroRoster._heroes.erase(int(h_v.get("instance_id")))
+	for slot: int in range(3):
+		HeroRoster.set_formation_slot(slot, 0)
+
+	# Act
+	var screen: Node = FormationAssignmentScene.instantiate()
+	add_child(screen)
+	auto_free(screen)
+	screen.on_enter()
+
+	# Assert — "Synergy: None" format does NOT include effect text
+	# (None state uses synergy_preview_none_format, no effect column).
+	# The em-dash separator should NOT appear in the no-synergy state.
+	assert_bool(screen._synergy_preview_label.text.contains("—")).override_failure_message(
+		"Did not expect em-dash in no-synergy preview text; got '%s'"
+		% screen._synergy_preview_label.text
+	).is_false()
