@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="HeroClass" format=3 uid="uid://b2paladinmvp001"]
+[gd_resource type="Resource" script_class="HeroClass" format=3 uid="uid://b7bbs1blwjes3"]
 
 [ext_resource type="Script" uid="uid://dvm75u02lhnb8" path="res://src/core/hero_class_database/hero_class.gd" id="1_hcpal"]
 
