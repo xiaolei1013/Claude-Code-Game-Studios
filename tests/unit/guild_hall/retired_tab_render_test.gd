@@ -20,6 +20,10 @@
 extends GdUnitTestSuite
 
 const GuildHallScene = preload("res://assets/screens/guild_hall/guild_hall.tscn")
+const HeroRosterFixture = preload("res://tests/helpers/hero_roster_test_fixture.gd")
+
+
+var _snapshot_roster: Dictionary = {}
 
 
 func _make_guild_hall() -> Node:
@@ -36,15 +40,13 @@ func _seed_records(records: Array[Dictionary]) -> void:
 
 
 func before_test() -> void:
-	HeroRoster._prestige_count = 0
-	HeroRoster._prestige_multiplier = 1.0
-	HeroRoster._retired_hero_records.clear()
+	# Sprint 24 S24-S3 — snapshot+reset via fixture (replaces inline boilerplate).
+	_snapshot_roster = HeroRosterFixture.snapshot_via_save_data()
+	HeroRosterFixture.reset_hero_roster()
 
 
 func after_test() -> void:
-	HeroRoster._prestige_count = 0
-	HeroRoster._prestige_multiplier = 1.0
-	HeroRoster._retired_hero_records.clear()
+	HeroRosterFixture.restore_via_load_save_data(_snapshot_roster)
 
 
 # ===========================================================================

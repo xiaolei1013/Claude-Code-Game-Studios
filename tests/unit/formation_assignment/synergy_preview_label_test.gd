@@ -13,38 +13,24 @@ const FormationAssignmentScene = preload(
 	"res://assets/screens/formation_assignment/formation_assignment.tscn"
 )
 const HeroInstanceScript = preload("res://src/core/hero_roster/hero_instance.gd")
+const HeroRosterFixture = preload("res://tests/helpers/hero_roster_test_fixture.gd")
 
 
 var _snapshot_roster: Dictionary = {}
 
 
 func before_test() -> void:
-	var roster: Node = get_tree().root.get_node_or_null("HeroRoster")
-	_snapshot_roster = roster.get_save_data() if roster != null else {}
+	# Sprint 24 S24-S3 — fixture handles snapshot+reset in one step.
+	_snapshot_roster = HeroRosterFixture.snapshot_via_save_data()
 
 
 func after_test() -> void:
-	var roster: Node = get_tree().root.get_node_or_null("HeroRoster")
-	if roster != null and not _snapshot_roster.is_empty():
-		roster.load_save_data(_snapshot_roster)
+	HeroRosterFixture.restore_via_load_save_data(_snapshot_roster)
 
 
 func _seed_three_warriors() -> Array[int]:
-	# Erase existing heroes so the seeded warriors are unambiguously the
-	# only members of the roster.
-	var roster: Node = HeroRoster
-	for h_v: Variant in roster.get_all_heroes():
-		HeroRoster._heroes.erase(int(h_v.get("instance_id")))
-	var ids: Array[int] = []
-	for i: int in range(3):
-		var inst: RefCounted = roster.call("add_hero", "warrior")
-		if inst != null:
-			ids.append(int(inst.get("instance_id")))
-	# Assign each warrior to a formation slot 0..2.
-	for slot: int in range(3):
-		if slot < ids.size():
-			HeroRoster.set_formation_slot(slot, ids[slot])
-	return ids
+	HeroRosterFixture.reset_hero_roster()
+	return HeroRosterFixture.seed_warriors(3)
 
 
 # ===========================================================================
