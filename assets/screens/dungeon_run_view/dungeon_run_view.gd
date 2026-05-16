@@ -175,11 +175,17 @@ func on_enter() -> void:
 	_run_end_overlay.visible = false
 
 	# Sprint 19 S19-M3 — set the biome background to match the active dispatch.
+	# Sprint 25 S25-M3-rev — pass the dispatched floor_index so the boss floor
+	# (F5) renders with a darkened palette per BiomeBackground's per-floor
+	# modulation. Regular floors (F1–F4) render at baseline brightness.
 	# DungeonRunOrchestrator.get_dispatched_biome_id() returns "" when no run
-	# is active (e.g. dev navigation into DRV); BiomeBackground.set_biome("")
-	# falls back to forest_reach per its own contract (GDD #26 §E + AC-26-12).
+	# is active (e.g. dev navigation into DRV); BiomeBackground falls back to
+	# forest_reach per its own contract (GDD #26 §E + AC-26-12).
 	if _biome_background != null:
-		_biome_background.set_biome(DungeonRunOrchestrator.get_dispatched_biome_id())
+		_biome_background.set_biome_for_floor(
+			DungeonRunOrchestrator.get_dispatched_biome_id(),
+			DungeonRunOrchestrator.get_dispatched_floor_index()
+		)
 
 	# Subscribe to tick_fired — 20 Hz hot path.
 	# Idempotent via is_connected guard (defensive; SceneManager guarantees

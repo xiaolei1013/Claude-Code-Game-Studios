@@ -277,6 +277,23 @@ func get_dispatched_biome_id() -> String:
 	return _dispatched_biome_id
 
 
+## Returns the floor_index captured at dispatch() entry, or 0 if no run is
+## active. Sprint 25 S25-M3-rev — exposes the dispatched floor for screens
+## that need per-floor visual modulation (DungeonRunView passes this to
+## BiomeBackground.set_biome_for_floor so the boss floor visually reads as
+## distinct from regular floors).
+##
+## Usage:
+## [codeblock]
+##   var biome: String = DungeonRunOrchestrator.get_dispatched_biome_id()
+##   var floor_idx: int = DungeonRunOrchestrator.get_dispatched_floor_index()
+##   if not biome.is_empty():
+##       biome_background.set_biome_for_floor(biome, floor_idx)
+## [/codeblock]
+func get_dispatched_floor_index() -> int:
+	return _dispatched_floor_index
+
+
 # ---------------------------------------------------------------------------
 # Offline replay infrastructure — Sprint 11 S11-X7 / OfflineProgressionEngine
 # GDD §F + OQ-OE-6 lockstep. Mirrors the Economy shape from S11-X6 / ADR-0013
