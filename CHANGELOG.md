@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.56] - 2026-05-16
+
+### Verified (S23-N1 — Audio MVP bootstrap closure)
+- **AudioRouter MVP wiring** was implemented in Sprint 12 S12-M6 (Stories 3–5). Sprint 23 S23-N1 closes the story as **verified-in-place** rather than reauthored — all three MVP contract surfaces are wired and the integration test asserts them end-to-end:
+  - `AudioRouter._on_screen_changed("guild_hall")` → `play_music(&"music_guild_hall_bed")` (silent in MVP until the music asset lands; the routing call is on the play log)
+  - `UIFramework.wire_touch_feedback(button)` → press-time `play_sfx(&"sfx_ui_tap")` (the "ui_confirm" surface in the N1 plan)
+  - Settings volume sliders (`set_music_volume_db` / `set_sfx_volume_db`) round-trip through AudioRouter getters; the Master/Music/SFX bus volumes are observable
+- **4 new tests** (`tests/integration/audio_router/n1_mvp_contract_test.gd`) lock in the N1 contract. The pre-existing AudioRouter test suite (`tests/unit/audio_router/`) covers the per-signal handler behavior; this new file is the explicit end-to-end gate.
+
+### Internal
+- Sprint 23 N1 documented as a verification-only closure in `production/sprint-status.yaml`. The AudioRouter subsystem is unchanged.
+- Full test suite: 2250/2250 PASS.
+
 ## [0.0.0.55] - 2026-05-16
 
 ### Added

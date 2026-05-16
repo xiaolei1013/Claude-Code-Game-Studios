@@ -286,15 +286,20 @@ stories:
 
   # ===== Nice to Have =====
 
+  # NOTE: S23-N1 closed 2026-05-16 as verification-only — AudioRouter MVP
+  # wiring (screen_changed → music_guild_hall_bed, wire_touch_feedback →
+  # sfx_ui_tap, Settings slider round-trip) was already implemented in
+  # Sprint 12 S12-M6. New integration test n1_mvp_contract_test.gd locks in
+  # the end-to-end contract. See CHANGELOG v0.0.0.56.
   - id: "S23-N1"
-    name: "Audio MVP bootstrap — AudioRouter autoload + guild_hall_ambient loop + ui_confirm cue; signal-driven per Audio System GDD"
-    file: "src/core/audio_router/ + assets/audio/"
+    name: "Audio MVP bootstrap — VERIFIED-IN-PLACE; AudioRouter (S12-M6) already wires screen_changed → guild_hall_bed + wire_touch_feedback → sfx_ui_tap + Settings slider round-trip"
+    file: "src/core/audio_router/ (no-change); tests/integration/audio_router/n1_mvp_contract_test.gd (NEW)"
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 1.5
-    blocker: "S23-M1, S23-M2, S23-M3, S23-S2"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-16 (v0.0.0.56); verification-only closure; 4 new end-to-end contract tests; 2250/2250 PASS"
 
   - id: "S23-N2"
     name: "Class Synergy V2 — passive synergy preview panel on Dispatch screen; live tier display as heroes are slotted"
