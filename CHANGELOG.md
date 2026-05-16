@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.59] - 2026-05-16
+
+### Fixed (post-`/simplify + /review` pass on the Sprint 23 stack)
+- **`project.godot config/version` bumped to `0.0.0.59`** — was stale at `0.0.0.53` (the value declared when S23-S2 first added the setting), which would have rendered "Version 0.0.0.53" in the Settings overlay to every player.
+- **Pause Menu Esc no longer dismisses pause when Settings is chained on top** — added a `SceneManager.topmost_overlay_id() != "pause_menu"` guard so the pause-menu Esc handler defers to whatever overlay sits above it. Prior behavior: opening Settings from the pause menu and pressing Esc popped pause first, orphaning Settings on a resumed game.
+- **`Screen._unhandled_input` no longer reads SceneManager privates via string reflection** — replaced `.get("_active_freestanding_modals")` / `.get("_active_overlays")` with new typed getters `SceneManager.active_freestanding_modal_count()` / `active_overlay_count()` / `topmost_overlay_id()`. Renaming the privates now fails the compile rather than silently breaking the Esc gate.
+- **`settings_quit_to_desktop_button` locale key is now wired** — `_quit_to_desktop_button.text = tr(...)` in `settings.gd._ready`. Key was previously defined in `en.csv` but unused (button text was hardcoded in the .tscn).
+- **`prestige-system.md` §F.2 + §J cross-reference rows updated** — was still describing the removed "Hall of Retired Heroes button + visibility gating"; now references the Retired tab on the RosterPanel (always visible, empty-state placeholder when no retirees).
+
+### Changed (post-`/simplify` quality polish)
+- **`ROSTER_LIST_PATH` constant hoisted in `tests/integration/guild_hall/roster_panel_test.gd`** — was duplicated literally 8 times; future scene reshuffles now touch one location.
+- **`_clear_container_immediate(container)` helper extracted in `guild_hall.gd`** — `_refresh_roster_panel` and `_refresh_retired_card_list` both implemented the same `for child in get_children: remove_child + queue_free` idiom; consolidated to one private helper. The 5-line "queue_free is deferred" comment moved onto the helper itself.
+
+### Internal
+- `tests/integration/scene_manager/formation_assignment_screen_test.gd` — path collateral from S23-N2's `FormationVBox` wrapper (one `FormationPanel/SlotsHBox` → `FormationPanel/FormationVBox/SlotsHBox`); brought to parity with the other two formation tests.
+- New SceneManager public API: `active_overlay_count() -> int`, `active_freestanding_modal_count() -> int`, `topmost_overlay_id() -> String`. All three are pure read-only accessors over existing private state.
+- Full test suite: 2253/2253 PASS (0 errors, 0 failures, 0 flaky).
+
+## [0.0.0.58] - 2026-05-16
+
+### Closed
+- **Sprint 22 + Sprint 23 playtest gates PASS** — tester walked the post-Sprint-23 build end-to-end on 2026-05-16. Both playtest-14 (Sprint 22 clarity) and playtest-15 (Sprint 23 consolidation finish + pause/settings polish + portraits + synergy preview) graded PASS on all 5 per-check rows. Tester verdict: *"playtest is done. its working"*.
+- **Sprint 22 retro flipped DRAFT → COMMITTED** at `production/retrospectives/sprint-22-retrospective-2026-05-15.md`. Sprint Goal MET.
+- **Sprint 23 retro flipped DRAFT → COMMITTED** at `production/retrospectives/sprint-23-retrospective-2026-05-16.md`. Sprint Goal MET. All 3 Must Haves + 2 Should Haves + 2 Nice to Haves shipped.
+- **S23-S1 dropped to advisory polish** — playtest-14 graded items c/d/e (the conditional clarity items) all PASS, so the M4 clarity follow-up is not scope-mandated. Carried to Sprint 24 as Nice-to-Have.
+
+### Internal
+- `production/sprint-status.yaml`: S22-M5 → done; S23-M3 → done; S23-S1 → deferred (advisory).
+- `production/session-state/active.md` updated; both playtest reports and both retros now reflect their final state.
+
 ## [0.0.0.57] - 2026-05-16
 
 ### Added

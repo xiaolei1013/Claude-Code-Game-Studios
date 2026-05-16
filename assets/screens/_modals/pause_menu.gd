@@ -49,10 +49,19 @@ func _ready() -> void:
 ## Handles Esc inside the pause modal itself — Esc dismisses (acts as Resume).
 ## The pause modal's own Esc handling is intentional: without it, the Screen
 ## base class's `_unhandled_input` would route Esc back to itself in a loop.
+##
+## Guard: only dismiss when this modal is the TOPMOST overlay. When the
+## player chains pause → Settings, Settings is topmost; the pause-menu
+## Esc handler must NOT fire underneath and pop pause while Settings
+## stays orphaned on a resumed game. The topmost-overlay check defers
+## Esc to whatever overlay sits above us.
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel"):
-		get_viewport().set_input_as_handled()
-		_dismiss()
+	if not event.is_action_pressed("ui_cancel"):
+		return
+	if SceneManager.topmost_overlay_id() != "pause_menu":
+		return
+	get_viewport().set_input_as_handled()
+	_dismiss()
 
 
 func _on_resume_pressed() -> void:

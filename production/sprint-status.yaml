@@ -238,26 +238,29 @@ stories:
     completed: "2026-05-16 (v0.0.0.53); 5 new pause-menu tests; global Esc handler in Screen base class; 2235/2235 PASS"
 
   - id: "S23-M3"
-    name: "Sprint 23 visual playtest (using _template-visual-playtest.md for M1+M2) + Sprint 23 retrospective"
-    file: "production/playtests/playtest-15-sprint-23-*.md + production/retrospectives/sprint-23-retrospective-*.md"
+    name: "Sprint 23 visual playtest + retrospective"
+    file: "production/playtests/playtest-15-sprint-23-consolidation-2026-05-16.md (PASS); production/retrospectives/sprint-23-retrospective-2026-05-16.md (COMMITTED)"
     priority: must-have
-    status: backlog
+    status: done
     owner: "xiaolei (human) + claude-code"
     estimate_days: 0.5
-    blocker: "S23-M1 + S23-M2"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-16 — playtest-15 PASS on all 5 checks; tester verdict: \"playtest is done. its working\"; Sprint 23 retro committed (DRAFT → final)"
 
   # ===== Should Have =====
 
+  # NOTE: S23-S1 dropped to advisory polish 2026-05-16 — playtest-14 graded
+  # all 5 clarity checks PASS (including items c/d/e), so the M4 clarity
+  # follow-up is NOT scope-mandated. Carried to Sprint 24 as Nice-to-Have.
   - id: "S23-S1"
-    name: "M4 clarity follow-up — empty states + tap-target verification (≥44×44) + Primary Button on CTAs; scope conditional on playtest-14 verdict"
+    name: "M4 clarity follow-up — DROPPED TO ADVISORY per playtest-14 PASS (items c/d/e all graded PASS); carried to Sprint 24 as Nice-to-Have"
     file: "assets/screens/*/*.tscn"
-    priority: should-have
-    status: backlog
+    priority: nice-to-have
+    status: deferred
     owner: "godot-gdscript-specialist"
     estimate_days: 1.0
-    blocker: "playtest-14 verdict"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-16 — DEFERRED to Sprint 24 backlog (advisory polish, not gated)"
 
   # NOTE: S23-S2 done 2026-05-16 — leveraged existing settings OVERLAY rather
   # than authoring a separate Settings SCREEN. The overlay already had the
@@ -324,7 +327,7 @@ stories:
 #   S22-M2 matchup→Dispatch: status: done (PR #127, v0.0.0.48)
 #   S22-M3 biome backgrounds: status: done (PR #128, v0.0.0.49)
 #   S22-M4 clarity polish: status: done (PR #129, v0.0.0.50)
-#   S22-M5 playtest+retro: status: in-progress (playtest-14 PENDING; retro DRAFT)
+#   S22-M5 playtest+retro: status: done 2026-05-16 (playtest-14 PASS on all 5 checks; sprint-22 retro DRAFT → final)
 #   S22-S1 playtest template: status: done (bundled in M5 PR)
 #   S22-S2 hall→tab: status: carried → S23-M1
 #   S22-S3 pause modal: status: carried → S23-M2

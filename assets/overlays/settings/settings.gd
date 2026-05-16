@@ -81,7 +81,9 @@ func _ready() -> void:
 	_close_button.pressed.connect(_on_close_pressed)
 	_dim_backdrop.gui_input.connect(_on_backdrop_input)
 
-	# Sprint 23 S23-S2 — Quit-to-Desktop + version readout.
+	# Sprint 23 S23-S2 — Quit-to-Desktop + version readout. Button label
+	# routes through tr() for locale parity with other Settings rows.
+	_quit_to_desktop_button.text = tr("settings_quit_to_desktop_button")
 	_quit_to_desktop_button.pressed.connect(_on_quit_to_desktop_pressed)
 	_refresh_version_label()
 

@@ -102,12 +102,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if SceneManager == null or SceneManager.state != SceneManager.State.IDLE:
 		return
 	# Freestanding modals (Hero Detail, MidRunReassign, …) own Esc themselves.
-	var freestanding: Array = SceneManager.get("_active_freestanding_modals") as Array
-	if freestanding != null and not freestanding.is_empty():
+	if SceneManager.active_freestanding_modal_count() > 0:
 		return
 	# Don't re-push if pause_menu (or any overlay) is already active.
-	var actives: Dictionary = SceneManager.get("_active_overlays") as Dictionary
-	if actives != null and not actives.is_empty():
+	if SceneManager.active_overlay_count() > 0:
 		return
 	get_viewport().set_input_as_handled()
 	SceneManager.push_overlay("pause_menu", true)
