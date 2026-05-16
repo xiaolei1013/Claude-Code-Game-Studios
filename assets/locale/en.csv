@@ -64,3 +64,9 @@ settings_version_label_format,Version %s
 settings_quit_to_desktop_button,Quit to Desktop
 synergy_preview_none_format,Synergy: %s
 synergy_preview_none_label,None
+synergy_tier_none,None
+synergy_tier_bronze,Bronze
+synergy_tier_silver,Silver
+synergy_tier_gold,Gold
+synergy_tier_platinum,Platinum
+synergy_preview_tiered_format,Synergy: %s (%s)
