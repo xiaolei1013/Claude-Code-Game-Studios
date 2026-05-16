@@ -402,3 +402,49 @@ func test_synergy_id_to_tier_unknown_returns_none_defensive() -> void:
 	# AC-CS-25
 	assert_str(UIFrameworkScript.synergy_id_to_tier("nonexistent_synergy")).is_equal("none")
 	assert_str(UIFrameworkScript.synergy_id_to_tier("future_v25_id")).is_equal("none")
+
+
+# ===========================================================================
+# Group H — tier-2 mono-class synergies tier mapping
+#
+# Each tier-2 class's 3-of-a-kind synergy maps to Gold tier — same as the
+# V1 mono-class set. Hoisted from tier2_synergy_multipliers_test.gd where
+# they were originally collocated with the orchestrator multiplier tests.
+# ===========================================================================
+
+func test_synergy_id_to_tier_bastion_returns_gold() -> void:
+	assert_str(UIFrameworkScript.synergy_id_to_tier("bastion")).is_equal("gold")
+
+
+func test_synergy_id_to_tier_volley_returns_gold() -> void:
+	assert_str(UIFrameworkScript.synergy_id_to_tier("volley")).is_equal("gold")
+
+
+func test_synergy_id_to_tier_frenzy_returns_gold() -> void:
+	assert_str(UIFrameworkScript.synergy_id_to_tier("frenzy")).is_equal("gold")
+
+
+func test_synergy_id_to_tier_vigil_returns_gold() -> void:
+	assert_str(UIFrameworkScript.synergy_id_to_tier("vigil")).is_equal("gold")
+
+
+# ===========================================================================
+# Group I — synergy_effect_text helper
+#
+# Effect text lookup for the writer-locked class_synergy_effect_<id>
+# locale keys. Centralizes the locale-key convention so guild_hall.gd +
+# formation_assignment.gd badge/preview-label call sites don't each
+# build the key string inline.
+# ===========================================================================
+
+func test_synergy_effect_text_returns_steel_wall_writer_locked_string() -> void:
+	# Validates V1 path. Resolves to "+25% gold vs bruisers" via en.csv
+	# OR to the key verbatim if en.csv isn't loaded — both are non-empty.
+	var result: String = UIFrameworkScript.synergy_effect_text("steel_wall")
+	assert_int(result.length()).is_greater(0)
+
+
+func test_synergy_effect_text_returns_empty_for_empty_synergy_id() -> void:
+	# No synergy → no effect to render. Empty input → empty output (defensive
+	# parallel to synergy_display_name's empty-id branch).
+	assert_str(UIFrameworkScript.synergy_effect_text("")).is_equal("")

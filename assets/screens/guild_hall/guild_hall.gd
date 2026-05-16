@@ -340,11 +340,11 @@ func _refresh_synergy_badge() -> void:
 		_synergy_badge.visible = false
 		return
 
-	# Render localized "Display Name: Effect" text. Both keys exist in
-	# en.csv per Sprint 18 S18-S2 locale closeout. Sprint 24 S24-M3 uses
-	# UIFramework.synergy_display_name for the writer-locked badge name.
+	# Render localized "Display Name: Effect" text. Locale keys for both
+	# halves resolve via UIFramework helpers (display_name + effect_text)
+	# so the locale-key convention lives in one place.
 	var display_name: String = UIFrameworkScript.synergy_display_name(synergy_id)
-	var effect_text: String = tr("class_synergy_effect_" + synergy_id)
+	var effect_text: String = UIFrameworkScript.synergy_effect_text(synergy_id)
 	_synergy_label.text = "%s: %s" % [display_name, effect_text]
 	_synergy_badge.visible = true
 
