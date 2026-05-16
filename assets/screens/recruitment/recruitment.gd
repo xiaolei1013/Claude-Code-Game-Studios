@@ -152,6 +152,35 @@ func _refresh_pool_panel() -> void:
 			continue
 		entry.visible = true
 		_render_pool_entry(entry, i, pool[i])
+	# Sprint 24 S24-S1 — empty-state copy: when ALL pool slots are hidden
+	# (pool.size() == 0), render a placeholder Label so the panel doesn't
+	# look broken. Defensive: a healthy pool is repopulated via the refresh
+	# button, but in mid-state (e.g., just recruited the last entry) the
+	# panel renders empty. Cozy-register placeholder instead of a "black"
+	# panel.
+	_refresh_empty_state_placeholder(pool.is_empty())
+
+
+func _refresh_empty_state_placeholder(show_placeholder: bool) -> void:
+	var vbox: VBoxContainer = _pool_panel.get_node_or_null("PoolVBox") as VBoxContainer
+	if vbox == null:
+		return
+	var placeholder: Label = vbox.get_node_or_null("EmptyPoolPlaceholder") as Label
+	if show_placeholder:
+		if placeholder == null:
+			# Lazy-create on first empty-state render. Programmatic per
+			# advisory-polish scope (.tscn surgery deferred — the placeholder
+			# is a single Label, not a complex empty-state graphic).
+			placeholder = Label.new()
+			placeholder.name = "EmptyPoolPlaceholder"
+			placeholder.text = tr("recruit_pool_empty_placeholder")
+			placeholder.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			placeholder.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			vbox.add_child(placeholder)
+		placeholder.visible = true
+	else:
+		if placeholder != null:
+			placeholder.visible = false
 
 
 func _render_pool_entry(entry: Control, pool_index: int, class_id: String) -> void:
