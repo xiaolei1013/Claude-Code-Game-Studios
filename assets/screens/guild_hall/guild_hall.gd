@@ -6,17 +6,23 @@
 ## placeholder with the real Guild Hall content.
 ##
 ## Sprint 21+ Prestige V1.0 / Story 3 UI (Slice B): adds the
-## "Hall of Retired Heroes" entry button, visibility-gated on
-## `HeroRoster.get_prestige_count() > 0` per
-## `design/gdd/prestige-system.md` §F.
+## "Hall of Retired Heroes" content as a Retired tab on the RosterPanel.
+##
+## Sprint 23 S23-M1: hall_of_retired_heroes retired as a standalone screen.
+## Its title + multiplier + retired-hero card list now lives inside the
+## Retired tab of this screen's RosterPanel TabContainer. Registry shrinks
+## 7 → 6. Tab labels are localized at runtime in on_enter.
 extends Screen
 
 @onready var _dispatch_nav_button: Button = $DispatchNavButton
-@onready var _hall_nav_button: Button = $HallOfRetiredHeroesNavButton
 @onready var _toast_label: Label = $ToastLabel
 @onready var _gold_counter: Label = $GoldCounter
 @onready var _recruit_nav_button: Button = $RecruitNavButton
-@onready var _roster_list: VBoxContainer = $RosterPanel/RosterScroll/RosterList
+@onready var _roster_tabs: TabContainer = $RosterPanel/RosterTabs
+@onready var _roster_list: VBoxContainer = $RosterPanel/RosterTabs/Active/RosterScroll/RosterList
+@onready var _hall_title_label: Label = $RosterPanel/RosterTabs/Retired/HallTitleLabel
+@onready var _multiplier_label: Label = $RosterPanel/RosterTabs/Retired/MultiplierLabel
+@onready var _retired_card_list: VBoxContainer = $RosterPanel/RosterTabs/Retired/RetiredScroll/RetiredCardList
 @onready var _settings_gear_button: Button = $SettingsGearButton
 # Sprint 19 S19-M3 — HD-2D pipeline background layer (GDD #26 + ADR-0019).
 # Set to the tavern preset on on_enter so the warm-amber backdrop renders
@@ -88,16 +94,19 @@ func on_enter() -> void:
 		if not _settings_gear_button.pressed.is_connected(_on_settings_gear_pressed):
 			_settings_gear_button.pressed.connect(_on_settings_gear_pressed)
 
-	# Hall of Retired Heroes button: localized label + visibility gate +
-	# subscribe to prestige_completed_signal so a freshly-prestiged hero
-	# pops the button into view immediately on screen-resume.
-	if _hall_nav_button != null:
-		_hall_nav_button.text = tr("guild_hall_open_hall_button_label")
-		if not _hall_nav_button.pressed.is_connected(_on_hall_nav_pressed):
-			_hall_nav_button.pressed.connect(_on_hall_nav_pressed)
-		if not HeroRoster.prestige_completed_signal.is_connected(_on_prestige_completed):
-			HeroRoster.prestige_completed_signal.connect(_on_prestige_completed)
-		_refresh_hall_button_visibility()
+	# Sprint 23 S23-M1: Retired tab content (replacing the standalone
+	# hall_of_retired_heroes screen). Localized tab titles + Hall title
+	# label + initial multiplier + card list render. Subscribe to
+	# prestige_completed_signal so a freshly-prestiged hero flows into
+	# the Retired tab content without a tab switch.
+	if _roster_tabs != null:
+		_roster_tabs.set_tab_title(0, tr("guild_hall_roster_tab_active"))
+		_roster_tabs.set_tab_title(1, tr("guild_hall_roster_tab_retired"))
+	if _hall_title_label != null:
+		_hall_title_label.text = tr("hall_of_retired_heroes_title")
+	if not HeroRoster.prestige_completed_signal.is_connected(_on_prestige_completed):
+		HeroRoster.prestige_completed_signal.connect(_on_prestige_completed)
+	_refresh_retired_tab()
 
 
 func on_exit() -> void:
@@ -117,8 +126,6 @@ func on_exit() -> void:
 		FloorUnlock.biome_unlocked.disconnect(_on_biome_unlocked)
 	if _settings_gear_button != null and _settings_gear_button.pressed.is_connected(_on_settings_gear_pressed):
 		_settings_gear_button.pressed.disconnect(_on_settings_gear_pressed)
-	if _hall_nav_button != null and _hall_nav_button.pressed.is_connected(_on_hall_nav_pressed):
-		_hall_nav_button.pressed.disconnect(_on_hall_nav_pressed)
 	if HeroRoster.prestige_completed_signal.is_connected(_on_prestige_completed):
 		HeroRoster.prestige_completed_signal.disconnect(_on_prestige_completed)
 	# Kill any in-flight toast tween so its bound `_dismiss_toast`
@@ -137,22 +144,73 @@ func on_resume() -> void:
 
 
 # ---------------------------------------------------------------------------
-# Hall of Retired Heroes button — visibility gate + nav
+# Retired tab — multiplier badge + retired-hero card list
+# (Sprint 23 S23-M1 — content migrated from the retired hall_of_retired_heroes
+# standalone screen; lives inside the RosterPanel TabContainer Retired tab.)
 # ---------------------------------------------------------------------------
 
-## Hides the Hall button until at least one prestige has been completed.
-## Per `prestige-system.md` §F + cozy-register rule: don't tease the
-## player with an empty Hall view. The button's visibility is content-
-## addressable: it shows iff
-## [code]HeroRoster.get_prestige_count() > 0[/code].
-func _refresh_hall_button_visibility() -> void:
-	if _hall_nav_button == null:
+## Refreshes both the multiplier label and the retired card list. Called
+## from on_enter and from _on_prestige_completed so the tab stays in sync
+## with HeroRoster state without requiring the player to switch tabs.
+## Per `prestige-system.md` §F + AC-PR-13.
+func _refresh_retired_tab() -> void:
+	_refresh_multiplier_label()
+	_refresh_retired_card_list()
+
+
+## Renders the global prestige multiplier as `×N.NN` (2 decimal places)
+## per AC-PR-13. `×1.00` is the no-prestige baseline and DOES render
+## (the tab is visible even with 0 records — empty-state path).
+func _refresh_multiplier_label() -> void:
+	if _multiplier_label == null:
 		return
-	_hall_nav_button.visible = HeroRoster.get_prestige_count() > 0
+	var mult: float = HeroRoster.get_prestige_multiplier()
+	_multiplier_label.text = "×%.2f" % mult
+
+
+## Tears down the current Retired-tab card children and rebuilds from
+## `HeroRoster.get_retired_hero_records()`. Each card is a Label whose
+## text is `tr("hall_card_metadata_format")` formatted with
+## `(display_name, class_id, level_at_retirement, prestige_index)`.
+##
+## Empty-state: a single placeholder card "No retired heroes yet." per
+## locale key `hall_empty_state_placeholder`. Cozy degrade, no error.
+func _refresh_retired_card_list() -> void:
+	if _retired_card_list == null:
+		return
+	for child: Node in _retired_card_list.get_children():
+		_retired_card_list.remove_child(child)
+		child.queue_free()
+
+	var records: Array = HeroRoster.get_retired_hero_records()
+	if records.is_empty():
+		var placeholder: Label = Label.new()
+		placeholder.text = tr("hall_empty_state_placeholder")
+		_retired_card_list.add_child(placeholder)
+		return
+
+	for rec_variant: Variant in records:
+		var rec: Dictionary = rec_variant
+		var card: Label = Label.new()
+		card.text = _format_retired_card_text(rec)
+		_retired_card_list.add_child(card)
+
+
+## Formats a single retired-hero record into the writer-locked card
+## metadata text via `hall_card_metadata_format`. Defensive: missing
+## fields fall back to safe defaults. Format `%s · %s · Lv %d · Retired Day %d`.
+func _format_retired_card_text(record: Dictionary) -> String:
+	var display_name: String = String(record.get("display_name", "Unknown"))
+	var class_id: String = String(record.get("class_id", "?")).capitalize()
+	var level: int = int(record.get("level_at_retirement", 0))
+	var day: int = int(record.get("prestige_index", 0))
+	return tr("hall_card_metadata_format") % [display_name, class_id, level, day]
 
 
 func _on_prestige_completed(record: Dictionary, _new_count: int) -> void:
-	_refresh_hall_button_visibility()
+	# Refresh the Retired tab so a fresh card is visible the next time
+	# the player taps the Retired tab. Active tab is not altered.
+	_refresh_retired_tab()
 	# Cozy completion toast: "[hero name] joined the Hall of Retired
 	# Heroes." Tween freezes if Guild Hall is paused under a modal at
 	# emit time (Hero Detail Modal flow), then resumes on modal close —
@@ -205,10 +263,6 @@ func _dismiss_toast() -> void:
 	if _toast_tween != null and _toast_tween.is_valid():
 		_toast_tween.kill()
 	_toast_tween = null
-
-
-func _on_hall_nav_pressed() -> void:
-	SceneManager.request_screen("hall_of_retired_heroes", SceneManager.TransitionType.CROSS_FADE)
 
 
 func _on_dispatch_nav_pressed() -> void:
@@ -308,7 +362,14 @@ func _refresh_synergy_badge() -> void:
 func _refresh_roster_panel() -> void:
 	if _roster_list == null:
 		return
-	for child in _roster_list.get_children():
+	# Sprint 23 S23-M1: remove_child + queue_free ensures cards are detached
+	# from the tree IMMEDIATELY. queue_free alone is deferred to the next idle
+	# frame, which leaks stale cards into the rebuild when _refresh_roster_panel
+	# fires multiple times within a frame (e.g., add_hero → hero_recruited →
+	# _on_roster_changed before queue_free has run). Mirrors the pattern used
+	# in _refresh_retired_card_list.
+	for child: Node in _roster_list.get_children():
+		_roster_list.remove_child(child)
 		child.queue_free()
 	var heroes: Array = HeroRoster.get_all_heroes()
 	heroes.sort_custom(func(a: Variant, b: Variant) -> bool:

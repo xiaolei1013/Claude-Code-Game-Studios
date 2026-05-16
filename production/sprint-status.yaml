@@ -218,14 +218,14 @@ stories:
   # ===== Must Have =====
 
   - id: "S23-M1"
-    name: "Hall of Retired Heroes → tab on Guild Hall (Active | Retired tabs); remove standalone screen from registry (7→6 after PR #126 achieves 8→7)"
-    file: "assets/screens/guild_hall/guild_hall.tscn + .gd; assets/screens/hall_of_retired_heroes/ (deletion)"
+    name: "Hall of Retired Heroes → tab on Guild Hall (Active | Retired tabs); remove standalone screen from registry (7→6)"
+    file: "assets/screens/guild_hall/guild_hall.tscn + .gd; assets/screens/hall_of_retired_heroes/ (deleted); tests/unit/guild_hall/retired_tab_render_test.gd (NEW); tests/unit/hall_of_retired_heroes/ (deleted)"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 0.75
-    blocker: "PR #126 merged"
-    completed: ""
+    blocker: ""
+    completed: "2026-05-16 (v0.0.0.52); 13 new retired-tab tests + 8 path-update test fixes; 2230/2230 PASS; registry shrunk 7 → 6"
 
   - id: "S23-M2"
     name: "Pause Menu modal scene — Esc key trigger; Resume / Settings / Quit-to-Guild-Hall; push_modal pattern on all screens"

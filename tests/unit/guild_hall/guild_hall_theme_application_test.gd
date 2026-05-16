@@ -183,7 +183,9 @@ func test_guild_hall_hero_card_uses_ledger_row_theme_variation() -> void:
 	auto_free(instance)
 	instance.on_enter()
 
-	var roster_list: VBoxContainer = instance.get_node("RosterPanel/RosterScroll/RosterList") as VBoxContainer
+	# Sprint 23 S23-M1: RosterPanel now hosts an Active/Retired TabContainer.
+	# The Active tab wraps the prior RosterScroll/RosterList hierarchy.
+	var roster_list: VBoxContainer = instance.get_node("RosterPanel/RosterTabs/Active/RosterScroll/RosterList") as VBoxContainer
 	var first_card: Button = roster_list.get_child(0) as Button
 	assert_object(first_card).override_failure_message(
 		"Expected at least one HeroCard Button child in RosterList after "

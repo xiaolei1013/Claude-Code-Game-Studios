@@ -102,14 +102,16 @@ Per cozy-register rule, this is an end-state late-game peak — most runs will s
 
 ### C.4 — Hall of Retired Heroes (UI surface)
 
-A new gallery view accessible from `guild_hall.tscn` via a "Hall of Retired Heroes" button (visible only when `_retired_hero_records.size() > 0`). Layout:
+> **Sprint 23 S23-M1 update (2026-05-15)**: the Hall is now a **Retired tab on Guild Hall's RosterPanel** — not a separate screen. The standalone `hall_of_retired_heroes` screen was retired; SceneManager registry shrank 7 → 6. See `guild-hall-screen.md` §F "V1.0 progression-layer additions". The card metadata format, multiplier badge rendering rules, sort order, and "no un-prestige" guarantee below all carry over to the tab implementation verbatim.
+
+A Retired tab on `guild_hall.tscn`'s RosterPanel TabContainer (sibling to the Active tab). Layout:
 
 - **List view**: each retired hero is a card with portrait + display_name + retirement metadata.
 - **Card metadata**: "Theron · Warrior · Lv 15 · Retired Day 47" (Day = `floor((retirement_unix_ts - first_launch_unix_ts) / 86400)` per Tick System GDD #1 wall-clock semantics).
 - **Sort order**: retirement date descending (newest first).
 - **Card visual**: portrait at standard size + parchment-warm laurel crown overlay (Art Bible Visual Identity Anchor — gold + dusk-purple per Pillar 4).
 - **No "un-prestige" button**. Retirement is permanent; the cozy register guarantees this so the player can prestige confidently.
-- **Empty state**: when no retirees exist, the Hall button is hidden from guild_hall. First retirement reveals it.
+- **Empty state**: the Retired tab is always visible (no visibility gate). When no retirees exist, a cozy "No retired heroes yet." placeholder card renders (locale key `hall_empty_state_placeholder`).
 
 Localization keys (8 new):
 - `prestige_button_label` — "Prestige Hero"

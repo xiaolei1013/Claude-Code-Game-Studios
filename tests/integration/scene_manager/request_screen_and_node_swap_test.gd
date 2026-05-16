@@ -480,15 +480,17 @@ func test_same_screen_request_does_not_free_current_screen() -> void:
 # Sprint 22 S22-M2: matchup_assignment folded into formation_assignment as
 # the in-screen Floor Picker overlay; registry shrunk 9 → 8.
 # Sprint 22 S22-M1: main_menu retired as dead code; registry shrunk 8 → 7.
+# Sprint 23 S23-M1: hall_of_retired_heroes folded into guild_hall as the
+# Retired tab on the RosterPanel TabContainer; registry shrunk 7 → 6.
 # ---------------------------------------------------------------------------
-func test_screen_registry_has_seven_entries() -> void:
+func test_screen_registry_has_six_entries() -> void:
 	var sm: Node = SceneManagerScript.new()
-	assert_int(sm._screen_registry.size()).is_equal(7)
+	assert_int(sm._screen_registry.size()).is_equal(6)
 	sm.free()
 
 
 # ---------------------------------------------------------------------------
-# E-02: _screen_registry contains exactly the 7 canonical IDs
+# E-02: _screen_registry contains exactly the 6 canonical IDs
 # ---------------------------------------------------------------------------
 func test_screen_registry_contains_canonical_ids() -> void:
 	var sm: Node = SceneManagerScript.new()
@@ -501,7 +503,7 @@ func test_screen_registry_contains_canonical_ids() -> void:
 
 
 # ---------------------------------------------------------------------------
-# E-03: All 7 registered PackedScenes are non-null and instantiable
+# E-03: All 6 registered PackedScenes are non-null and instantiable
 # ---------------------------------------------------------------------------
 func test_all_registered_packedscenes_load_and_instantiate() -> void:
 	var sm: Node = SceneManagerScript.new()
@@ -534,7 +536,6 @@ func test_screen_registry_resource_paths_match_canonical_layout() -> void:
 		"dungeon_run_view": "res://assets/screens/dungeon_run_view/dungeon_run_view.tscn",
 		"victory_moment": "res://assets/screens/victory_moment/victory_moment.tscn",
 		"return_to_app": "res://assets/screens/return_to_app/return_to_app.tscn",
-		"hall_of_retired_heroes": "res://assets/screens/hall_of_retired_heroes/hall_of_retired_heroes.tscn",
 	}
 
 	for id: String in expected_paths.keys():

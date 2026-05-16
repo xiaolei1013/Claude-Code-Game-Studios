@@ -120,12 +120,52 @@ grow_horizontal = 2
 grow_vertical = 2
 custom_minimum_size = Vector2(480, 200)
 
-[node name="RosterScroll" type="ScrollContainer" parent="RosterPanel"]
+; Sprint 23 S23-M1: Active/Retired tab strip replaces the standalone
+; hall_of_retired_heroes screen. Tab labels are localized at runtime
+; in guild_hall.gd via set_tab_title(idx, tr(key)).
+[node name="RosterTabs" type="TabContainer" parent="RosterPanel"]
 layout_mode = 2
 
-[node name="RosterList" type="VBoxContainer" parent="RosterPanel/RosterScroll"]
+[node name="Active" type="VBoxContainer" parent="RosterPanel/RosterTabs"]
+layout_mode = 2
+
+[node name="RosterScroll" type="ScrollContainer" parent="RosterPanel/RosterTabs/Active"]
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="RosterList" type="VBoxContainer" parent="RosterPanel/RosterTabs/Active/RosterScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Retired" type="VBoxContainer" parent="RosterPanel/RosterTabs"]
+visible = false
+layout_mode = 2
+
+; Sprint 23 S23-M1: Hall of Retired Heroes content migrated into the
+; Retired tab. Title + multiplier badge + scrollable retired-hero card
+; list. Multiplier renders ×N.NN per prestige-system.md AC-PR-13.
+[node name="HallTitleLabel" type="Label" parent="RosterPanel/RosterTabs/Retired"]
+layout_mode = 2
+text = "Hall of Retired Heroes"
+horizontal_alignment = 1
+theme_type_variation = &"IdentityHeader"
+
+[node name="MultiplierLabel" type="Label" parent="RosterPanel/RosterTabs/Retired"]
+layout_mode = 2
+text = "×1.00"
+horizontal_alignment = 1
+
+[node name="RetiredScroll" type="ScrollContainer" parent="RosterPanel/RosterTabs/Retired"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="RetiredCardList" type="VBoxContainer" parent="RosterPanel/RosterTabs/Retired/RetiredScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 
 [node name="DispatchNavButton" type="Button" parent="."]
 layout_mode = 1
@@ -162,25 +202,6 @@ custom_minimum_size = Vector2(240, 52)
 focus_mode = 0
 mouse_filter = 0
 text = "Recruit"
-
-[node name="HallOfRetiredHeroesNavButton" type="Button" parent="."]
-visible = false
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -160.0
-offset_top = 96.0
-offset_right = 160.0
-offset_bottom = 148.0
-grow_horizontal = 2
-grow_vertical = 2
-custom_minimum_size = Vector2(320, 52)
-focus_mode = 0
-mouse_filter = 0
-text = "Hall of Retired Heroes"
 
 [node name="ToastLabel" type="Label" parent="."]
 visible = false
