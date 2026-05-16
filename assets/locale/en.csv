@@ -60,3 +60,5 @@ pause_menu_title,Paused
 pause_menu_resume_button,Resume
 pause_menu_settings_button,Settings
 pause_menu_quit_to_guild_hall_button,Quit to Guild Hall
+settings_version_label_format,Version %s
+settings_quit_to_desktop_button,Quit to Desktop

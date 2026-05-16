@@ -12,6 +12,7 @@ config_version=5
 
 config/name="Lantern Guild"
 config/description="Cozy fantasy idle-clicker — hero roster, dungeon runs, offline progression."
+config/version="0.0.0.53"
 run/main_scene="res://src/core/scene_manager/MainRoot.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"

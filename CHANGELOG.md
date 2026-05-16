@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.54] - 2026-05-16
+
+### Added
+- **Settings scaffold additions (Sprint 23 S23-S2)** — the existing Settings overlay (volume sliders + reduce-motion toggle + locale + telemetry) now also displays the **app version** (read from `ProjectSettings("application/config/version")`) and offers a **Quit-to-Desktop button**. Reachable from the new Pause Menu's Settings button.
+- **`config/version="0.0.0.53"` declared in `project.godot`** — single source of truth for the runtime version string. The Settings overlay reads this at `_ready` and renders it via the writer-locked `settings_version_label_format` locale key.
+- **Locale (`assets/locale/en.csv`)** — `settings_version_label_format`, `settings_quit_to_desktop_button`.
+- **4 new tests** (`tests/unit/settings_overlay/version_and_quit_test.gd`) covering version label presence + content + quit button presence + pressed-signal wiring.
+
+### Internal
+- `_on_quit_to_desktop_pressed` pops the Settings overlay first (unwinds the modal-pause counter cleanly) before calling `get_tree().quit()` — defensive against debug-build warnings about pause-counter leakage at exit.
+- Full test suite: 2239/2239 PASS.
+
 ## [0.0.0.53] - 2026-05-16
 
 ### Added
