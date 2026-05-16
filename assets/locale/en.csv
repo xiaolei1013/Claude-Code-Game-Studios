@@ -54,6 +54,7 @@ hall_of_retired_heroes_title,Hall of Retired Heroes
 hall_card_metadata_format,%s · %s · Lv %d · Retired Day %d
 prestige_disabled_active_run_tooltip,Prestige a hero between runs.
 hall_empty_state_placeholder,No retired heroes yet.
+recruit_pool_empty_placeholder,The pool is rebuilding. Refresh to scout new heroes.
 guild_hall_roster_tab_active,Active
 guild_hall_roster_tab_retired,Retired
 pause_menu_title,Paused
