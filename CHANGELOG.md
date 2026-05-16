@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - Sprint 24 Day-0 (2026-05-16)
+
+### Internal
+- **Sprint 24 plan authored** at `production/sprints/sprint-24.md`. Eleventh consecutive same-day-compressed sprint (S14 → S24). Theme: Class Synergy V2 tier ladder + UIFramework hygiene + Onboarding GDD + S23-S1 advisory polish carryforward. 4 Must Have stories (2.0d), 3 Should Have (2.5d), 3 Nice to Have (2.0d).
+- **Process rule (Sprint 24+)**: per-task PR with `base=main` ALWAYS. No stacked PRs. Sprint 23 stacked-PR cascade lost 6 PRs to GitHub merge semantics and required a recovery PR (#139) to clean up. This rule is encoded in sprint-24.md §"Sprint 24 Process Rules" item #1.
+- **Sprint 23 final state archived** in `sprint-status.yaml` comment block. Sprint Goal MET. All 6 implementable stories shipped (M1/M2/S2/S3/N1/N2 via PRs #132–#137); M3 closure (playtest verdicts + retros) + post-`/simplify+/review` cleanup in PR #138; recovery merge in PR #139 brought stranded content onto main.
+
 ## [0.0.0.59] - 2026-05-16
 
 ### Fixed (post-`/simplify + /review` pass on the Sprint 23 stack)
