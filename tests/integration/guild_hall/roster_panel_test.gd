@@ -13,6 +13,10 @@ const GuildHallScene: PackedScene = preload(
 )
 const HeroInstanceScript = preload("res://src/core/hero_roster/hero_instance.gd")
 
+# Sprint 23 S23-M1: Active tab path inside the RosterPanel TabContainer.
+# Hoisted to a single constant so future scene-tree changes update one place.
+const ROSTER_LIST_PATH: String = "RosterPanel/RosterTabs/Active/RosterScroll/RosterList"
+
 
 # ---------------------------------------------------------------------------
 # Hygiene barrier — snapshot/restore live HeroRoster + SceneManager state.
@@ -73,7 +77,7 @@ func test_roster_panel_renders_one_card_per_hero() -> void:
 	_seed_hero("warrior", 1)
 	_seed_hero("mage", 1)
 	var screen: Node = _make_guild_hall_in_tree()
-	var roster_list: Node = screen.get_node("RosterPanel/RosterTabs/Active/RosterScroll/RosterList")
+	var roster_list: Node = screen.get_node(ROSTER_LIST_PATH)
 	assert_object(roster_list).is_not_null()
 	# Theron (seeded by autoload) + 2 added = 3 cards expected.
 	var card_count: int = roster_list.get_child_count()
@@ -83,7 +87,7 @@ func test_roster_panel_renders_one_card_per_hero() -> void:
 func test_hero_card_text_includes_name_class_and_level() -> void:
 	var id: int = _seed_hero("rogue", 3)
 	var screen: Node = _make_guild_hall_in_tree()
-	var roster_list: Node = screen.get_node("RosterPanel/RosterTabs/Active/RosterScroll/RosterList")
+	var roster_list: Node = screen.get_node(ROSTER_LIST_PATH)
 	var found: bool = false
 	for child in roster_list.get_children():
 		# HeroCard text lives in the child Label, not the Button itself (the
@@ -124,7 +128,7 @@ func test_hero_cards_sorted_level_desc_then_class_id_asc() -> void:
 	_seed_hero("rogue", 5)
 
 	var screen: Node = _make_guild_hall_in_tree()
-	var roster_list: Node = screen.get_node("RosterPanel/RosterTabs/Active/RosterScroll/RosterList")
+	var roster_list: Node = screen.get_node(ROSTER_LIST_PATH)
 	var labels: Array[String] = []
 	for child in roster_list.get_children():
 		labels.append(_extract_card_summary_text(child))
@@ -148,7 +152,7 @@ func test_hero_card_tap_wires_pressed_signal_handler() -> void:
 	_seed_hero("warrior", 1)
 	var screen: Node = _make_guild_hall_in_tree()
 
-	var roster_list: Node = screen.get_node("RosterPanel/RosterTabs/Active/RosterScroll/RosterList")
+	var roster_list: Node = screen.get_node(ROSTER_LIST_PATH)
 	var first_card: Button = roster_list.get_child(0) as Button
 	assert_object(first_card).is_not_null()
 
@@ -164,7 +168,7 @@ func test_hero_card_tap_ignored_when_modal_already_active() -> void:
 	SceneManager.set("state", SceneManager.State.PAUSED)
 	var pre_modal_count: int = (SceneManager.get("_active_freestanding_modals") as Array).size()
 
-	var roster_list: Node = screen.get_node("RosterPanel/RosterTabs/Active/RosterScroll/RosterList")
+	var roster_list: Node = screen.get_node(ROSTER_LIST_PATH)
 	var first_card: Button = roster_list.get_child(0) as Button
 	first_card.pressed.emit()
 
@@ -197,7 +201,7 @@ func test_hero_card_has_xp_progress_bar_with_correct_fraction() -> void:
 	theron.xp = 50  # halfway toward level 2 if threshold is 100
 
 	var screen: Node = _make_guild_hall_in_tree()
-	var roster_list: Node = screen.get_node("RosterPanel/RosterTabs/Active/RosterScroll/RosterList")
+	var roster_list: Node = screen.get_node(ROSTER_LIST_PATH)
 	var found_bar: ProgressBar = null
 	for child in roster_list.get_children():
 		for pb in child.find_children("*", "ProgressBar", true, false):
@@ -221,7 +225,7 @@ func test_hero_card_xp_bar_full_at_level_cap() -> void:
 	theron.xp = 0  # at cap, accumulated XP is meaningless
 
 	var screen: Node = _make_guild_hall_in_tree()
-	var roster_list: Node = screen.get_node("RosterPanel/RosterTabs/Active/RosterScroll/RosterList")
+	var roster_list: Node = screen.get_node(ROSTER_LIST_PATH)
 	var found_bar: ProgressBar = null
 	for child in roster_list.get_children():
 		for pb in child.find_children("*", "ProgressBar", true, false):
@@ -236,7 +240,7 @@ func test_hero_card_xp_bar_full_at_level_cap() -> void:
 
 func test_hero_recruited_signal_refreshes_roster_panel() -> void:
 	var screen: Node = _make_guild_hall_in_tree()
-	var roster_list: Node = screen.get_node("RosterPanel/RosterTabs/Active/RosterScroll/RosterList")
+	var roster_list: Node = screen.get_node(ROSTER_LIST_PATH)
 	var initial_count: int = roster_list.get_child_count()
 
 	# add_hero emits hero_recruited which Guild Hall is subscribed to.

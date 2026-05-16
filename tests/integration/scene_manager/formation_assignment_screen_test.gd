@@ -561,7 +561,9 @@ func test_formation_assignment_screen_s9m1_active_slot_badge_visible_on_active_s
 	var screen: Control = await _navigate_to_formation_screen(null)
 	assert_object(screen).is_not_null()
 
-	var slots_hbox: HBoxContainer = screen.get_node_or_null("FormationPanel/SlotsHBox") as HBoxContainer
+	# Sprint 23 S23-N2: SlotsHBox now wrapped in FormationVBox alongside the
+	# SynergyPreviewLabel; path moved one level deeper.
+	var slots_hbox: HBoxContainer = screen.get_node_or_null("FormationPanel/FormationVBox/SlotsHBox") as HBoxContainer
 	assert_object(slots_hbox).is_not_null()
 
 	# Act — slots are built in on_enter() → _refresh_formation_panel() (already called).
