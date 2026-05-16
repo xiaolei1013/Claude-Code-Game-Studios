@@ -127,6 +127,78 @@ The first-pass GDD is bounded to 3 composition synergies. The system is designed
 - **Synergy unlock cadence** (OQ-32-4 deferred): if V1.5+ wants to gate synergies behind first-clear or prestige, add a `_synergy_is_unlocked(synergy_id) -> bool` predicate at detection time. Backward-compatible — V1.0 always returns true.
 - **Cross-system "RunModifier" abstraction** (OQ-32-8): when a third multiplier source (e.g., buff/debuff system) emerges, refactor the four-multiplier formula into a `RunModifier` aggregator. Until then, four explicit factors is clearer than premature abstraction.
 
+### C.6 — V2 Tier Ladder (Sprint 24 S24-M1)
+
+The V1.0 detection surface returns a `synergy_id` string ("steel_wall" / "arcane_elite" / "triple_strike" / "triple_threat" / ""). The **V2 Tier Ladder** layer maps that detection result into a categorical tier (None / Bronze / Silver / Gold / Platinum) for player-facing display surfaces (Dispatch SynergyPreviewLabel; future Guild Hall synergy summary; future toast / cue variants).
+
+**Tier mapping (V1 → V2 first-pass)**:
+
+| Tier | Synergy IDs (V1) | Rationale | Locale key |
+|------|------------------|-----------|------------|
+| **None** | `""` (no detection) | No matching composition. Cozy degrade — render `"Synergy: None"` rather than hiding. | `synergy_tier_none` → "None" |
+| **Bronze** | (reserved for V2.5+) | Future: 2-of-a-kind without matching counter archetype. Documented for V2 GDD expansion; not yet emitted by `detect_active_synergy`. | `synergy_tier_bronze` → "Bronze" |
+| **Silver** | (reserved for V2.5+) | Future: 2-of-a-kind WITH matching counter archetype (the partial-mono-class pattern that teaches matchup awareness without requiring 3-of-a-kind commitment). Not yet emitted. | `synergy_tier_silver` → "Silver" |
+| **Gold** | `steel_wall`, `arcane_elite`, `triple_strike` | 3-of-a-kind mono-class synergies. The current V1 first-pass mono-class roster. Strong but specialized (Steel Wall/Triple Strike conditional on archetype; Arcane Elite unconditional XP). | `synergy_tier_gold` → "Gold" |
+| **Platinum** | `triple_threat` | 1+1+1 balanced composition. Highest categorical tier because it represents full class-diversity coverage (unlocks every counter-archetype matchup simultaneously). Lower numerical bonus (+15% gold) but unconditional — the "balanced excellence" beat. | `synergy_tier_platinum` → "Platinum" |
+
+**Tier-mapping function**:
+
+```gdscript
+# Returns the V2 tier name (lowercase enum string) for a V1 synergy_id.
+# Pure function — safe to call every UI refresh. O(1) string switch.
+static func synergy_id_to_tier(synergy_id: String) -> String:
+    match synergy_id:
+        "":               return "none"
+        "steel_wall":     return "gold"
+        "arcane_elite":   return "gold"
+        "triple_strike":  return "gold"
+        "triple_threat":  return "platinum"
+        _:                return "none"  # defensive: unknown synergy_id degrades to None
+```
+
+**Why "Gold" for 3-mono-class and "Platinum" for 1+1+1**:
+
+The temptation is to read tier as a strict numerical-bonus ranking (which would put Steel Wall's +25% above Triple Threat's +15%). The V2 categorical reading is intentionally different: tier represents **composition versatility**, not raw multiplier strength. Mono-class compositions are *strong-but-narrow* (one matchup window, deep specialty). 1+1+1 is *balanced-and-universal* (every matchup covered, broader applicability). Platinum names the latter as the "completeness" tier — matching the cozy-register design ethos that rewards diverse compositions, not min-maxing the highest-yield mono.
+
+This split also future-proofs the tier ladder. Once V2.5+ adds Silver (2-of-a-kind with counter) and Bronze (2-of-a-kind without counter), the ladder reads cleanly:
+- **None** = no detection
+- **Bronze** = partial composition, no archetype counter
+- **Silver** = partial composition with archetype counter
+- **Gold** = full mono-class (any of 3 MVP variants)
+- **Platinum** = balanced 1+1+1
+
+Each tier teaches a distinct lesson: Bronze ("you need more of these"), Silver ("you're using their counter wisely"), Gold ("you committed; here's the mono-class payoff"), Platinum ("you balanced; here's the universal payoff").
+
+**UI render surface (V2 first-pass scope = SynergyPreviewLabel only)**:
+
+The Dispatch screen's `SynergyPreviewLabel` (added in Sprint 23 S23-N2) is the first consumer of the tier ladder. S24-M2 refreshes the label format from:
+
+```
+Synergy: {display_name}            (V1 first-pass — Sprint 23 S23-N2)
+```
+
+to:
+
+```
+Synergy: {tier} ({display_name})   (V2 first-pass — Sprint 24 S24-M2)
+```
+
+Examples:
+- Empty composition → `Synergy: None`
+- 3 warriors → `Synergy: Gold (Steel Wall)`
+- 1+1+1 → `Synergy: Platinum (Triple Threat)`
+
+The cozy `SynergyBadge` (animated detection-moment glow on Guild Hall + Dispatch) is unchanged in S24-M2 — it remains the *active cue* tied to the specific synergy_id, while the preview label is the *passive read* tied to the tier ladder. Future tier-coloring + iconography (per Sprint 25+ scope) will introduce per-tier visual treatment (Gold/Platinum medal icons, color-coded backgrounds matching the parchment palette).
+
+**Acceptance criteria deferred to AC-CS-22+** (added in Sprint 24 S24-M1 implementation pass, not in this design amendment). The detection-accuracy ACs (AC-CS-01..05) remain authoritative for V1 detection; the V2 layer adds:
+- AC-CS-22 — `synergy_id_to_tier("")` returns `"none"`
+- AC-CS-23 — `synergy_id_to_tier("steel_wall")` returns `"gold"` (and `"arcane_elite"` + `"triple_strike"` likewise)
+- AC-CS-24 — `synergy_id_to_tier("triple_threat")` returns `"platinum"`
+- AC-CS-25 — `synergy_id_to_tier("<unknown_synergy>")` returns `"none"` (defensive)
+- AC-CS-26 — SynergyPreviewLabel renders `"Synergy: {tier} ({display_name})"` per the V2 format
+
+These ACs are referenced by S24-M2's test suite (`tests/unit/formation_assignment/synergy_preview_label_test.gd`).
+
 ---
 
 ## D. Formulas
