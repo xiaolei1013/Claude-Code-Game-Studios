@@ -268,6 +268,14 @@ const SYNERGY_STEEL_WALL: String = "steel_wall"
 const SYNERGY_ARCANE_ELITE: String = "arcane_elite"
 const SYNERGY_TRIPLE_STRIKE: String = "triple_strike"
 const SYNERGY_TRIPLE_THREAT: String = "triple_threat"
+# Tier-2 class synergies (added Sprint 26 M4). Mono-class 3-of-a-kind for
+# each tier-2 class. Structurally parallel to the V1 mono-class set
+# (Steel Wall / Arcane Elite / Triple Strike): conditional gold vs counter
+# archetype for combat-shape classes; XP boost for the support shape.
+const SYNERGY_BASTION: String = "bastion"  # 3 paladins, conditional gold vs caster
+const SYNERGY_VOLLEY: String = "volley"    # 3 archers, conditional gold vs swarm
+const SYNERGY_FRENZY: String = "frenzy"    # 3 berserkers, conditional gold vs bruiser
+const SYNERGY_VIGIL: String = "vigil"      # 3 clerics, unconditional XP (support investment)
 
 
 ## Detects which V1.0 first-pass class synergy is active for a given formation
@@ -380,6 +388,21 @@ func detect_active_synergy(formation_snapshot: Dictionary) -> String:
 	var sorted_mix: Array[String] = ["mage", "rogue", "warrior"]
 	if class_ids == sorted_mix:
 		return SYNERGY_TRIPLE_THREAT
+
+	# Tier-2 mono-class synergies (Sprint 26 M4). Same sorted-multiset
+	# comparison shape as the V1 mono-class set above.
+	var sorted_paladin: Array[String] = ["paladin", "paladin", "paladin"]
+	if class_ids == sorted_paladin:
+		return SYNERGY_BASTION
+	var sorted_archer: Array[String] = ["archer", "archer", "archer"]
+	if class_ids == sorted_archer:
+		return SYNERGY_VOLLEY
+	var sorted_berserker: Array[String] = ["berserker", "berserker", "berserker"]
+	if class_ids == sorted_berserker:
+		return SYNERGY_FRENZY
+	var sorted_cleric: Array[String] = ["cleric", "cleric", "cleric"]
+	if class_ids == sorted_cleric:
+		return SYNERGY_VIGIL
 
 	# No synergy matches (e.g., 2W+1M, 2W+1R, 2M+1R — V1.0 first-pass does
 	# not include 2+1 mixes; V1.5+ may extend).
