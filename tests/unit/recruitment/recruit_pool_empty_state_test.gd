@@ -43,9 +43,7 @@ func test_recruit_screen_renders_no_placeholder_when_pool_has_entries() -> void:
 	screen.on_enter()
 
 	# Assert — no placeholder Label in the PoolVBox while pool is populated.
-	# PoolVBox became an HBoxContainer in the 3-card-draft restyle; cast to the
-	# generic Container base (the placeholder-child assertions are unchanged).
-	var vbox: Control = screen.get_node_or_null("PoolPanel/PoolVBox") as Control
+	var vbox: VBoxContainer = screen.get_node_or_null("PoolPanel/PoolVBox") as VBoxContainer
 	assert_object(vbox).is_not_null()
 	var placeholder: Label = vbox.get_node_or_null("EmptyPoolPlaceholder") as Label
 	# Either: placeholder doesn't exist at all (lazy-create path), OR it
@@ -59,13 +57,8 @@ func test_recruit_screen_renders_placeholder_when_pool_is_empty() -> void:
 	# (Defensive scenario: just-recruited-last-entry, mid-refresh window.)
 	var rec_autoload: Node = get_tree().root.get_node_or_null("Recruitment")
 	assert_object(rec_autoload).is_not_null()
-	# Pool state lives in the `_current_pool` (Array[String]) field per
-	# recruitment.gd — get_recruit_pool() returns _current_pool.duplicate().
-	# (Prior code targeted a non-existent `_pool` field, so the pool never
-	# actually emptied and this test silently never exercised the empty path.)
-	# Use a typed empty local — the typed field rejects untyped/Packed literals.
-	var empty_pool: Array[String] = []
-	rec_autoload.set("_current_pool", empty_pool)
+	# Pool state lives in `_pool` private field per recruitment.gd.
+	rec_autoload.set("_pool", PackedStringArray())
 
 	var screen: Node = RecruitmentScene.instantiate()
 	add_child(screen)
@@ -75,9 +68,7 @@ func test_recruit_screen_renders_placeholder_when_pool_is_empty() -> void:
 	screen.on_enter()
 
 	# Assert — placeholder Label is present + visible + contains expected copy.
-	# PoolVBox became an HBoxContainer in the 3-card-draft restyle; cast to the
-	# generic Container base (the placeholder-child assertions are unchanged).
-	var vbox: Control = screen.get_node_or_null("PoolPanel/PoolVBox") as Control
+	var vbox: VBoxContainer = screen.get_node_or_null("PoolPanel/PoolVBox") as VBoxContainer
 	assert_object(vbox).is_not_null()
 	var placeholder: Label = vbox.get_node_or_null("EmptyPoolPlaceholder") as Label
 	assert_object(placeholder).is_not_null().override_failure_message(

@@ -57,10 +57,10 @@ offset_top = 88.0
 offset_bottom = -88.0
 grow_horizontal = 2
 
-[node name="PoolVBox" type="HBoxContainer" parent="PoolPanel"]
+[node name="PoolVBox" type="VBoxContainer" parent="PoolPanel"]
 layout_mode = 2
 
-[node name="PoolEntry0" type="VBoxContainer" parent="PoolPanel/PoolVBox"]
+[node name="PoolEntry0" type="HBoxContainer" parent="PoolPanel/PoolVBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 120)
 
@@ -94,7 +94,7 @@ focus_mode = 0
 mouse_filter = 0
 text = "Recruit"
 
-[node name="PoolEntry1" type="VBoxContainer" parent="PoolPanel/PoolVBox"]
+[node name="PoolEntry1" type="HBoxContainer" parent="PoolPanel/PoolVBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 120)
 
@@ -128,7 +128,7 @@ focus_mode = 0
 mouse_filter = 0
 text = "Recruit"
 
-[node name="PoolEntry2" type="VBoxContainer" parent="PoolPanel/PoolVBox"]
+[node name="PoolEntry2" type="HBoxContainer" parent="PoolPanel/PoolVBox"]
 layout_mode = 2
 custom_minimum_size = Vector2(0, 120)
 
