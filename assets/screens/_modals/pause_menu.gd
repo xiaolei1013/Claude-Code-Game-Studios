@@ -19,6 +19,7 @@
 extends Control
 
 const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
+const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
 
 
 @onready var _title_label: Label = $Panel/VBox/TitleLabel
@@ -44,6 +45,9 @@ func _ready() -> void:
 	UIFrameworkScript.wire_touch_feedback(_resume_button)
 	UIFrameworkScript.wire_touch_feedback(_settings_button)
 	UIFrameworkScript.wire_touch_feedback(_quit_button)
+
+	# Lantern Guild mock wireframe: "the guild waits" framing (greybox).
+	_build_wireframe()
 
 
 ## Handles Esc inside the pause modal itself — Esc dismisses (acts as Resume).
@@ -85,3 +89,22 @@ func _on_quit_pressed() -> void:
 
 func _dismiss() -> void:
 	SceneManager.pop_overlay("pause_menu")
+
+
+# ===========================================================================
+# Lantern Guild mock wireframe — greybox "the guild waits" framing for Pause
+# Additive: eyebrow above the title + a tagline below it (no .tscn edits).
+# ===========================================================================
+
+func _build_wireframe() -> void:
+	var vbox: Node = get_node_or_null("Panel/VBox")
+	if vbox == null or _title_label == null:
+		return
+	var eyebrow: Label = WireframeKitScript.eyebrow("· The guild waits ·", WireframeKitScript.ACCENT)
+	eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(eyebrow)
+	vbox.move_child(eyebrow, 0)
+	var tagline: Label = WireframeKitScript.caption("The hour-glass turns regardless.", WireframeKitScript.MUTED, 13)
+	tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(tagline)
+	vbox.move_child(tagline, _title_label.get_index() + 1)

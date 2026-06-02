@@ -13,6 +13,7 @@
 ##     SceneManager persistence pathways)
 extends Control
 
+const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
 const _MIN_DB: float = -80.0  # below this, treat as -INF (silent floor)
 
 # Per GDD #30 §C.2 defaults (audio-system.md §C.7 baselines).
@@ -91,6 +92,9 @@ func _ready() -> void:
 	_refresh_db_label(_master_db_label, AudioRouter.get_master_volume_db())
 	_refresh_db_label(_music_db_label, AudioRouter.get_music_volume_db())
 	_refresh_db_label(_sfx_db_label, AudioRouter.get_sfx_volume_db())
+
+	# Lantern Guild mock wireframe: add the mock's section framing (greybox).
+	_build_wireframe()
 
 
 # ---------------------------------------------------------------------------
@@ -261,3 +265,29 @@ func _on_quit_to_desktop_pressed() -> void:
 	# but produces a noisy warning in debug builds.
 	SceneManager.pop_overlay("settings")
 	get_tree().quit()
+
+
+# ===========================================================================
+# Lantern Guild mock wireframe — greybox section framing for Settings
+# Additive (no .tscn edits): inserts the mock's "inner workings" eyebrow + per-
+# section eyebrows (Audio / Accessibility / Data & locale) into Panel/VBox.
+# Colors route through WireframeKit (no Color() literals).
+# ===========================================================================
+
+func _build_wireframe() -> void:
+	var vbox: Node = get_node_or_null("Panel/VBox")
+	if vbox == null:
+		return
+	_insert_section(vbox, get_node_or_null("Panel/VBox/HeaderLabel"), "· The inner workings ·", WireframeKitScript.ACCENT)
+	_insert_section(vbox, get_node_or_null("Panel/VBox/MasterRow"), "Audio", WireframeKitScript.MUTED)
+	_insert_section(vbox, get_node_or_null("Panel/VBox/ReduceMotionRow"), "Accessibility", WireframeKitScript.MUTED)
+	_insert_section(vbox, get_node_or_null("Panel/VBox/LocaleRow"), "Data & locale", WireframeKitScript.MUTED)
+
+
+## Inserts a greybox eyebrow label immediately before [param before] in [param vbox].
+func _insert_section(vbox: Node, before: Node, text: String, color: Color) -> void:
+	if vbox == null or before == null:
+		return
+	var eyebrow: Label = WireframeKitScript.eyebrow(text, color)
+	vbox.add_child(eyebrow)
+	vbox.move_child(eyebrow, before.get_index())
