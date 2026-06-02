@@ -67,12 +67,20 @@ extends GameData
 ## of [Floor] resources. The dungeon runner resolves the active dungeon by
 ## index into this array. Story 004 validates non-empty constraint.
 ##
-## Typed as [code]Array[Dungeon][/code] so the Inspector shows an "Add Dungeon"
-## element button for designer authoring. If Godot's nested-resource array
-## authoring regresses in a future engine patch, fall back to
-## [code]Array[Resource][/code] and cast elements at call sites.
-## GDD §C — dungeons.
-@export var dungeons: Array[Dungeon] = []
+## Typed as [code]Array[Resource][/code] (was [code]Array[Dungeon][/code]) — the
+## fallback the previous comment anticipated, now load-bearing.
+##
+## The .tres files serialize this as [code]Array[Resource]([ExtResource])[/code].
+## Against a typed [code]Array[Dungeon][/code] field, a COLD global_script_class_cache
+## build (CI is ALWAYS cold — .godot/ is gitignored) can fail to resolve the
+## [code]Dungeon[/code] class while coercing the value, silently leaving the array
+## EMPTY (the biome itself still loads — no error). FloorUnlock._ready then drops
+## the biome at its [code]dungeons.is_empty()[/code] guard (line ~224), so the
+## Dispatch floor picker loses tabs — an import-order-fragile failure that an
+## unrelated .tscn edit can perturb. [code]Array[Resource][/code] matches the
+## serialized type exactly → no coercion → always populates. Consumers (FloorUnlock,
+## DataRegistry DAG) already read elements as [Resource]. GDD §C — dungeons.
+@export var dungeons: Array[Resource] = []
 
 # ---------------------------------------------------------------------------
 # Section: Narrative (GDD §C)

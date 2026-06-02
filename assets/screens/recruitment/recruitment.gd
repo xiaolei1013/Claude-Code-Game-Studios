@@ -55,6 +55,10 @@ var POOL_SIZE: int = RecruitmentScript.POOL_SIZE
 @warning_ignore("unused_private_class_variable")
 var _is_rendering: bool = false
 
+# Lantern Guild mock wireframe (feat/ui-wireframe-detail-recruit) — greybox state.
+const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+var _wire_built: bool = false
+
 
 func _ready() -> void:
 	# Touch-feedback wired in _ready (one-time, .tscn-defined Buttons).
@@ -97,6 +101,11 @@ func on_enter() -> void:
 	# dungeon, so the tavern warm-amber preset reinforces "you are home."
 	if _biome_background != null:
 		_biome_background.set_biome("guild_hall_tavern")
+
+	# Lantern Guild mock wireframe (feat/ui-wireframe-detail-recruit): restyle
+	# the pool into the mock's side-by-side 3-card draft (the .tscn flips
+	# PoolVBox→HBox and each PoolEntry→VBox; this styles the cards).
+	_build_wireframe_once()
 
 
 func on_exit() -> void:
@@ -162,7 +171,9 @@ func _refresh_pool_panel() -> void:
 
 
 func _refresh_empty_state_placeholder(show_placeholder: bool) -> void:
-	var vbox: VBoxContainer = _pool_panel.get_node_or_null("PoolVBox") as VBoxContainer
+	# PoolVBox is an HBoxContainer since the 3-card-draft restyle; type it as the
+	# generic Container base so the EmptyPoolPlaceholder logic is orientation-agnostic.
+	var vbox: Control = _pool_panel.get_node_or_null("PoolVBox") as Control
 	if vbox == null:
 		return
 	var placeholder: Label = vbox.get_node_or_null("EmptyPoolPlaceholder") as Label
@@ -371,3 +382,77 @@ func _on_gold_changed(_new_balance: int, _delta: int, _reason: String) -> void:
 # post-/design-review.
 func _show_toast(message: String) -> void:
 	push_warning("[RecruitScreen] toast: %s" % message)
+
+
+# ===========================================================================
+# Lantern Guild mock wireframe — greybox 3-card recruit draft
+# (feat/ui-wireframe-detail-recruit)
+#
+# The mock's Recruit is a side-by-side 3-card draft ("three came to the door").
+# The .tscn flips PoolVBox VBox→HBox (cards side by side) and each PoolEntry
+# HBox→VBox (portrait on top, class / cost / owned, flavour, recruit button at
+# the foot) — node paths preserved so the path-based tests stay green. This
+# styles the draft: a defined draft table, evenly-spaced fixed-width cards with
+# a header rule, centered content, and a flavour line. Colors route through
+# WireframeKit (no Color() literals here).
+# ===========================================================================
+
+func _build_wireframe_once() -> void:
+	if _wire_built:
+		return
+	_wire_built = true
+
+	# The pool panel becomes the draft "table".
+	if _pool_panel != null:
+		_pool_panel.add_theme_stylebox_override("panel", WireframeKitScript.stylebox(
+			WireframeKitScript.FILL, WireframeKitScript.LINE, 1, 4, 20))
+
+	var pool_box: Control = get_node_or_null("PoolPanel/PoolVBox")  # now an HBoxContainer
+	if pool_box is BoxContainer:
+		(pool_box as BoxContainer).alignment = BoxContainer.ALIGNMENT_CENTER
+		pool_box.add_theme_constant_override("separation", 20)
+
+	for i: int in range(POOL_SIZE):
+		_style_draft_card(_pool_entries[i] as Control)
+
+
+## Styles one recruit entry (now a VBox) as a draft card: fixed width, a top
+## accent rule, centered content, and a flavour line.
+func _style_draft_card(entry: Control) -> void:
+	if entry == null:
+		return
+	entry.custom_minimum_size = Vector2(248, 0)
+	entry.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	if entry is BoxContainer:
+		(entry as BoxContainer).alignment = BoxContainer.ALIGNMENT_CENTER
+		entry.add_theme_constant_override("separation", 8)
+
+	# Header rule so each column reads as a distinct card.
+	if not entry.has_node("WireCardTop"):
+		var rule: ColorRect = ColorRect.new()
+		rule.name = "WireCardTop"
+		rule.color = WireframeKitScript.ACCENT
+		rule.custom_minimum_size = Vector2(0, 2)
+		entry.add_child(rule)
+		entry.move_child(rule, 0)
+
+	# Center the portrait + recruit button.
+	var portrait: Control = entry.get_node_or_null("ClassPortrait") as Control
+	if portrait != null:
+		portrait.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var btn: Control = entry.get_node_or_null("RecruitButton") as Control
+	if btn != null:
+		btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+
+	# Center the detail labels + add a flavour placeholder line under the cost.
+	var details: Control = entry.get_node_or_null("EntryDetails") as Control
+	if details != null:
+		for child: Node in details.get_children():
+			if child is Label:
+				(child as Label).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		if not details.has_node("WireFlavor"):
+			var flavor: Label = WireframeKitScript.caption(
+				"“They came to the door.”", WireframeKitScript.MUTED, 11)
+			flavor.name = "WireFlavor"
+			flavor.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			details.add_child(flavor)
