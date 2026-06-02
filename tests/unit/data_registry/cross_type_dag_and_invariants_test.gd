@@ -37,7 +37,7 @@ func _make_dungeon(dungeon_id: String, biome_id: String) -> Dungeon:
 
 
 ## Builds a minimal Biome with the given id + embedded dungeons list.
-func _make_biome(biome_id: String, dungeons: Array[Dungeon]) -> Biome:
+func _make_biome(biome_id: String, dungeons: Array[Resource]) -> Biome:
 	var b: Biome = BiomeScript.new()
 	b.id = biome_id
 	b.dungeons = dungeons
@@ -119,9 +119,9 @@ func test_ac_dls_06_real_cycle_via_cross_parent_embedding_detects_circular_ref()
 	auto_free(dr)
 	var dungeon_a: Dungeon = _make_dungeon("dungeon_a", "biome_x")
 	var dungeon_b: Dungeon = _make_dungeon("dungeon_b", "biome_y")
-	var biome_x_dungeons: Array[Dungeon] = [dungeon_b]  # cross-parent: dungeon_b's parent is biome_y
+	var biome_x_dungeons: Array[Resource] = [dungeon_b]  # cross-parent: dungeon_b's parent is biome_y
 	var biome_x: Biome = _make_biome("biome_x", biome_x_dungeons)
-	var biome_y_dungeons: Array[Dungeon] = [dungeon_a]  # cross-parent: dungeon_a's parent is biome_x
+	var biome_y_dungeons: Array[Resource] = [dungeon_a]  # cross-parent: dungeon_a's parent is biome_x
 	var biome_y: Biome = _make_biome("biome_y", biome_y_dungeons)
 	dr._categories["dungeons"] = {"dungeon_a": dungeon_a, "dungeon_b": dungeon_b}
 	dr._categories["biomes"] = {"biome_x": biome_x, "biome_y": biome_y}
@@ -157,7 +157,7 @@ func test_ac_dls_06_acyclic_dungeon_biome_graph_passes_silently() -> void:
 	var dr: Node = _make_registry()
 	auto_free(dr)
 	var dungeon_a: Dungeon = _make_dungeon("dungeon_a", "biome_x")
-	var empty_dungeons: Array[Dungeon] = []
+	var empty_dungeons: Array[Resource] = []
 	var biome_x: Biome = _make_biome("biome_x", empty_dungeons)
 	dr._categories["dungeons"] = {"dungeon_a": dungeon_a}
 	dr._categories["biomes"] = {"biome_x": biome_x}
@@ -191,9 +191,9 @@ func test_ac_dls_06_cycle_length_3_full_path_reported() -> void:
 	auto_free(dr)
 	var dungeon_a: Dungeon = _make_dungeon("dungeon_a", "biome_b")
 	var dungeon_c: Dungeon = _make_dungeon("dungeon_c", "biome_a")
-	var biome_b_dungeons: Array[Dungeon] = [dungeon_c]
+	var biome_b_dungeons: Array[Resource] = [dungeon_c]
 	var biome_b: Biome = _make_biome("biome_b", biome_b_dungeons)
-	var biome_a_dungeons: Array[Dungeon] = [dungeon_a]
+	var biome_a_dungeons: Array[Resource] = [dungeon_a]
 	var biome_a: Biome = _make_biome("biome_a", biome_a_dungeons)
 	dr._categories["dungeons"] = {"dungeon_a": dungeon_a, "dungeon_c": dungeon_c}
 	dr._categories["biomes"] = {"biome_a": biome_a, "biome_b": biome_b}
@@ -279,9 +279,9 @@ func test_ac_dls_06_post_error_resolve_returns_null_for_cyclic_resources() -> vo
 	auto_free(dr)
 	var dungeon_a: Dungeon = _make_dungeon("dungeon_a", "biome_x")
 	var dungeon_b: Dungeon = _make_dungeon("dungeon_b", "biome_y")
-	var biome_x_dungeons: Array[Dungeon] = [dungeon_b]
+	var biome_x_dungeons: Array[Resource] = [dungeon_b]
 	var biome_x: Biome = _make_biome("biome_x", biome_x_dungeons)
-	var biome_y_dungeons: Array[Dungeon] = [dungeon_a]
+	var biome_y_dungeons: Array[Resource] = [dungeon_a]
 	var biome_y: Biome = _make_biome("biome_y", biome_y_dungeons)
 	dr._categories["dungeons"] = {"dungeon_a": dungeon_a, "dungeon_b": dungeon_b}
 	dr._categories["biomes"] = {"biome_x": biome_x, "biome_y": biome_y}
