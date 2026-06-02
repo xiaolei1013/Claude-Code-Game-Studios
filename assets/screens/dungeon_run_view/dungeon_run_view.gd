@@ -62,6 +62,7 @@ extends Screen
 
 const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
 const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/dungeon_run_state.gd")
+const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
 
 # ---------------------------------------------------------------------------
 # Constants (Story 013)
@@ -130,6 +131,10 @@ var _overlay_shown: bool = false
 ## SceneManager's TRANSITIONING queue-overwrite guard).
 ## Distinct from _overlay_shown — they guard different concerns.
 var _routed: bool = false
+
+## Lantern Guild mock wireframe (feat/ui-wireframe-core-loop) — greybox HUD state.
+var _wire_built: bool = false
+var _float_layer: Control = null
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +214,10 @@ func on_enter() -> void:
 
 	# Single-focus-mode strategy: suppress keyboard/gamepad focus on all Controls.
 	UIFrameworkScript.suppress_keyboard_focus(self)
+
+	# Lantern Guild mock wireframe (feat/ui-wireframe-core-loop): build the
+	# greybox live-Expedition HUD once.
+	_build_wireframe_once()
 
 	# Story 013 (Sprint 13 S13-S1) replaces the prior on_enter early-detection
 	# hotfix with an orchestrator-level buffered-replay pattern. The Sprint 8
@@ -442,3 +451,199 @@ func _show_run_end_overlay(final_kill_count: int) -> void:
 	if _stats_panel != null:
 		_stats_panel.visible = false
 	_run_end_overlay.visible = true
+
+
+# ===========================================================================
+# Lantern Guild mock wireframe — greybox live Expedition HUD
+# (feat/ui-wireframe-core-loop)
+#
+# Recreates the mock's Expedition layout (party HUD top-left, run stats +
+# Return-to-Hall top-right, expedition progress bottom-right, channel-light
+# lantern bottom-center, event feed mid-left) at greybox fidelity, built
+# additively over the existing display-only nodes. The real tick/kill labels
+# are kept and repositioned into the run-stats HUD.
+#
+# NO Color() literals in this file — all colors route through WireframeKit
+# constants (dungeon_run_view_screen_test greps this file for Color literals).
+# ===========================================================================
+
+const _WIRE_Z: int = 1
+
+
+func _place(node: Control, al: float, at: float, ar: float, ab: float,
+		ol: float, ot: float, orr: float, ob: float) -> void:
+	if node == null:
+		return
+	node.anchor_left = al
+	node.anchor_top = at
+	node.anchor_right = ar
+	node.anchor_bottom = ab
+	node.offset_left = ol
+	node.offset_top = ot
+	node.offset_right = orr
+	node.offset_bottom = ob
+
+
+func _build_wireframe_once() -> void:
+	if _wire_built:
+		return
+	_wire_built = true
+	_reposition_existing_nodes_drv()
+	_build_party_hud()
+	_build_run_stats_hud()
+	_build_progress_panel()
+	_build_activity_feed_drv()
+	_build_lantern_drv()
+	var layer: Control = WireframeKitScript.float_layer()
+	add_child(layer)
+	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_float_layer = layer
+
+
+func _reposition_existing_nodes_drv() -> void:
+	var header: Label = get_node_or_null("HeaderLabel") as Label
+	if header != null:
+		_place(header, 0, 0, 1, 0, 0.0, 14.0, 0.0, 54.0)
+		header.z_index = 2
+	# Real live tick/kill labels → top-right, over the run-stats backing panel.
+	if _stats_panel != null:
+		_place(_stats_panel, 1, 0, 1, 0, -232.0, 48.0, -28.0, 112.0)
+		_stats_panel.z_index = 2
+	# Keep the run-end overlay above the wireframe HUD when it shows.
+	if _run_end_overlay != null:
+		_run_end_overlay.z_index = 5
+
+
+## Top-left: party HUD — real formation heroes with placeholder HP.
+func _build_party_hud() -> void:
+	var panel: PanelContainer = WireframeKitScript.section_panel("Party")
+	panel.name = "WirePartyHud"
+	panel.z_index = _WIRE_Z
+	add_child(panel)
+	_place(panel, 0, 0, 0, 0, 14.0, 14.0, 324.0, 232.0)
+	var body: VBoxContainer = WireframeKitScript.body_of(panel)
+	var party: Array = []
+	if HeroRoster != null:
+		party = HeroRoster.get_formation_heroes()
+	if party.is_empty():
+		body.add_child(WireframeKitScript.caption(
+			"No party on this expedition.", WireframeKitScript.MUTED))
+		return
+	for h: Variant in party:
+		if h == null:
+			continue
+		var nm: String = "Hero"
+		if "display_name" in h:
+			nm = String(h.display_name)
+		var lvl: int = 0
+		if "current_level" in h:
+			lvl = int(h.current_level)
+		var cls: String = ""
+		if "class_id" in h:
+			cls = String(h.class_id)
+		body.add_child(WireframeKitScript.list_tile(
+			nm, "%s · Lv %d" % [cls, lvl], "HP"))
+
+
+## Top-right: run stats backing panel + Return-to-Hall. The real StatsPanel
+## (Tick/Kills) is repositioned to overlay this panel's body.
+func _build_run_stats_hud() -> void:
+	var panel: PanelContainer = WireframeKitScript.section_panel("Run")
+	panel.name = "WireRunStats"
+	panel.z_index = _WIRE_Z
+	add_child(panel)
+	_place(panel, 1, 0, 1, 0, -250.0, 14.0, -14.0, 120.0)
+
+	var btn: Button = Button.new()
+	btn.name = "WireReturnButton"
+	btn.text = "Return to Hall"
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.custom_minimum_size = Vector2(150, 44)
+	btn.z_index = 2
+	add_child(btn)
+	_place(btn, 1, 0, 1, 0, -164.0, 132.0, -14.0, 176.0)
+	btn.pressed.connect(_on_wire_return_pressed)
+
+
+## Bottom-right: expedition progress (placeholder bar — no clean run % yet).
+func _build_progress_panel() -> void:
+	var panel: PanelContainer = WireframeKitScript.section_panel("Expedition progress")
+	panel.name = "WireProgress"
+	panel.z_index = _WIRE_Z
+	add_child(panel)
+	_place(panel, 1, 1, 1, 1, -300.0, -118.0, -14.0, -14.0)
+	var body: VBoxContainer = WireframeKitScript.body_of(panel)
+	var bar: ProgressBar = ProgressBar.new()
+	bar.custom_minimum_size = Vector2(0, 14)
+	bar.show_percentage = false
+	bar.max_value = 100.0
+	bar.value = 42.0
+	body.add_child(bar)
+	body.add_child(WireframeKitScript.caption(
+		"tick-driven · wireframe placeholder", WireframeKitScript.MUTED, 10))
+
+
+## Mid-left: live combat event feed (static flavour lines for the wireframe).
+func _build_activity_feed_drv() -> void:
+	var panel: PanelContainer = WireframeKitScript.section_panel("Event log")
+	panel.name = "WireActivityFeed"
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.z_index = _WIRE_Z
+	add_child(panel)
+	_place(panel, 0, 0, 0, 1, 14.0, 244.0, 324.0, -120.0)
+	var body: VBoxContainer = WireframeKitScript.body_of(panel)
+	for line: String in [
+		"A blade finds a skeleton in the dark.",
+		"A relic clatters out of the floor.",
+		"The lantern flares. The party sees clearly.",
+		"The party descends to depth 3.",
+	]:
+		var l: Label = WireframeKitScript.caption("· " + line, WireframeKitScript.MUTED, 12)
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		body.add_child(l)
+
+
+## Bottom-center: the channel-light lantern (idle-clicker target).
+func _build_lantern_drv() -> void:
+	var wrap: VBoxContainer = VBoxContainer.new()
+	wrap.name = "WireLantern"
+	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.alignment = BoxContainer.ALIGNMENT_CENTER
+	wrap.add_theme_constant_override("separation", 8)
+	wrap.z_index = 2
+	add_child(wrap)
+	_place(wrap, 0.5, 1, 0.5, 1, -150.0, -210.0, 150.0, -16.0)
+
+	var cap_top: Label = WireframeKitScript.eyebrow(
+		"Channel light · click the lantern", WireframeKitScript.ACCENT)
+	cap_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cap_top.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wrap.add_child(cap_top)
+
+	var center_row: HBoxContainer = HBoxContainer.new()
+	center_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	wrap.add_child(center_row)
+	center_row.add_child(WireframeKitScript.lantern_button(_on_lantern_pressed_drv))
+
+	var note: Label = WireframeKitScript.caption(
+		"Wireframe — click feedback only; channel-light economy TBD",
+		WireframeKitScript.MUTED, 10)
+	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wrap.add_child(note)
+
+
+func _on_lantern_pressed_drv() -> void:
+	if _float_layer == null:
+		return
+	var vp: Vector2 = get_viewport_rect().size
+	var animate: bool = not (SceneManager != null and SceneManager.reduce_motion)
+	WireframeKitScript.spawn_float(
+		_float_layer, "+ light",
+		Vector2(vp.x * 0.5 - 28.0 + randf_range(-26.0, 26.0), vp.y - 210.0),
+		animate)
+
+
+func _on_wire_return_pressed() -> void:
+	SceneManager.request_screen("guild_hall", SceneManager.TransitionType.CROSS_FADE)

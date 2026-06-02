@@ -50,6 +50,26 @@ const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
 const TOAST_FADE_DURATION_SEC: float = 4.0
 var _toast_tween: Tween = null
 
+# ---------------------------------------------------------------------------
+# Lantern Guild mock wireframe (feat/ui-wireframe-core-loop) — state.
+# Greybox 3-column Hall built additively over the existing nodes. See the
+# "mock wireframe" section at the bottom of this file.
+# ---------------------------------------------------------------------------
+const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+const _WIRE_Z: int = 2          # draw above WarmLanternOverlay (z=1): greybox stays neutral
+const _TOPBAR_H: float = 52.0
+const _COL_GAP: float = 14.0
+const _LEFT_W: float = 340.0
+const _RIGHT_W: float = 360.0
+const _CONTENT_TOP: float = 60.0
+const _FOOTER_H: float = 56.0
+
+var _wire_built: bool = false
+var _runs_body: VBoxContainer = null
+var _map_body: VBoxContainer = null
+var _lantern_button: Button = null
+var _float_layer: Control = null
+
 
 func on_enter() -> void:
 	if _dispatch_nav_button == null:
@@ -107,6 +127,13 @@ func on_enter() -> void:
 	if not HeroRoster.prestige_completed_signal.is_connected(_on_prestige_completed):
 		HeroRoster.prestige_completed_signal.connect(_on_prestige_completed)
 	_refresh_retired_tab()
+
+	# Lantern Guild mock wireframe (feat/ui-wireframe-core-loop): build the
+	# greybox 3-column Hall once, then refresh its data-driven panels each
+	# time the player lands here (e.g. returning from a run).
+	_build_wireframe_once()
+	_refresh_runs_panel()
+	_refresh_map_panel()
 
 
 func on_exit() -> void:
@@ -535,3 +562,335 @@ func _on_settings_gear_pressed() -> void:
 # Sprint 24 S24-M3: _clear_container_immediate hoisted to
 # UIFramework.clear_children_immediate. Call sites updated to use the
 # UIFramework helper directly. Local wrapper removed.
+
+
+# ===========================================================================
+# Lantern Guild mock wireframe — greybox 3-column Hall
+# (feat/ui-wireframe-core-loop)
+#
+# Recreates "The Hall" layout from the Lantern Guild Prototype mock
+# (Roster · Expeditions+Lantern · Map, with a top bar + event feed) at
+# greybox/wireframe fidelity. Built ADDITIVELY: every node the @onready vars
+# and tests reference keeps its original path; existing nodes are repositioned
+# via anchors and new neutral-grey wireframe siblings are added at z=2 (above
+# the WarmLanternOverlay) so the greybox reads as neutral structure.
+#
+# Real data is wired where cheap (gold, roster, biomes, run state). The lantern
+# is the idle-clicker click target; we have NO channel-light economy mechanic
+# yet, so its click only spawns wireframe feedback (see the caption under it).
+# ===========================================================================
+
+## Sets a Control's four anchors then four offsets in one call.
+func _place(node: Control, al: float, at: float, ar: float, ab: float,
+		ol: float, ot: float, orr: float, ob: float) -> void:
+	if node == null:
+		return
+	node.anchor_left = al
+	node.anchor_top = at
+	node.anchor_right = ar
+	node.anchor_bottom = ab
+	node.offset_left = ol
+	node.offset_top = ot
+	node.offset_right = orr
+	node.offset_bottom = ob
+
+
+func _center_col_left() -> float:
+	return _COL_GAP + _LEFT_W + _COL_GAP
+
+
+func _center_col_right() -> float:
+	return -(_COL_GAP + _RIGHT_W + _COL_GAP)
+
+
+func _build_wireframe_once() -> void:
+	if _wire_built:
+		return
+	_wire_built = true
+	_reposition_existing_nodes()
+	_build_top_bar()
+	_build_runs_panel()
+	_build_activity_feed()
+	_build_lantern()
+	_build_map_panel()
+	_build_float_layer()
+
+
+## Moves the pre-existing .tscn nodes into the mock's 3-column layout. Their
+## node paths are unchanged — only anchors/offsets/z. Text + theme variation
+## are left alone (identity-header + smoke-flow tests assert on those).
+func _reposition_existing_nodes() -> void:
+	# top bar: screen title as the left lockup; gold + gear on the right (z=3
+	# so they draw above the WireTopBar strip).
+	var title: Label = get_node_or_null("ScreenTitleLabel") as Label
+	if title != null:
+		_place(title, 0, 0, 0, 0, 16.0, 8.0, 360.0, 46.0)
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		title.z_index = 3
+	if _gold_counter != null:
+		_place(_gold_counter, 1, 0, 1, 0, -300.0, 8.0, -64.0, 46.0)
+		_gold_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		_gold_counter.z_index = 3
+	if _settings_gear_button != null:
+		_place(_settings_gear_button, 1, 0, 1, 0, -56.0, 9.0, -14.0, 45.0)
+		_settings_gear_button.z_index = 3
+
+	# left column: roster panel + recruit footer button. Clear the .tscn's
+	# 480px min-size + GROW_BOTH (centered layout) so the panel pins to the
+	# left column instead of overflowing off-screen.
+	var roster_panel: Control = get_node_or_null("RosterPanel") as Control
+	if roster_panel != null:
+		roster_panel.custom_minimum_size = Vector2.ZERO
+		roster_panel.grow_horizontal = Control.GROW_DIRECTION_END
+		roster_panel.grow_vertical = Control.GROW_DIRECTION_END
+		_place(roster_panel, 0, 0, 0, 1,
+			_COL_GAP, _CONTENT_TOP, _COL_GAP + _LEFT_W, -(_FOOTER_H + _COL_GAP))
+		roster_panel.z_index = _WIRE_Z
+	if _recruit_nav_button != null:
+		_place(_recruit_nav_button, 0, 1, 0, 1,
+			_COL_GAP, -(_FOOTER_H + _COL_GAP), _COL_GAP + _LEFT_W, -_COL_GAP)
+		_recruit_nav_button.z_index = _WIRE_Z
+
+	# right column: dispatch ("Send Party") footer button. The Map panel built
+	# in _build_map_panel fills the column above it.
+	if _dispatch_nav_button != null:
+		_place(_dispatch_nav_button, 1, 1, 1, 1,
+			-(_RIGHT_W + _COL_GAP), -(_FOOTER_H + _COL_GAP), -_COL_GAP, -_COL_GAP)
+		_dispatch_nav_button.z_index = _WIRE_Z
+
+	# synergy badge: park it centered just above the lantern. Still hidden by
+	# default; on_enter's _refresh_synergy_badge shows it when a synergy is
+	# active (visibility is NOT touched here).
+	if _synergy_badge != null:
+		_place(_synergy_badge, 0.5, 1, 0.5, 1, -220.0, -250.0, 220.0, -214.0)
+		_synergy_badge.z_index = _WIRE_Z
+
+
+## Decorative top-bar strip with the mock's nav tabs + currency-tray
+## placeholders. The brand lockup + real gold/gear sit on top of it (z=3).
+func _build_top_bar() -> void:
+	var bar: PanelContainer = PanelContainer.new()
+	bar.name = "WireTopBar"
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.z_index = _WIRE_Z
+	bar.add_theme_stylebox_override("panel", WireframeKitScript.stylebox(
+		WireframeKitScript.HEADER_FILL, WireframeKitScript.LINE, 1, 0, 0))
+	add_child(bar)
+	_place(bar, 0, 0, 1, 0, 0.0, 0.0, 0.0, _TOPBAR_H)
+
+	var row: HBoxContainer = HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 10)
+	bar.add_child(row)
+	row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var lead: Control = Control.new()
+	lead.custom_minimum_size = Vector2(360, 0)
+	lead.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(lead)
+
+	for tab_text: String in ["The Hall", "Codex", "Lantern Shards · 0"]:
+		var is_active: bool = tab_text == "The Hall"
+		var tab: Label = WireframeKitScript.eyebrow(tab_text,
+			WireframeKitScript.ACCENT if is_active else WireframeKitScript.MUTED)
+		tab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tab.add_theme_font_size_override("font_size", 12)
+		row.add_child(tab)
+
+	var grow: Control = Control.new()
+	grow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(grow)
+
+	for chip_text: String in ["Gems —", "Keys —"]:
+		var chip: Label = WireframeKitScript.eyebrow(chip_text)
+		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(chip)
+
+	var tail: Control = Control.new()       # reserve room for the real gold + gear
+	tail.custom_minimum_size = Vector2(300, 0)
+	tail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(tail)
+
+
+## Center-column top panel: "Expeditions in progress". Our orchestrator is a
+## single-run engine, so this honestly shows 0 or 1 run.
+func _build_runs_panel() -> void:
+	var panel: PanelContainer = WireframeKitScript.section_panel("Expeditions in progress")
+	panel.name = "WireRunsPanel"
+	panel.z_index = _WIRE_Z
+	add_child(panel)
+	_place(panel, 0, 0, 1, 0,
+		_center_col_left(), _CONTENT_TOP, _center_col_right(), _CONTENT_TOP + 196.0)
+	var dyn: VBoxContainer = VBoxContainer.new()
+	dyn.name = "Dyn"
+	dyn.add_theme_constant_override("separation", 6)
+	WireframeKitScript.body_of(panel).add_child(dyn)
+	_runs_body = dyn
+
+
+func _refresh_runs_panel() -> void:
+	if _runs_body == null:
+		return
+	for c: Node in _runs_body.get_children():
+		c.queue_free()
+	var snap: Variant = DungeonRunOrchestrator.run_snapshot if DungeonRunOrchestrator != null else null
+	if snap == null:
+		_runs_body.add_child(WireframeKitScript.caption(
+			"The lantern is lit. No one has answered yet.", WireframeKitScript.MUTED))
+		return
+	var biome_id: String = DungeonRunOrchestrator.get_dispatched_biome_id()
+	var floor_i: int = DungeonRunOrchestrator.get_dispatched_floor_index()
+	var biome_label: String = biome_id.capitalize()
+	if BiomeDungeonDatabase != null:
+		biome_label = _biome_display(BiomeDungeonDatabase.get_biome_by_id(biome_id), biome_id)
+	_runs_body.add_child(WireframeKitScript.list_tile(
+		biome_label, "Floor %d · in progress" % floor_i, "WATCH"))
+
+
+## Center-column middle panel: the event/activity feed (static flavour lines —
+## the live combat log is wired on the Expedition screen).
+func _build_activity_feed() -> void:
+	var panel: PanelContainer = WireframeKitScript.section_panel("Event log")
+	panel.name = "WireActivityFeed"
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.z_index = _WIRE_Z
+	add_child(panel)
+	_place(panel, 0, 0, 1, 1,
+		_center_col_left(), _CONTENT_TOP + 208.0, _center_col_right(), -216.0)
+	var body: VBoxContainer = WireframeKitScript.body_of(panel)
+	for line: String in [
+		"The lantern needs trimming.",
+		"A draft. Somewhere a door closes.",
+		"The party rests four breaths.",
+		"A loose stone settles in the wall.",
+	]:
+		var l: Label = WireframeKitScript.caption("· " + line, WireframeKitScript.MUTED, 12)
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		body.add_child(l)
+
+
+## Center-bottom: the lantern click target. Idle-clicker hero element.
+func _build_lantern() -> void:
+	var wrap: VBoxContainer = VBoxContainer.new()
+	wrap.name = "WireLantern"
+	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.alignment = BoxContainer.ALIGNMENT_CENTER
+	wrap.add_theme_constant_override("separation", 8)
+	wrap.z_index = _WIRE_Z
+	add_child(wrap)
+	_place(wrap, 0.5, 1, 0.5, 1, -150.0, -224.0, 150.0, -20.0)
+
+	var cap_top: Label = WireframeKitScript.eyebrow(
+		"Channel · click the lantern", WireframeKitScript.ACCENT)
+	cap_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cap_top.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wrap.add_child(cap_top)
+
+	var center_row: HBoxContainer = HBoxContainer.new()
+	center_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	wrap.add_child(center_row)
+
+	var btn: Button = WireframeKitScript.lantern_button(_on_lantern_pressed)
+	center_row.add_child(btn)
+	_lantern_button = btn
+
+	var note: Label = WireframeKitScript.caption(
+		"Wireframe — click feedback only; channel-light economy TBD",
+		WireframeKitScript.MUTED, 10)
+	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wrap.add_child(note)
+
+
+func _on_lantern_pressed() -> void:
+	_spawn_lantern_float()
+
+
+## Spawns a floating "+ light" number near the lantern (the idle-clicker
+## feedback). Respects reduce_motion: no travel/fade, snap-hide via a timer.
+func _spawn_lantern_float() -> void:
+	if _float_layer == null:
+		return
+	var vp: Vector2 = get_viewport_rect().size
+	var animate: bool = not (SceneManager != null and SceneManager.reduce_motion)
+	WireframeKitScript.spawn_float(
+		_float_layer, "+ light",
+		Vector2(vp.x * 0.5 - 28.0 + randf_range(-26.0, 26.0), vp.y - 210.0),
+		animate)
+
+
+## Resolves a biome's player-facing name defensively (biomes may carry a
+## `display_name`, a localized `display_name_key`, or neither). Mirrors the
+## fallback chain in formation_assignment.gd + victory_moment.gd.
+func _biome_display(biome: Variant, fallback_id: String) -> String:
+	if biome != null and "display_name" in biome:
+		var dn: String = String(biome.display_name)
+		if dn != "":
+			return dn
+	if biome != null and "display_name_key" in biome:
+		var key: String = String(biome.display_name_key)
+		if key != "":
+			var localized: String = tr(key)
+			if localized != "" and localized != key:
+				return localized
+	return fallback_id.capitalize()
+
+
+## Right column: "The Map" — list of playable biomes (real data) with their
+## clear progress. Floor/party selection happens in Dispatch (Send Party CTA).
+func _build_map_panel() -> void:
+	var panel: PanelContainer = WireframeKitScript.section_panel("The Map")
+	panel.name = "WireMapPanel"
+	panel.z_index = _WIRE_Z
+	add_child(panel)
+	_place(panel, 1, 0, 1, 1,
+		-(_RIGHT_W + _COL_GAP), _CONTENT_TOP, -_COL_GAP, -(_FOOTER_H + _COL_GAP))
+	var scroll: ScrollContainer = ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	WireframeKitScript.body_of(panel).add_child(scroll)
+	var dyn: VBoxContainer = VBoxContainer.new()
+	dyn.name = "Dyn"
+	dyn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dyn.add_theme_constant_override("separation", 6)
+	scroll.add_child(dyn)
+	_map_body = dyn
+
+
+func _refresh_map_panel() -> void:
+	if _map_body == null:
+		return
+	for c: Node in _map_body.get_children():
+		c.queue_free()
+	var biomes: Array = []
+	if BiomeDungeonDatabase != null:
+		biomes = BiomeDungeonDatabase.get_playable_biomes()
+	if biomes.is_empty():
+		_map_body.add_child(WireframeKitScript.caption(
+			"No dungeons available yet.", WireframeKitScript.MUTED))
+	else:
+		var shown: int = 0
+		for b: Variant in biomes:
+			if b == null:
+				continue
+			var bid: String = String(b.id)
+			var bname: String = _biome_display(b, bid)
+			var sub: String = "Sealed"
+			if FloorUnlock != null and FloorUnlock.is_biome_available(bid):
+				sub = "Cleared to floor %d" % FloorUnlock.get_highest_cleared(bid)
+			_map_body.add_child(WireframeKitScript.list_tile(bname, sub, ""))
+			shown += 1
+			if shown >= 6:
+				break
+	_map_body.add_child(WireframeKitScript.caption(
+		"Choose a party and floor in Dispatch ->", WireframeKitScript.MUTED, 11))
+
+
+## Full-rect input-transparent layer for the lantern's floating numbers.
+func _build_float_layer() -> void:
+	var layer: Control = WireframeKitScript.float_layer()
+	add_child(layer)
+	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_float_layer = layer
