@@ -33,6 +33,19 @@ func _open_picker_and_collect_biome_tabs() -> Array[String]:
 	screen.on_enter()
 	screen.call("_show_floor_picker")
 
+	# --- FRAGDUMP2 (temporary) ---
+	var _vb: Array = screen.find_children("FloorPickerBiomeVBox", "", true, false)
+	var _fpb: Variant = screen.get("_fp_biomes")
+	var _fpbn: int = (_fpb as Array).size() if _fpb is Array else -99
+	var _dr2: Node = get_tree().root.get_node_or_null("DataRegistry")
+	var _res: Variant = _dr2.call("resolve", "biomes", "forest_reach") if _dr2 != null else null
+	var _vbchildren: int = -1
+	if _vb.size() > 0:
+		_vbchildren = (_vb.front() as Node).get_child_count()
+	push_warning("[FRAGDUMP2] vbox_found=%d vbox_children=%d | _fp_biomes_size=%d | resolve(forest_reach)=%s" % [
+		_vb.size(), _vbchildren, _fpbn, str(_res)])
+	# --- end ---
+
 	var biome_ids: Array[String] = []
 	var vbox: Node = screen.find_children("FloorPickerBiomeVBox", "", true, false).front() as Node
 	if vbox == null:
