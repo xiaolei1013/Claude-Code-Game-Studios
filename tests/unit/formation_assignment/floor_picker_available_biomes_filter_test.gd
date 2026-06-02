@@ -34,7 +34,13 @@ func _open_picker_and_collect_biome_tabs() -> Array[String]:
 	screen.call("_show_floor_picker")
 
 	var biome_ids: Array[String] = []
-	var vbox: Node = screen.find_children("FloorPickerBiomeVBox", "", true, false).front() as Node
+	# The biome tabs are children of PickerBiomeVBox (formation_assignment.tscn:
+	# FloorPickerOverlay/PickerPanel/PickerContent/PickerScroll/PickerBiomeVBox, and
+	# the `_floor_picker_biome_vbox` @onready). An earlier scene refactor renamed
+	# this node FloorPickerBiomeVBox -> PickerBiomeVBox; this test searched the stale
+	# name, found nothing, and silently returned [] — so the contains() assertions
+	# failed whenever the suite actually reached this test. Search the real name.
+	var vbox: Node = screen.find_children("PickerBiomeVBox", "", true, false).front() as Node
 	if vbox == null:
 		return biome_ids
 	for child: Node in vbox.get_children():
