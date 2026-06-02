@@ -62,6 +62,7 @@
 - [ADR-0001: Difficulty Config Interface](../../docs/architecture/adr-0001-difficulty-config-interface.md) — IDifficultyProvider centralizes multiplier access across SpawnManager, EnemyController, Endless
 - [ADR-0002: SpawnManager Mode Routing](../../docs/architecture/adr-0002-spawnmanager-mode-routing.md) — Unified SpawnManager with strategy pattern for campaign vs Endless
 - [ADR-0005: Archer Class Extension Strategy](../../docs/architecture/adr-0005-archer-class-extension.md) — ArcherPlayerController subclass, ICharacterClass interface, DashSkill refactor, 7 exclusive skills
+- [ADR-0008: SpawnManager Public API & Wave Provider Consumption Contract](../../docs/architecture/adr-0008-spawnmanager-wave-consumption-contract.md) — Locks SpawnManager public surface, WaveData authored/procedural union, IsWaveComplete semantic, event+polling pattern, SetWave asymmetry resolved
 
 ## Engine Specialists
 

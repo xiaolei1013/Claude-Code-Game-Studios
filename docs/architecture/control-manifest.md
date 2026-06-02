@@ -1,8 +1,8 @@
 # Control Manifest — Trizzle / Shadow Quest v1.0
 
-Manifest Version: 2026-04-08-v1
+Manifest Version: 2026-04-18-v2
 Engine: Unity 6000.3.11f1
-ADRs Covered: ADR-0001 through ADR-0007
+ADRs Covered: ADR-0001 through ADR-0008
 
 ---
 
@@ -25,8 +25,9 @@ ADRs Covered: ADR-0001 through ADR-0007
 - R-010: Boss phase transitions must use the stagger coroutine sequence: set invulnerable → `StateMachine.ResetState()` → swap `BehaviourTree` → apply `StatModifiers` → instantiate `TransitionVFX` → set `HasTriggered = true` → fire `OnPhaseTransition` → `WaitForSeconds(0.5f)` → lift invulnerable. (Source: ADR-0004)
 - R-011: `ComboEffect.Activate(PlayerController)` must register event listeners and apply immediate attribute modifications. `ComboEffect.Deactivate()` must unsubscribe all listeners and reverse all attribute changes — leaving the asset clean for reuse next run. (Source: ADR-0003)
 - R-012: Each `ComboEffect.Activate()` must call `Deactivate()` as its first step, as a guard against Editor play-mode state leaks. (Source: ADR-0003)
-- R-013: `EndlessSessionController.WaveLoop()` must call `_difficultyProvider.SetWave(_waveNumber)` and `_waveProvider.SetWave(_waveNumber)` before calling `SpawnManager.SpawnNextWave()`. Order is mandatory. (Source: ADR-0001, ADR-0007)
+- R-013 (v2): Before calling `SpawnManager.SpawnNextWave()`, `EndlessSessionController.WaveLoop()` must call `_difficultyProvider.SetWave(_waveNumber)` and `_waveProvider.SetWave(_waveNumber)`. This ordering applies ONLY to the Endless path — campaign flow does not call `SetWave` on `CampaignWaveProvider` because `SetWave(int)` is not on the `IWaveProvider` interface; it is a method exposed by `EndlessWaveProvider` only. `CampaignWaveProvider` is initialized by `SetRoom(RoomConfig)` at room entry and auto-advances its internal wave index on each `GetNextWave()` call. (Source: ADR-0001, ADR-0007, ADR-0008)
 - R-014: `DraftRunController.ShowDraft()` must filter candidates through `CanApplyUpgrade(player.CollectedSkills)` before building the draft pool. No class-specific `if` branches in `DraftRunController`. (Source: ADR-0005)
+- R-029: `SpawnManager.SpawnNextWave()` must call `ExpandToSpawnQueue()` exactly once per wave to produce the internal `List<SpawnItemInfo>` queue, then `ApplyDifficulty()` exactly once on that queue before dispatching. The sequence `GetNextWave → Expand → ApplyDifficulty → Dispatch` is mandatory and must not be re-ordered. (Source: ADR-0008)
 
 ### Data Structures
 
@@ -50,6 +51,8 @@ ADRs Covered: ADR-0001 through ADR-0007
 - R-026: `OnSkillUse` combo effects subscribe to `PlayerController.OnSkillUsed` in `Activate()`. `OnKill` combo effects subscribe to the project-wide kill event (confirm exact name against `Health.cs` and `PlayerController.cs` during implementation). `Passive` effects call `AttributeModifier.Add()` in `Activate()` — no event subscription needed. (Source: ADR-0003)
 - R-027: `SpawnManager` and `DraftRunController` subscribe to `IBossPhaseController.OnBossDefeated` and `IBossPhaseController.OnPhaseTransition` — never poll `CurrentPhaseIndex` per frame. (Source: ADR-0004)
 - R-028: `ComboRegistry.CheckCombos()` fires `IComboRegistry.OnComboDiscovered` exactly once per newly discovered combo per run. The combo discovery UI subscribes to this event. (Source: ADR-0003)
+- R-030: `SpawnManager.OnWaveComplete` must fire AFTER `IsWaveComplete` is set to `true`, in the same statement block, so any event handler that re-reads the property observes the new value. The event fires exactly once per wave; re-entry on an already-complete wave is a programmer error. (Source: ADR-0008)
+- R-031: Wave-completion consumers should subscribe to `SpawnManager.OnWaveComplete` in `Awake()` (one-shot handler pattern). `EndlessSessionController.WaveLoop()` is grandfathered to use `WaitUntil(() => SpawnManager.IsWaveComplete)` because it is a coroutine; new consumers must use the event unless they have a coroutine-shaped reason to poll. (Source: ADR-0008)
 
 ---
 
@@ -159,3 +162,4 @@ ADRs Covered: ADR-0001 through ADR-0007
 | ADR-0005 | Accepted | `ICharacterClass` | Archer is a `PlayerController` subclass alongside Mage; `ICharacterClass` eliminates `MagePlayerController` casts in shared skills; class filtering is data-driven via `CanApplyUpgrade()`. |
 | ADR-0006 | Proposed | `RoomConfig` (SO) | 10 `RoomConfig` ScriptableObjects store Normal-only wave/trap/boss data; Hard mode is derived at runtime by `CampaignWaveProvider` applying `IDifficultyProvider` multipliers — no per-difficulty authoring. |
 | ADR-0007 | Proposed | `EndlessSessionController`, `EndlessWaveProvider` | Endless run is coordinated by `EndlessSessionController`; waves are procedural via `EndlessWaveProvider`; score persists to `LevelStats` with synthetic IDs `"Endless_Mage"` / `"Endless_Archer"`; no mid-run save. |
+| ADR-0008 | Accepted | `SpawnManager` public API, `WaveData` (union) | Locks SpawnManager public surface (`SetWaveProvider`/`SpawnNextWave`/`IsWaveComplete`/`OnWaveComplete`); `WaveData` becomes an authored/procedural tagged union so campaign `SpawnItemInfo` lists and Endless recipes flow through one `GetNextWave()`; `IsWaveComplete` = dispatch exhausted ∧ zero live hostiles; event + polling both supported; `SetWave(int)` is Endless-only. |
