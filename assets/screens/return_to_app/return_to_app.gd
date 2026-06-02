@@ -34,6 +34,8 @@ extends Screen
 # ---------------------------------------------------------------------------
 
 const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
+const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+var _wire_built: bool = false
 
 # ---------------------------------------------------------------------------
 # @onready node references — matched to return_to_app.tscn node names.
@@ -142,6 +144,9 @@ func on_enter() -> void:
 		_render_summary(summary)
 	else:
 		_render_no_summary_fallback()
+
+	# Lantern Guild mock wireframe: "while you were away" framing (greybox).
+	_build_wireframe_once()
 
 
 ## Called by SceneManager BEFORE queue_free. Disconnects all signals connected
@@ -288,3 +293,35 @@ func _on_cap_reached(seconds_clipped: int) -> void:
 ## SceneManager.request_screen (no SceneTree.change_scene_to_* per ADR-0007).
 func _on_acknowledge_button_pressed() -> void:
 	SceneManager.request_screen("guild_hall", SceneManager.TransitionType.CROSS_FADE)
+
+
+# ===========================================================================
+# Lantern Guild mock wireframe — greybox "while you were away" framing
+# Additive: eyebrow above the header, the elapsed subhead enlarged into the
+# mock's "clock", and a flavour quote above the acknowledge button. Build once.
+# ===========================================================================
+
+func _build_wireframe_once() -> void:
+	if _wire_built:
+		return
+	_wire_built = true
+	var vbox: Node = get_node_or_null("SummaryPanel/VBoxContainer")
+	if vbox == null:
+		return
+	var eyebrow: Label = WireframeKitScript.eyebrow("· While you were away ·", WireframeKitScript.ACCENT)
+	eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(eyebrow)
+	vbox.move_child(eyebrow, 0)
+
+	# Enlarge the elapsed subhead into the mock's "the candle did not go out" clock.
+	if _elapsed_subhead != null:
+		_elapsed_subhead.add_theme_font_size_override("font_size", 30)
+		_elapsed_subhead.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	if _acknowledge_button != null:
+		var quote: Label = WireframeKitScript.caption(
+			"The Guild kept the candle. The heroes kept walking.",
+			WireframeKitScript.MUTED, 12)
+		quote.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		vbox.add_child(quote)
+		vbox.move_child(quote, _acknowledge_button.get_index())
