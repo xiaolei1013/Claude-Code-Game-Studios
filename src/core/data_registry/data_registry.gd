@@ -27,6 +27,25 @@ extends Node
 # Constants
 # ---------------------------------------------------------------------------
 
+# Cold-load class-cache warming. Forcing these GameData-subclass schema scripts
+# to compile as ordered dependencies of this autoload guarantees their global
+# `class_name`s (GameData/Biome/Dungeon/Floor/HeroClass/EnemyData) register
+# BEFORE _boot_scan() calls ResourceLoader.load() on the `script_class="..."`
+# .tres headers. Without this, a cold global_script_class_cache build (CI is
+# ALWAYS cold — .godot/ is gitignored) can resolve the cache in an order where a
+# Biome/Dungeon .tres loads before its script class is bound; ResourceLoader
+# .load() then returns null and the resource is silently skipped in
+# _load_category, dropping biomes from the registry → the Dispatch floor picker
+# loses tabs. An unrelated .tscn edit can perturb that order (cf. the
+# recruitment 3-card-draft restyle in this PR), making it flaky in CI. Same
+# mitigation pattern documented in hero_roster.gd. Reference-only consts.
+const _GameDataScript = preload("res://assets/data/_base/game_data.gd")
+const _BiomeScript = preload("res://src/core/biome_dungeon_database/biome.gd")
+const _DungeonScript = preload("res://src/core/biome_dungeon_database/dungeon.gd")
+const _FloorScript = preload("res://src/core/biome_dungeon_database/floor.gd")
+const _HeroClassScript = preload("res://src/core/hero_class_database/hero_class.gd")
+const _EnemyDataScript = preload("res://src/core/enemy_database/enemy_data.gd")
+
 ## Deterministic content category load order per ADR-0006.
 ##
 ## Adding a new category requires an explicit edit HERE plus a corresponding
