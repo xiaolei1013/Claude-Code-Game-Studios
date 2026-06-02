@@ -56,6 +56,7 @@ var _toast_tween: Tween = null
 # "mock wireframe" section at the bottom of this file.
 # ---------------------------------------------------------------------------
 const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+const CodexModalScript = preload("res://assets/screens/codex/codex_modal.gd")
 const _WIRE_Z: int = 2          # draw above WarmLanternOverlay (z=1): greybox stays neutral
 const _TOPBAR_H: float = 52.0
 const _COL_GAP: float = 14.0
@@ -693,8 +694,13 @@ func _build_top_bar() -> void:
 		var is_active: bool = tab_text == "The Hall"
 		var tab: Label = WireframeKitScript.eyebrow(tab_text,
 			WireframeKitScript.ACCENT if is_active else WireframeKitScript.MUTED)
-		tab.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tab.add_theme_font_size_override("font_size", 12)
+		# The Codex tab is the live entry point for the read-only catalogue modal.
+		if tab_text == "Codex":
+			tab.mouse_filter = Control.MOUSE_FILTER_STOP
+			tab.gui_input.connect(_on_codex_tab_input)
+		else:
+			tab.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(tab)
 
 	var grow: Control = Control.new()
@@ -711,6 +717,16 @@ func _build_top_bar() -> void:
 	tail.custom_minimum_size = Vector2(300, 0)
 	tail.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(tail)
+
+
+## Opens the read-only Codex catalogue (code-only modal) on a Codex-tab tap.
+## Gated on PAUSED state like the hero-card tap, so it can't stack on a modal.
+func _on_codex_tab_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.pressed):
+		return
+	if SceneManager.state == SceneManager.State.PAUSED:
+		return
+	SceneManager.show_modal(CodexModalScript.new())
 
 
 ## Center-column top panel: "Expeditions in progress". Our orchestrator is a
