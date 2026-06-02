@@ -20,6 +20,7 @@ extends Control
 
 const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
 const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+const TitleScreenScript = preload("res://assets/screens/title/title_screen.gd")
 
 
 @onready var _title_label: Label = $Panel/VBox/TitleLabel
@@ -108,3 +109,18 @@ func _build_wireframe() -> void:
 	tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(tagline)
 	vbox.move_child(tagline, _title_label.get_index() + 1)
+
+	# "Return to Title" entry (mock pause flow) — opens the code-only Title
+	# screen as a modal. Boot still routes to Guild Hall (onboarding intact).
+	var to_title: Button = Button.new()
+	to_title.name = "ReturnToTitleButton"
+	to_title.text = "Return to Title"
+	to_title.focus_mode = Control.FOCUS_NONE
+	to_title.custom_minimum_size = Vector2(0, 52)
+	to_title.pressed.connect(_on_return_to_title_pressed)
+	UIFrameworkScript.wire_touch_feedback(to_title)
+	vbox.add_child(to_title)
+
+
+func _on_return_to_title_pressed() -> void:
+	SceneManager.show_modal(TitleScreenScript.new())
