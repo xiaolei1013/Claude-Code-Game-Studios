@@ -270,6 +270,10 @@ func on_enter() -> void:
 	# INCLUDING dynamically-created hero buttons from _refresh_roster_panel.
 	UIFrameworkScript.suppress_keyboard_focus(self)
 
+	# Lantern Guild mock wireframe (feat/ui-wireframe-core-loop): build the
+	# greybox Dispatch layout once, then the real panels above it render live data.
+	_build_wireframe_once()
+
 
 ## Called by SceneManager BEFORE queue_free. Disconnects all signals.
 func on_exit() -> void:
@@ -1113,3 +1117,282 @@ func _kill_synergy_badge_tween() -> void:
 	if _synergy_badge_tween != null and _synergy_badge_tween.is_valid():
 		_synergy_badge_tween.kill()
 	_synergy_badge_tween = null
+
+
+# ===========================================================================
+# Lantern Guild mock wireframe — greybox Dispatch screen
+# (feat/ui-wireframe-core-loop)
+#
+# Recreates the "Dispatch" layout from the Lantern Guild Prototype mock
+# (Roster left column, Formation + Floor right column, Dispatch CTA footer)
+# at greybox/wireframe fidelity. Built ADDITIVELY: every @onready node path
+# and every node referenced by tests remains unchanged. Existing nodes are
+# repositioned via anchor/offset; new neutral-grey wireframe siblings are
+# added at z=2 (above BiomeBackground/WarmLanternOverlay) so the greybox
+# reads as neutral structure without disturbing the interactive behaviour.
+#
+# PickerPanel receives a single stylebox override for visual coherence;
+# NO node names, paths, or types inside FloorPickerOverlay are changed.
+#
+# NO Color() literals in this file — all colors route through WireframeKit
+# palette constants (a sibling screen's test greps for Color( literals).
+# ===========================================================================
+
+const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+
+const _WIRE_Z: int = 2          # draw above BiomeBackground (z=-1) and WarmLanternOverlay (z=1)
+const _TOPBAR_H: float = 52.0   # height of the decorative top-bar strip
+const _COL_GAP: float = 12.0    # gap between viewport edge and panels
+const _ROW_GAP: float = 10.0    # vertical gap between stacked panels
+const _LEFT_W: float = 340.0    # roster column width
+const _CONTENT_TOP: float = 58.0  # y-offset below top bar where panels start
+const _FORMATION_H: float = 180.0 # height of the formation panel
+const _FLOOR_H: float = 80.0    # height of the floor-selector panel
+const _FOOTER_H: float = 60.0   # height of the dispatch CTA footer strip
+
+var _wire_built: bool = false
+var _wire_float_layer: Control = null
+
+
+## Sets a Control's four anchors then four offsets in one call.
+## Private helper shared by all wireframe build methods.
+func _place_fa(node: Control, al: float, at: float, ar: float, ab: float,
+		ol: float, ot: float, orr: float, ob: float) -> void:
+	if node == null:
+		return
+	node.anchor_left = al
+	node.anchor_top = at
+	node.anchor_right = ar
+	node.anchor_bottom = ab
+	node.offset_left = ol
+	node.offset_top = ot
+	node.offset_right = orr
+	node.offset_bottom = ob
+
+
+## Entry point — called once from on_enter(); guarded by _wire_built flag.
+func _build_wireframe_once() -> void:
+	if _wire_built:
+		return
+	_wire_built = true
+	_reposition_existing_nodes_fa()
+	_build_top_bar_fa()
+	_build_roster_section()
+	_build_formation_section()
+	_build_floor_section()
+	_build_dispatch_footer()
+	_style_picker_panel()
+	_build_float_layer_fa()
+
+
+## Repositions the pre-existing .tscn nodes into the wireframe 2-column layout.
+## Node paths are UNCHANGED — only anchors, offsets, and z-index are modified.
+## Text, theme_type_variation, and signals are preserved.
+func _reposition_existing_nodes_fa() -> void:
+	# Back button: top-left corner above the top bar. custom_minimum_size gives
+	# the rendered button a >=44px mobile-parity tap target. (UIFramework's
+	# on-enter check reads .size before layout settles, so it still logs the
+	# button's intrinsic 104x31 .tscn size — a warning present on main too,
+	# unaffected by this wireframe; not chased here per the no-hygiene-creep steer.)
+	if _back_button != null:
+		_back_button.custom_minimum_size = Vector2(88.0, 44.0)
+		_place_fa(_back_button, 0, 0, 0, 0,
+			_COL_GAP, 4.0, _COL_GAP + 140.0, 48.0)
+		_back_button.z_index = 3
+
+	# HeaderLabel: centered in the top bar strip.
+	var header: Label = get_node_or_null("HeaderLabel") as Label
+	if header != null:
+		_place_fa(header, 0.5, 0, 0.5, 0,
+			-200.0, 10.0, 200.0, 48.0)
+		header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		header.z_index = 3
+
+	# GoldCounter: top-right corner above the top bar.
+	if _gold_counter != null:
+		_place_fa(_gold_counter, 1, 0, 1, 0,
+			-220.0, 8.0, -_COL_GAP, 46.0)
+		_gold_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		_gold_counter.z_index = 3
+
+	# RosterPanel: left column, from content-top to the footer.
+	var roster_panel: PanelContainer = get_node_or_null("RosterPanel") as PanelContainer
+	if roster_panel != null:
+		roster_panel.custom_minimum_size = Vector2.ZERO
+		roster_panel.grow_horizontal = Control.GROW_DIRECTION_END
+		roster_panel.grow_vertical = Control.GROW_DIRECTION_END
+		_place_fa(roster_panel, 0, 0, 0, 1,
+			_COL_GAP, _CONTENT_TOP,
+			_COL_GAP + _LEFT_W, -(_FOOTER_H + _ROW_GAP + _COL_GAP))
+		roster_panel.z_index = _WIRE_Z
+
+	# FormationPanel: right column, top portion.
+	var formation_panel: PanelContainer = get_node_or_null("FormationPanel") as PanelContainer
+	if formation_panel != null:
+		formation_panel.grow_horizontal = Control.GROW_DIRECTION_END
+		formation_panel.grow_vertical = Control.GROW_DIRECTION_END
+		_place_fa(formation_panel, 0, 0, 1, 0,
+			_COL_GAP + _LEFT_W + _ROW_GAP, _CONTENT_TOP,
+			-_COL_GAP, _CONTENT_TOP + _FORMATION_H)
+		formation_panel.z_index = _WIRE_Z
+
+	# FloorSelectorPanel: right column, below formation.
+	var floor_panel: PanelContainer = get_node_or_null("FloorSelectorPanel") as PanelContainer
+	if floor_panel != null:
+		floor_panel.grow_horizontal = Control.GROW_DIRECTION_END
+		floor_panel.grow_vertical = Control.GROW_DIRECTION_END
+		_place_fa(floor_panel, 0, 0, 1, 0,
+			_COL_GAP + _LEFT_W + _ROW_GAP,
+			_CONTENT_TOP + _FORMATION_H + _ROW_GAP,
+			-_COL_GAP,
+			_CONTENT_TOP + _FORMATION_H + _ROW_GAP + _FLOOR_H)
+		floor_panel.z_index = _WIRE_Z
+
+	# DispatchButton: full-width footer, bottom of screen.
+	if _dispatch_button != null:
+		_place_fa(_dispatch_button, 0, 1, 1, 1,
+			_COL_GAP, -(_FOOTER_H + _COL_GAP),
+			-_COL_GAP, -_COL_GAP)
+		_dispatch_button.z_index = _WIRE_Z
+
+	# SynergyBadge: park it centered below the formation panel; visibility
+	# controlled by the existing _refresh_synergy_badge logic (not touched here).
+	if _synergy_badge != null:
+		_place_fa(_synergy_badge, 0.5, 0, 0.5, 0,
+			-240.0, _CONTENT_TOP + _FORMATION_H - 32.0,
+			240.0, _CONTENT_TOP + _FORMATION_H)
+		_synergy_badge.z_index = _WIRE_Z
+
+	# ToastLabel: centered just above the footer dispatch button.
+	if _toast_label != null:
+		_place_fa(_toast_label, 0, 1, 1, 1,
+			_COL_GAP, -(_FOOTER_H + _COL_GAP + 40.0),
+			-_COL_GAP, -(_FOOTER_H + _COL_GAP + 2.0))
+		_toast_label.z_index = _WIRE_Z + 1
+
+	# MidRunReassignConfirmation: keep as full-rect overlay (unchanged semantics),
+	# raise its z so it sits above the wireframe.
+	var confirm_root: Control = get_node_or_null("MidRunReassignConfirmation") as Control
+	if confirm_root != null:
+		confirm_root.z_index = 6
+
+	# FloorPickerOverlay: raise z so the modal sits above all wireframe panels.
+	# Node names and paths inside this subtree are NOT touched.
+	if _floor_picker_root != null:
+		_floor_picker_root.z_index = 7
+
+
+## Decorative top-bar strip. The real HeaderLabel, BackButton, and GoldCounter
+## are repositioned above it (z=3) so real text reads over the strip.
+func _build_top_bar_fa() -> void:
+	var bar: PanelContainer = PanelContainer.new()
+	bar.name = "WireTopBarDispatch"
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.z_index = _WIRE_Z
+	bar.add_theme_stylebox_override("panel", WireframeKitScript.stylebox(
+		WireframeKitScript.HEADER_FILL, WireframeKitScript.LINE, 1, 0, 0))
+	add_child(bar)
+	_place_fa(bar, 0, 0, 1, 0, 0.0, 0.0, 0.0, _TOPBAR_H)
+
+
+## Left column: Roster section label. The real RosterPanel is repositioned
+## to fill this column; this method adds a section_panel eyebrow wrapper
+## BEHIND the real panel (z=1 vs RosterPanel z=2) to give the column a
+## titled wireframe frame.
+func _build_roster_section() -> void:
+	var panel: PanelContainer = WireframeKitScript.section_panel("Roster")
+	panel.name = "WireRosterSection"
+	panel.z_index = 1   # behind the real RosterPanel (z=2)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(panel)
+	_place_fa(panel, 0, 0, 0, 1,
+		_COL_GAP, _CONTENT_TOP,
+		_COL_GAP + _LEFT_W, -(_FOOTER_H + _ROW_GAP + _COL_GAP))
+	# Annotation inside the section body
+	var body: VBoxContainer = WireframeKitScript.body_of(panel)
+	body.add_child(WireframeKitScript.caption(
+		"Tap a hero to place them in the active slot.",
+		WireframeKitScript.MUTED, 11))
+
+
+## Right column, top: Formation section label. The real FormationPanel is
+## repositioned to fill this zone; this method adds a section_panel wrapper
+## behind it (z=1) for the titled wireframe frame.
+func _build_formation_section() -> void:
+	var panel: PanelContainer = WireframeKitScript.section_panel("Formation")
+	panel.name = "WireFormationSection"
+	panel.z_index = 1   # behind the real FormationPanel (z=2)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(panel)
+	_place_fa(panel, 0, 0, 1, 0,
+		_COL_GAP + _LEFT_W + _ROW_GAP, _CONTENT_TOP,
+		-_COL_GAP, _CONTENT_TOP + _FORMATION_H)
+	var body: VBoxContainer = WireframeKitScript.body_of(panel)
+	body.add_child(WireframeKitScript.caption(
+		"3 slots · tap a slot to select it, then tap a hero.",
+		WireframeKitScript.MUTED, 11))
+
+
+## Right column, below formation: Floor-selector section label. The real
+## FloorSelectorPanel is repositioned here; this wrapper sits at z=1.
+func _build_floor_section() -> void:
+	var panel: PanelContainer = WireframeKitScript.section_panel("Destination")
+	panel.name = "WireFloorSection"
+	panel.z_index = 1   # behind the real FloorSelectorPanel (z=2)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(panel)
+	_place_fa(panel, 0, 0, 1, 0,
+		_COL_GAP + _LEFT_W + _ROW_GAP,
+		_CONTENT_TOP + _FORMATION_H + _ROW_GAP,
+		-_COL_GAP,
+		_CONTENT_TOP + _FORMATION_H + _ROW_GAP + _FLOOR_H)
+	var body: VBoxContainer = WireframeKitScript.body_of(panel)
+	body.add_child(WireframeKitScript.caption(
+		"Tap to choose biome + floor.", WireframeKitScript.MUTED, 11))
+
+
+## Full-width footer accent strip behind the real DispatchButton.
+## The real button stays interactive at z=2; this strip sits at z=1.
+func _build_dispatch_footer() -> void:
+	var strip: PanelContainer = PanelContainer.new()
+	strip.name = "WireDispatchFooter"
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	strip.z_index = 1   # behind the real DispatchButton (z=2)
+	strip.add_theme_stylebox_override("panel", WireframeKitScript.stylebox(
+		WireframeKitScript.FILL_RAISED, WireframeKitScript.ACCENT, 2, 4, 0))
+	add_child(strip)
+	_place_fa(strip, 0, 1, 1, 1,
+		_COL_GAP, -(_FOOTER_H + _COL_GAP),
+		-_COL_GAP, -_COL_GAP)
+
+	# Eyebrow annotation above the dispatch button area.
+	var label: Label = WireframeKitScript.eyebrow(
+		"Dispatch party", WireframeKitScript.ACCENT)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.z_index = 1
+	add_child(label)
+	_place_fa(label, 0, 1, 1, 1,
+		_COL_GAP, -(_FOOTER_H + _COL_GAP + 18.0),
+		-_COL_GAP, -(_FOOTER_H + _COL_GAP + 2.0))
+
+
+## Applies a greybox stylebox to PickerPanel for visual coherence with the
+## other wireframe panels. ONLY touches the stylebox override — NO node names,
+## paths, types, or children inside FloorPickerOverlay are changed.
+func _style_picker_panel() -> void:
+	var picker_panel: PanelContainer = get_node_or_null(
+		"FloorPickerOverlay/PickerPanel") as PanelContainer
+	if picker_panel == null:
+		return
+	picker_panel.add_theme_stylebox_override("panel",
+		WireframeKitScript.stylebox(WireframeKitScript.FILL, WireframeKitScript.LINE, 1, 4, 0))
+
+
+## Full-rect, input-transparent float layer for any future floating-number
+## feedback on this screen.
+func _build_float_layer_fa() -> void:
+	var layer: Control = WireframeKitScript.float_layer()
+	add_child(layer)
+	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_wire_float_layer = layer
