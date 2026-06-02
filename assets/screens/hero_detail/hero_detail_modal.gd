@@ -75,6 +75,10 @@ var _enter_time_msec: int = 0
 # Cached level-up cost per render (per GDD §C.5 / §D.3 cost-stability).
 var _cached_level_up_cost: int = -1
 
+# Lantern Guild mock wireframe (feat/ui-wireframe-detail-recruit) — greybox state.
+const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+var _wire_built: bool = false
+
 
 # Node references — assumed via @onready (.tscn defines the tree).
 @onready var _dim_backdrop: ColorRect = $DimBackdrop
@@ -200,6 +204,11 @@ func on_enter() -> void:
 
 	# Step 5: initial render.
 	_refresh_all()
+
+	# Lantern Guild mock wireframe (feat/ui-wireframe-detail-recruit): enrich the
+	# modal toward the mock's hero-detail (equipment / combat / bio / skills).
+	# Runs only after the hero + class resolved (early-returns above guard it).
+	_build_wireframe_once()
 
 
 func on_exit() -> void:
@@ -604,3 +613,114 @@ func _show_toast(message: String) -> void:
 	# Scaffold: log to console; .tscn-side ToastLabel wiring is a
 	# /design-review polish item per GDD §G + §I OQ-22-7.
 	push_warning("[HeroDetailModal] toast: %s" % message)
+
+
+# ===========================================================================
+# Lantern Guild mock wireframe — greybox hero-detail enrichment
+# (feat/ui-wireframe-detail-recruit)
+#
+# The mock's Hero Detail is a rich two-column sheet (portrait + equipment +
+# vitals | ledger bio + stats + skills). Our modal already has portrait, name,
+# class, level, XP and the level-up/prestige/close actions. This widens the
+# modal and inserts a 2-column wireframe body (Equipment / Combat / Bio /
+# Skills) between the stats block and the action row — additively, so every
+# tested node keeps its path. Combat stats + bio are REAL (from the HeroClass);
+# equipment and skills are labeled placeholders (no such systems yet). Colors
+# route through WireframeKit.
+# ===========================================================================
+
+func _build_wireframe_once() -> void:
+	if _wire_built:
+		return
+	_wire_built = true
+
+	# Widen the modal to host the richer two-column layout.
+	if _detail_panel != null:
+		_detail_panel.custom_minimum_size = Vector2(760, 520)
+		_detail_panel.offset_left = -380.0
+		_detail_panel.offset_top = -260.0
+		_detail_panel.offset_right = 380.0
+		_detail_panel.offset_bottom = 260.0
+
+	var action_row: Control = _level_up_button.get_parent() as Control
+	if action_row == null:
+		return
+	var content: VBoxContainer = action_row.get_parent() as VBoxContainer
+	if content == null:
+		return
+	content.add_theme_constant_override("separation", 12)
+
+	var body: HBoxContainer = HBoxContainer.new()
+	body.name = "WireMockBody"
+	body.add_theme_constant_override("separation", 14)
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_child(_hd_left_col())
+	body.add_child(_hd_right_col())
+
+	# Insert just before the action row (keeps Close/Level-Up/Prestige last).
+	content.add_child(body)
+	content.move_child(body, action_row.get_index())
+
+
+## Left column: equipment slots (placeholders) + combat stats (real).
+func _hd_left_col() -> VBoxContainer:
+	var col: VBoxContainer = VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_theme_constant_override("separation", 10)
+
+	var equip: PanelContainer = WireframeKitScript.section_panel("Equipment")
+	var slots: HBoxContainer = HBoxContainer.new()
+	slots.add_theme_constant_override("separation", 8)
+	slots.alignment = BoxContainer.ALIGNMENT_CENTER
+	for slot_name: String in ["weapon", "armor", "trinket"]:
+		slots.add_child(WireframeKitScript.placeholder_box(slot_name, Vector2(64, 64)))
+	WireframeKitScript.body_of(equip).add_child(slots)
+	col.add_child(equip)
+
+	var lvl: int = int(_hero.current_level) if _hero != null else 1
+	var combat: PanelContainer = WireframeKitScript.section_panel("Combat")
+	var cb: VBoxContainer = WireframeKitScript.body_of(combat)
+	cb.add_child(WireframeKitScript.list_tile("Damage", "", str(_hd_stat("base_attack", "attack_per_level", lvl))))
+	cb.add_child(WireframeKitScript.list_tile("Speed", "", str(_hd_stat("base_speed", "speed_per_level", lvl))))
+	cb.add_child(WireframeKitScript.list_tile("Health", "", str(_hd_stat("base_hp", "hp_per_level", lvl))))
+	cb.add_child(WireframeKitScript.list_tile("Defense", "", "—"))
+	cb.add_child(WireframeKitScript.list_tile("Luck", "", "—"))
+	col.add_child(combat)
+	return col
+
+
+## Right column: ledger bio (real flavor text) + skills (placeholders).
+func _hd_right_col() -> VBoxContainer:
+	var col: VBoxContainer = VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_theme_constant_override("separation", 10)
+
+	var bio_text: String = ""
+	if _class_data != null and "flavor_text" in _class_data:
+		bio_text = String(_class_data.flavor_text)
+	if bio_text == "":
+		bio_text = "Kept on the second shelf of the ledger, where the candle does not gutter."
+	var bio: PanelContainer = WireframeKitScript.section_panel("From the ledger")
+	WireframeKitScript.body_of(bio).add_child(WireframeKitScript.caption(bio_text, WireframeKitScript.TEXT, 13))
+	col.add_child(bio)
+
+	var skills: PanelContainer = WireframeKitScript.section_panel("Skills")
+	var sb: VBoxContainer = WireframeKitScript.body_of(skills)
+	sb.add_child(WireframeKitScript.list_tile("[ active skill ]", "Wireframe — skill system TBD", "CD —"))
+	sb.add_child(WireframeKitScript.list_tile("[ passive skill ]", "Wireframe — skill system TBD", "CD —"))
+	col.add_child(skills)
+	return col
+
+
+## Current value of a HeroClass stat = base + per_level * (level - 1).
+## Returns 0 for stats our model does not define (defensive "in" guards).
+func _hd_stat(base_key: String, per_key: String, lvl: int) -> int:
+	if _class_data == null:
+		return 0
+	var base: int = 0
+	if base_key in _class_data:
+		base = int(_class_data.get(base_key))
+	var per: int = 0
+	if per_key in _class_data:
+		per = int(_class_data.get(per_key))
+	return base + per * maxi(0, lvl - 1)
