@@ -26,6 +26,7 @@
 extends Screen
 
 const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
+const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
 
 # Pacing constants per GDD §G.
 const TAP_GRACE_MS: int = 200
@@ -47,15 +48,16 @@ var _hero_level_deltas: Array = []
 # Tap-debounce grace from on_enter (per GDD §C.9).
 var _enter_time_msec: int = 0
 
+# Lantern Guild mock wireframe (feat/ui-wireframe-core-loop) — greybox state.
+var _wire_built: bool = false
+
 
 @onready var _dim_backdrop: ColorRect = $DimBackdrop
 # Sprint 22 S22-M3: BiomeBackground at z=-1, set to the cleared biome's
 # preset on on_enter for thematic continuity with the just-cleared run.
 @onready var _biome_background: ColorRect = $BiomeBackground
-## Reserved for Sprint 17 S17-S2 visual polish — staggered reveal
-## animation queries the center panel for size/position to drive
-## tween targets. Read deferred until that work lands.
-@warning_ignore("unused_private_class_variable")
+## Ceremony panel — widened by the mock wireframe pass to host the loot grid;
+## also the future anchor for S17-S2 staggered-reveal tweens.
 @onready var _center_panel: PanelContainer = $CenterPanel
 @onready var _headline_label: Label = $CenterPanel/CenterVBox/HeadlineLabel
 @onready var _unlock_notice_label: Label = $CenterPanel/CenterVBox/UnlockNoticeLabel
@@ -158,6 +160,12 @@ func on_enter() -> void:
 			_on_continuation_dwell_elapsed,
 			CONNECT_ONE_SHOT
 		)
+
+	# Lantern Guild mock wireframe (feat/ui-wireframe-core-loop): augment the
+	# ceremony with the mock's loot-reveal structure (returns eyebrow, party
+	# badges, spoils + loot grid). Runs only on the valid path (after the
+	# null-snapshot / replay-in-flight early-returns above).
+	_build_wireframe_once()
 
 
 func on_exit() -> void:
@@ -309,3 +317,115 @@ func _compute_hero_level_deltas(snapshot: RunSnapshot) -> Array:
 				"terminal_level": current_level,
 			})
 	return deltas
+
+
+# ===========================================================================
+# Lantern Guild mock wireframe — greybox loot-reveal augmentation
+# (feat/ui-wireframe-core-loop)
+#
+# The mock's Result screen is a loot ceremony: "the party returns" eyebrow →
+# title → party badges → SPOILS divider → gold → loot grid → continue. Our
+# screen already renders the title, kills, gold, level-ups and continuation
+# prompt. This adds the missing mock structure (eyebrow, party badges, spoils
+# divider, 4-tile loot grid) into the existing CenterVBox without disturbing
+# the tested nodes. Loot is a placeholder — we have no loot system yet.
+# ===========================================================================
+
+func _build_wireframe_once() -> void:
+	if _wire_built:
+		return
+	_wire_built = true
+	var vbox: VBoxContainer = _continuation_prompt.get_parent() as VBoxContainer
+	if vbox == null:
+		return
+
+	# Widen the ceremony panel so the loot grid fits (mock Result is wide).
+	if _center_panel != null:
+		_center_panel.custom_minimum_size = Vector2(720, 460)
+		_center_panel.offset_left = -360.0
+		_center_panel.offset_right = 360.0
+		_center_panel.offset_top = -230.0
+		_center_panel.offset_bottom = 230.0
+	vbox.add_theme_constant_override("separation", 10)
+
+	# Top eyebrow — "the party returns".
+	var eyebrow: Label = WireframeKitScript.eyebrow("· The party returns ·", WireframeKitScript.ACCENT)
+	eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(eyebrow)
+	vbox.move_child(eyebrow, 0)
+
+	# Party badges — the heroes who ran (real names from the run snapshot).
+	vbox.add_child(_build_party_badges())
+
+	# SPOILS divider + loot grid (placeholder — no loot system in MVP).
+	var spoils: Label = WireframeKitScript.eyebrow("Spoils", WireframeKitScript.MUTED)
+	spoils.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(spoils)
+	vbox.add_child(_build_loot_grid())
+
+	# Keep the continuation prompt as the last row.
+	vbox.move_child(_continuation_prompt, vbox.get_child_count() - 1)
+
+
+## Centered row of party badges (portrait placeholder + name) for the heroes
+## captured in the run snapshot's formation. Empty → a single placeholder.
+func _build_party_badges() -> HBoxContainer:
+	var row: HBoxContainer = HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 12)
+	var heroes: Array = _wire_party_heroes()
+	if heroes.is_empty():
+		row.add_child(WireframeKitScript.placeholder_box("party", Vector2(140, 64)))
+		return row
+	for h: Dictionary in heroes:
+		var box: VBoxContainer = VBoxContainer.new()
+		box.alignment = BoxContainer.ALIGNMENT_CENTER
+		box.add_theme_constant_override("separation", 4)
+		box.add_child(WireframeKitScript.placeholder_box("portrait", Vector2(68, 68)))
+		var nl: Label = WireframeKitScript.caption(String(h.get("name", "Hero")), WireframeKitScript.TEXT, 12)
+		nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		box.add_child(nl)
+		row.add_child(box)
+	return row
+
+
+## Resolves the party heroes from the run snapshot's formation_snapshot.heroes,
+## returning [{name}] dicts. Names resolve from display_name → live roster →
+## class_id → "Hero" fallback. Defensive against the seeded-test shapes.
+func _wire_party_heroes() -> Array:
+	var out: Array = []
+	var snap: Variant = DungeonRunOrchestrator.run_snapshot
+	if snap == null or not ("formation_snapshot" in snap):
+		return out
+	var fs: Dictionary = snap.formation_snapshot
+	var heroes: Variant = fs.get("heroes", [])
+	if not (heroes is Array):
+		return out
+	for ph: Variant in heroes:
+		if not (ph is Dictionary):
+			continue
+		var nm: String = ""
+		if ph.has("display_name"):
+			nm = String(ph.get("display_name"))
+		if nm == "" and ph.has("instance_id"):
+			var iid: int = int(ph.get("instance_id"))
+			if HeroRoster != null and HeroRoster._heroes.has(iid):
+				nm = String(HeroRoster._heroes[iid].display_name)
+		if nm == "" and ph.has("class_id"):
+			nm = String(ph.get("class_id")).capitalize()
+		if nm == "":
+			nm = "Hero"
+		out.append({"name": nm})
+	return out
+
+
+## 4-tile placeholder loot grid (the mock's staggered loot reveal). Real loot
+## rewards are not implemented yet — these annotate where they will render.
+func _build_loot_grid() -> GridContainer:
+	var grid: GridContainer = GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	for _i: int in range(4):
+		grid.add_child(WireframeKitScript.placeholder_box("loot", Vector2(150, 92)))
+	return grid
