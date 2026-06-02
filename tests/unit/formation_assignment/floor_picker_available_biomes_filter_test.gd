@@ -81,6 +81,24 @@ func test_fresh_save_includes_forest_reach_starter_biome() -> void:
 	# Act
 	var tab_biome_ids: Array[String] = _open_picker_and_collect_biome_tabs()
 
+	# --- FRAGILITY INSTRUMENTATION (temporary) ---
+	var _dr: Node = get_tree().root.get_node_or_null("DataRegistry")
+	var _dbg: Array[String] = []
+	if _dr != null:
+		for _b: Variant in _dr.call("get_all_by_type", "biomes"):
+			var _bid: String = String(_b.get("id")) if ("id" in _b) else "?"
+			var _dn: int = -1
+			if ("dungeons" in _b) and (_b.get("dungeons") is Array):
+				_dn = (_b.get("dungeons") as Array).size()
+			var _st: String = String(_b.get("status")) if ("status" in _b) else "?"
+			_dbg.append("%s(d=%d,st=%s)" % [_bid, _dn, _st])
+	push_warning("[FRAGDUMP] tabs=%s | DR_biomes=%s | BFC=%s | avail=%s | active_mvp=%s" % [
+		str(tab_biome_ids), str(_dbg),
+		str(fu.get("BIOME_FLOOR_COUNT")),
+		str(fu.call("get_available_biomes")),
+		str(fu.get("active_biome_mvp"))])
+	# --- end instrumentation ---
+
 	# Assert — forest_reach is THE canonical starter biome
 	assert_array(tab_biome_ids).contains(["forest_reach"]).override_failure_message(
 		"Starter biome 'forest_reach' missing from Dispatch tabs. Tabs found: %s"
