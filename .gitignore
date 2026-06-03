@@ -25,13 +25,16 @@ expansions/
 # placeholder and ship art is authored under assets/art/, assets/audio/,
 # etc. — never sourced from these folders.
 #
-# Glob covers the established naming pattern (octopath1, octopath2, ...).
-# The current sets live OUTSIDE the project tree at
-# /Users/xiaolei/work/godot-project/octopath{1,2}/ — these entries are
-# belt-and-suspenders against a future re-drop under the same names.
-# Add a sibling _reference/ entry if a new vendor/series is added.
+# English-named variants (original drop location):
 assets/octopath*/
 assets/_reference/
+# Chinese-named variants — current drop location after being moved inside
+# the project tree. 八方旅人 = "Octopath Traveler" in Chinese.
+assets/八方旅人*/
+# Assembled demo assets (produced by tools/demo-asset-setup.py from above
+# sources; local only — never commit placeholder derivative assets).
+assets/art/demo/
+assets/audio/demo/
 
 # === Marrow (eval tooling — never commit, upstream framework v1.0) ===
 marrow/
