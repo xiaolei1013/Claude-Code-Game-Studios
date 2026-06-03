@@ -6,11 +6,11 @@ Usage:
     python3 tools/demo-asset-setup.py [--dry-run]
 
 What it does:
-  1. Reads individual animation frames from assets/八方旅人1/
+  1. Reads individual animation frames from assets/octopath1/
   2. Assembles 4-frame idle sprite sheets per hero class (horizontal strip)
   3. Generates 48×48 portrait stills from the first idle frame
   4. Copies selected BGM tracks to assets/audio/demo/
-  5. Copies VFX textures from assets/八方旅人2/ to assets/art/demo/vfx/
+  5. Copies VFX textures from assets/octopath2/ to assets/art/demo/vfx/
 
 Output structure (gitignored — local only):
     assets/art/demo/heroes/[class]/
@@ -41,8 +41,8 @@ from pathlib import Path
 DRY_RUN = "--dry-run" in sys.argv
 ROOT = Path(__file__).parent.parent
 
-SRC_OT1 = ROOT / "assets" / "八方旅人1"
-SRC_OT2 = ROOT / "assets" / "八方旅人2"
+SRC_OT1 = ROOT / "assets" / "octopath1"
+SRC_OT2 = ROOT / "assets" / "octopath2"
 DST_HEROES = ROOT / "assets" / "art" / "demo" / "heroes"
 DST_AUDIO = ROOT / "assets" / "audio" / "demo"
 DST_VFX = ROOT / "assets" / "art" / "demo" / "vfx"
@@ -53,47 +53,48 @@ DST_VFX = ROOT / "assets" / "art" / "demo" / "vfx"
 # 7 Lantern Guild classes mapped to OT1's 8 characters.
 # Tressa (Merchant) is held as a spare for future class additions.
 #
-# Source folder format: assets/八方旅人1/玩家/[char_dir]/[CharName Base]/001.png
+# Source folder format: assets/octopath1/heroes/[char_dir]/[CharName Base]/001.png
 # We pick the "Base" class folder (the character's default class visual).
+# char_dir values are the English slugs produced by tools/rename-octopath-dirs.py.
 CLASS_MAP = {
     "warrior": {
-        "char_dir": "战士：欧贝利克",
+        "char_dir": "olberic",
         "base_folder": "Olberic Warrior Base",
         "frames": ["001.png", "002.png", "003.png", "004.png"],
         "note": "Olberic — Knight/Warrior archetype. Shield+sword silhouette.",
     },
     "mage": {
-        "char_dir": "学者：赛拉斯",
+        "char_dir": "cyrus",
         "base_folder": "Cyrus Scholar Base",
         "frames": ["001.png", "002.png", "003.png", "004.png"],
         "note": "Cyrus — Scholar archetype. Staff + robes.",
     },
     "rogue": {
-        "char_dir": "盗贼：提里昂",
-        "base_folder": "Therion Thief",
+        "char_dir": "therion",
+        "base_folder": "Therion Thief Base",
         "frames": ["001.png", "002.png", "003.png", "004.png"],
         "note": "Therion — Thief archetype. Hood + dagger.",
     },
     "cleric": {
-        "char_dir": "神官：奥菲莉亚",
-        "base_folder": "Ophilia Cleric",
+        "char_dir": "ophilia",
+        "base_folder": "Ophilia Cleric Base",
         "frames": ["001.png", "002.png", "003.png", "004.png"],
         "note": "Ophilia — Cleric archetype. Lantern implement.",
     },
     "archer": {
-        "char_dir": "猎人：汉伊特",
+        "char_dir": "haanit",
         "base_folder": "Haanit Hunter Base",
         "frames": ["001.png", "002.png", "003.png", "004.png"],
         "note": "H'aanit — Hunter archetype. Bow.",
     },
     "berserker": {
-        "char_dir": "舞女：普里姆萝斯",
+        "char_dir": "primrose",
         "base_folder": "Primrose Dancer Base",
         "frames": ["001.png", "002.png", "003.png", "004.png"],
         "note": "Primrose — Dynamic/expressive movement reads as berserker energy.",
     },
     "paladin": {
-        "char_dir": "药师：阿芬",
+        "char_dir": "alfyn",
         "base_folder": "Alfyn Apothecary Base",
         "frames": ["001.png", "002.png", "003.png", "004.png"],
         "note": "Alfyn — Support/healer archetype.",
@@ -102,7 +103,7 @@ CLASS_MAP = {
 
 # Spare: Tressa (Merchant) — available for future class additions.
 SPARE = {
-    "char_dir": "商人：特蕾莎",
+    "char_dir": "tressa",
     "base_folder": "Tressa Merchant Base",
     "note": "Tressa (Merchant) — spare; maps to a future Lantern Guild class.",
 }
@@ -125,9 +126,9 @@ BGM_MAP = {
 # VFX: OT2 pre-extracted effects to copy
 # ---------------------------------------------------------------------------
 VFX_MAP = {
-    "vfx_bubble_a.png": "图片/Effect/Fx_Tx_Bubble_A.png",
-    "vfx_aura_a.png": "图片/Effect/FxTX_Aura_A.png",
-    "vfx_batwing_a.png": "图片/Effect/FxTX_Batwing_A.png",
+    "vfx_bubble_a.png": "images/Effect/Fx_Tx_Bubble_A.png",
+    "vfx_aura_a.png": "images/Effect/FxTX_Aura_A.png",
+    "vfx_batwing_a.png": "images/Effect/FxTX_Batwing_A.png",
 }
 
 
@@ -163,10 +164,10 @@ def assemble_sprite_sheet(class_name, cfg):
     Requires Pillow (pip install pillow). Falls back to copying frame 001
     individually if Pillow is unavailable.
     """
-    src_base = SRC_OT1 / "玩家" / cfg["char_dir"] / cfg["base_folder"]
+    src_base = SRC_OT1 / "heroes" / cfg["char_dir"] / cfg["base_folder"]
     if not src_base.exists():
         # Try alternate folder name patterns (some folders append "Base" differently)
-        candidates = list((SRC_OT1 / "玩家" / cfg["char_dir"]).glob("*Base*"))
+        candidates = list((SRC_OT1 / "heroes" / cfg["char_dir"]).glob("*Base*"))
         if candidates:
             src_base = candidates[0]
             log(f"  Using alternate folder: {src_base.name}")
@@ -228,7 +229,8 @@ def main():
 
     if not SRC_OT1.exists():
         print(f"ERROR: OT1 source not found at {SRC_OT1}")
-        print("       Place the 八方旅人1 folder at assets/八方旅人1/")
+        print("       Place the OT1 assets at assets/octopath1/ "
+              "(run tools/rename-octopath-dirs.py if they have Chinese names)")
         sys.exit(1)
 
     # 1. Hero sprite sheets
