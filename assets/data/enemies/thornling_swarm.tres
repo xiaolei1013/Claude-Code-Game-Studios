@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b2thornlingswarmtres"]
+
+[ext_resource type="Script" uid="uid://cegoulrtcuujq" path="res://src/core/enemy_database/enemy_data.gd" id="1_ed"]
+
+[resource]
+script = ExtResource("1_ed")
+id = "thornling_swarm"
+display_name = "Thornling Swarm"
+tier = 1
+archetype = "swarm"
+biome = "forest_reach"
+base_hp = 28
+base_attack = 6
+base_speed = 7
+sprite_path = "assets/art/enemies/thornling_swarm/sprite.png"
+death_anim_key = "enemy_death_default"
+flavor_text = "Not one thing but a hundred small hungers moving as one — the forest's pettiest grudge, multiplied. Singly, nothing. In a cloud, they strip a careless boot to the buckle."
+is_boss = false
