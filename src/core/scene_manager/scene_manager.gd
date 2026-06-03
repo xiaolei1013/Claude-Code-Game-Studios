@@ -71,8 +71,10 @@ enum InputPolicy { BLOCK, QUEUE_ONE }
 ## These constants cause a parse-time error if any .tscn is missing — the hard fail
 ## mode per TR-scene-manager-022 (missing registry entries must assert-fail).
 ## ADR-0007 §screen_registry
-## Sprint 22 S22-M1: `main_menu` retired as dead code — boot routes to guild_hall;
-## RUN_ENDED routes to victory_moment; no remaining live navigation reached main_menu.
+## Sprint 22 S22-M1: `main_menu` retired as dead code.
+## Boot now routes to start_menu (see _on_registry_ready). guild_hall is
+## reached from the StartMenu "Start Expedition" button.
+const _SCREEN_START_MENU: PackedScene = preload("res://assets/screens/start_menu/start_menu.tscn")
 const _SCREEN_GUILD_HALL: PackedScene = preload("res://assets/screens/guild_hall/guild_hall.tscn")
 const _SCREEN_RECRUITMENT: PackedScene = preload("res://assets/screens/recruitment/recruitment.tscn")
 const _SCREEN_FORMATION_ASSIGNMENT: PackedScene = preload("res://assets/screens/formation_assignment/formation_assignment.tscn")
@@ -206,6 +208,7 @@ var current_screen_id: String = ""
 ## Populated at _ready() from the preloaded constants above.
 ## TR-scene-manager-022 — ADR-0007
 var _screen_registry: Dictionary = {
+	"start_menu": _SCREEN_START_MENU,
 	"guild_hall": _SCREEN_GUILD_HALL,
 	"recruitment": _SCREEN_RECRUITMENT,
 	"formation_assignment": _SCREEN_FORMATION_ASSIGNMENT,
@@ -1231,13 +1234,12 @@ func _on_registry_ready() -> void:
 		_execute_transition(pending.get("screen_id", "") as String, pending.get("transition", TransitionType.CROSS_FADE) as int)
 		return
 
-	# Default boot route: guild_hall.
-	# TickSystem rank 0 < SceneManager rank (≥8) — state read at _ready is safe (ADR-0003).
-	# offline_elapsed_seconds fires asynchronously; for the boot-sync path, the return_to_app
-	# branch is documented here and fully wired when OfflineProgressionEngine.offline_rewards_collected
-	# triggers a post-boot request_screen("return_to_app", SLIDE_DOWN) — see Story 009.
-	# For MVP this story defaults to guild_hall on every clean launch.
-	_execute_transition("guild_hall", TransitionType.CROSS_FADE)
+	# Default boot route: start_menu.
+	# Players see the title screen before entering the game. "Start Expedition"
+	# navigates to guild_hall. The offline-progression return_to_app branch still
+	# wins when queued (see _queued_request drain above) — that case produces
+	# start_menu → return_to_app correctly without showing guild_hall first.
+	_execute_transition("start_menu", TransitionType.CROSS_FADE)
 
 
 ## Returns the TransitionLayer CanvasLayer child of MainRoot, or null if missing.

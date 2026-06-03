@@ -36,6 +36,7 @@ const MAIN_ROOT_SCENE_PATH: String = "res://src/core/scene_manager/MainRoot.tscn
 # Sprint 22 S22-M1: main_menu removed — retired as dead code (no live navigation
 # reached it post-Sprint-9; victory_moment supersedes its RUN_ENDED landing role).
 const CANONICAL_SCREEN_IDS: Array[String] = [
+	"start_menu",
 	"guild_hall",
 	"recruitment",
 	"formation_assignment",
@@ -482,10 +483,11 @@ func test_same_screen_request_does_not_free_current_screen() -> void:
 # Sprint 22 S22-M1: main_menu retired as dead code; registry shrunk 8 → 7.
 # Sprint 23 S23-M1: hall_of_retired_heroes folded into guild_hall as the
 # Retired tab on the RosterPanel TabContainer; registry shrunk 7 → 6.
+# start_menu added as boot entry point: registry grew 6 → 7.
 # ---------------------------------------------------------------------------
 func test_screen_registry_has_six_entries() -> void:
 	var sm: Node = SceneManagerScript.new()
-	assert_int(sm._screen_registry.size()).is_equal(6)
+	assert_int(sm._screen_registry.size()).is_equal(7)
 	sm.free()
 
 
@@ -530,6 +532,7 @@ func test_screen_registry_resource_paths_match_canonical_layout() -> void:
 	var registry: Dictionary = sm._screen_registry
 
 	var expected_paths: Dictionary = {
+		"start_menu": "res://assets/screens/start_menu/start_menu.tscn",
 		"guild_hall": "res://assets/screens/guild_hall/guild_hall.tscn",
 		"recruitment": "res://assets/screens/recruitment/recruitment.tscn",
 		"formation_assignment": "res://assets/screens/formation_assignment/formation_assignment.tscn",
@@ -558,7 +561,7 @@ func test_screen_registry_resource_paths_match_canonical_layout() -> void:
 # Then: state advances to TRANSITIONING (within handler) then IDLE (after tween finishes);
 #       current_screen_id == "guild_hall".
 # ---------------------------------------------------------------------------
-func test_first_launch_routes_to_guild_hall() -> void:
+func test_first_launch_routes_to_start_menu() -> void:
 	# Arrange — wired instance so ScreenContainer is resolvable
 	var result: Array = await _make_wired_scene_manager()
 	var sm: Node = result[0]
@@ -580,7 +583,7 @@ func test_first_launch_routes_to_guild_hall() -> void:
 	await _await_transition(sm)
 
 	# Assert
-	assert_str(sm.current_screen_id).is_equal("guild_hall")
+	assert_str(sm.current_screen_id).is_equal("start_menu")
 	assert_int(sm.state).is_equal(SceneManagerScript.State.IDLE)
 
 	# Cleanup
@@ -588,7 +591,7 @@ func test_first_launch_routes_to_guild_hall() -> void:
 
 
 # ---------------------------------------------------------------------------
-# F-02: Queued request takes precedence over default guild_hall route
+# F-02: Queued request takes precedence over default start_menu boot route
 #
 # Given: SceneManager in UNINITIALIZED; _queued_request populated with "recruitment".
 # When: _on_registry_ready() called.
