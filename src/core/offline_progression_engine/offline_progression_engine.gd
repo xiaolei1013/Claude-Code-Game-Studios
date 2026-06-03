@@ -297,10 +297,17 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 						cleared_list.append(result.first_clear_tick)
 
 		if economy != null and economy.has_method("compute_offline_batch"):
-			var _result = economy.compute_offline_batch(chunk_ticks)
-			# Stub for Story 010 — economy.compute_offline_batch returns null;
-			# when implemented, the result will populate gold drip accumulators
-			# on `summary` here (mirroring the orchestrator branch above).
+			var economy_result: Variant = economy.compute_offline_batch(chunk_ticks)
+			# Surface the drip on the summary so the Return-to-App screen reports
+			# the gold the player ACTUALLY earned offline. economy.compute_offline_batch
+			# returns a populated OfflineResult whose total_gold is this chunk's drip
+			# (already credited to the balance via the method's internal add_gold).
+			# The prior code discarded the result behind a stale "returns null" comment,
+			# which silently left summary.gold_earned at 0 — so the player saw
+			# "0 gold earned" while their balance quietly grew. (Kills/floors/XP still
+			# pending the orchestrator.compute_offline_batch feeder; see §C below.)
+			if economy_result != null and "total_gold" in economy_result:
+				summary.gold_earned += int(economy_result.total_gold)
 
 		summary.ticks_replayed += chunk_ticks
 		summary.chunks_consumed += 1

@@ -139,9 +139,16 @@ func test_run_offline_replay_small_elapsed_single_chunk() -> void:
 	assert_int(summary.ticks_replayed).is_equal(elapsed_seconds * 20)
 
 
-func test_run_offline_replay_empty_replay_emits_summary() -> void:
-	## Even with zero kills/gold, summary is emitted (not null).
+func test_run_offline_replay_short_window_surfaces_credited_gold() -> void:
+	## A short replay still credits offline drip, and the summary must SURFACE the
+	## gold the economy actually credited. Regression guard for the bug where
+	## summary.gold_earned was left at 0 (the per-chunk economy result was discarded
+	## behind a stale "returns null" comment) while add_gold quietly grew the
+	## balance — so the Return-to-App screen reported "0 gold earned" falsely.
 	# Arrange — 10 s = 200 ticks
+	var economy: Node = get_tree().root.get_node_or_null("Economy")
+	assert_object(economy).is_not_null()
+	var lifetime_before: int = int(economy.get_lifetime_gold_earned())
 	var captured_summary: Array = [null]
 	OfflineProgressionEngine.offline_rewards_collected.connect(
 		func(s: OfflineProgressionEngine.OfflineSummary) -> void: captured_summary[0] = s,
@@ -156,7 +163,13 @@ func test_run_offline_replay_empty_replay_emits_summary() -> void:
 	assert_bool(fired).is_true()
 	var summary: OfflineProgressionEngine.OfflineSummary = captured_summary[0]
 	assert_object(summary).is_not_null()
-	assert_int(summary.gold_earned).is_equal(0)
+	# The summary's gold_earned must EQUAL the gold the economy actually credited
+	# during the replay (its lifetime delta) — not a stale 0. Under the prior bug
+	# this was 0 while `credited` was the real (non-zero) drip, so this fails RED.
+	var credited: int = int(economy.get_lifetime_gold_earned()) - lifetime_before
+	assert_int(summary.gold_earned).is_equal(credited)
+	# Floors/kills remain unwired pending the orchestrator.compute_offline_batch
+	# feeder (deferred follow-up); floors_cleared stays empty for now.
 	assert_bool(summary.floors_cleared_in_window.is_empty()).is_true()
 
 
