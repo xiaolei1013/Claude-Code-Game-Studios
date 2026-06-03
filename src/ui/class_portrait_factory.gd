@@ -40,17 +40,25 @@ const _INITIAL_GLYPH_LEN: int = 1
 static var _cache: Dictionary = {}
 
 
-## Returns a 96×96 placeholder portrait for [param class_id]. Deterministic
-## hash → color mapping ensures the same class always renders the same
-## color. Cached after the first build; repeat calls are O(1) dictionary
-## lookups.
+## Returns a 96×96 portrait for [param class_id]. First tries to load from
+## the canonical production path ([code]assets/art/classes/[id]/portrait.png[/code]).
+## If the file is absent, falls back to the programmatic colored-block
+## placeholder so the UI never receives null.
 ##
-## If [param class_id] is empty, returns a neutral grey block (defensive —
-## avoids null returns on caller code paths).
+## Cached after the first build; repeat calls are O(1) dictionary lookups.
+## If [param class_id] is empty, returns a neutral grey block (defensive).
 static func get_portrait_texture(class_id: String) -> Texture2D:
 	var key: String = class_id
 	if _cache.has(key):
 		return _cache[key]
+	# Production / demo path: HeroClass.portrait_path convention is
+	# "assets/art/classes/[id]/portrait.png" — try it before generating.
+	var disk_path: String = "res://assets/art/classes/%s/portrait.png" % class_id
+	if not class_id.is_empty() and FileAccess.file_exists(disk_path):
+		var loaded: Variant = load(disk_path)
+		if loaded is Texture2D:
+			_cache[key] = loaded as Texture2D
+			return _cache[key]
 	var tex: Texture2D = _build_portrait(class_id)
 	_cache[key] = tex
 	return tex
