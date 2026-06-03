@@ -33,7 +33,9 @@ IP notice: All output assets are derivative of Square Enix copyrighted material.
            Replace with original art before any public release.
 """
 
+import hashlib
 import os
+import re
 import sys
 import shutil
 from pathlib import Path
@@ -46,6 +48,34 @@ SRC_OT2 = ROOT / "assets" / "octopath2"
 DST_HEROES = ROOT / "assets" / "art" / "demo" / "heroes"
 DST_AUDIO = ROOT / "assets" / "audio" / "demo"
 DST_VFX = ROOT / "assets" / "art" / "demo" / "vfx"
+
+# Enemy sprite assembly — the Octopath enemy archive (organized by creature type)
+# mapped onto the game's 34 enemy .tres by theme. Output goes to the production
+# path EnemyData.sprite_path references (assets/art/enemies/<id>/sprite.png),
+# gitignored as IP placeholders.
+ENEMY_ARCHIVE = SRC_OT1 / "extras" / "enemies_pack" / "enemies"
+ENEMY_TRES_DIR = ROOT / "assets" / "data" / "enemies"
+DST_ENEMIES = ROOT / "assets" / "art" / "enemies"
+ENEMY_THUMB_MAX = 96  # longest-edge cap after alpha-crop (keeps thumbnails light)
+
+# Keyword (in enemy id) → source creature-type folder. First match wins, so
+# order specific themes before generic ones. is_boss short-circuits to "bosses".
+ENEMY_KEYWORD_FOLDERS = [
+    (("root", "moss", "vine", "thorn", "bloom", "druid", "sprout", "bram"), "plants"),
+    (("grub", "moth", "glow", "beetle", "acarid", "hive"), "bugs"),
+    (("eel", "serpent", "coral", "tide", "deep", "drowned", "abyss", "shell", "husk", "brine", "mire"), "sea_creatures"),
+    (("revenant", "wraith", "hollow", "marrow", "thrall", "pilgrim", "winter", "bone", "skull", "grave", "echo"), "undead"),
+    (("djinn", "cinder", "ash", "frost", "glasswind", "windborne", "kiln", "ember", "flame", "spark", "icebound"), "elementals"),
+    (("titan", "colossus", "obsidian", "iron", "stone", "crag", "spire", "golem", "silent", "stoneback"), "golems"),
+    (("boar", "jackal", "hound", "wolf", "beast", "stag", "elder"), "mammals"),
+    (("hunter", "born", "wing", "feather", "raptor"), "birds"),
+    (("warden", "knight", "judge", "chorister", "step", "witch", "lamplit"), "humans"),
+]
+# Archetype fallback when no keyword matches.
+ENEMY_ARCHETYPE_FOLDERS = {
+    "swarm": "bugs", "bruiser": "mammals", "armored": "golems",
+    "skirmisher": "birds", "caster": "undead",
+}
 
 # ---------------------------------------------------------------------------
 # Class → Octopath character mapping
@@ -218,8 +248,7 @@ def assemble_sprite_sheet(class_name, cfg):
         # Also write to the production paths the game already references.
         # HeroClass.tres → portrait_path = "assets/art/classes/[id]/portrait.png"
         # HeroClass.tres → sprite_path   = "assets/art/classes/[id]/sprite.png"
-        # These files stay untracked (not gitignored — intended as local
-        # temporary placeholders until real production art ships).
+        # assets/art/classes/ is gitignored (IP placeholders) — see .gitignore.
         prod_dir = ROOT / "assets" / "art" / "classes" / class_name
         prod_portrait = prod_dir / "portrait.png"
         prod_sprite = prod_dir / "sprite.png"
@@ -235,6 +264,135 @@ def assemble_sprite_sheet(class_name, cfg):
         log(f"  Pillow not available; copying frame 001 only for {class_name}")
         copy_file(frames[0], dst_idle)
         copy_file(frames[0], dst_portrait)
+
+
+# ---------------------------------------------------------------------------
+# Enemy sprite assembly
+# ---------------------------------------------------------------------------
+def _stable_index(key, n):
+    """Deterministic index in [0, n) from a string key (PYTHONHASHSEED-safe)."""
+    if n <= 0:
+        return 0
+    return int(hashlib.md5(key.encode()).hexdigest(), 16) % n
+
+
+def _parse_enemy_tres(path):
+    """Extract id / archetype / biome / is_boss from an enemy .tres (regex-light)."""
+    txt = path.read_text(encoding="utf-8", errors="ignore")
+
+    def grab(field, default=""):
+        m = re.search(rf'^{field}\s*=\s*"?([^"\n]+)"?', txt, re.M)
+        return m.group(1).strip() if m else default
+
+    return {
+        "id": grab("id"),
+        "archetype": grab("archetype"),
+        "biome": grab("biome"),
+        "is_boss": grab("is_boss", "false").lower() == "true",
+    }
+
+
+def _enemy_folder(enemy):
+    """Pick the source creature-type folder for an enemy by theme."""
+    name = enemy["id"].lower()
+    if enemy["is_boss"]:
+        return "bosses"
+    for keys, folder in ENEMY_KEYWORD_FOLDERS:
+        if any(k in name for k in keys):
+            return folder
+    return ENEMY_ARCHETYPE_FOLDERS.get(enemy["archetype"], "misc")
+
+
+def _crop_main_figure(im):
+    """Crop a multi-figure enemy sheet down to its single largest creature.
+
+    The Octopath enemy art packs several frames/creatures horizontally with
+    transparent gaps between them. Showing the whole sheet in a thumbnail yields
+    a row of tiny figures, so we isolate ONE: scan column alpha-occupancy, split
+    into runs (merging within-creature gaps smaller than ~6% of the height), pick
+    the WIDEST run (the main creature, not a stray sliver), then tight-crop it.
+    """
+    w, h = im.size
+    px = im.getchannel("A").load()
+    occ = [any(px[x, y] > 8 for y in range(0, h, 3)) for x in range(w)]
+    if not any(occ):
+        return im  # fully transparent — leave as-is
+
+    min_gap = max(8, round(h * 0.06))
+    runs = []
+    start = None
+    end = 0
+    gap = 0
+    for x in range(w):
+        if occ[x]:
+            if start is None:
+                start = x
+            end = x
+            gap = 0
+        elif start is not None:
+            gap += 1
+            if gap > min_gap:
+                runs.append((start, end))
+                start = None
+    if start is not None:
+        runs.append((start, end))
+    if not runs:
+        return im
+
+    x0, x1 = max(runs, key=lambda r: r[1] - r[0])
+    band = im.crop((x0, 0, x1 + 1, h))
+    bb = band.getbbox()
+    return band.crop(bb) if bb else band
+
+
+def assemble_enemy_sprites():
+    """One demo sprite per enemy .tres: theme-map to a source folder, pick a
+    deterministic sprite, alpha-crop + downscale, write to the production path."""
+    if not ENEMY_ARCHIVE.exists():
+        print(f"  SKIP enemies: archive not found at {ENEMY_ARCHIVE}")
+        return
+    tres_files = sorted(ENEMY_TRES_DIR.glob("*.tres"))
+    if not tres_files:
+        print(f"  SKIP enemies: no .tres in {ENEMY_TRES_DIR}")
+        return
+    try:
+        from PIL import Image
+    except ImportError:
+        log("  Pillow not available; skipping enemy sprites (pip install pillow).")
+        return
+
+    # Index source pngs per folder once (case-insensitive .png / .PNG).
+    folder_files = {}
+    for d in sorted(ENEMY_ARCHIVE.iterdir()):
+        if d.is_dir():
+            pngs = sorted(f for f in d.iterdir() if f.suffix.lower() == ".png")
+            if pngs:
+                folder_files[d.name] = pngs
+
+    assembled = 0
+    for tres in tres_files:
+        enemy = _parse_enemy_tres(tres)
+        if not enemy["id"]:
+            continue
+        folder = _enemy_folder(enemy)
+        pngs = folder_files.get(folder) or folder_files.get("misc")
+        if not pngs:
+            pngs = next(iter(folder_files.values()), [])
+        if not pngs:
+            continue
+        src = pngs[_stable_index(enemy["id"], len(pngs))]
+
+        dst_dir = DST_ENEMIES / enemy["id"]
+        dst = dst_dir / "sprite.png"
+        if not DRY_RUN:
+            im = Image.open(src).convert("RGBA")
+            im = _crop_main_figure(im)  # isolate one creature from the sheet
+            im.thumbnail((ENEMY_THUMB_MAX, ENEMY_THUMB_MAX), Image.NEAREST)
+            mkdir(dst_dir)
+            im.save(dst)
+        assembled += 1
+        log(f"  ENEMY {enemy['id']}: {folder}/{src.name} -> {dst.relative_to(ROOT)}")
+    log(f"  {assembled} enemy sprite(s) assembled (gitignored at assets/art/enemies/).")
 
 
 def main():
@@ -272,8 +430,14 @@ def main():
         log("OT2 source not found — skipping VFX.")
     print()
 
+    # 4. Enemy sprites (archive → per-enemy demo sprite at the production path)
+    log("--- Enemy sprites ---")
+    assemble_enemy_sprites()
+    print()
+
     log("=== Done ===")
-    log("Output assets are gitignored (assets/art/demo/, assets/audio/demo/).")
+    log("Output assets are gitignored (assets/art/demo/, assets/audio/demo/, "
+        "assets/art/classes/, assets/art/enemies/).")
     log("See design/art/demo-asset-manifest.md for the full mapping.")
     log("Install Pillow for sprite sheet assembly: pip install pillow")
 

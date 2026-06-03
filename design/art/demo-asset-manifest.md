@@ -100,11 +100,39 @@ revert before merge**. Same pattern for sprites/portraits (disk-first, else gene
 
 ---
 
-## Enemy / background placeholder strategy
+## Enemy sprite mapping
+
+`tools/demo-asset-setup.py` assembles **one demo sprite per enemy** from the OT1
+enemy archive (`assets/octopath1/extras/enemies_pack/enemies/`, ~489 sprites in
+type folders: bosses, bugs, golems, plants, sea_creatures, undead, …).
+
+Each enemy `.tres` is theme-mapped to a source folder by keyword in its id
+(`is_boss` short-circuits to `bosses`), then a deterministic sprite is picked
+(stable md5 hash of the id → folder index), alpha-cropped, and downscaled to
+≤96 px. Output: `assets/art/enemies/<id>/sprite.png` (the path
+`EnemyData.sprite_path` references) — **gitignored** as an IP placeholder.
+
+| Theme keyword (in enemy id) | Source folder | Example enemies |
+|---|---|---|
+| root / moss / vine / thorn / druid | `plants` | thornling_swarm, moss_druid, vined_knight, thorn_guardian |
+| eel / coral / tide / deep / drowned / shell / mire | `sea_creatures` | abyss_eel, coral_warden, tide_husk, mire_colossus |
+| revenant / wraith / hollow / marrow / pilgrim / echo | `undead` | frost_revenant, hollow_brute, crag_wraith, marrow_witch |
+| djinn / cinder / ash / frost / windborne / kiln | `elementals` | ash_djinn, cinder_jackal, glasswind_walker |
+| titan / obsidian / iron / spire / stoneback | `golems` | obsidian_titan, iron_silent, spire_warden |
+| boar / jackal / hound / elder | `mammals` | elder_boar, stairmaw_hound |
+| grub / moth / glow | `bugs` | glowmoth, stoneback_grub |
+| *(is_boss = true)* | `bosses` | ancient_rootking, the_drowned_king, the_kiln_below |
+| *(unmatched)* → archetype fallback | swarm→bugs, bruiser→mammals, armored→golems | — |
+
+**Consumer:** `EnemySpriteFactory.get_sprite(id)` loads the sprite disk-first
+(null when absent). The Codex **Monsters** tab shows it as a per-card thumbnail;
+absent → neutral greybox box. Next step (not yet wired): the dungeon-run-view
+enemy lineup (show the current floor's `enemy_list` sprites during a run).
+
+## Background placeholder strategy
 
 **No directly usable dungeon backgrounds in OT1.** Only the world-map image exists (`assets/octopath1/map/World Map Background.png`). For demo builds:
 - **Biome backgrounds** — use `BiomeBackground.set_biome("guild_hall_tavern")` on all screens (shipped placeholder behavior from Sprint 22)
-- **Enemy sprites** — the enemy archive at `assets/octopath1/extras/enemies_pack/enemies/` contains OT1 enemy sprites (organized by type: bosses, bugs, golems, undead, etc.); run through the same assembly script pattern if needed for a combat demo. Not included in the default setup pass.
 
 ---
 

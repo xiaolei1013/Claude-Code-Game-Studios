@@ -9,10 +9,17 @@ extends Control
 ## WireframeKit styling.
 
 const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+# Demo art thumbnails per card (no-op fallbacks without demo assets).
+const ClassPortraitFactoryScript = preload("res://src/ui/class_portrait_factory.gd")
+const ClassSpriteFactoryScript = preload("res://src/ui/class_sprite_factory.gd")
+const EnemySpriteFactoryScript = preload("res://src/ui/enemy_sprite_factory.gd")
 
 # Backdrop dim. A named const (not an inline literal); mirrors the modal
 # DimBackdrop colour used in settings.tscn / pause_menu.tscn.
 const _DIM: Color = Color(0, 0, 0, 0.7)
+
+# Catalogue card thumbnail edge (square). Sized for the 270×92 card.
+const _THUMB_PX: int = 64
 
 
 func _ready() -> void:
@@ -106,19 +113,29 @@ func _make_catalogue_tab(title: String, content_type: String) -> Control:
 		grid.add_child(WireframeKitScript.caption("Nothing recorded yet.", WireframeKitScript.MUTED))
 		return scroll
 	for res: Variant in entries:
-		grid.add_child(_make_card(res))
+		grid.add_child(_make_card(res, content_type))
 	return scroll
 
 
-## A catalogue card: name + a meta line + flavour, sized for the grid.
-func _make_card(res: Variant) -> PanelContainer:
+## A catalogue card: a demo-art thumbnail (left) + name / meta / flavour (right),
+## sized for the grid. [param content_type] selects which art factory drives the
+## thumbnail ("classes" → hero portrait/idle sprite, "enemies" → enemy sprite);
+## any other type (e.g. "biomes") gets a neutral placeholder box.
+func _make_card(res: Variant, content_type: String) -> PanelContainer:
 	var card: PanelContainer = PanelContainer.new()
 	card.custom_minimum_size = Vector2(270, 92)
 	card.add_theme_stylebox_override("panel",
 		WireframeKitScript.stylebox(WireframeKitScript.FILL_RAISED, WireframeKitScript.LINE_SOFT, 1, 4, 10))
+
+	var row: HBoxContainer = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	card.add_child(row)
+	row.add_child(_make_thumbnail(res, content_type))
+
 	var v: VBoxContainer = VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_theme_constant_override("separation", 3)
-	card.add_child(v)
+	row.add_child(v)
 
 	var nm: Label = Label.new()
 	nm.text = _display_name(res)
@@ -133,6 +150,36 @@ func _make_card(res: Variant) -> PanelContainer:
 	if flavor != "":
 		v.add_child(WireframeKitScript.caption(flavor, WireframeKitScript.MUTED, 11))
 	return card
+
+
+## Builds the per-card art thumbnail. Heroes show the class portrait (animated
+## with the idle sprite when demo assets exist); monsters show the enemy sprite;
+## anything else (or any entry with no demo art) shows a neutral placeholder box
+## so the grid stays visually aligned.
+func _make_thumbnail(res: Variant, content_type: String) -> Control:
+	var id: String = _field_str(res, "id")
+	if content_type == "classes" and id != "":
+		var slot: TextureRect = _thumb_rect()
+		slot.texture = ClassPortraitFactoryScript.get_portrait_texture(id)
+		ClassSpriteFactoryScript.animate(slot, id)
+		return slot
+	if content_type == "enemies" and id != "":
+		var tex: Texture2D = EnemySpriteFactoryScript.get_sprite(id)
+		if tex != null:
+			var slot: TextureRect = _thumb_rect()
+			slot.texture = tex
+			return slot
+	# No demo art for this entry — neutral greybox box, same footprint.
+	return WireframeKitScript.placeholder_box("", Vector2(_THUMB_PX, _THUMB_PX))
+
+
+## A square TextureRect sized to the thumbnail footprint, aspect-kept + centred.
+func _thumb_rect() -> TextureRect:
+	var slot: TextureRect = TextureRect.new()
+	slot.custom_minimum_size = Vector2(_THUMB_PX, _THUMB_PX)
+	slot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	slot.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	return slot
 
 
 func _display_name(res: Variant) -> String:
