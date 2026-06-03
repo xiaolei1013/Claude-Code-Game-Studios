@@ -48,6 +48,14 @@ func on_exit() -> void:
 	pass  # Nothing to disconnect.
 
 
+func on_pause() -> void:
+	pass  # Start menu is never paused (no pause overlay reachable from boot).
+
+
+func on_resume() -> void:
+	pass  # No paused state to restore.
+
+
 func _build() -> void:
 	# Full-screen parchment backdrop.
 	var bg: ColorRect = ColorRect.new()
