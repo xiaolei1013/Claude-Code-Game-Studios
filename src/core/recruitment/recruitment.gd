@@ -62,8 +62,16 @@ enum RecruitOutcome {
 
 ## Number of class_ids in the pool per refresh. ADR-0015 §G default; the
 ## tuned value lives in a future recruitment_config.tres (analogous to
-## economy_config.tres). MVP value matches the cozy-shop "3 picks" register.
-const POOL_SIZE: int = 3
+## economy_config.tres).
+##
+## 4 (was 3): the original "3 picks" matched the 3-class MVP. The roster has
+## since grown to 7 active classes, making a 3-card draft thin (~37% chance to
+## see any given class per refresh). A distinct 4-card draft (ADR-0015
+## §Amendment 1, drawn WITHOUT replacement) restores meaningful choice per the
+## game-concept "Autonomy = Core" need. Layout-safe: at the 248px wireframe
+## card width, 4 cards (4×248 + 3×20 = 1052px) fit the 1280px Steam Deck
+## target in a single centered row; 5 (1320px) would overflow.
+const POOL_SIZE: int = 4
 
 ## Paid-refresh cost curve base + multiplier per ADR-0015 §OQ-RC-2:
 ##   refresh_cost(n) = BASE_REFRESH_COST × (1 + REFRESH_COST_MULT × n)
@@ -478,21 +486,28 @@ func _first_launch_seed_init() -> void:
 ## Regenerates _current_pool deterministically from
 ## (_save_pool_seed XOR _refresh_counter). Same inputs always produce the
 ## same output (ADR-0015 §Validation Criteria — two _regenerate_pool calls
-## with the same _refresh_counter produce IDENTICAL pools).
+## with the same _refresh_counter produce IDENTICAL pools); DIFFERENT inputs
+## (a new save seed OR an incremented counter) produce a DIFFERENT pool.
 ##
-## Pool composition: random-with-replacement draw of POOL_SIZE active
-## class_ids from HeroClassDatabase. Deduplication policy is OQ-0015-2
-## (Sprint 12+ Story 4 picks). MVP: with-replacement draw — same class can
-## appear twice; the cost-curve interaction (§OQ-RC-3 global per-class)
-## means duplicates show the same cost until one is recruited.
+## Pool composition (ADR-0015 §Amendment 1 / OQ-0015-2 → option b): draw
+## WITHOUT replacement, so a draft of POOL_SIZE shows POOL_SIZE *distinct*
+## classes. When the active-class set is smaller than POOL_SIZE (content
+## removal / sparse test env), fall back to with-replacement so the pool
+## still fills; the §OQ-RC-3 global-per-class cost interaction keeps duplicate
+## slots cost-consistent in that fallback case.
 ##
 ## Defensive against missing autoloads: if HeroClassDatabase is absent
 ## (test env), the pool is left empty. Production boot order
 ## (HeroClassDatabase rank 4 → Recruitment rank 12) guarantees presence.
 func _regenerate_pool() -> void:
 	var rng := RandomNumberGenerator.new()
+	# Seed ALONE drives both reproducibility (same seed → same sequence) and
+	# per-(seed,counter) variety. The prior `rng.state = 0` line was REMOVED per
+	# ADR-0015 §Amendment 2: empirically (Godot 4.6.1) setting state=0 *after*
+	# seed clobbers the seed, yielding an identical pool for every seed AND every
+	# counter — silently defeating the per-save-uniqueness (§Risk table) and
+	# per-refresh-variety goals this system exists to provide.
 	rng.seed = _save_pool_seed ^ _refresh_counter
-	rng.state = 0  # explicit per ADR-0015 reproducibility recipe
 
 	var active_class_ids: Array[String] = _get_active_class_ids()
 	var new_pool: Array[String] = []
@@ -501,9 +516,24 @@ func _regenerate_pool() -> void:
 		_current_pool = new_pool
 		return
 
-	for _i: int in range(POOL_SIZE):
-		var pick_index: int = rng.randi_range(0, active_class_ids.size() - 1)
-		new_pool.append(active_class_ids[pick_index])
+	var class_count: int = active_class_ids.size()
+	if class_count >= POOL_SIZE:
+		# Draw WITHOUT replacement: partial Fisher-Yates over a working copy.
+		# Each iteration swaps a uniformly-chosen remaining element into slot i,
+		# guaranteeing POOL_SIZE distinct picks. Deterministic under the seeded
+		# rng (same seed XOR counter → same swap sequence → same pool).
+		var working: Array[String] = active_class_ids.duplicate()
+		for i: int in range(POOL_SIZE):
+			var j: int = rng.randi_range(i, class_count - 1)
+			var swap: String = working[i]
+			working[i] = working[j]
+			working[j] = swap
+			new_pool.append(working[i])
+	else:
+		# Fewer active classes than pool slots — with-replacement fallback so
+		# the pool still fills POOL_SIZE rows.
+		for _i: int in range(POOL_SIZE):
+			new_pool.append(active_class_ids[rng.randi_range(0, class_count - 1)])
 	_current_pool = new_pool
 
 

@@ -21,9 +21,10 @@ const RecruitmentScript = preload("res://src/core/recruitment/recruitment.gd")
 const ClassPortraitFactoryScript = preload("res://src/ui/class_portrait_factory.gd")
 
 
-# Layout: POOL_SIZE PoolEntry rows pre-defined in the .tscn (3 rows for
-# MVP per Recruitment.POOL_SIZE = 3). Each row exposes named child nodes
-# the .gd populates.
+# Layout: POOL_SIZE PoolEntry rows pre-defined in the .tscn (4 rows per
+# Recruitment.POOL_SIZE = 4 — see that const's doc for the 3→4 rationale).
+# Each row exposes named child nodes the .gd populates. Keep _pool_entries
+# in lockstep with POOL_SIZE and the .tscn PoolEntryN node count.
 var POOL_SIZE: int = RecruitmentScript.POOL_SIZE
 
 
@@ -36,6 +37,7 @@ var POOL_SIZE: int = RecruitmentScript.POOL_SIZE
 	$PoolPanel/PoolVBox/PoolEntry0,
 	$PoolPanel/PoolVBox/PoolEntry1,
 	$PoolPanel/PoolVBox/PoolEntry2,
+	$PoolPanel/PoolVBox/PoolEntry3,
 ]
 @onready var _gold_counter: Label = $HeaderBar/HeaderHBox/GoldCounter
 @onready var _back_button: Button = $HeaderBar/HeaderHBox/BackButton

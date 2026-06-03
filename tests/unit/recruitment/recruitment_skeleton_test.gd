@@ -168,33 +168,95 @@ func test_two_recruitment_instances_with_same_seed_and_counter_produce_same_pool
 
 
 func test_different_refresh_counter_produces_different_pool_when_classes_available() -> void:
-	# Defensive — only meaningful if DataRegistry has multiple active classes
-	# in the test env. If DataRegistry has only 1 active class OR is absent,
-	# the pool will be identical regardless of counter (skip is acceptable).
-	var a: Node = _make_recruitment()
-	var b: Node = _make_recruitment()
-
+	# ADR-0015 §Amendment 2 regression: incrementing _refresh_counter must
+	# actually change the pool — the player rerolls and sees a NEW draft. Prior
+	# to the §Amendment-2 seed fix, `rng.state = 0` clobbered the seed so EVERY
+	# counter produced the IDENTICAL pool, making refresh a silent no-op.
+	#
+	# Deterministic assertion: sweep several counters for a fixed seed; the
+	# generated pools must NOT all be identical. Under the bug every pool is
+	# identical (guaranteed fail); under the fix they vary.
+	var r: Node = _make_recruitment()
 	var empty_pool: Array[String] = []
-	a._save_pool_seed = 12345
-	a._refresh_counter = 0
-	a._current_pool = empty_pool.duplicate()
-	b._save_pool_seed = 12345
-	b._refresh_counter = 1
-	b._current_pool = empty_pool.duplicate()
+	var signatures: Dictionary = {}
+	for counter: int in range(8):
+		r._save_pool_seed = 12345
+		r._refresh_counter = counter
+		r._current_pool = empty_pool.duplicate()
+		r._regenerate_pool()
+		if r._current_pool.size() < 2:
+			return  # sparse/empty test-env class set — soft skip.
+		signatures[str(r._current_pool)] = true
+	assert_int(signatures.size()).override_failure_message(
+		"All 8 refresh_counter values produced the IDENTICAL pool — refresh is a "
+		+ "no-op (rng.state=0 seed-clobber regression)."
+	).is_greater(1)
 
-	a._regenerate_pool()
-	b._regenerate_pool()
 
-	# Both pools should be size POOL_SIZE (3) when classes are available.
-	# If classes are unavailable in test env, skip the difference assertion.
-	if a._current_pool.is_empty() or b._current_pool.is_empty():
-		return  # No class set in test DataRegistry — soft skip.
+func test_different_save_seed_produces_different_pool() -> void:
+	# ADR-0015 §Amendment 2 + §Risk table (per-save uniqueness): two saves with
+	# DIFFERENT _save_pool_seed values must get DIFFERENT recruit pools, so the
+	# pool isn't globally identical across every player. Regression guard for the
+	# same rng.state=0 seed-clobber bug, on the save-seed axis.
+	var r: Node = _make_recruitment()
+	var empty_pool: Array[String] = []
+	var signatures: Dictionary = {}
+	for seed_val: int in [11, 22, 33, 44, 55, 66, 77, 88]:
+		r._save_pool_seed = seed_val
+		r._refresh_counter = 0
+		r._current_pool = empty_pool.duplicate()
+		r._regenerate_pool()
+		if r._current_pool.size() < 2:
+			return  # sparse/empty test-env class set — soft skip.
+		signatures[str(r._current_pool)] = true
+	assert_int(signatures.size()).override_failure_message(
+		"All 8 distinct save seeds produced the IDENTICAL pool — per-save "
+		+ "uniqueness is broken (rng.state=0 seed-clobber)."
+	).is_greater(1)
 
-	# Pools may or may not differ depending on the available class count
-	# (small class sets produce frequent collisions). We only assert that
-	# determinism holds: another a-style call with the same inputs gives
-	# the same result.
-	assert_int(a._current_pool.size()).is_equal(RecruitmentScript.POOL_SIZE)
+
+func test_regenerate_pool_draws_distinct_classes_when_enough_available() -> void:
+	# OQ-0015-2 resolution (ADR-0015 §Amendment 1, option b): the pool is
+	# drawn WITHOUT replacement, so every generated pool of POOL_SIZE entries
+	# is all-distinct WHEN the active-class set has at least POOL_SIZE members.
+	# This implements the ADR-0015 risk-table mitigation ("Pool-generation
+	# algorithm SHOULD prefer same-class deduplication").
+	#
+	# Determinism guard: sweep many seeds. Under the prior with-replacement
+	# draw, at least one seed in this range WOULD collide (4-from-7 ≈ 65% per
+	# seed), so this assertion deterministically catches a regression to
+	# with-replacement. Under without-replacement, ALL seeds produce distinct
+	# pools.
+	#
+	# Soft-skip per-seed when the test-env DataRegistry exposes fewer than
+	# POOL_SIZE active classes (the with-replacement fallback path is then
+	# correct and is covered by the existing determinism tests).
+	var r: Node = _make_recruitment()
+	var empty_pool: Array[String] = []
+	var asserted_at_least_once: bool = false
+	for seed_offset: int in range(50):
+		r._save_pool_seed = 1000 + seed_offset
+		r._refresh_counter = 0
+		r._current_pool = empty_pool.duplicate()
+		r._regenerate_pool()
+		if r._current_pool.size() < RecruitmentScript.POOL_SIZE:
+			continue  # sparse class set — fallback path, covered elsewhere.
+		asserted_at_least_once = true
+		var seen: Dictionary = {}
+		for cid: String in r._current_pool:
+			seen[cid] = true
+		assert_int(seen.size()).override_failure_message(
+			"seed %d produced a duplicate pool (with-replacement regression?): %s"
+			% [1000 + seed_offset, str(r._current_pool)]
+		).is_equal(r._current_pool.size())
+	# If the env never had a full pool, the test is a no-op (acceptable soft
+	# skip), but note it so a silently-empty DataRegistry doesn't masquerade
+	# as a pass.
+	if not asserted_at_least_once:
+		push_warning(
+			"test_regenerate_pool_draws_distinct: DataRegistry exposed < POOL_SIZE "
+			+ "active classes for all swept seeds — distinctness not exercised."
+		)
 
 
 # ===========================================================================
