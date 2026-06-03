@@ -1,8 +1,19 @@
 # ADR-0008: UI Framework — Dual-Focus Parity, Tap-Target Enforcement, and Parchment Theme
 
+> **Amendment 2026-06-03 (font system) — playtest legibility fix.** The "two-font
+> system" decision below (custom Information + Identity faces, wired as Lora + IM
+> Fell English in Sprint 20) is **suspended**. Playtest found the faces "not clear";
+> per user decision the theme now ships **no custom font face** — every Control falls
+> back to Godot's built-in default sans-serif. Sizes, colors, the 16px/24px
+> legibility floors, and all other ADR-0008 decisions are unchanged, and the
+> two-font-MAX invariant still holds (zero ≤ two). This deviates from Art Bible §7's
+> illuminated-manuscript typography aspiration — that direction is deferred to a
+> future polish pass, not retired (the TTFs remain on disk). See DESIGN.md
+> §Typography and the `parchment_theme.tres` header note.
+
 ## Status
 
-Accepted
+Accepted (font system amended 2026-06-03 — see top note)
 
 ## Date
 

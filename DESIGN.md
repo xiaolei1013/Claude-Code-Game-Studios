@@ -35,24 +35,28 @@
 
 ### Font choices
 
+> **Reverted 2026-06-03 (playtest legibility fix).** The Sprint 20 Lora + IM Fell
+> English serif treatment read as "not clear" in playtest. The game now uses
+> Godot's built-in default font everywhere.
+
 | Role | Font | Why |
 |------|------|-----|
-| **Information (body)** | **Lora** (Google Fonts) | Calligraphic-tradition serif. Reads as writerly/literate without sacrificing legibility at 16px. Free for commercial use, wide Latin Extended + Cyrillic coverage for localization. |
-| **Identity (display)** | **IM Fell English** (Google Fonts) | Historical 17th-century printing matrix revival — the ink-drawn calligraphic-tool variation the art bible asks for, literally. Used at ≥24px only. |
-| **Numbers** | **Lora** with `tabular-nums` feature (Godot: `font_features = {"tnum": 1}`) | Gold counters and stat tables need column-aligned digits. Lora supports tabular figures. |
+| **All text (body, display, numbers)** | **Godot built-in default** (sans-serif) | Maximum legibility at every size. The theme specifies font *sizes* only and lets every Control fall back to the engine default face. |
 
-**No third font.** Two-font max per ADR-0008. Code/monospace contexts (rare in this game) use the engine default at editor-debug surfaces only.
+**No custom font.** The theme (`assets/ui/parchment_theme.tres`) sets sizes and
+colors but no font face. ADR-0008's two-font-max still holds (zero custom fonts ≤ two).
 
 ### Asset path
 
-- `res://assets/fonts/Lora/Lora-Regular.ttf`
-- `res://assets/fonts/Lora/Lora-Medium.ttf`
-- `res://assets/fonts/Lora/Lora-SemiBold.ttf`
-- `res://assets/fonts/Lora/Lora-Bold.ttf`
-- `res://assets/fonts/IM_Fell_English/IMFellEnglish-Regular.ttf`
-- `res://assets/fonts/IM_Fell_English/IMFellEnglish-Italic.ttf`
+The Lora and IM Fell English TTFs remain on disk (now **unreferenced** by the theme)
+in case a future polish pass wants a custom face:
 
-Both fonts ship under SIL Open Font License; commercial use confirmed. License files copied to `res://assets/fonts/<family>/LICENSE.txt`.
+- `res://assets/fonts/Lora/Lora.ttf`, `Lora-Italic.ttf`
+- `res://assets/fonts/IM_Fell_English/IMFellEnglish-Regular.ttf`, `IMFellEnglish-Italic.ttf`
+
+Both ship under SIL Open Font License (LICENSE files alongside each family). To
+re-adopt a custom face: wire `FontFile` ext_resources + a `default_font` in the
+theme — see the `parchment_theme.tres` header note.
 
 ### Type scale
 
@@ -72,20 +76,22 @@ Logical pixels at 1280×800 reference resolution (Steam Deck native). Each step 
 
 ### Hierarchy + color pairing
 
+All surfaces use the **Godot built-in default font**. Hierarchy now comes from
+**size + color** (and the theme's `IdentityHeader`/`SelectedSlotButton` variations),
+not typeface or weight — there is no SemiBold face wired for the default font.
+
 | Surface | Font | Size | Color |
 |---------|------|------|-------|
-| Screen title (identity) | IM Fell English | 32px (`2xl`) | Slate Ink |
-| Section/biome title | IM Fell English | 24px (`xl`) | Slate Ink |
-| Unlock title (reward ceremony) | IM Fell English | 40px (`3xl`) | Lantern Gold on Slate Ink ground |
-| Body copy | Lora Regular | 16px (`base`) | Slate Ink |
-| Stat label (e.g., "Gold:") | Lora SemiBold | 16px (`base`) | Slate Ink |
-| Stat value (e.g., "450") | Lora SemiBold | 20px (`lg`) | Lantern Gold |
-| Secondary label (e.g., "Lv 7") | Lora Regular | 14px (`sm`) | Slate Ink |
-| Button label (primary CTA) | Lora SemiBold | 18px (`md`) | Slate Ink |
-| Button label (secondary) | Lora Regular | 16px (`base`) | Slate Ink |
-| Tooltip text | Lora Regular | 14px (`sm`) | Slate Ink |
-
-**Hand-lettered accent rule** (Art Bible §7): the identity font (IM Fell English) is **never** used for body copy or stat labels. Every use is a deliberate art direction decision.
+| Screen title (identity) | Default | 32px (`2xl`) | Slate Ink |
+| Section/biome title | Default | 24px (`xl`) | Slate Ink |
+| Unlock title (reward ceremony) | Default | 40px (`3xl`) | Lantern Gold on Slate Ink ground |
+| Body copy | Default | 16px (`base`) | Slate Ink |
+| Stat label (e.g., "Gold:") | Default | 16px (`base`) | Slate Ink |
+| Stat value (e.g., "450") | Default | 20px (`lg`) | Lantern Gold |
+| Secondary label (e.g., "Lv 7") | Default | 14px (`sm`) | Slate Ink |
+| Button label (primary CTA) | Default | 18px (`md`) | Slate Ink |
+| Button label (secondary) | Default | 16px (`base`) | Slate Ink |
+| Tooltip text | Default | 14px (`sm`) | Slate Ink |
 
 ---
 
