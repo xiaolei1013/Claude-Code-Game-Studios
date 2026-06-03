@@ -378,7 +378,7 @@ This system has no cost-tuning knobs of its own. All cost-curve tuning lives in 
 Sprint 12+ ADR-X04 will add (or not) tuning knobs depending on candidate choice:
 
 - **Candidate 1**: zero new knobs.
-- **Candidate 2**: `RECRUIT_POOL_SIZE: int` (e.g., 3); `RECRUIT_REFRESH_CADENCE_TICKS: int` (e.g., per-clear); `RECRUIT_REFRESH_COST_GOLD: int` (if on-demand refresh costs gold).
+- **Candidate 2**: `RECRUIT_POOL_SIZE: int` (currently 4, drawn without replacement per ADR-0015 §Amendment 1 — was 3 for the 3-class MVP, raised with the 7-class roster); `RECRUIT_REFRESH_CADENCE_TICKS: int` (e.g., per-clear); `RECRUIT_REFRESH_COST_GOLD: int` (if on-demand refresh costs gold).
 - **Candidate 3**: `TIER_ROTATION_BIAS: float` (per-tier weight).
 
 These land in a new `recruitment_config.tres` (analogous to `economy_config.tres`) when ADR-X04 picks a candidate.

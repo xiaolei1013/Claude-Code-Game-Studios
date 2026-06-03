@@ -162,6 +162,40 @@ focus_mode = 0
 mouse_filter = 0
 text = "Recruit"
 
+[node name="PoolEntry3" type="VBoxContainer" parent="PoolPanel/PoolVBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 120)
+
+[node name="ClassPortrait" type="TextureRect" parent="PoolPanel/PoolVBox/PoolEntry3"]
+layout_mode = 2
+custom_minimum_size = Vector2(96, 96)
+expand_mode = 1
+stretch_mode = 5
+
+[node name="EntryDetails" type="VBoxContainer" parent="PoolPanel/PoolVBox/PoolEntry3"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ClassNameLabel" type="Label" parent="PoolPanel/PoolVBox/PoolEntry3/EntryDetails"]
+layout_mode = 2
+text = "Class"
+theme_type_variation = &"IdentityHeader"
+
+[node name="CostLabel" type="Label" parent="PoolPanel/PoolVBox/PoolEntry3/EntryDetails"]
+layout_mode = 2
+text = "0 gold"
+
+[node name="OwnedLabel" type="Label" parent="PoolPanel/PoolVBox/PoolEntry3/EntryDetails"]
+layout_mode = 2
+text = "(owned: 0)"
+
+[node name="RecruitButton" type="Button" parent="PoolPanel/PoolVBox/PoolEntry3"]
+layout_mode = 2
+custom_minimum_size = Vector2(160, 60)
+focus_mode = 0
+mouse_filter = 0
+text = "Recruit"
+
 [node name="FooterBar" type="PanelContainer" parent="."]
 layout_mode = 1
 anchors_preset = 12

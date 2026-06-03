@@ -58,8 +58,11 @@ func after_test() -> void:
 
 func test_recruit_screen_pool_size_matches_recruitment_constant() -> void:
 	var screen: Node = _make_screen()
-	# The screen reads POOL_SIZE from RecruitmentScript.POOL_SIZE = 3.
-	assert_int(screen.POOL_SIZE).is_equal(3)
+	# The screen's POOL_SIZE must track RecruitmentScript.POOL_SIZE exactly so
+	# the .tscn PoolEntryN row count, _pool_entries, and the domain pool stay in
+	# lockstep. Assert against the constant (not a literal) so a future tuning
+	# bump only needs the const + matching .tscn rows.
+	assert_int(screen.POOL_SIZE).is_equal(RecruitmentScript.POOL_SIZE)
 
 
 # ===========================================================================
