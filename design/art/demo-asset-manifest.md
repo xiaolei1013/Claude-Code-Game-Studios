@@ -80,11 +80,21 @@ All four are gitignored (IP placeholders).
 **AudioRouter wiring (implemented):** `AudioRouter.play_music` resolves production
 music via DataRegistry first (ADR-0016 silent-MVP path, untouched). Only when that
 returns null does it fall back to `assets/audio/demo/bgm_<track>.mp3`, mapping the
-requested bed (`guild_hall` + the 6 biome ids, stripped of the `_bed`/`_stinger`
-suffix) onto a demo track via `AudioRouter._DEMO_MUSIC_MAP` (default
-`_DEMO_MUSIC_DEFAULT = "dungeon_run"`). Because the demo audio is gitignored, the
-fallback file never exists in CI/production builds — so the demo wiring needs **no
-revert before merge**. Same pattern for sprites/portraits (disk-first, else generate).
+requested bed (stripped of the `_bed`/`_stinger` suffix) onto a demo track via
+`AudioRouter._DEMO_MUSIC_MAP` (default `_DEMO_MUSIC_DEFAULT = "dungeon_run"`):
+
+| Bed requested | Trigger | Demo track |
+|---|---|---|
+| `music_guild_hall_bed` | any non-dungeon screen | `bgm_guild_hall` |
+| `music_<biome>_bed` (×6) | dungeon run, non-boss floor | per biome (dungeon_run / dark_cavern / battle) |
+| `music_boss_bed` | dungeon run on a floor with `is_boss_floor` | `bgm_boss` |
+| `music_victory_bed` | the `victory_moment` screen appears | `bgm_victory` |
+
+Boss-floor detection resolves the live `run_snapshot.floor_id` through
+`BiomeDungeonDatabase`; victory is keyed on the screen id in `_on_screen_changed`.
+Because the demo audio is gitignored, the fallback file never exists in
+CI/production builds — so the demo wiring needs **no revert before merge**. Same
+pattern for sprites/portraits (disk-first, else generate).
 
 ---
 
