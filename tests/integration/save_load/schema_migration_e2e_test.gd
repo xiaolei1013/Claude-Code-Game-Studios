@@ -233,13 +233,24 @@ func test_forged_v99_envelope_rejects_early_with_version_future() -> void:
 # bumped 1→2. A forged V1 envelope is now PRIOR-version; loading it
 # triggers the V1→V2 migration chain via _migrate_v1_to_v2 (default
 # prestige fields). The post-migration payload hydrates consumers
-# successfully; LOADING → MIGRATION → READY.
-func test_forged_v1_envelope_runs_v1_to_v2_migration_proceeds_to_ready() -> void:
+# successfully; LOADING → MIGRATION → READY, then a deferred re-persist
+# writes the migrated save back to disk under CURRENT_SAVE_VERSION.
+#
+# Regression (2026-06-03): the deferred re-persist called a NON-EXISTENT
+# method ("request_persist" vs the real "request_full_persist"), so it
+# failed silently at idle time and the on-disk save stayed at V1 until an
+# unrelated heartbeat/scene-boundary persist — a data-loss window on a quick
+# quit right after an app update. This test now DRAINS the deferred call and
+# asserts the on-disk envelope is actually re-written under CURRENT_SAVE_VERSION.
+func test_forged_v1_envelope_runs_v1_to_v2_migration_and_repersists_to_disk() -> void:
 	var sl: Node = get_tree().root.get_node_or_null("SaveLoadSystem")
 	_connect_spies(sl)
 
 	var envelope: PackedByteArray = _forge_envelope_with_version(sl, 1)
 	_write_envelope_to_fixture(envelope)
+	# Pre-condition: the on-disk file is V1 before load.
+	var pre_bytes: PackedByteArray = FileAccess.get_file_as_bytes(FIXTURE_SAVE_PATH)
+	assert_int(int(sl._parse_header(pre_bytes).version)).is_equal(1)
 
 	sl.request_full_load("forged_v1_runs_migration_test")
 
@@ -251,5 +262,21 @@ func test_forged_v1_envelope_runs_v1_to_v2_migration_proceeds_to_ready() -> void
 	assert_str(_load_completed_calls[0]).is_equal("forged_v1_runs_migration_test")
 	assert_int(_load_failed_calls.size()).is_equal(0)
 	assert_int(_tamper_calls).is_equal(0)
+
+	# Drain the deferred post-migration re-persist (call_deferred) — two idle
+	# frames let it run its synchronous READY → PERSISTING → READY I/O cycle.
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+	# The on-disk envelope must now be re-written under CURRENT_SAVE_VERSION.
+	# Under the request_persist→request_full_persist bug this stayed at 1 (the
+	# deferred call hit a non-existent method and silently no-op'd).
+	var post_bytes: PackedByteArray = FileAccess.get_file_as_bytes(FIXTURE_SAVE_PATH)
+	var post_version: int = int(sl._parse_header(post_bytes).version)
+	assert_int(post_version).override_failure_message(
+		"Post-migration re-persist did not land on disk: on-disk version is %d, "
+		% post_version + "expected CURRENT_SAVE_VERSION=%d."
+		% SaveLoadScript.CURRENT_SAVE_VERSION
+	).is_equal(SaveLoadScript.CURRENT_SAVE_VERSION)
 
 	_disconnect_spies(sl)

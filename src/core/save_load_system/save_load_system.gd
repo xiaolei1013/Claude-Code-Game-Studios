@@ -1127,7 +1127,12 @@ func request_full_load(reason: String) -> void:
 		# CURRENT_SAVE_VERSION unconditionally — see _compose_header) and
 		# advances _meta.save_sequence_number. call_deferred avoids the
 		# stack of running another sync I/O cycle inside the load handler.
-		call_deferred("request_persist", "post_migration")
+		# NOTE: the method is request_full_persist — the prior "request_persist"
+		# was a stale doc-era name (no such method), so call_deferred failed
+		# silently at idle time and the migrated save was never written back to
+		# disk under V2 (it stayed V1 until an unrelated heartbeat / scene-boundary
+		# persist). The .bak-recovery sibling above uses the correct name.
+		call_deferred("request_full_persist", "post_migration")
 
 
 # ---------------------------------------------------------------------------
