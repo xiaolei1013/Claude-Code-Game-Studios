@@ -299,6 +299,9 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 					var fi: int = int(result.floor_index)
 					if fi not in cleared_list:
 						cleared_list.append(fi)
+				# Surface the floor-clear bonus gold (credited to the balance by the
+				# orchestrator's try_award_floor_clear) so summary gold matches balance.
+				summary.gold_earned += int(result.get("floor_clear_bonus_gold", 0))
 
 		if economy != null and economy.has_method("compute_offline_batch"):
 			var economy_result: Variant = economy.compute_offline_batch(chunk_ticks)

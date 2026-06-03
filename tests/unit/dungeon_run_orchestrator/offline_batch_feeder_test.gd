@@ -159,3 +159,86 @@ func test_flush_resets_offline_batch_state_for_next_resume() -> void:
 	orch.flush_offline_signals()
 	assert_object(orch._offline_combat_snapshot).is_null()
 	assert_int(orch._offline_replay_cursor).is_equal(0)
+
+
+# ===========================================================================
+# Offline floor-clear UNLOCK + bonus gating (Story 010 follow-up)
+#
+# Uses the live Economy autoload as the Layer-3 monotonic gate; snapshots +
+# restores its ledger so the tests don't leak credited floors.
+# ===========================================================================
+
+const _FC_KEY: String = "forest_reach_f4"  # FLOOR_CLEAR_BONUS[4] = 1000
+
+
+func _make_orchestrator_for_floor_clear() -> Node:
+	var orch: Node = _make_orchestrator()
+	var hero: RefCounted = HeroInstanceScript.new()
+	hero.instance_id = 7
+	hero.class_id = "warrior"
+	hero.current_level = 1
+	orch.set_offline_replay_inputs([hero], 4, "forest_reach")
+	return orch
+
+
+func test_offline_first_clear_of_fresh_floor_accumulates_and_returns_bonus() -> void:
+	var economy: Node = get_tree().root.get_node_or_null("Economy")
+	assert_object(economy).is_not_null()
+	var ledger_snap: Dictionary = economy._floor_clear_bonus_credited.duplicate()
+	var gold_snap: int = economy._gold_balance
+	economy._floor_clear_bonus_credited.erase(_FC_KEY)  # force NOT-yet-cleared
+
+	var orch: Node = _make_orchestrator_for_floor_clear()
+	# Spy: loops_completed = 600/300 = 2 → the floor cleared this chunk.
+	var result: Dictionary = orch.compute_offline_batch(600)
+
+	# Accumulated for the post-replay floor_cleared_first_time (→ FloorUnlock) +
+	# the per-floor-clear XP, and the bonus is surfaced for the summary.
+	assert_int(orch._offline_pending_first_clears.size()).override_failure_message(
+		"first clear of a fresh floor must accumulate a pending floor-clear"
+	).is_equal(1)
+	assert_int(int(orch._offline_pending_first_clears[0]["floor_index"])).is_equal(4)
+	assert_str(String(orch._offline_pending_first_clears[0]["biome_id"])).is_equal("forest_reach")
+	assert_int(int(result["floor_clear_bonus_gold"])).is_equal(1000)  # FLOOR_CLEAR_BONUS[4]
+
+	economy._floor_clear_bonus_credited = ledger_snap
+	economy._gold_balance = gold_snap
+
+
+func test_offline_already_cleared_floor_does_not_re_award_or_re_unlock() -> void:
+	# Layer-3 guard: an already-cleared floor (ledger at the full bonus) must NOT
+	# re-unlock or double-credit when ground again offline.
+	var economy: Node = get_tree().root.get_node_or_null("Economy")
+	var ledger_snap: Dictionary = economy._floor_clear_bonus_credited.duplicate()
+	var gold_snap: int = economy._gold_balance
+	economy._floor_clear_bonus_credited[_FC_KEY] = 1000  # force ALREADY-cleared
+
+	var orch: Node = _make_orchestrator_for_floor_clear()
+	var result: Dictionary = orch.compute_offline_batch(600)
+
+	assert_int(orch._offline_pending_first_clears.size()).override_failure_message(
+		"an already-cleared floor must NOT accumulate a new first-clear (no false re-unlock)"
+	).is_equal(0)
+	assert_int(int(result["floor_clear_bonus_gold"])).is_equal(0)
+
+	economy._floor_clear_bonus_credited = ledger_snap
+	economy._gold_balance = gold_snap
+
+
+func test_offline_floor_clear_fires_at_most_once_per_replay() -> void:
+	var economy: Node = get_tree().root.get_node_or_null("Economy")
+	var ledger_snap: Dictionary = economy._floor_clear_bonus_credited.duplicate()
+	var gold_snap: int = economy._gold_balance
+	economy._floor_clear_bonus_credited.erase(_FC_KEY)
+
+	var orch: Node = _make_orchestrator_for_floor_clear()
+	orch.compute_offline_batch(600)  # first chunk clears → accumulates once
+	var second: Dictionary = orch.compute_offline_batch(600)  # later: gated by floor_clear_emitted
+
+	assert_int(orch._offline_pending_first_clears.size()).override_failure_message(
+		"floor-clear must fire at most once per replay (Layer-2 floor_clear_emitted gate)"
+	).is_equal(1)
+	assert_int(int(second["floor_clear_bonus_gold"])).is_equal(0)  # no second bonus
+
+	economy._floor_clear_bonus_credited = ledger_snap
+	economy._gold_balance = gold_snap
