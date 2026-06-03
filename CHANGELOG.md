@@ -2,6 +2,53 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.98] - 2026-06-03 — Demo art suite + offline loop + greybox wireframe pass
+
+> This entry consolidates 24 PRs (#170–#195) merged after the Sprint 27 version catch-up
+> (v0.0.0.74, PR #169). Covers four workstreams: process docs, greybox UI wireframe pass,
+> offline progression loop completion, and the full demo asset suite wiring.
+
+### Added — Demo asset suite (PRs #187–#195)
+
+- **Portrait disk-load + guild BGM** (PR #189) — Hero portraits load from `assets/art/demo/classes/`; guild hall background music wired to `AudioRouter`.
+- **Animated hero idle sprites** (PR #190) — `ClassSpriteFactory` + `SpriteSheetAnimator` automate idle animation for all 7 classes. Dungeon BGM mapped per biome; IP-sensitive demo art gitignored (`assets/art/classes/`).
+- **Start menu boot screen** (PR #191) — `start_menu` scene added as the project's entry point; scene registry grows from 6 → 7. Includes `on_pause`/`on_resume` hooks for CI gate.
+- **Enemy sprites → Codex bestiary** (PR #192) — `EnemySpriteFactory` assembles enemy portraits from demo assets; Monsters tab in Codex wired. `assets/art/enemies/` gitignored.
+- **Dungeon-run enemy lineup** (PR #193) — `dungeon_run_view` shows the current floor's `enemy_list` enemies center-stage during combat.
+- **Boss-floor + victory BGM** (PR #194) — F5 boss floors trigger `bgm_boss`; Victory Moment screen triggers `bgm_victory`.
+- **Felt-progression toasts** (PR #195) — Milestone level-up toasts at Lv10/Lv15 + live region-unlock toast on `floor_unlocked` signal. Both signals wired to `dungeon_run_view` (not `guild_hall`, which is inactive during runs).
+- **Demo asset setup** (PR #187) — Octopath placeholder PNGs and MP3s staged under `assets/art/demo/` and `assets/audio/demo/`.
+- **Renamed Octopath paths to English** (PR #188) — CJK directory names converted to ASCII paths for CI compatibility.
+
+### Added — Offline progression loop (PRs #181–#186)
+
+- **Recruit draft 4 distinct + dead-pool RNG fix** (PR #181) — `POOL_SIZE` raised to 4; guarantees 4 distinct classes per refresh; eliminates the dead-pool edge case where all 7 classes are already owned.
+- **Offline gold surfacing** (PR #182) — `return_to_app` screen now shows gold earned during the offline window via `OfflineSummary.gold_earned`.
+- **Save re-persist bug fix** (PR #183) — Post-migration re-persist called a non-existent method; corrected.
+- **Offline kills, floors-cleared, and kill-XP** (PR #184) — Kill count, floor clears, and kill-XP are now credited during offline replay.
+- **Swarm enemy for Volley + Archer matchup** (PR #185) — `enemy_swarm.tres` authored; assigned to floors where archer/volley synergy was untriggerable. Revives the Volley and Archer class fantasy.
+- **Offline floor-clear unlock + bonus + floor-clear XP** (PR #186) — Offline replay now fires `floor_unlocked` when a floor clears for the first time offline; grants floor-clear XP bonus. Offline loop is complete: gold + kills + floors + XP + unlocks all credited.
+
+### Added — Greybox wireframe pass (PRs #172–#180)
+
+- **Core idle loop wireframes** (PR #172) — `guild_hall`, `dungeon_run_view`, `victory_moment` receive greybox WireframeKit overlays (3-col layout, party HUD, spoils grid). 142 tests green.
+- **Hero Detail + Recruit draft wireframes** (PR #173) — Greybox layouts for `hero_detail_modal` and the 3-card recruit draft.
+- **Settings / Pause / Offline wireframes** (PR #174) — Greybox layouts for settings, pause modal, and return-to-app screens.
+- **Codex modal wireframe** (PR #175) — Greybox Codex catalogue modal.
+- **Title screen** (PR #176) — Code-only title screen via Pause "Return to Title" path.
+- **Floor picker stale node fix + Recruit wireframe** (PR #179) — Corrected stale node name (`FloorPickerBiomeVBox` → `PickerBiomeVBox`) in floor-picker biome filter test; Recruit 3-card draft wireframe polished.
+- **Formation/Dispatch wireframe** (PR #180) — `formation_assignment` (Dispatch) greybox wireframe.
+
+### Added — Process documentation (PRs #170–#171)
+
+- **Unified playtest protocol** (PR #170) — `production/playtests/unified-playtest-16-17-18-protocol-2026-05-16.md` — collapses the 3-sprint playtest backlog into a single 25-40 min guided session.
+- **Cross-sprint meta-retrospective S24–S27** (PR #171) — Consolidated retrospective for Sprints 24-27 capturing infrastructure-debt-drift patterns, the grep-first check lesson, and the playtest-as-closure-gate principle.
+
+### Changed
+
+- `WireframeKit` (`src/ui/wireframe_kit.gd`) — shared greybox helper providing panels, tiles, lantern widget, and floating-number spawner for all wireframe screens.
+- Biome UID references corrected for `ember_wastes` and `whispering_crags` (caught during wireframe pass).
+
 ## [0.0.0.74] - 2026-05-16 — Sprints 24-27 content pivot consolidation
 
 > This entry consolidates the content-pivot work shipped across Sprints 24-27 (PRs #140-#168). Individual sprint retros document the per-PR breakdown; this CHANGELOG captures the player-visible delta from `0.0.0.59` (post-Sprint-23 cleanup) to `0.0.0.74` (post-Sprint-27 closure).
