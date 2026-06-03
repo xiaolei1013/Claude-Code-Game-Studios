@@ -19,6 +19,8 @@ const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
 const RecruitmentScript = preload("res://src/core/recruitment/recruitment.gd")
 # Sprint 23 S23-S3 — programmatic ClassPortrait placeholders (third carry).
 const ClassPortraitFactoryScript = preload("res://src/ui/class_portrait_factory.gd")
+# Demo idle-sprite animation over the portrait slot (no-op without demo assets).
+const ClassSpriteFactoryScript = preload("res://src/ui/class_sprite_factory.gd")
 
 
 # Layout: POOL_SIZE PoolEntry rows pre-defined in the .tscn (4 rows per
@@ -207,6 +209,9 @@ func _render_pool_entry(entry: Control, pool_index: int, class_id: String) -> vo
 	var class_portrait: TextureRect = entry.get_node("ClassPortrait") as TextureRect
 	if class_portrait != null:
 		class_portrait.texture = ClassPortraitFactoryScript.get_portrait_texture(class_id)
+		# Demo build: if an idle sprite sheet exists for this class, animate the
+		# slot through it. No-op (keeps the still portrait above) when absent.
+		ClassSpriteFactoryScript.animate(class_portrait, class_id)
 
 	# Resolve class via DataRegistry (defensive — orphan class per §C.4 step 2.b).
 	var class_data: Resource = DataRegistry.resolve("classes", class_id)
