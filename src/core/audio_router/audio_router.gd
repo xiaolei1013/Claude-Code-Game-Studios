@@ -48,6 +48,23 @@ const _DEFAULT_MUSIC_DB: float = -8.0
 const _DEFAULT_SFX_DB: float = -3.0
 const _DEFAULT_MASTER_MUTED: bool = false
 
+## Demo-build music mapping (local placeholder audio only — see
+## design/art/demo-asset-manifest.md). Maps the music bed base-name
+## (guild_hall + the 6 biome ids, after the "_bed" suffix is stripped) onto the
+## demo track basenames present in assets/audio/demo/bgm_<track>.mp3. Only
+## consulted when DataRegistry resolves no production music asset (ADR-0016
+## silent-MVP path is unaffected). Unmapped ids use _DEMO_MUSIC_DEFAULT.
+const _DEMO_MUSIC_MAP: Dictionary = {
+	"guild_hall": "guild_hall",
+	"forest_reach": "dungeon_run",
+	"frostmire": "dark_cavern",
+	"sunken_ruins": "battle",
+	"whispering_crags": "dungeon_run",
+	"ember_wastes": "battle",
+	"hollow_stair": "dark_cavern",
+}
+const _DEMO_MUSIC_DEFAULT: String = "dungeon_run"
+
 ## Class Synergy V1.0 (Sprint 21 S21-S2 / Story 3) — live-preview detection
 ## chime throttle. Per `class-synergy-system.md` §C.4 + §G + AC-CS-14:
 ## rapid slot-toggling that fires the detection signal repeatedly within
@@ -374,7 +391,11 @@ func play_music(music_id: StringName, fade_in_ms: int = _MUSIC_DEFAULT_FADE_MS) 
 		# demo tracks only load when the demo directory and matching file exist.
 		if stream == null:
 			var base_name: String = raw_id.trim_suffix("_bed").trim_suffix("_stinger")
-			var demo_path: String = "res://assets/audio/demo/bgm_%s.mp3" % base_name
+			# Map the requested bed (guild_hall + the 6 biome ids) onto the demo
+			# track set so dungeon runs aren't silent. Unmapped ids fall back to
+			# the generic dungeon track. See design/art/demo-asset-manifest.md.
+			var track: String = _DEMO_MUSIC_MAP.get(base_name, _DEMO_MUSIC_DEFAULT)
+			var demo_path: String = "res://assets/audio/demo/bgm_%s.mp3" % track
 			if FileAccess.file_exists(demo_path):
 				stream = load(demo_path) as AudioStream
 

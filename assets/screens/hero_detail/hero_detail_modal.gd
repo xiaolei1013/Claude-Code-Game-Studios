@@ -27,6 +27,8 @@ extends Screen
 const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
 # Sprint 23 S23-S3 — programmatic ClassPortrait placeholders (third carry).
 const ClassPortraitFactoryScript = preload("res://src/ui/class_portrait_factory.gd")
+# Demo idle-sprite animation over the portrait slot (no-op without demo assets).
+const ClassSpriteFactoryScript = preload("res://src/ui/class_sprite_factory.gd")
 
 # ---------------------------------------------------------------------------
 # Pre-show setter (per GDD §C.2)
@@ -271,6 +273,8 @@ func _refresh_header() -> void:
 	# the first surface to render the class identity visually.
 	if _class_portrait != null:
 		_class_portrait.texture = ClassPortraitFactoryScript.get_portrait_texture(_hero.class_id)
+		# Demo build: animate the slot through the class idle sheet when present.
+		ClassSpriteFactoryScript.animate(_class_portrait, _hero.class_id)
 	# DisplayNameLabel — immutable per ADR-0012.
 	_display_name_label.text = _hero.display_name
 	# ClassNameLabel — locale-aware via display_name_key (when class.tres

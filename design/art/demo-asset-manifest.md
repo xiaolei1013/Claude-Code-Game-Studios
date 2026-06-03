@@ -14,8 +14,19 @@ python3 tools/rename-octopath-dirs.py  # 八方旅人{1,2}/ → octopath{1,2}/ +
 # 1. assemble demo assets
 pip install pillow                     # required for sprite sheet assembly
 python3 tools/demo-asset-setup.py      # assembles all demo assets
-# assets/art/demo/ and assets/audio/demo/ are gitignored — local only
+
+# 2. IMPORT the new assets into Godot — REQUIRED.
+#    Godot can only load() resources it has imported. Freshly-written PNGs/MP3s
+#    have no .import sidecar yet, so the game silently falls back to placeholders
+#    (programmatic colored-block portraits, silent audio) until this runs.
+#    Reliable method: open the project in the Godot editor once — it scans the
+#    filesystem and imports on boot. (`--headless --import` does NOT pick up the
+#    newly-written untracked files on macOS; a GUI editor boot does.)
 ```
+
+`assets/art/demo/`, `assets/audio/demo/`, AND `assets/art/classes/` (the production
+paths the game references — see Hero sprite mapping below) are all gitignored: the
+assembled assets are local-only and never committed.
 
 The source assets must live at `assets/octopath1/` and `assets/octopath2/` with English subdir names. `rename-octopath-dirs.py` is idempotent — safe to re-run after a fresh asset drop.
 
@@ -41,9 +52,13 @@ Source paths are under `assets/octopath1/heroes/` (English slugs produced by `to
 | `paladin` | Alfyn | `heroes/alfyn/Alfyn Apothecary Base` | Support/healer archetype; warm design palette |
 | *(spare)* | Tressa | `heroes/tressa/Tressa Merchant Base` | Available for next Lantern Guild class (Tactician?) |
 
-**Output per class** (gitignored at `assets/art/demo/heroes/[class]/`):
-- `hero_[class]_idle.png` — 4-frame horizontal sprite sheet (centered in max-bounding-box canvas)
-- `hero_[class]_portrait_sm.png` — 48×48 nearest-neighbor still from frame 001
+**Output per class:**
+- `assets/art/demo/heroes/[class]/hero_[class]_idle.png` — 4-frame horizontal sprite sheet (centered in max-bounding-box canvas)
+- `assets/art/demo/heroes/[class]/hero_[class]_portrait_sm.png` — 48×48 still from frame 001
+- `assets/art/classes/[class]/portrait.png` — 96×96 still; the path `HeroClass.portrait_path` references. `ClassPortraitFactory.get_portrait_texture` loads this disk-first, else generates a colored block.
+- `assets/art/classes/[class]/sprite.png` — the 4-frame idle sheet; the path `HeroClass.sprite_path` references. `ClassSpriteFactory` slices it into frames and `SpriteSheetAnimator` cycles them over the Recruit card / Hero Detail portrait slot.
+
+All four are gitignored (IP placeholders).
 
 **Resolution note:** OT1 sprites are ~20-54px wide × 25-44px tall (variable per frame). The art bible targets 32×48 for in-scene hero sprites (§8.3.2). The demo sheets are pixel-exact from the source — no scaling. Production art must be drawn to the §8.3.2 spec.
 
@@ -62,7 +77,14 @@ Source paths are under `assets/octopath1/heroes/` (English slugs produced by `to
 | `bgm_cleric_theme.mp3` | `1-02 Ophilia, the Cleric.mp3` | Recruit/detail screen ambiance |
 | `bgm_victory.mp3` | `2-06 How Amusing!.mp3` | Victory / unlock moment |
 
-**AudioRouter wiring:** Set `ADR-0016 pivot trigger = "playtest reaches 3+ sessions"`. Until then AudioRouter is silent-MVP. Swap in demo tracks by setting `AudioRouter._track_overrides` or by temporarily hardcoding paths in `audio_router.gd` behind a `OS.has_feature("demo")` guard. **Revert before main-branch merge.**
+**AudioRouter wiring (implemented):** `AudioRouter.play_music` resolves production
+music via DataRegistry first (ADR-0016 silent-MVP path, untouched). Only when that
+returns null does it fall back to `assets/audio/demo/bgm_<track>.mp3`, mapping the
+requested bed (`guild_hall` + the 6 biome ids, stripped of the `_bed`/`_stinger`
+suffix) onto a demo track via `AudioRouter._DEMO_MUSIC_MAP` (default
+`_DEMO_MUSIC_DEFAULT = "dungeon_run"`). Because the demo audio is gitignored, the
+fallback file never exists in CI/production builds — so the demo wiring needs **no
+revert before merge**. Same pattern for sprites/portraits (disk-first, else generate).
 
 ---
 
