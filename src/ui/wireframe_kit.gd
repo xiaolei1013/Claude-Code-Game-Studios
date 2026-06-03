@@ -56,12 +56,19 @@ static func section_panel(title: String, min_size: Vector2 = Vector2.ZERO) -> Pa
 	if min_size != Vector2.ZERO:
 		panel.custom_minimum_size = min_size
 	panel.clip_contents = true
+	# Decorative greybox: never catch input. These panels are routinely overlaid
+	# at the SAME rect as real interactive panels (behind them via z_index). Since
+	# Godot routes GUI input by tree order — NOT z_index — a non-IGNORE node here
+	# would steal taps from the real slot/roster/floor controls it sits over.
+	# (MarginContainer/VBoxContainer default to MOUSE_FILTER_PASS, which intercepts.)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	var margin: MarginContainer = MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", PAD)
 	margin.add_theme_constant_override("margin_right", PAD)
 	margin.add_theme_constant_override("margin_top", 10)
 	margin.add_theme_constant_override("margin_bottom", PAD)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(margin)
 
 	var body: VBoxContainer = VBoxContainer.new()
@@ -69,6 +76,7 @@ static func section_panel(title: String, min_size: Vector2 = Vector2.ZERO) -> Pa
 	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 8)
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(body)
 
 	if title != "":
@@ -92,6 +100,7 @@ static func eyebrow(text: String, color: Color = MUTED) -> Label:
 	l.text = text.to_upper()
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_font_size_override("font_size", 11)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE  # decorative — never catch input
 	return l
 
 
@@ -102,6 +111,7 @@ static func caption(text: String, color: Color = MUTED, size: int = 13) -> Label
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_font_size_override("font_size", size)
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE  # decorative — never catch input
 	return l
 
 
@@ -112,6 +122,7 @@ static func divider() -> HSeparator:
 	sb.color = LINE_SOFT
 	sb.thickness = 1
 	s.add_theme_stylebox_override("separator", sb)
+	s.mouse_filter = Control.MOUSE_FILTER_IGNORE  # decorative — never catch input
 	return s
 
 
