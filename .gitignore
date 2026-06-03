@@ -25,11 +25,11 @@ expansions/
 # placeholder and ship art is authored under assets/art/, assets/audio/,
 # etc. — never sourced from these folders.
 #
-# English-named variants (original drop location):
+# Canonical English directory names (after tools/rename-octopath-dirs.py):
 assets/octopath*/
 assets/_reference/
-# Chinese-named variants — current drop location after being moved inside
-# the project tree. 八方旅人 = "Octopath Traveler" in Chinese.
+# Belt-and-suspenders: catch a future re-drop that still has the Chinese
+# names before the rename tool is run. 八方旅人 = "Octopath Traveler".
 assets/八方旅人*/
 # Assembled demo assets (produced by tools/demo-asset-setup.py from above
 # sources; local only — never commit placeholder derivative assets).

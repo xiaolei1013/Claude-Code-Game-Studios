@@ -8,10 +8,16 @@
 ## How to set up
 
 ```bash
+# 0. (one time, only if the source folders still have Chinese names)
+python3 tools/rename-octopath-dirs.py  # 八方旅人{1,2}/ → octopath{1,2}/ + English subdirs
+
+# 1. assemble demo assets
 pip install pillow                     # required for sprite sheet assembly
 python3 tools/demo-asset-setup.py      # assembles all demo assets
 # assets/art/demo/ and assets/audio/demo/ are gitignored — local only
 ```
+
+The source assets must live at `assets/octopath1/` and `assets/octopath2/` with English subdir names. `rename-octopath-dirs.py` is idempotent — safe to re-run after a fresh asset drop.
 
 Dry-run mode (see what will happen without writing files):
 ```bash
@@ -22,16 +28,18 @@ python3 tools/demo-asset-setup.py --dry-run
 
 ## Hero sprite mapping
 
-| Lantern Guild class | OT1 character | OT1 folder | Rationale |
+Source paths are under `assets/octopath1/heroes/` (English slugs produced by `tools/rename-octopath-dirs.py`).
+
+| Lantern Guild class | OT1 character | OT1 source folder | Rationale |
 |---|---|---|---|
-| `warrior` | Olberic (战士) | `Olberic Warrior Base` | Knight + shield + sword — direct silhouette match |
-| `mage` | Cyrus (学者) | `Cyrus Scholar Base` | Staff + robes — vertical accent matches §3 Mage silhouette |
-| `rogue` | Therion (盗贼) | `Therion Thief` | Hood + dagger — asymmetric lean matches §3 Rogue |
-| `cleric` | Ophilia (神官) | `Ophilia Cleric` | Lantern implement — matches §5 Cleric raised-luminous-object rule |
-| `archer` | H'aanit (猎人) | `Haanit Hunter Base` | Bow at draw — horizontal extension matches §3 Ranger/Archer |
-| `berserker` | Primrose (舞女) | `Primrose Dancer Base` | Dynamic expressive movement; closest available energy match |
-| `paladin` | Alfyn (药师) | `Alfyn Apothecary Base` | Support/healer archetype; warm design palette |
-| *(spare)* | Tressa (商人) | `Tressa Merchant Base` | Available for next Lantern Guild class (Tactician?) |
+| `warrior` | Olberic | `heroes/olberic/Olberic Warrior Base` | Knight + shield + sword — direct silhouette match |
+| `mage` | Cyrus | `heroes/cyrus/Cyrus Scholar Base` | Staff + robes — vertical accent matches §3 Mage silhouette |
+| `rogue` | Therion | `heroes/therion/Therion Thief Base` | Hood + dagger — asymmetric lean matches §3 Rogue |
+| `cleric` | Ophilia | `heroes/ophilia/Ophilia Cleric Base` | Lantern implement — matches §5 Cleric raised-luminous-object rule |
+| `archer` | H'aanit | `heroes/haanit/Haanit Hunter Base` | Bow at draw — horizontal extension matches §3 Ranger/Archer |
+| `berserker` | Primrose | `heroes/primrose/Primrose Dancer Base` | Dynamic expressive movement; closest available energy match |
+| `paladin` | Alfyn | `heroes/alfyn/Alfyn Apothecary Base` | Support/healer archetype; warm design palette |
+| *(spare)* | Tressa | `heroes/tressa/Tressa Merchant Base` | Available for next Lantern Guild class (Tactician?) |
 
 **Output per class** (gitignored at `assets/art/demo/heroes/[class]/`):
 - `hero_[class]_idle.png` — 4-frame horizontal sprite sheet (centered in max-bounding-box canvas)
@@ -62,19 +70,19 @@ python3 tools/demo-asset-setup.py --dry-run
 
 | Demo filename | OT2 source | Suggested use |
 |---|---|---|
-| `vfx_bubble_a.png` | `图片/Effect/Fx_Tx_Bubble_A.png` | Water/magic particle base texture |
-| `vfx_aura_a.png` | `图片/Effect/FxTX_Aura_A.png` | Cleric/paladin glow aura |
-| `vfx_batwing_a.png` | `图片/Effect/FxTX_Batwing_A.png` | Enemy death / dark spell effects |
+| `vfx_bubble_a.png` | `images/Effect/Fx_Tx_Bubble_A.png` | Water/magic particle base texture |
+| `vfx_aura_a.png` | `images/Effect/FxTX_Aura_A.png` | Cleric/paladin glow aura |
+| `vfx_batwing_a.png` | `images/Effect/FxTX_Batwing_A.png` | Enemy death / dark spell effects |
 
-**Note on OT2 zips:** The BGM1/BGM2 zips are 1.9 GB and 2.3 GB — do not extract unless necessary. The VFX textures above are already extracted at `assets/八方旅人2/图片/Effect/`.
+**Note on OT2 zips:** The BGM1/BGM2 zips (`octopath2/octopath2_bgm1.zip`, `_bgm2.zip`) are 1.9 GB and 2.3 GB — do not extract unless necessary. The VFX textures above are already extracted at `assets/octopath2/images/Effect/`.
 
 ---
 
 ## Enemy / background placeholder strategy
 
-**No directly usable dungeon backgrounds in OT1.** Only the world-map image exists (`assets/八方旅人1/地图/World Map Background.png`). For demo builds:
+**No directly usable dungeon backgrounds in OT1.** Only the world-map image exists (`assets/octopath1/map/World Map Background.png`). For demo builds:
 - **Biome backgrounds** — use `BiomeBackground.set_biome("guild_hall_tavern")` on all screens (shipped placeholder behavior from Sprint 22)
-- **Enemy sprites** — the enemy archive at `assets/八方旅人1/补充存档（不足这里可以找找）/八方敌人敌人20241018/` contains OT1 enemy sprites; run through the same assembly script pattern if needed for a combat demo. Not included in the default setup pass.
+- **Enemy sprites** — the enemy archive at `assets/octopath1/extras/enemies_pack/enemies/` contains OT1 enemy sprites (organized by type: bosses, bugs, golems, undead, etc.); run through the same assembly script pattern if needed for a combat demo. Not included in the default setup pass.
 
 ---
 
