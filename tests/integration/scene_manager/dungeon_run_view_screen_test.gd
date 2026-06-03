@@ -52,6 +52,10 @@ const RunSnapshotScript = preload("res://src/core/dungeon_run_orchestrator/run_s
 var _orch_state_snapshot: int = DungeonRunStateScript.State.NO_RUN
 var _orch_run_snapshot_snapshot: RunSnapshot = null
 var _orch_last_dispatch_ms_snapshot: int = 0
+## Dispatched biome/floor drive the "Enemies ahead" lineup; snapshot + restore
+## so a lineup test's mutation never leaks into another test.
+var _orch_dispatched_biome_snapshot: String = ""
+var _orch_dispatched_floor_snapshot: int = 0
 
 ## Snapshots of SceneManager state modified by tests.
 ## Story 013 adds _on_state_changed → request_screen("main_menu") on RUN_ENDED.
@@ -81,6 +85,10 @@ func before_test() -> void:
 	DungeonRunOrchestrator.run_snapshot = null
 	DungeonRunOrchestrator._last_dispatch_ms = 0
 
+	# Snapshot dispatched biome/floor (mutated by the enemy-lineup tests).
+	_orch_dispatched_biome_snapshot = DungeonRunOrchestrator._dispatched_biome_id
+	_orch_dispatched_floor_snapshot = DungeonRunOrchestrator._dispatched_floor_index
+
 	# Snapshot SceneManager state (Story 013 adds auto-route on RUN_ENDED which
 	# writes SceneManager._queued_request; after_test() must restore it).
 	_sm_state_snapshot = SceneManager.state
@@ -98,6 +106,8 @@ func after_test() -> void:
 	DungeonRunOrchestrator.state = _orch_state_snapshot
 	DungeonRunOrchestrator.run_snapshot = _orch_run_snapshot_snapshot
 	DungeonRunOrchestrator._last_dispatch_ms = _orch_last_dispatch_ms_snapshot
+	DungeonRunOrchestrator._dispatched_biome_id = _orch_dispatched_biome_snapshot
+	DungeonRunOrchestrator._dispatched_floor_index = _orch_dispatched_floor_snapshot
 
 
 # ---------------------------------------------------------------------------
@@ -482,3 +492,52 @@ func test_dungeon_run_view_screen_no_hardcoded_color_literals() -> void:
 			violations.append("line %d: %s" % [line_num, line.strip_edges()])
 	fa.close()
 	assert_int(violations.size()).is_equal(0)
+
+
+# ===========================================================================
+# Enemy lineup — "Enemies ahead" shows the dispatched floor's enemy_list
+# (Demo asset wiring: dungeon-run enemy lineup)
+# ===========================================================================
+
+## Recursively concatenates all Label text under [param node] for content asserts.
+func _gather_text(node: Node) -> String:
+	var out: String = ""
+	if node is Label:
+		out += (node as Label).text + " "
+	for child: Node in node.get_children():
+		out += _gather_text(child)
+	return out
+
+
+func test_enemy_lineup_shows_dispatched_floor_enemies() -> void:
+	# Arrange — dispatch context: forest_reach floor 1 (hollow_brute ×3 + glowmoth ×1).
+	DungeonRunOrchestrator._dispatched_biome_id = "forest_reach"
+	DungeonRunOrchestrator._dispatched_floor_index = 1
+
+	# Act
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var panel: Node = screen.find_child("WireEnemyLineup", true, false)
+
+	# Assert — the lineup exists and names the floor-1 enemies + the ×3 count.
+	assert_object(panel).is_not_null()
+	var text: String = _gather_text(panel)
+	assert_str(text).contains("Hollow Brute")
+	assert_str(text).contains("Glowmoth")
+	assert_str(text).contains("×3")
+
+
+func test_enemy_lineup_quiet_when_no_run_dispatched() -> void:
+	# Arrange — no dispatched biome (cleared state).
+	DungeonRunOrchestrator._dispatched_biome_id = ""
+	DungeonRunOrchestrator._dispatched_floor_index = 0
+
+	# Act
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	var panel: Node = screen.find_child("WireEnemyLineup", true, false)
+
+	# Assert — panel present but shows the quiet fallback, no enemy names.
+	assert_object(panel).is_not_null()
+	var text: String = _gather_text(panel)
+	assert_str(text).contains("quiet")
+	assert_bool(text.contains("Hollow Brute")).is_false()
