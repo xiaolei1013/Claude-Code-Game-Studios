@@ -9,358 +9,84 @@
 #   done           ↔  Complete
 #   blocked        ↔  Blocked
 #
-# UPDATED 2026-05-16 via hand-authored Sprint 24 Day-0:
-#   - Sprint 23 closes (full content landed via recovery PR #139 after stacked-PR
-#     pitfall); Sprint 24 Day-0 plan authored (eleventh consecutive same-day-
-#     compressed sprint cadence).
-#   - Sprint 24 theme: CLASS SYNERGY V2 TIER LADDER + UI FRAMEWORK HYGIENE +
-#     ONBOARDING GDD + CARRYFORWARD POLISH.
-#     Author Class Synergy V2 tier ladder design (None/Bronze/Silver/Gold/Platinum)
-#     + refresh Dispatch SynergyPreviewLabel to render tier names. Ship UIFramework
-#     hygiene helpers (clear_children_immediate, synergy_display_name) consolidating
-#     ~9 sites of duplication identified in Sprint 23 /simplify+/review.
-#     S24-S1 carries S23-S1 advisory polish: empty states + tap targets + Primary
-#     Button on CTAs. S24-S2 authors design/gdd/onboarding-first-session.md (8-section
-#     GDD; implementation deferred to Sprint 25+).
-#   - Sprint 24 Must Haves (4 total, 2.0d): M1 V2 tier GDD, M2 tier-aware label,
-#     M3 UIFramework helpers, M4 playtest+retro.
-#   - Pre-plan dispositions: NONE (Sprint 23 fully closed; main is at 87d9307).
-#   - Sprint 24 PROCESS RULE: per-task PR with base=main ALWAYS. No stacked PRs.
-#     (Sprint 23 stacked-PR cascade lost 6 PRs to GitHub merge semantics; required
-#     recovery PR #139 to clean up. Do not repeat.)
-#   - Solo review mode — no PR-SPRINT producer gate.
-#   - Sprint 23 final state archived in comment block below.
-#
-# Sprint 23 final state (archived 2026-05-16):
-#   sprint_status: CLOSED — Sprint Goal MET. 3/3 Must Haves + 2/3 Should Haves
-#     (S1 deferred to S24-S1) + 2/2 Nice to Haves shipped.
-#   actual_close: 2026-05-16 (tenth consecutive same-day-compressed sprint)
-#   Must Have: M1 hall→tab PR#132 (v0.0.0.52); M2 pause modal PR#133 (v0.0.0.53);
-#              M3 playtest+retro (v0.0.0.59 closure commit) — both playtests PASS.
-#   Should Have: S1 M4 clarity → DEFERRED to S24-S1 (advisory per playtest-14 PASS);
-#                S2 settings scaffold PR#134 (v0.0.0.54); S3 ClassPortrait
-#                placeholders PR#135 (v0.0.0.55).
-#   Nice to Have: N1 audio MVP verification PR#136 (v0.0.0.56);
-#                 N2 synergy preview label PR#137 (v0.0.0.57) — tier ladder
-#                 deferred to S24-M1/M2.
-#   New tests: +36 across 6 new test files (retired_tab_render, pause_menu_render,
-#              settings/version_and_quit, class_portrait_factory, audio_router/
-#              n1_mvp_contract, formation_assignment/synergy_preview_label).
-#   Scene/overlay: registry 7→6 (M1 retire); +1 overlay (pause_menu).
-#   Version: 0.0.0.51 → 0.0.0.59 across sprint (8 PRs: #131 plan + #132–#138
-#            implementation + #139 recovery).
-#   Stacked-PR pitfall: PRs #133–#138 were authored with stacked bases. On rapid
-#   sequential merge, only #132 (base=main) landed on main; #133–#138 merged into
-#   deleted feature branches. Recovery PR #139 (base=main, head=sprint-23/recovery-
-#   m2-through-m3 pointing at 5446dec) landed the cumulative 6-PR diff in a single
-#   merge. Sprint 24 process rule #1: never stack PRs. base=main always.
-#
-# UPDATED 2026-05-15 via /sprint-plan new (Sprint 23 Day-0):
-#   - Sprint 22 closes; Sprint 23 Day-0 plan authored
-#     (tenth consecutive same-day-compressed sprint cadence).
-#   - Sprint 23 theme: SCENE CONSOLIDATION FINISH + PAUSE MODAL + SETTINGS SCAFFOLD.
-#     Retire hall_of_retired_heroes as standalone (→ tab on Guild Hall; registry 8→7).
-#     Pause Menu modal wired on all screens. Settings screen scaffold (audio + a11y).
-#     M4 deferred clarity items (c/d/e) per playtest-14 verdict.
-#   - Sprint 23 Must Haves (3 total, 2.0d):
-#     M1 hall retire→tab, M2 pause modal, M3 playtest+retro.
-#   - Pre-plan dispositions (must resolve BEFORE M1 begins):
-#     PR #126 (main_menu retire) — MERGE FIRST (closes 10→7 consolidation goal)
-#     playtest-14 — FILL IN verdict (drives S23-S1 scope)
-#     sprint-22 retro — FINALIZE once playtest-14 verdict lands
-#   - Solo review mode — no PR-SPRINT producer gate.
-#   - Sprint 22 final state archived in comment block below.
-#
-# Sprint 22 final state (archived 2026-05-15):
-#   sprint_status: CLOSED-WITH-PENDING — 3/5 Must Haves DONE (M2-M4); M1 (#126) OPEN at plan time;
-#                  M5 playtest PENDING; 1/3 Should Haves (S1 done); 0/1 Nice to Have.
-#   actual_close: 2026-05-15 (ninth consecutive same-day-compressed sprint)
-#   Must Have: M1 main_menu retire PR#126 (OPEN — merge as pre-S23 disposition);
-#              M2 matchup→Dispatch fold PR#127 (done, v0.0.0.48); M3 biome bg PR#128
-#              (done, v0.0.0.49); M4 clarity polish PR#129 (done, v0.0.0.50);
-#              M5 playtest-14 PENDING + retro DRAFT.
-#   Should Have: S1 playtest template DONE (bundled in M5 PR); S2 hall→tab deferred
-#                to S23-M1 (promoted Must Have); S3 pause modal deferred to S23-M2
-#                (promoted Must Have).
-#   Nice to Have: N1 settings scaffold carried to S23-S2.
-#   New tests: +2 (M3 BiomeBackground contract) + 1 (M4 IdentityHeader) = +3.
-#   Scene registry: 9 → 8 (M2 fold); pending → 7 after #126 merges.
-#   Version: 0.0.0.47 → 0.0.0.50 across sprint (4 PRs).
-#
-# UPDATED 2026-05-15 via /sprint-plan new (Sprint 22 Day-0):
-#   - Sprint 21 effectively closes; Sprint 22 Day-0 plan authored
-#     (ninth consecutive same-day-compressed sprint cadence).
-#   - Sprint 22 theme: SCENE ARCHITECTURE CLEANUP + per-screen CLARITY PASS.
-#     Reduce 10 scenes to 7 (retire main_menu, fold matchup into formation
-#     as "Dispatch", make hall_of_retired_heroes a tab on guild_hall). In
-#     parallel, run per-screen clarity pass: biome backgrounds everywhere,
-#     visual hierarchy, empty states, label sizing.
-#   - Sprint 22 Must Haves (5 total, 4.75d):
-#     M1 main_menu retire, M2 matchup-into-dispatch fold, M3 biome backgrounds
-#     on every screen, M4 per-screen clarity polish, M5 playtest + retro.
-#   - Sprint 21 retro: INLINE in sprint-22.md (no separate retro PR).
-#     Theme-inheritance bug (PR #124) was the dominant Sprint 21 finding —
-#     5 sprints of theme work were functionally invisible to players.
-#   - Pre-plan dispositions (must resolve BEFORE M1 begins):
-#     #124 (theme inheritance fix) — MERGE FIRST
-#     #123 (S21-M2 Recruit Affordability) — MERGE after #124
-#   - Solo review mode — no PR-SPRINT producer gate.
-#   - Sprint 21 final state archived in comment block below.
+# Sprint 28 Day-0 plan authored 2026-06-03.
+# Theme: drain playtest backlog + theme ADR + per-floor matchup hints (playtest-gated).
+# Prior sprint history archived in production/sprints/sprint-{N}.md files.
 
-# Sprint 21 final state (archived 2026-05-15):
-#   sprint_status: CLOSED-WITH-FINDING — 2/4 Must Haves DONE (PR #122 + #123);
-#                  M3 + M4 superseded by Sprint 22 (theme-bug + new direction).
-#   actual_close: 2026-05-15 (eighth consecutive same-day-compressed sprint)
-#   Must Have: 2/4 DONE — M1 Formation theme PR#122 (v0.0.0.46); M2 Recruit
-#              theme PR#123 (v0.0.0.47, OPEN at S22 plan time — recommended
-#              merge as pre-S22-M1 disposition); M3 playtest superseded by
-#              S22-M5; M4 retro INLINE in sprint-22.md.
-#   Should Have: 0/2 — S1 playtest checklist 4th-time carry → S22-S1
-#                non-negotiable; S2 ClassPortrait deferred to Sprint 23.
-#   Nice to Have: 0/1 — N1 proactive theming dropped from S22 (M4 supersedes).
-#   Dominant finding: theme inheritance bug (PR #124). MainRoot.tscn ScreenContainer
-#   was type="Node"; Godot theme cascades only through Control ancestors. Result:
-#   5 sprints of theme work (Sprint 10 parchment + 18 tilt-shift + 19 BiomeBg + 20
-#   DESIGN.md + 21 SlotButton) were functionally invisible to players. One-line
-#   fix shipped as PR #124. 3 contract tests guard regression.
-#   ADRs authored: 0. New tests: +6 S21-M1 + 7 S21-M2 + 3 S21-fix = 16 tests.
-#   Version: 0.0.0.45 → 0.0.0.46 (S21-M1); will → 0.0.0.47 (S21-M2 + theme fix
-#   merge sequence).
-#
-
-# UPDATED 2026-05-15 via /sprint-plan new (Sprint 21 Day-0):
-#   - Sprint 20 closed same-day; Sprint 21 Day-0 plan authored on top
-#     (eighth consecutive same-day-compressed sprint cadence).
-#   - Sprint 21 theme: design system sweep across remaining live screens.
-#     Apply DESIGN.md to Formation Assignment + Recruit Screen; trial 3
-#     process disciplines from Sprint 20 retro (sprint-status flip-on-
-#     merge + .uid sidecar tracking + playtest-branch verification).
-#   - Sprint 21 Must Haves (4 total, 2.75d): Formation Assignment theme
-#     (M1), Recruit Screen theme (M2), visual playtest (M3), retro (M4).
-#     Process trial items embedded in M1+M2, not separate Must Have.
-#   - Pre-plan deliverables already merged (NOT in sprint count): #111
-#     DESIGN.md, #112 Formation Assignment UX spec, #113 Recruit Screen UX
-#     spec, #115 fonts, #118 11 patterns, #119 Guild Hall theme impl, #120
-#     S20 closeout + lessons.
-#   - Solo review mode — no PR-SPRINT producer gate.
-#   - Sprint 20 final state archived in comment block below.
-
-# UPDATED 2026-05-15 via Sprint 20 closeout (S20-M6 + S20-M7 bundle):
-#   - Sprint 20 closed: 7/7 Must Haves DONE; 0/2 Should Haves (S1+S2 theme
-#     implementations carried to Sprint 21 as HIGH priority); 0/1 Nice to
-#     Haves (N1 ClassPortrait placeholder art deferred pending real-art ETA).
-#     7 sprint-execution PRs total: #114 plan, #115 fonts, #116 scaffolds
-#     audit, #117 5 UX specs, #118 11 patterns, #119 Guild Hall theme,
-#     #120 bookkeeping + playtest skeleton. Plus 4 pre-plan PRs (#110-#113
-#     not counted in sprint execution). Sprint goal MET.
-#     Cumulative tests at S20 close: 4462 PASS / 0 errors / 0 failures.
-#     0 regressions. 0 new ADRs (design system in DESIGN.md, not ADR-shaped).
-#     0 GDD status transitions. +8 contract tests (Guild Hall theme).
-#     +11 patterns (library 9 → 20). Version: 0.0.0.44 → 0.0.0.45.
-#     Twice-deferred S18 retro #1 (scaffolds audit) FINALLY shipped as M1.
-#   - Solo review mode — no PR-SPRINT producer gate.
-#   - Sprint 20 final state archived in comment block below.
-
-# Sprint 20 final state (archived 2026-05-15):
-#   sprint_status: CLOSED — 7/7 Must Haves DONE; Sprint goal MET
-#   actual_close: 2026-05-15 (seventh consecutive same-day-compressed sprint)
-#   Must Have: 7/7 DONE — M1 scaffolds audit PR#116 (twice-deferred from
-#              S18 retro #1); M2 fonts PR#115; M3 5 UX specs PR#117; M4 11
-#              patterns PR#118; M5 Guild Hall theme PR#119 (v0.0.0.45);
-#              M6 playtest-12 PASS on all 5 checks; M7 sprint-20 retro.
-#   Should Have: 0/2 DONE — S1 Formation Assignment theme + S2 Recruit
-#                Screen theme carried to Sprint 21 as HIGH (M1+M2).
-#   Nice to Have: 0/1 DONE — N1 ClassPortrait placeholder carried to
-#                Sprint 21 S2 (real-art ETA still pending).
-#   ADRs authored: 0 (design tokens in DESIGN.md, not ADR-shaped).
-#   New tests: +8 (Guild Hall theme application — LedgerRow + SynergyBadge).
-#   Pattern library: 9 → 20 patterns (v0.1 → v0.2); +11 new patterns.
-#   Process lessons surfaced for Sprint 21 trial: sprint-status flip-on-
-#   merge + .uid sidecar tracking + playtest-branch verification.
-#
-
-# UPDATED 2026-05-14 via Sprint 20 plan authoring:
-#   - Sprint 20 theme: UI/HUD design (UX flows + visual system + per-screen
-#     layout + Guild Hall implementation + scaffolds audit).
-#   - Pre-plan deliverables already merged (NOT in sprint count):
-#     #110 Guild Hall UX spec, #111 DESIGN.md, #112 Formation Assignment UX
-#     spec, #113 Recruit Screen UX spec. ~3 days of foundation work.
-#   - Sprint 20 Must Haves (7 total, 3.75d): scaffolds audit (M1, twice-
-#     deferred), font sourcing (M2), 5 remaining UX specs (M3), pattern
-#     library additions (M4), Guild Hall theme implementation (M5),
-#     visual playtest (M6), retro (M7).
-#   - Solo review mode — no PR-SPRINT producer gate.
-#   - Sprint 19 final state archived in comment block below.
-
-# UPDATED 2026-05-14 via Sprint 19 closeout (S19-M5 + S19-M6 bundle):
-#   - Sprint 19 closed: 6/6 Must Haves DONE; 0/2 Should Haves (deferred — S1
-#     pulled forward to Sprint 20 setup; S2+N1 retired pending real-art).
-#     5 PRs total: #104 sprint plan, #105 GDD #26 first-pass, #106 ADR-0019,
-#     #107 BiomeBackground system, #108 tilt-shift activation. Sprint goal MET.
-#     Cumulative tests at S19 close: 4446 PASS (most-comprehensive local run yet).
-#     0 regressions. 1 new ADR (ADR-0019); 1 GDD status transition (#26 APPROVED).
-#   - Solo review mode — no PR-SPRINT producer gate.
-#
-# Sprint 19 final state (archived 2026-05-14):
-#   sprint_status: CLOSED — 6/6 Must Haves DONE; Sprint goal MET
-#   actual_close: 2026-05-14 (sixth consecutive same-day-compressed sprint)
-#   Must Have: 6/6 DONE — M1 GDD #26 first-pass PR#105; M2 ADR-0019 PR#106;
-#              M3 BiomeBackground PR#107; M4 tilt-shift activation PR#108;
-#              M5 playtest-11 light-touch PASS; M6 sprint-19 retro.
-#   Should Have: 0/2 DONE — S1 scaffolds audit twice-deferred (S20 setup);
-#                S2 per-biome tilt-shift presets RETIRED pending real-art.
-#   Nice to Have: 0/1 DONE — N1 gradient shader RETIRED pending real-art.
-#   ADR authored: ADR-0019 (HD-2D Pipeline Activation, successor to ADR-0017).
-#   GDD status: #26 HD-2D Rendering Pipeline STUB DRAFT → APPROVED.
-#   New tests: +23 (21 BiomeBackground + 2 UI-sharpness guard).
-#   Critical bug class structurally prevented: S18-N1 UI-ghost-smear via
-#     layer-order contract (BiomeBackground z=-1 → BackBufferCopy z=-1 →
-#     TiltShiftDof z=-1 → UI z=0 → WarmLanternOverlay z=1).
-#
-# UPDATED 2026-05-14 via /sprint-plan new (Sprint 19 Day-0):
-#   - Sprint 18 closed: all 7 Must Haves DONE; both Should Haves DONE; 1 Nice to Have DONE.
-#     7 PRs total: #96 sprint plan, #97 GDD revisions, #98 synergy backend + ADR-0018,
-#     #99 M3+S1+S2 closeout, #100 LOSING wiring, #101 materialize_enemy_list,
-#     #102 tilt-shift DoF + disable-by-default fix, #103 Sprint 18 retro.
-#     Cumulative tests at S18 close: ~2393 PASS. 2 critical scaffolded-but-unwired bugs
-#     caught + fixed by playtest (LOSING wiring, materialize_enemy_list).
-#   - Sprint 19 theme: HD-2D First Visual Pass — biome backgrounds + tilt-shift activation.
-#   - Solo review mode — no PR-SPRINT producer gate.
-#   - Sprint 18 final state archived in comment block below.
-#
-# Sprint 18 final state (archived 2026-05-14):
-#   sprint_status: CLOSED — all 7 Must Haves DONE; both Should Haves DONE; 1 N DONE
-#   actual_close: 2026-05-14 (same-day compressed)
-#   Must Have: 7/7 DONE — M1 GDD APPROVED PR#97; M2 synergy backend PR#98; M3 live preview
-#              PR#99; M4 playtest (3 rounds — caught LOSING wiring + materialize bugs);
-#              M5 retro PR#103.
-#   Should Have: 2/2 DONE — S1 onboarding RETIRED; S2 PATTERNS §15 scaffolds audit pattern.
-#   Nice to Have: 1/1 DONE — N1 tilt-shift DoF shader disabled-by-default PR#102.
-#   ADR authored: ADR-0018 (multiplier composition order).
-#   Critical mid-sprint bugs: PR#100 LOSING wiring (hardcoded 1.0 since S7-M13);
-#     PR#101 materialize_enemy_list (deferred MVP step never landed since Sprint 16).
-#
-# Sprint 17 final state (archived 2026-05-14):
-#   sprint_status: CLOSED — all 7 Must Haves DONE; both Should Haves DONE; sprint goal MET
-#   Must Have: 7/7 DONE — M1-M5 matchup-hints PRs (#83-#87); M6 playtest-09 PASS; M7 retro.
-#   Should Have: 2/2 DONE — S2 biome-cost re-baseline; S1 Recruitment audit RETIRED.
-#   Nice to Have: 0/0 (tilt-shift carried to S18-N1).
-#   Critical mid-sprint bug: PR #90 Economy multi-biome ledger collision + ADR-0002 Amend 1.
-#
-
-sprint: 27
-goal: "Close the synergy teaching loop by surfacing effect text on the Dispatch SynergyPreviewLabel so the player sees BOTH 'what synergy is active' AND 'what does it do' in one line."
-start: "2026-07-24"
-end: "2026-08-06"
-generated: "2026-05-16"
-updated: "2026-05-16"
-
-# Pre-plan dispositions: playtest backlog from S25 + S26 still DRAFT.
-# Single deep playthrough recommended to cover playtests 16 + 17 + 18.
-# Sprint 27 single-Must-Have direction came from Sprint 26 retro § Sprint 27 Recommendations
-# (top item: synergy effect-text on Dispatch label).
+sprint: 28
+goal: "Drain the compounded playtest backlog, lock the theme direction, and ship per-floor matchup hints contingent on playtest verdict."
+start: "2026-06-03"
+end: "2026-06-16"
+generated: "2026-06-03"
+updated: "2026-06-03"
 
 stories:
-  # ===== Must Have =====
-
-  - id: "S27-M1"
-    name: "Synergy preview label appends effect text — 'Synergy: Gold (Bastion) — +25% gold vs casters'; routes through new UIFramework.synergy_effect_text helper"
-    file: "assets/screens/formation_assignment/formation_assignment.gd (_refresh_synergy_preview_label); assets/locale/en.csv (4 tier-2 effect keys + 1 format key); tests/unit/formation_assignment/synergy_preview_label_test.gd (Group D, NEW)"
+  - id: "28-M1"
+    name: "Run unified playtest 16/17/18 session"
+    file: "production/playtests/unified-playtest-16-17-18-protocol-2026-05-16.md"
     priority: must-have
-    status: done
-    owner: "godot-gdscript-specialist"
+    status: ready-for-dev
+    owner: "Human (tester)"
     estimate_days: 0.5
-    blocker: ""
-    completed: "2026-05-16 (PR #166); +3 tests in Group D; closes teaching gap from S26 retro"
-
-  - id: "S27-M2"
-    name: "Sprint 27 visual playtest + retrospective — 5-axis grading on effect text format; foldable into single deep playthrough alongside playtest-16 + 17"
-    file: "production/playtests/playtest-18-sprint-27-synergy-effect-text-2026-05-16.md; production/retrospectives/sprint-27-retrospective-2026-05-16.md"
-    priority: must-have
-    status: blocked
-    owner: "xiaolei (human) + claude-code"
-    estimate_days: 0.5
-    blocker: "human playtest execution (single deep playthrough covers all 3 sprints)"
+    blocker: "Requires manual game session (not automatable)"
     completed: ""
 
-# ===== Sprint 26 archived stories (for history) =====
-#
-#   sprint_status: CLOSED-PENDING-PLAYTEST — 7/7 plannable items shipped;
-#                  Day-0 plan retroactive + 5 content/UX PRs + 1 refactor + 1 hotfix.
-#   actual_close: 2026-05-16 (thirteenth consecutive same-day-compressed sprint)
-#   PRs: #158 M1 Dispatch biome filter (R7 compliance); #159 M2 berserker class (6th);
-#        #160 N1 ClassRegistrationTestHelper (Rule-of-Three refactor); #161 M3 cleric
-#        class (7th, support); #162 /simplify+/review cleanup (BiomeBackground API
-#        collapse + stat-name guard + naming + comments); #163 const PackedStringArray
-#        parse error hotfix + Godot-regenerated UIDs + .uid sidecars; #164 M4 tier-2
-#        class synergies (Bastion / Volley / Frenzy / Vigil); #165 closure docs.
-#   Player-visible PRs: 5 of 7 sprint PRs (71%).
-#   Content shipped: +2 classes (berserker, cleric = 5 → 7); +4 synergies
-#                    (Bastion/Volley/Frenzy/Vigil); Dispatch R7 compliance fix.
-#   New tests: +42 across 4 new test files.
-#   Process learnings recorded: parse-check before merge; skip hand-written UIDs.
-#   Retro: DRAFT, pending playtest-17 verdict (5 axes).
-#
-# ===== Sprint 25 archived stories (for history) =====
-#
-#   sprint_status: CLOSED-PENDING-PLAYTEST — 6/6 plannable items shipped;
-#                  Day-0 plan + addendum + 4 player-visible PRs + playtest template + retro skeleton.
-#                  Original Day-0 M1-M3 (Floor Unlock implementation) + M4 (Onboarding overlay)
-#                  CLOSED as VERIFIED-IN-PLACE per the addendum's grep audit; revised M-tasks
-#                  shipped as actual content.
-#   actual_close: 2026-05-16 (twelfth consecutive same-day-compressed sprint)
-#   PRs: #150 Day-0 plan + S24 closure retro; #151 addendum (grep audit / content pivot);
-#        #152 S25-M2-rev paladin class; #153 S25-M3-rev boss floor visual differentiation;
-#        #154 S25-S2-rev archer class; #155 S25-N2-rev floor lock 🔒 indicator;
-#        #156 S25-M5-rev playtest template + retro skeleton; #157 /simplify+/review cleanup
-#        (BiomeBackground API collapse + magic number + naming + comments).
-#   Player-visible PRs: 4 of 6 sprint PRs (66%; improvement vs Sprint 24's 20%).
-#   Day-0 Mistakes: scoped Floor Unlock + Onboarding overlay as if NEW — both already shipped.
-#                   Caught by addendum's grep audit minutes after Day-0 plan merged.
-#                   Memory entry feedback_grep_first_check_must_run_pre_planning written.
-#   Content shipped: +2 classes (paladin, archer = 3 → 5); +1 boss floor visual (F5 65% RGB);
-#                    +1 lock indicator (🔒 + tooltip).
-#   New tests: +23 across 4 new test files.
-#   Retro: DRAFT, pending playtest-16 verdict (5 axes).
-#
-# ===== Sprint 24 archived stories (for history) =====
-#
-#   sprint_status: CLOSED — 10/10 PRs shipped (9 sprint + 1 chore cleanup);
-#                  TECHNICAL Definition of Done MET; STRATEGIC verdict FAILED
-#                  per playtest 2026-05-16 ("uiux and functions are not progressing too much").
-#                  See production/retrospectives/sprint-24-retrospective-2026-05-16.md §"What Could Be Better".
-#   actual_close: 2026-05-16 (twelfth consecutive same-day-compressed sprint)
-#   Must Have: M1 V2 tier GDD PR#141 (done, v0.0.0.58); M2 tier-aware preview PR#142
-#              (done, v0.0.0.59); M3 UIFramework helpers PR#143 (done, v0.0.0.60);
-#              M4 playtest+retro DONE 2026-05-16.
-#   Should Have: S1 polish PARTIAL — only Recruit pool placeholder landed (PR#148);
-#                Guild Hall empty-state + Dispatch hints + tap-target audit DEFERRED;
-#                S2 Onboarding GDD VERIFIED-IN-PLACE (GDD #29 already existed; PR#144
-#                appended §K audit note); S3 HeroRoster test fixture PARTIAL — helper
-#                shipped + 2 of 5 sites refactored (PR#145).
-#   Nice to Have: N1 fill_rect optimization (PR#146, v0.0.0.64); N2 Floor Unlock GDD
-#                 VERIFIED-IN-PLACE (GDD #16 already existed with 9-pass review history;
-#                 PR#147 appended §K audit note); N3 real-art-ingestion DEFERRED
-#                 pending art workstream ETA.
-#   Chore cleanup: .uid sidecars committed via PR#149.
-#   New tests: +20 across 4 new test files (UIFramework helpers, fixture, fill_rect
-#              regression, Recruit pool empty-state).
-#   Locale keys: +7 (6 synergy tier + 1 recruit pool empty-state).
-#   Scene/overlay registry: unchanged (6 screens + 1 overlay).
-#   Version: 0.0.0.57 → ~0.0.0.65 across the sprint.
-#   Player-visible PR count: 2 of 10 (M1+M2 tier label + S1 pool placeholder).
-#   Load-bearing finding: feedback_infrastructure_debt_drift memory entry written.
-#   Process learning: grep-first GDD-existence check fired correctly on both S2 + N2
-#                     pre-existing GDDs; the check should land in /sprint-plan new itself.
+  - id: "28-M2"
+    name: "VERSION + CHANGELOG catch-up (PRs #170-#195)"
+    file: ""
+    priority: must-have
+    status: done
+    owner: ""
+    estimate_days: 0.5
+    blocker: ""
+    completed: "2026-06-03"
 
-# ===== Sprint 22 archived stories (for history) =====
-#
-#   S22-M1 main_menu retire: status: blocked (PR #126 OPEN — merge as pre-S23 disposition)
-#   S22-M2 matchup→Dispatch: status: done (PR #127, v0.0.0.48)
-#   S22-M3 biome backgrounds: status: done (PR #128, v0.0.0.49)
-#   S22-M4 clarity polish: status: done (PR #129, v0.0.0.50)
-#   S22-M5 playtest+retro: status: done 2026-05-16 (playtest-14 PASS on all 5 checks; sprint-22 retro DRAFT → final)
-#   S22-S1 playtest template: status: done (bundled in M5 PR)
-#   S22-S2 hall→tab: status: carried → S23-M1
-#   S22-S3 pause modal: status: carried → S23-M2
-#   S22-N1 settings: status: carried → S23-S2
+  - id: "28-M3"
+    name: "Theme skin ADR-0020: dark-mock vs light-parchment"
+    file: "docs/architecture/ADR-0020-theme-skin-direction.md"
+    priority: must-have
+    status: ready-for-dev
+    owner: ""
+    estimate_days: 0.5
+    blocker: "User design decision required"
+    completed: ""
+
+  - id: "28-S1"
+    name: "Per-floor matchup hint on floor picker"
+    file: ""
+    priority: should-have
+    status: review
+    owner: "godot-gdscript-specialist"
+    estimate_days: 1.5
+    blocker: "Impl + 9 tests GREEN. Pending /code-review; PR MERGE gated on S28-M1 PASS (sprint rule #6)"
+    completed: ""
+
+  - id: "28-S2"
+    name: "Prestige GDD #31 /design-review → APPROVED (or pivot)"
+    file: "design/gdd/prestige-system.md"
+    priority: should-have
+    status: backlog
+    owner: ""
+    estimate_days: 0.5
+    blocker: "Gated on S28-M1 PASS; GDD #31 already drafted (8 sections, model locked) — decision is ratify-vs-pivot, not author"
+    completed: ""
+
+  - id: "28-N1"
+    name: "VFX: aura/bubble/batwing placeholder to real particle textures"
+    file: ""
+    priority: nice-to-have
+    status: backlog
+    owner: ""
+    estimate_days: 1.0
+    blocker: ""
+    completed: ""
+
+  - id: "28-N2"
+    name: "Offline-unlock surfacing at return-to-app"
+    file: ""
+    priority: nice-to-have
+    status: backlog
+    owner: ""
+    estimate_days: 1.0
+    blocker: ""
+    completed: ""
