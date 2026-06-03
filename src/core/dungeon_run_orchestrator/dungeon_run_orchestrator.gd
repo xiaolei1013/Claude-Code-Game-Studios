@@ -1455,6 +1455,37 @@ func compute_offline_batch(tick_budget: int) -> Dictionary:
 			int(_offline_pending_kills_by_tier.get(tier_v, 0)) + int(chunk_kills[tier_v])
 		)
 
+	# Offline floor-clear UNLOCK + bonus + floor-clear XP. Mirrors the foreground
+	# _process_kill_events first-clear path's 3-layer idempotency:
+	#   Layer 2 — run_snapshot.floor_clear_emitted: fire at most once per replay.
+	#   Layer 3 — Economy.try_award_floor_clear's monotonic ledger: returns false
+	#             if the floor was ALREADY cleared (foreground or a prior resume),
+	#             so a re-ground floor never re-unlocks or double-credits.
+	# When awarded, we append to _offline_pending_first_clears so
+	# flush_offline_signals emits floor_cleared_first_time (→ FloorUnlock advances
+	# the unlock frontier) AND compute_offline_total_xp adds the per-floor-clear
+	# XP. The bonus gold (credited to the balance by try_award_floor_clear via the
+	# offline-accumulating add_gold) is surfaced on the summary so the
+	# Return-to-App screen's gold matches the balance.
+	var floor_clear_bonus_gold: int = 0
+	if int(batch.loops_completed) >= 1 and run_snapshot != null and not run_snapshot.floor_clear_emitted:
+		var biome_id: String = _resolve_offline_replay_biome_id()
+		if not biome_id.is_empty():
+			var bonus: int = int(FLOOR_CLEAR_BONUS.get(floor_index, 0))
+			var economy: Node = get_node_or_null("/root/Economy")
+			var awarded: bool = false
+			if economy != null and bonus > 0 and economy.has_method("try_award_floor_clear"):
+				awarded = bool(economy.try_award_floor_clear(biome_id, floor_index, bonus))
+			# Layer 2 set regardless of awarded — a re-grind never re-attempts.
+			run_snapshot.floor_clear_emitted = true
+			if awarded:
+				_offline_pending_first_clears.append({
+					"floor_index": floor_index,
+					"biome_id": biome_id,
+					"losing_run": false,
+				})
+				floor_clear_bonus_gold = bonus
+
 	return {
 		"kills_by_tier": chunk_kills,
 		# loops_completed >= 1 in this chunk's window means the floor was cleared
@@ -1462,6 +1493,9 @@ func compute_offline_batch(tick_budget: int) -> Dictionary:
 		# chunk yields a single floors_cleared entry.
 		"floor_cleared": int(batch.loops_completed) >= 1,
 		"floor_index": floor_index,
+		# Floor-clear bonus credited this chunk (0 unless a genuine first-clear) —
+		# surfaced onto summary.gold_earned by the engine.
+		"floor_clear_bonus_gold": floor_clear_bonus_gold,
 	}
 
 
