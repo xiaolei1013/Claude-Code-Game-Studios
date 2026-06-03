@@ -207,11 +207,28 @@ def assemble_sprite_sheet(class_name, cfg):
             sheet.save(dst_idle)
         log(f"  SHEET {class_name}: {len(imgs)} frames @ {canvas_w}×{canvas_h} → {dst_idle.name}")
 
-        # Portrait: first frame resized to 48×48 nearest-neighbor.
-        portrait = imgs[0].resize((48, 48), Image.NEAREST)
+        # Portrait: first frame resized to 48×48 nearest-neighbor (demo dir)
+        # and 96×96 (production path ClassPortraitFactory reads from).
+        portrait_48 = imgs[0].resize((48, 48), Image.NEAREST)
+        portrait_96 = imgs[0].resize((96, 96), Image.NEAREST)
         if not DRY_RUN:
-            portrait.save(dst_portrait)
+            portrait_48.save(dst_portrait)
         log(f"  PORTRAIT {class_name}: {dst_portrait.name}")
+
+        # Also write to the production paths the game already references.
+        # HeroClass.tres → portrait_path = "assets/art/classes/[id]/portrait.png"
+        # HeroClass.tres → sprite_path   = "assets/art/classes/[id]/sprite.png"
+        # These files stay untracked (not gitignored — intended as local
+        # temporary placeholders until real production art ships).
+        prod_dir = ROOT / "assets" / "art" / "classes" / class_name
+        prod_portrait = prod_dir / "portrait.png"
+        prod_sprite = prod_dir / "sprite.png"
+        if not DRY_RUN:
+            prod_dir.mkdir(parents=True, exist_ok=True)
+            portrait_96.save(prod_portrait)
+            sheet.save(prod_sprite)
+        log(f"  PROD portrait: assets/art/classes/{class_name}/portrait.png (96×96)")
+        log(f"  PROD sprite:   assets/art/classes/{class_name}/sprite.png (sheet)")
 
     except ImportError:
         # Pillow not installed — fall back to plain copy of frame 001.

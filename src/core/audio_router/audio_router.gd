@@ -367,6 +367,16 @@ func play_music(music_id: StringName, fade_in_ms: int = _MUSIC_DEFAULT_FADE_MS) 
 		# asset is at assets/audio/music/<id_without_prefix>.ogg
 		if registry.has_method("resolve"):
 			stream = registry.resolve("music", raw_id) as AudioStream
+		# Demo fallback: when DataRegistry has no music assets (production art not
+		# yet delivered), try loading from assets/audio/demo/ using a name mapping
+		# that strips the trailing "_bed" / "_stinger" pattern.
+		# Keeps the ADR-0016 silent-MVP contract intact in the production path —
+		# demo tracks only load when the demo directory and matching file exist.
+		if stream == null:
+			var base_name: String = raw_id.trim_suffix("_bed").trim_suffix("_stinger")
+			var demo_path: String = "res://assets/audio/demo/bgm_%s.mp3" % base_name
+			if FileAccess.file_exists(demo_path):
+				stream = load(demo_path) as AudioStream
 
 	# Spawn new player at -80 dB baseline (near-silence per §F.4 -∞ intent;
 	# -80 avoids INF arithmetic edge cases in the Tween).
