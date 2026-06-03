@@ -62,6 +62,9 @@ const _DEMO_MUSIC_MAP: Dictionary = {
 	"whispering_crags": "dungeon_run",
 	"ember_wastes": "battle",
 	"hollow_stair": "dark_cavern",
+	# Special beds (not biomes): boss floors + the victory/result screen.
+	"boss": "boss",
+	"victory": "victory",
 }
 const _DEMO_MUSIC_DEFAULT: String = "dungeon_run"
 
@@ -499,8 +502,14 @@ func _on_screen_changed(new_screen_id: String, _old_screen_id: String) -> void:
 		in_dungeon = (orch.state == 2)
 
 	if not in_dungeon and new_screen_id != "":
-		# Non-dungeon screen entered: fade to guild hall bed.
-		play_music(&"music_guild_hall_bed")
+		# The victory / result screen gets the triumphant bed; every other
+		# non-dungeon screen returns to the guild hall ambient. (When demo audio
+		# is absent, music_victory_bed resolves to nothing and is silent — the
+		# production silent-MVP path is unchanged.)
+		if new_screen_id == "victory_moment":
+			play_music(&"music_victory_bed")
+		else:
+			play_music(&"music_guild_hall_bed")
 
 
 ## §C.3 / §K Story 4: biome-bed swap when run state transitions.
@@ -509,7 +518,11 @@ func _on_screen_changed(new_screen_id: String, _old_screen_id: String) -> void:
 func _on_run_state_changed(new_state: int, _old_state: int) -> void:
 	# ACTIVE_FOREGROUND = 2, RUN_ENDED = 4 per DungeonRunState.State enum.
 	if new_state == 2:
-		# Entering ACTIVE_FOREGROUND: swap to biome bed.
+		# Entering ACTIVE_FOREGROUND: a boss floor gets the boss bed; otherwise
+		# the biome bed (empty biome → guild hall fallback per spec).
+		if _dispatched_floor_is_boss():
+			play_music(&"music_boss_bed")
+			return
 		var orch: Node = get_node_or_null("/root/DungeonRunOrchestrator")
 		var biome_id: String = ""
 		if orch != null and "_dispatched_biome_id" in orch:
@@ -520,8 +533,41 @@ func _on_run_state_changed(new_state: int, _old_state: int) -> void:
 			# Unknown/empty biome: fall back to guild hall bed per spec.
 			play_music(&"music_guild_hall_bed")
 	elif new_state == 4:
-		# RUN_ENDED: return to guild hall bed.
+		# RUN_ENDED: return to guild hall bed. (The victory_moment screen, which
+		# appears next, swaps to the victory bed in _on_screen_changed.)
 		play_music(&"music_guild_hall_bed")
+
+
+## True when the active run's dispatched floor is a boss floor. Resolves the
+## Floor from the live run_snapshot's floor_id via BiomeDungeonDatabase. Returns
+## false defensively when no run is active (run_snapshot null) or the floor can't
+## be resolved — so the audio unit tests (which don't seed a run_snapshot) keep
+## taking the biome-bed path. Mirrors the dungeon_run_view biome→floor lookup.
+func _dispatched_floor_is_boss() -> bool:
+	var orch: Node = get_node_or_null("/root/DungeonRunOrchestrator")
+	if orch == null or orch.run_snapshot == null:
+		return false
+	var floor_id: String = str(orch.run_snapshot.floor_id)
+	if floor_id == "":
+		return false
+	var biome_id: String = ""
+	if "_dispatched_biome_id" in orch:
+		biome_id = str(orch.get("_dispatched_biome_id"))
+	if biome_id == "":
+		return false
+	var db: Node = get_node_or_null("/root/BiomeDungeonDatabase")
+	if db == null or not db.has_method("get_biome_by_id"):
+		return false
+	var biome: Variant = db.get_biome_by_id(biome_id)
+	if biome == null or not ("dungeons" in biome) or (biome.dungeons as Array).is_empty():
+		return false
+	var dungeon: Variant = biome.dungeons[0]
+	if dungeon == null or not ("floors" in dungeon):
+		return false
+	for f: Variant in dungeon.floors:
+		if f != null and ("id" in f) and str(f.id) == floor_id:
+			return ("is_boss_floor" in f) and bool(f.is_boss_floor)
+	return false
 
 
 ## §F.1 / §C.2 / §K Story 3: tier-modulated kill chime per Formula F.1.

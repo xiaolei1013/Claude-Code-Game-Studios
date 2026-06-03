@@ -511,3 +511,116 @@ func test_audio_router_subscribes_to_prestige_completed_signal_at_ready() -> voi
 
 	# Assert: signal is connected to the handler.
 	assert_bool(roster.prestige_completed_signal.is_connected(ar._on_prestige_completed)).is_true()
+
+
+# ===========================================================================
+# Demo music wiring — boss-floor bed + victory bed
+# (Demo asset wiring: boss/victory music triggers)
+# ===========================================================================
+
+const _RunSnapshotForMusic = preload("res://src/core/dungeon_run_orchestrator/run_snapshot.gd")
+
+
+func test_run_state_active_foreground_boss_floor_plays_boss_bed() -> void:
+	# Arrange: dispatched to forest_reach floor 5 (is_boss_floor = true).
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+	var orch: Node = get_tree().root.get_node_or_null("DungeonRunOrchestrator")
+	if orch == null or "_dispatched_biome_id" not in orch:
+		assert_bool(true).is_true()
+		return
+
+	var saved_biome: String = str(orch._dispatched_biome_id)
+	var saved_snapshot: Variant = orch.run_snapshot
+	orch._dispatched_biome_id = "forest_reach"
+	var snap: Variant = _RunSnapshotForMusic.new()
+	snap.floor_id = "forest_reach_f5"
+	orch.run_snapshot = snap
+
+	# Act
+	ar._on_run_state_changed(2, 0)
+
+	# Assert: boss bed, NOT the forest_reach biome bed.
+	assert_str(str(ar._current_ambient_id)).is_equal("music_boss_bed")
+
+	# Cleanup
+	orch._dispatched_biome_id = saved_biome
+	orch.run_snapshot = saved_snapshot
+	ar.stop_music(0)
+	ar._current_ambient_id = &""
+
+
+func test_run_state_active_foreground_non_boss_floor_plays_biome_bed() -> void:
+	# Guard: a non-boss floor with a live snapshot must still take the biome bed
+	# (the boss check must not false-positive).
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+	var orch: Node = get_tree().root.get_node_or_null("DungeonRunOrchestrator")
+	if orch == null or "_dispatched_biome_id" not in orch:
+		assert_bool(true).is_true()
+		return
+
+	var saved_biome: String = str(orch._dispatched_biome_id)
+	var saved_snapshot: Variant = orch.run_snapshot
+	orch._dispatched_biome_id = "forest_reach"
+	var snap: Variant = _RunSnapshotForMusic.new()
+	snap.floor_id = "forest_reach_f1"  # is_boss_floor = false
+	orch.run_snapshot = snap
+
+	# Act
+	ar._on_run_state_changed(2, 0)
+
+	# Assert
+	assert_str(str(ar._current_ambient_id)).is_equal("music_forest_reach_bed")
+
+	# Cleanup
+	orch._dispatched_biome_id = saved_biome
+	orch.run_snapshot = saved_snapshot
+	ar.stop_music(0)
+	ar._current_ambient_id = &""
+
+
+func test_screen_changed_victory_moment_plays_victory_bed() -> void:
+	# Arrange: not in an active run, victory_moment screen appears.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+	var orch: Node = get_tree().root.get_node_or_null("DungeonRunOrchestrator")
+	var saved_state: int = 0
+	if orch != null and "state" in orch:
+		saved_state = int(orch.state)
+		orch.state = 4  # RUN_ENDED — not ACTIVE_FOREGROUND, so the music path runs.
+
+	# Act
+	ar._on_screen_changed("victory_moment", "dungeon_run_view")
+
+	# Assert
+	assert_str(str(ar._current_ambient_id)).is_equal("music_victory_bed")
+
+	# Cleanup
+	if orch != null and "state" in orch:
+		orch.state = saved_state
+	ar.stop_music(0)
+	ar._current_ambient_id = &""
+
+
+func test_screen_changed_non_victory_screen_plays_guild_hall_bed() -> void:
+	# Guard: a non-victory, non-dungeon screen still returns to the guild bed.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+	var orch: Node = get_tree().root.get_node_or_null("DungeonRunOrchestrator")
+	var saved_state: int = 0
+	if orch != null and "state" in orch:
+		saved_state = int(orch.state)
+		orch.state = 4
+
+	# Act
+	ar._on_screen_changed("recruitment", "guild_hall")
+
+	# Assert
+	assert_str(str(ar._current_ambient_id)).is_equal("music_guild_hall_bed")
+
+	# Cleanup
+	if orch != null and "state" in orch:
+		orch.state = saved_state
+	ar.stop_music(0)
+	ar._current_ambient_id = &""
