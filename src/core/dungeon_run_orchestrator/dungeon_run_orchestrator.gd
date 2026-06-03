@@ -343,6 +343,40 @@ var _offline_pending_first_clears: Array[Dictionary] = []
 ## Hero Leveling GDD #15 §E.9 / AC-15-11
 var _offline_pending_kills_by_tier: Dictionary = {}
 
+## Offline-replay combat-batch state (Story 010 landing — the feeder that makes
+## the OfflineProgressionEngine kills/floors/XP branch actually run). Transient
+## per-replay-cycle; reset by [method flush_offline_signals].
+##
+## [method compute_offline_batch] is called once per OfflineProgressionEngine
+## chunk. The combat resolver counts kills in the window
+## [code](dispatched_at_tick, dispatched_at_tick + tick_budget][/code], where
+## [code]dispatched_at_tick[/code] is BOTH the schedule anchor and the window-low
+## bound. We re-anchor it to a running cursor each chunk and pass the chunk's
+## budget, so each chunk processes exactly its own [code](cursor, cursor + chunk][/code]
+## window in O(chunk) work (the resolver returns as soon as a scheduled kill
+## exceeds the window edge — no cumulative re-walk, so long replays don't blow up
+## the per-chunk wall-time / chunk count). The kill schedule is periodic
+## (period = ticks_per_loop), so contiguous equal windows tile to the correct
+## total; chunk-size adaptation introduces only sub-loop boundary rounding,
+## negligible for an offline kill estimate.
+var _offline_combat_snapshot: RefCounted = null
+var _offline_replay_cursor: int = 0
+
+## Test-injection seam mirroring [code]Economy.set_offline_replay_inputs[/code].
+## Production leaves these empty/zero and the live HeroRoster formation +
+## dispatched floor/biome are resolved instead.
+var _offline_replay_formation_override: Array = []
+var _offline_replay_floor_index_override: int = 0
+var _offline_replay_biome_id_override: String = ""
+
+## Loop budget for the offline snapshot. The formation grinds the dispatched
+## floor for the whole offline window (kills scale with time, consistent with
+## the linear-in-time Economy gold drip), so we give the resolver a large loop
+## budget. The resolver returns as soon as a scheduled kill exceeds the window
+## edge, so unused loops cost nothing — this is just an upper bound well past
+## any offline cap.
+const _OFFLINE_LOOPS_CAP: int = 1_000_000
+
 
 # ---------------------------------------------------------------------------
 # Dispatch debounce + validation state — Story 003 (TR-026, TR-027, TR-032)
@@ -1356,6 +1390,119 @@ func flush_offline_signals() -> void:
 	_offline_pending_first_clears.clear()
 	_offline_pending_kills_by_tier.clear()
 	_is_offline_replay = false
+	# Reset the per-replay-cycle combat-batch state so the next offline resume
+	# rebuilds a fresh snapshot + cursor (see compute_offline_batch).
+	_offline_combat_snapshot = null
+	_offline_replay_cursor = 0
+
+
+## Offline-replay combat feeder — landed Story 010. Called once per
+## OfflineProgressionEngine chunk while [member _is_offline_replay] is true.
+## Returns a plain [Dictionary] (NOT the CombatBatchResult — the engine calls
+## [code]result.has(...)[/code], which is Dictionary-only):
+##   [code]{kills_by_tier: Dictionary, floor_cleared: bool, floor_index: int}[/code]
+##
+## Mirrors the Economy offline-input resolution (formation + floor): the offline
+## batch represents the player's live formation grinding the dispatched (or
+## default floor-1) floor for the elapsed window. Routes through
+## [code]_combat_resolver.compute_offline_batch[/code] (shared kill-schedule
+## source of truth → foreground/offline parity), accumulates per-tier kills into
+## [member _offline_pending_kills_by_tier] so [method flush_offline_signals]
+## grants the batched kill-XP, and builds [member run_snapshot] if absent so the
+## XP grant has a formation to target.
+##
+## Scope: GOLD (Economy branch) + KILLS + KILL-XP + floors-cleared DISPLAY.
+## Offline floor-clear UNLOCK + floor-clear XP (first_clear emission gated on the
+## already-cleared check + Economy floor-award coupling) are a deliberate
+## follow-up — not wired here.
+func compute_offline_batch(tick_budget: int) -> Dictionary:
+	var floor_index: int = _resolve_offline_replay_floor_index()
+	var empty: Dictionary = {"kills_by_tier": {}, "floor_cleared": false, "floor_index": floor_index}
+	if tick_budget <= 0:
+		return empty
+	if _combat_resolver == null or not _combat_resolver.has_method("compute_offline_batch"):
+		return empty
+
+	# Lazy-init the offline snapshot ONCE per replay cycle (first chunk).
+	if _offline_combat_snapshot == null:
+		var formation: Array = _resolve_offline_replay_formation()
+		var biome_id: String = _resolve_offline_replay_biome_id()
+		_offline_combat_snapshot = _build_combat_snapshot(formation, floor_index, biome_id)
+		if _offline_combat_snapshot != null:
+			_offline_combat_snapshot.loops_per_run = _OFFLINE_LOOPS_CAP
+		_offline_replay_cursor = 0
+		# Offline resume: run_snapshot is null (it's transient, never persisted).
+		# Build it so flush_offline_signals → _grant_xp_to_formation has a
+		# formation_snapshot to grant against. Guard: never clobber a genuinely
+		# active run.
+		if run_snapshot == null:
+			run_snapshot = _build_run_snapshot(formation, floor_index, biome_id, _offline_combat_snapshot)
+	if _offline_combat_snapshot == null:
+		return empty
+
+	# Per-chunk window: re-anchor the schedule at the running cursor and count
+	# this chunk's budget — O(chunk), no cumulative re-walk.
+	_offline_combat_snapshot.dispatched_at_tick = _offline_replay_cursor
+	var batch: RefCounted = _combat_resolver.compute_offline_batch(_offline_combat_snapshot, tick_budget)
+	_offline_replay_cursor += tick_budget
+	if batch == null:
+		return empty
+
+	var chunk_kills: Dictionary = batch.kills_by_tier
+	# Accumulate this chunk's kills into the pending tier dict for batched XP.
+	for tier_v: Variant in chunk_kills:
+		_offline_pending_kills_by_tier[tier_v] = (
+			int(_offline_pending_kills_by_tier.get(tier_v, 0)) + int(chunk_kills[tier_v])
+		)
+
+	return {
+		"kills_by_tier": chunk_kills,
+		# loops_completed >= 1 in this chunk's window means the floor was cleared
+		# at least once. The engine dedups by floor_index, so reporting it on any
+		# chunk yields a single floors_cleared entry.
+		"floor_cleared": int(batch.loops_completed) >= 1,
+		"floor_index": floor_index,
+	}
+
+
+## Test-injection seam for offline-replay inputs — mirrors
+## [code]Economy.set_offline_replay_inputs[/code]. Production callers MUST NOT
+## use this; the OfflineProgressionEngine is the sole legitimate driver and the
+## live HeroRoster formation + dispatched floor/biome are resolved instead.
+func set_offline_replay_inputs(formation: Array, floor_index: int, biome_id: String) -> void:
+	_offline_replay_formation_override = formation
+	_offline_replay_floor_index_override = floor_index
+	_offline_replay_biome_id_override = biome_id
+
+
+## Resolves the formation for the offline replay snapshot. Precedence:
+## test override → live [code]HeroRoster.get_formation_heroes()[/code] → empty.
+func _resolve_offline_replay_formation() -> Array:
+	if not _offline_replay_formation_override.is_empty():
+		return _offline_replay_formation_override
+	var roster: Node = get_node_or_null("/root/HeroRoster") if get_tree() != null else null
+	if roster != null and roster.has_method("get_formation_heroes"):
+		return roster.get_formation_heroes()
+	return []
+
+
+## Resolves the floor index for the offline replay. Precedence: test override
+## (>= 1) → dispatched floor (if a run was dispatched this session) → default 1
+## (the floor where every save begins). Mirrors Economy's default-1 policy.
+func _resolve_offline_replay_floor_index() -> int:
+	if _offline_replay_floor_index_override >= 1:
+		return _offline_replay_floor_index_override
+	var fi: int = get_dispatched_floor_index()
+	return fi if fi >= 1 else 1
+
+
+## Resolves the biome for the offline replay. Precedence: test override →
+## dispatched biome → empty (which drives _build_combat_snapshot's synthetic
+## floor fallback).
+func _resolve_offline_replay_biome_id() -> String:
+	if not _offline_replay_biome_id_override.is_empty():
+		return _offline_replay_biome_id_override
+	return get_dispatched_biome_id()
 
 
 ## Returns the total XP a single dispatched-formation hero would gain from

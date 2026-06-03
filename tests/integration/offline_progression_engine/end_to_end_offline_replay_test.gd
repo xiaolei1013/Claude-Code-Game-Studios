@@ -377,6 +377,81 @@ func test_e2e_replay_in_flight_changed_does_not_emit_on_zero_elapsed() -> void:
 		OfflineProgressionEngine.replay_in_flight_changed.disconnect(c["callable"])
 
 
+# ===========================================================================
+# Group H: Story 010 — offline replay produces KILLS + FLOORS + XP
+#
+# Before the orchestrator's compute_offline_batch feeder landed, the engine's
+# kills/floors/XP branch was a permanent no-op (has_method guard always false),
+# so the Return-to-App summary showed 0 kills / 0 floors / no level-up while gold
+# quietly grew. This test drives a real replay with a seeded formation hero and
+# asserts all three now surface. It would fail RED against that dead-method state.
+# ===========================================================================
+
+func test_e2e_offline_replay_produces_kills_floors_and_grants_xp() -> void:
+	var roster: Node = get_node_or_null("/root/HeroRoster")
+	var orch: Node = get_node_or_null("/root/DungeonRunOrchestrator")
+	assert_object(roster).is_not_null()
+	assert_object(orch).is_not_null()
+
+	# Seed a deterministic formation hero we can assert XP against. add_hero
+	# returns the new HeroInstance (warrior — a tier-1 starter class).
+	var inst: RefCounted = roster.add_hero("warrior")
+	if inst == null:
+		push_warning("Skipped: HeroRoster.add_hero('warrior') returned null (DataRegistry).")
+		return
+	var hero_id: int = int(inst.instance_id)
+	var level_before: int = int(inst.current_level)
+	var xp_before: int = int(inst.xp)
+
+	# Drive the offline replay against this formation + a real starter floor.
+	# run_snapshot must be null so the feeder builds it (offline-resume shape).
+	orch.run_snapshot = null
+	orch.set_offline_replay_inputs([inst], 1, "forest_reach")
+
+	var captured: Array = [null]
+	OfflineProgressionEngine.offline_rewards_collected.connect(
+		func(s): captured[0] = s, CONNECT_ONE_SHOT
+	)
+
+	# Act — 10 min offline (12000 ticks; plenty to clear floor 1 repeatedly).
+	OfflineProgressionEngine.run_offline_replay(600)
+	var fired: bool = await _pump_until_summary(captured, _PIPELINE_TIMEOUT_FRAMES)
+	assert_bool(fired).is_true()
+	var summary: OfflineProgressionEngine.OfflineSummary = captured[0]
+	assert_object(summary).is_not_null()
+
+	# (1) KILLS — surfaced to the Return-to-App screen via the _kills_by_tier meta.
+	assert_bool(summary.has_meta("_kills_by_tier")).override_failure_message(
+		"offline replay produced no _kills_by_tier meta — kills branch still dead"
+	).is_true()
+	var kbt: Dictionary = summary.get_meta("_kills_by_tier")
+	var total_kills: int = 0
+	for tier_v: Variant in kbt:
+		total_kills += int(kbt[tier_v])
+	assert_int(total_kills).override_failure_message(
+		"offline replay produced 0 kills"
+	).is_greater(0)
+
+	# (2) FLOORS — the formation cleared floor 1 offline.
+	assert_int(summary.floors_cleared_in_window.size()).override_failure_message(
+		"offline replay cleared 0 floors"
+	).is_greater(0)
+
+	# (3) XP — the formation hero gained XP (leveled up and/or accumulated XP).
+	var hero_after: RefCounted = roster.get_hero_by_id(hero_id)
+	if hero_after != null:
+		var changed: bool = int(hero_after.current_level) > level_before or int(hero_after.xp) > xp_before
+		assert_bool(changed).override_failure_message(
+			"offline replay granted no XP (level %d→%d, xp %d→%d)"
+			% [level_before, int(hero_after.current_level), xp_before, int(hero_after.xp)]
+		).is_true()
+
+	# Cleanup — remove the seeded hero + clear the injected offline inputs.
+	roster.remove_hero(hero_id)
+	orch.set_offline_replay_inputs([], 0, "")
+	orch.run_snapshot = null
+
+
 func test_e2e_replay_in_flight_changed_re_entrant_call_does_not_emit_extra_true() -> void:
 	## When run_offline_replay is called while a replay is in flight, the call
 	## is dropped via the in-flight guard. The dropped call MUST NOT emit a
