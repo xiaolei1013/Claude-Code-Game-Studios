@@ -280,3 +280,42 @@ func test_victory_moment_backdrop_input_handler_wired_in_on_enter() -> void:
 	assert_bool(
 		screen._dim_backdrop.gui_input.is_connected(screen._on_backdrop_input)
 	).is_false()
+
+
+# Regression (playtest 2026-06-03): the player could not tap to continue.
+# CenterPanel (PanelContainer, mouse_filter=STOP) draws ABOVE DimBackdrop and
+# consumes every tap over the ceremony content — including the "Tap to continue"
+# prompt, which lives INSIDE CenterPanel. STOP controls do not bubble to parents,
+# so neither the root nor the (behind-the-panel) DimBackdrop gui_input ever fired
+# for taps on the content. The old "handler_wired" test passed because it only
+# checked signal connection on DimBackdrop — never that a tap over the content
+# actually routes anywhere. Fix: a top-most full-rect STOP TapCatcher wired to
+# _on_backdrop_input. This asserts that routing contract.
+func test_victory_moment_tap_catcher_covers_content_above_panel() -> void:
+	var screen: Node = _make_screen()
+	_seed_run_snapshot(1, "forest_reach", 3, 100, [])
+	screen.on_enter()
+
+	var catcher: Control = screen.get_node_or_null("TapCatcher") as Control
+	assert_object(catcher).is_not_null().override_failure_message(
+		"on_enter must add a top-most TapCatcher. Without it, CenterPanel (STOP) "
+		+ "eats every tap over the content and the player is stuck on the screen."
+	)
+	# Wired to the continue handler.
+	assert_bool(catcher.gui_input.is_connected(screen._on_backdrop_input)).is_true() \
+		.override_failure_message("TapCatcher.gui_input must route to _on_backdrop_input.")
+	# STOP so it actually catches taps (PASS/IGNORE would defeat the purpose).
+	assert_int(catcher.mouse_filter).is_equal(Control.MOUSE_FILTER_STOP)
+	# Ordered after CenterPanel among root children → drawn on top → receives
+	# taps over the panel.
+	assert_int(catcher.get_index()).is_greater(screen._center_panel.get_index()) \
+		.override_failure_message("TapCatcher must draw above CenterPanel to catch its taps.")
+	# Full-rect: spans the whole screen, so it covers the prompt and all content.
+	assert_float(catcher.anchor_left).is_equal(0.0)
+	assert_float(catcher.anchor_top).is_equal(0.0)
+	assert_float(catcher.anchor_right).is_equal(1.0)
+	assert_float(catcher.anchor_bottom).is_equal(1.0)
+
+	screen.on_exit()
+	# Disconnected after on_exit (mirrors the DimBackdrop lifecycle).
+	assert_bool(catcher.gui_input.is_connected(screen._on_backdrop_input)).is_false()

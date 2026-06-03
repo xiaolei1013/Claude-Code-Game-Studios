@@ -51,6 +51,9 @@ var _enter_time_msec: int = 0
 # Lantern Guild mock wireframe (feat/ui-wireframe-core-loop) — greybox state.
 var _wire_built: bool = false
 
+# Top-most tap-anywhere catcher (playtest fix 2026-06-03 — see on_enter).
+var _tap_catcher: Control = null
+
 
 @onready var _dim_backdrop: ColorRect = $DimBackdrop
 # Sprint 22 S22-M3: BiomeBackground at z=-1, set to the cleared biome's
@@ -153,6 +156,25 @@ func on_enter() -> void:
 	if not _dim_backdrop.gui_input.is_connected(_on_backdrop_input):
 		_dim_backdrop.gui_input.connect(_on_backdrop_input)
 
+	# Playtest fix (2026-06-03): the root + DimBackdrop handlers above CANNOT
+	# catch taps over the ceremony content. CenterPanel (PanelContainer,
+	# mouse_filter=STOP) draws on top of DimBackdrop and consumes every tap over
+	# its area — and the "Tap to continue" prompt lives INSIDE it. A STOP control
+	# does not bubble events to its parent, so the root handler never fires for
+	# those taps either; only the thin DimBackdrop margin worked. Add a top-most,
+	# full-rect, transparent catcher above everything so tap-anywhere works. Safe:
+	# this screen has no interactive widgets (tap-to-continue only, GDD §C.9).
+	if _tap_catcher == null:
+		_tap_catcher = Control.new()
+		_tap_catcher.name = "TapCatcher"
+		_tap_catcher.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_tap_catcher.mouse_filter = Control.MOUSE_FILTER_STOP
+		add_child(_tap_catcher)
+	# Keep it the last child so it draws above CenterPanel + the wireframe content.
+	move_child(_tap_catcher, get_child_count() - 1)
+	if not _tap_catcher.gui_input.is_connected(_on_backdrop_input):
+		_tap_catcher.gui_input.connect(_on_backdrop_input)
+
 	# Schedule the ContinuationPrompt reveal after CONTINUATION_DWELL_MS.
 	_continuation_prompt.visible = false
 	if get_tree() != null:
@@ -173,6 +195,8 @@ func on_exit() -> void:
 		gui_input.disconnect(_on_backdrop_input)
 	if _dim_backdrop != null and _dim_backdrop.gui_input.is_connected(_on_backdrop_input):
 		_dim_backdrop.gui_input.disconnect(_on_backdrop_input)
+	if _tap_catcher != null and _tap_catcher.gui_input.is_connected(_on_backdrop_input):
+		_tap_catcher.gui_input.disconnect(_on_backdrop_input)
 
 
 func on_pause() -> void:
