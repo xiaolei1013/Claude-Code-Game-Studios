@@ -63,6 +63,8 @@ extends Screen
 const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
 const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/dungeon_run_state.gd")
 const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+# Demo enemy sprites for the "Enemies ahead" lineup (no-op without demo assets).
+const EnemySpriteFactoryScript = preload("res://src/ui/enemy_sprite_factory.gd")
 
 # ---------------------------------------------------------------------------
 # Constants (Story 013)
@@ -490,6 +492,7 @@ func _build_wireframe_once() -> void:
 	_wire_built = true
 	_reposition_existing_nodes_drv()
 	_build_party_hud()
+	_build_enemy_lineup_drv()
 	_build_run_stats_hud()
 	_build_progress_panel()
 	_build_activity_feed_drv()
@@ -543,6 +546,119 @@ func _build_party_hud() -> void:
 			cls = String(h.class_id)
 		body.add_child(WireframeKitScript.list_tile(
 			nm, "%s · Lv %d" % [cls, lvl], "HP"))
+
+
+## Center, upper-middle: the enemies on the current floor — the diorama focal
+## point the party is dispatched against. A horizontal row of sprite + name +
+## ×count cells, resolved from the dispatched biome/floor's enemy_list. Enemy
+## sprites come from the demo pack (EnemySpriteFactory); absent → greybox box.
+func _build_enemy_lineup_drv() -> void:
+	var panel: PanelContainer = WireframeKitScript.section_panel("Enemies ahead")
+	panel.name = "WireEnemyLineup"
+	panel.z_index = _WIRE_Z
+	add_child(panel)
+	_place(panel, 0.5, 0, 0.5, 0, -280.0, 188.0, 280.0, 384.0)
+	var body: VBoxContainer = WireframeKitScript.body_of(panel)
+
+	var enemies: Array = _resolve_floor_enemies()
+	if enemies.is_empty():
+		body.add_child(WireframeKitScript.caption(
+			"The way ahead is quiet.", WireframeKitScript.MUTED))
+		return
+
+	var row: HBoxContainer = HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
+	body.add_child(row)
+	for entry: Dictionary in enemies:
+		row.add_child(_make_enemy_cell(entry))
+
+
+## One enemy cell: sprite thumbnail (or greybox), name, and ×count when >1.
+func _make_enemy_cell(entry: Dictionary) -> Control:
+	var cell: VBoxContainer = VBoxContainer.new()
+	cell.alignment = BoxContainer.ALIGNMENT_CENTER
+	cell.custom_minimum_size = Vector2(84, 0)
+	cell.add_theme_constant_override("separation", 2)
+
+	var tex: Texture2D = EnemySpriteFactoryScript.get_sprite(String(entry.get("enemy_id", "")))
+	if tex != null:
+		var slot: TextureRect = TextureRect.new()
+		slot.custom_minimum_size = Vector2(60, 60)
+		slot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		slot.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		slot.texture = tex
+		cell.add_child(slot)
+	else:
+		cell.add_child(WireframeKitScript.placeholder_box("", Vector2(60, 60)))
+
+	var name_lbl: Label = WireframeKitScript.caption(
+		String(entry.get("display_name", "")), WireframeKitScript.TEXT, 11)
+	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_lbl.custom_minimum_size = Vector2(84, 0)
+	name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	cell.add_child(name_lbl)
+
+	var cnt: int = int(entry.get("count", 1))
+	if cnt > 1:
+		var cnt_lbl: Label = WireframeKitScript.caption(
+			"×%d" % cnt, WireframeKitScript.MUTED, 11)
+		cnt_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cell.add_child(cnt_lbl)
+	return cell
+
+
+## Resolves the dispatched floor's enemy roster as
+## [{enemy_id, count, display_name}]. Empty when no run is dispatched or the
+## biome/floor cannot be resolved. Defensive duck-typing throughout — the screen
+## must never crash on missing content.
+func _resolve_floor_enemies() -> Array:
+	var out: Array = []
+	if BiomeDungeonDatabase == null:
+		return out
+	var biome_id: String = DungeonRunOrchestrator.get_dispatched_biome_id()
+	var floor_index: int = DungeonRunOrchestrator.get_dispatched_floor_index()
+	if biome_id == "":
+		return out
+
+	var biome: Variant = BiomeDungeonDatabase.get_biome_by_id(biome_id)
+	if biome == null or not ("dungeons" in biome) or (biome.dungeons as Array).is_empty():
+		return out
+	var dungeon: Variant = biome.dungeons[0]
+	if dungeon == null or not ("floors" in dungeon) or (dungeon.floors as Array).is_empty():
+		return out
+
+	var target: Variant = null
+	for f: Variant in dungeon.floors:
+		if f != null and ("floor_index" in f) and int(f.floor_index) == floor_index:
+			target = f
+			break
+	if target == null:
+		target = dungeon.floors[0]  # defensive: fall back to the first floor
+	if not ("enemy_list" in target):
+		return out
+
+	for entry: Variant in target.enemy_list:
+		var data: Dictionary = entry as Dictionary
+		var eid: String = String(data.get("enemy_id", ""))
+		if eid == "":
+			continue
+		out.append({
+			"enemy_id": eid,
+			"count": int(data.get("count", 1)),
+			"display_name": _enemy_display_name(eid),
+		})
+	return out
+
+
+## Localized-ish display name for an enemy id, via DataRegistry; falls back to
+## a capitalized id when the enemy resource or its display_name is unavailable.
+func _enemy_display_name(enemy_id: String) -> String:
+	if DataRegistry != null and DataRegistry.has_method("resolve"):
+		var ed: Variant = DataRegistry.resolve("enemies", enemy_id)
+		if ed != null and ("display_name" in ed) and String(ed.display_name) != "":
+			return String(ed.display_name)
+	return enemy_id.capitalize()
 
 
 ## Top-right: run stats backing panel + Return-to-Hall. The real StatsPanel
