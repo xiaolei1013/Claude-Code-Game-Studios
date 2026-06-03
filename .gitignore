@@ -42,6 +42,9 @@ assets/audio/demo/
 # never commit Square Enix art. When ORIGINAL production art is authored to
 # these paths, delete this line (and the .import files become committable normally).
 assets/art/classes/
+# Same for per-enemy demo sprites (EnemyData.sprite_path =
+# assets/art/enemies/<id>/sprite.png), assembled from the Octopath enemy archive.
+assets/art/enemies/
 
 # === Marrow (eval tooling — never commit, upstream framework v1.0) ===
 marrow/
