@@ -18,8 +18,8 @@ script = ExtResource("2_fl")
 id = "forest_reach_f2"
 display_name = "Floor 2: The Thicket"
 floor_index = 2
-enemy_list = [{"enemy_id": "hollow_brute", "count": 2}, {"enemy_id": "glowmoth", "count": 1}, {"enemy_id": "shellback", "count": 2}]
-expected_clear_time_seconds = 55
+enemy_list = [{"enemy_id": "hollow_brute", "count": 2}, {"enemy_id": "glowmoth", "count": 1}, {"enemy_id": "shellback", "count": 2}, {"enemy_id": "thornling_swarm", "count": 4}]
+expected_clear_time_seconds = 70
 is_boss_floor = false
 flavor_text = "The path closes in. Something with a shell and bad intentions has claimed this part of the forest as its own."
 
@@ -28,8 +28,8 @@ script = ExtResource("2_fl")
 id = "forest_reach_f3"
 display_name = "Floor 3: The Deep Grove"
 floor_index = 3
-enemy_list = [{"enemy_id": "elder_boar", "count": 2}, {"enemy_id": "moss_druid", "count": 2}, {"enemy_id": "vined_knight", "count": 1}]
-expected_clear_time_seconds = 85
+enemy_list = [{"enemy_id": "elder_boar", "count": 2}, {"enemy_id": "moss_druid", "count": 2}, {"enemy_id": "vined_knight", "count": 1}, {"enemy_id": "thornling_swarm", "count": 4}]
+expected_clear_time_seconds = 100
 is_boss_floor = false
 flavor_text = "The trees here are older than the guild's founding. Whatever lives in them has been watching since before that."
 
