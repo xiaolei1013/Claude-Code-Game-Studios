@@ -168,9 +168,9 @@ func test_run_offline_replay_short_window_surfaces_credited_gold() -> void:
 	# this was 0 while `credited` was the real (non-zero) drip, so this fails RED.
 	var credited: int = int(economy.get_lifetime_gold_earned()) - lifetime_before
 	assert_int(summary.gold_earned).is_equal(credited)
-	# Floors/kills remain unwired pending the orchestrator.compute_offline_batch
-	# feeder (deferred follow-up); floors_cleared stays empty for now.
-	assert_bool(summary.floors_cleared_in_window.is_empty()).is_true()
+	# (Kills/floors are now wired via DungeonRunOrchestrator.compute_offline_batch
+	# and covered by end_to_end_offline_replay_test.gd — whether this short window
+	# clears a floor depends on the live formation, so no floors assertion here.)
 
 
 # === Group C: Multi-Chunk Loop (Large Elapsed) ===

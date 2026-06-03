@@ -288,13 +288,17 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 							summary.set_meta("_kills_by_tier", {})
 						var tier_dict: Dictionary = summary.get_meta("_kills_by_tier")
 						tier_dict[tier] = tier_dict.get(tier, 0) + result.kills_by_tier[tier]
-				# Track first_clear_tick to populate floors_cleared_in_window post-replay.
-				if result.has("first_clear_tick") and result.first_clear_tick >= 0:
-					if not summary.has_meta("_floors_cleared_ticks"):
-						summary.set_meta("_floors_cleared_ticks", [])
-					var cleared_list: Array = summary.get_meta("_floors_cleared_ticks")
-					if result.first_clear_tick not in cleared_list:
-						cleared_list.append(result.first_clear_tick)
+				# Track distinct floors cleared this window → floors_cleared_in_window
+				# post-loop. compute_offline_batch reports floor_cleared (a combat
+				# loop completed in the window) plus the floor_index; dedup by floor
+				# so a floor ground repeatedly counts once.
+				if result.get("floor_cleared", false) and result.has("floor_index"):
+					if not summary.has_meta("_floors_cleared"):
+						summary.set_meta("_floors_cleared", [])
+					var cleared_list: Array = summary.get_meta("_floors_cleared")
+					var fi: int = int(result.floor_index)
+					if fi not in cleared_list:
+						cleared_list.append(fi)
 
 		if economy != null and economy.has_method("compute_offline_batch"):
 			var economy_result: Variant = economy.compute_offline_batch(chunk_ticks)
@@ -329,6 +333,17 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 			current_chunk_size = clampi(adjusted, OFFLINE_CHUNK_MIN_TICKS, OFFLINE_CHUNK_MAX_TICKS)
 
 	summary.total_replay_wall_time_ms = Time.get_ticks_msec() - replay_start_ms
+
+	# Story 010: convert the accumulated distinct cleared-floor indices into the
+	# summary field the Return-to-App screen reads (`.size()`). The orchestrator
+	# branch previously never ran (compute_offline_batch was unimplemented), so
+	# this field stayed empty; now the floors the formation cleared offline
+	# surface. Typed Array[int] local per the field's declared type.
+	if summary.has_meta("_floors_cleared"):
+		var floors: Array[int] = []
+		for f_v: Variant in (summary.get_meta("_floors_cleared") as Array):
+			floors.append(int(f_v))
+		summary.floors_cleared_in_window = floors
 
 	# Clear suppression flags BEFORE flush (defensive re-init; flush also clears).
 	if economy != null:
