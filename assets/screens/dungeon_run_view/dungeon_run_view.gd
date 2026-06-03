@@ -85,6 +85,13 @@ const RUN_END_DWELL_MS: int = 1500
 const LEVEL_UP_TOAST_LIFETIME_SEC: float = 3.0
 const LEVEL_UP_TOAST_FADE_START_SEC: float = 2.4
 
+## Hero levels that earn an emphasized "milestone" toast (vs the routine
+## per-level toast). 15 is the level cap, so it doubles as the max-level beat.
+const _MILESTONE_LEVELS: Array[int] = [10, 15]
+
+## Emphasized-toast font size (vs the theme-default routine toast).
+const _MILESTONE_TOAST_FONT_SIZE: int = 20
+
 # ---------------------------------------------------------------------------
 # @onready node references (matched to .tscn node names)
 # ---------------------------------------------------------------------------
@@ -209,6 +216,13 @@ func on_enter() -> void:
 	if not HeroRoster.hero_leveled.is_connected(_on_hero_leveled):
 		HeroRoster.hero_leveled.connect(_on_hero_leveled)
 
+	# Felt-progression: a gate floor cleared THIS run can unlock a new region.
+	# biome_unlocked fires while this screen is live (the player is watching the
+	# run), so the toast surfaces here — the guild_hall subscription rarely sees
+	# it because the hall isn't the active screen mid-run. Disconnected in on_exit.
+	if FloorUnlock.has_signal("biome_unlocked") and not FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked):
+		FloorUnlock.biome_unlocked.connect(_on_biome_unlocked)
+
 	# Initial render — snap labels to the current snapshot (covers the case
 	# where this screen is shown after DISPATCHING has already begun and ticks
 	# have already advanced the snapshot before on_enter fires).
@@ -253,6 +267,10 @@ func on_exit() -> void:
 	# Sprint 10 S10-M4: mirror the on_enter hero_leveled subscription.
 	if HeroRoster.hero_leveled.is_connected(_on_hero_leveled):
 		HeroRoster.hero_leveled.disconnect(_on_hero_leveled)
+
+	# Mirror the on_enter biome_unlocked subscription.
+	if FloorUnlock.has_signal("biome_unlocked") and FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked):
+		FloorUnlock.biome_unlocked.disconnect(_on_biome_unlocked)
 
 
 ## Called by SceneManager when a modal overlay opens on top of this screen.
@@ -397,23 +415,52 @@ func _on_hero_leveled(instance_id: int, _old_level: int, new_level: int) -> void
 	if display_name.is_empty():
 		display_name = str(instance_id)
 
-	var toast: Label = Label.new()
-	toast.name = "LevelUpToast_%d" % instance_id
-	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# S10-N1: hoisted safe-format pattern via UIFramework.format_localized.
-	toast.text = UIFrameworkScript.format_localized(
-		"hero_level_up_toast_format", [display_name, new_level]
+	# Milestone levels (10, cap-15) earn an emphasized toast; routine levels get
+	# the standard one. Both auto-dismiss + stack via the shared spawner.
+	var is_milestone: bool = new_level in _MILESTONE_LEVELS
+	var loc_key: String = "hero_milestone_toast_format" if is_milestone else "hero_level_up_toast_format"
+	var text: String = UIFrameworkScript.format_localized(loc_key, [display_name, new_level])
+	_spawn_run_toast(text, "LevelUpToast_%d" % instance_id, is_milestone)
+
+
+## Felt-progression: a new region unlocked mid-run (a gate floor cleared). Shows
+## an emphasized toast naming the region. Defensive — skips if the biome can't be
+## resolved (data drift). Mirrors guild_hall._on_biome_unlocked, but fires here
+## where the player is actually watching when the unlock happens.
+func _on_biome_unlocked(biome_id: String) -> void:
+	var biome: Variant = DataRegistry.resolve("biomes", biome_id)
+	if biome == null or not ("display_name" in biome):
+		return
+	var display_name: String = String(biome.get("display_name"))
+	if display_name.is_empty():
+		return
+	var text: String = UIFrameworkScript.format_localized(
+		"biome_unlocked_toast_format", [display_name]
 	)
-	# Anchor to top-center, just below HeaderLabel; stack subsequent toasts
-	# below by counting existing live toasts.
+	_spawn_run_toast(text, "BiomeUnlockToast", true)
+
+
+## Spawns a self-fading, self-freeing toast Label anchored top-center. Stacks
+## below any live toasts. [param emphasized] bumps the font size + tints it the
+## WireframeKit accent (gold) for milestone / unlock beats. The owning Tween is
+## parented to the toast so it auto-cleans if the screen exits mid-fade.
+func _spawn_run_toast(text: String, node_name: String, emphasized: bool) -> void:
+	var toast: Label = Label.new()
+	toast.name = node_name
+	toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# S10-N1: hoisted safe-format pattern — caller already formatted the text.
+	toast.text = text
 	toast.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	toast.position = Vector2(0, 56 + _live_level_up_toast_count() * 28)
+	toast.position = Vector2(0, 56 + _live_toast_count() * 28)
 	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if emphasized:
+		toast.add_theme_font_size_override("font_size", _MILESTONE_TOAST_FONT_SIZE)
+		toast.add_theme_color_override("font_color", WireframeKitScript.ACCENT)
 	add_child(toast)
 
-	# Held visible for FADE_START_SEC, then fade modulate.a from 1.0 → 0.0
-	# over the remaining lifetime, then queue_free. Tween is owned by the toast
-	# so it auto-cleans if the screen exits early (Tween freed with parent).
+	# Held visible for FADE_START_SEC, then fade modulate.a 1.0 → 0.0 over the
+	# remaining lifetime, then queue_free. Tween owned by the toast so it
+	# auto-cleans if the screen exits early (Tween freed with parent).
 	var tween: Tween = toast.create_tween()
 	tween.tween_interval(LEVEL_UP_TOAST_FADE_START_SEC)
 	tween.tween_property(
@@ -423,12 +470,12 @@ func _on_hero_leveled(instance_id: int, _old_level: int, new_level: int) -> void
 	tween.tween_callback(toast.queue_free)
 
 
-## Counts currently-live level-up toasts so newly-spawned toasts stack instead
-## of overlapping. A toast is "live" while it has not yet been queue_freed.
-func _live_level_up_toast_count() -> int:
+## Counts currently-live toasts (level-up + biome-unlock) so newly-spawned
+## toasts stack instead of overlapping. A toast is "live" until queue_freed.
+func _live_toast_count() -> int:
 	var n: int = 0
 	for child: Node in get_children():
-		if child is Label and child.name.begins_with("LevelUpToast_"):
+		if child is Label and child.name.contains("Toast"):
 			n += 1
 	return n
 

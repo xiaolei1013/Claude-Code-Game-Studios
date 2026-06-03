@@ -13,6 +13,8 @@ tick_label_prefix,Tick:
 kill_count_label_prefix,Kills:
 run_complete_kill_count_format,Run Complete — %d kills
 hero_level_up_toast_format,%s reached level %d!
+hero_milestone_toast_format,Milestone! %s is now Level %d
+biome_unlocked_toast_format,New region unlocked: %s
 return_to_app_title,Welcome back!
 return_to_app_seconds_credited_format,You were away for %d minutes.
 return_to_app_gold_earned_format,+%d gold earned

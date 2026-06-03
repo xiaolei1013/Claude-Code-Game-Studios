@@ -541,3 +541,59 @@ func test_enemy_lineup_quiet_when_no_run_dispatched() -> void:
 	var text: String = _gather_text(panel)
 	assert_str(text).contains("quiet")
 	assert_bool(text.contains("Hollow Brute")).is_false()
+
+
+# ===========================================================================
+# Felt-progression toasts — milestone level-up + live biome-unlock
+# (Felt-progression polish)
+# ===========================================================================
+
+## Finds the first live toast Label under the screen whose name starts with the
+## given prefix ("LevelUpToast_" / "BiomeUnlockToast").
+func _find_toast(screen: Node, prefix: String) -> Label:
+	for child: Node in screen.get_children():
+		if child is Label and (child as Label).name.begins_with(prefix):
+			return child as Label
+	return null
+
+
+func test_milestone_level_spawns_emphasized_toast() -> void:
+	# Arrange
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	# Act — level 10 is a milestone (no roster hero needed; id-text fallback).
+	screen.call("_on_hero_leveled", 4242, 9, 10)
+
+	# Assert — a level toast spawned and is emphasized (font-size override).
+	var toast: Label = _find_toast(screen, "LevelUpToast_")
+	assert_object(toast).is_not_null()
+	assert_bool(toast.has_theme_font_size_override("font_size")).override_failure_message(
+		"milestone level toast should be emphasized (font-size override)"
+	).is_true()
+
+
+func test_routine_level_spawns_plain_toast() -> void:
+	# Arrange
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+
+	# Act — level 2 is NOT a milestone.
+	screen.call("_on_hero_leveled", 4243, 1, 2)
+
+	# Assert — a level toast spawned and is NOT emphasized.
+	var toast: Label = _find_toast(screen, "LevelUpToast_")
+	assert_object(toast).is_not_null()
+	assert_bool(toast.has_theme_font_size_override("font_size")).is_false()
+
+
+func test_biome_unlock_spawns_live_toast_naming_the_region() -> void:
+	# Arrange
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+
+	# Act — unlock a real biome (ember_wastes resolves via DataRegistry).
+	screen.call("_on_biome_unlocked", "ember_wastes")
+
+	# Assert — a biome-unlock toast spawned naming the region.
+	var toast: Label = _find_toast(screen, "BiomeUnlockToast")
+	assert_object(toast).is_not_null()
+	assert_str(toast.text).contains("Ember Wastes")

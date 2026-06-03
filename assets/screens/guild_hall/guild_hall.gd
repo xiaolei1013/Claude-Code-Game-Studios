@@ -499,6 +499,11 @@ func _on_roster_changed(_a: Variant = null, _b: Variant = null, _c: Variant = nu
 ## (no animation, no easing).
 ##
 ## Signal arity is (id, old_level, new_level) per HeroRoster.gd:790.
+## Levels 10 and cap-15 earn the emphasized "Milestone!" toast (manual level-ups
+## from the Hero Detail modal land while the hall is the active screen).
+const _MILESTONE_LEVELS: Array[int] = [10, 15]
+
+
 func _on_hero_leveled(id: int, _old_level: int, new_level: int) -> void:
 	_refresh_roster_panel()
 	# Resolve display name for the toast. If the hero isn't resolvable
@@ -510,8 +515,10 @@ func _on_hero_leveled(id: int, _old_level: int, new_level: int) -> void:
 	var display_name: String = String(hero.display_name)
 	if display_name == "":
 		return
-	# Localized format: "%s reached level %d!" per assets/locale/en.csv.
-	var text: String = tr("hero_level_up_toast_format") % [display_name, new_level]
+	# Milestone levels get the emphasized format; routine levels the standard one.
+	# Both per assets/locale/en.csv.
+	var loc_key: String = "hero_milestone_toast_format" if new_level in _MILESTONE_LEVELS else "hero_level_up_toast_format"
+	var text: String = tr(loc_key) % [display_name, new_level]
 	_show_toast(text)
 
 
@@ -528,7 +535,9 @@ func _on_biome_unlocked(biome_id: String) -> void:
 	var display_name: String = String(biome.get("display_name"))
 	if display_name == "":
 		return
-	_show_toast("Unlocked: %s" % display_name)
+	# Shared loc key with dungeon_run_view's live unlock toast for one consistent
+	# "New region unlocked: <name>" string across screens.
+	_show_toast(tr("biome_unlocked_toast_format") % display_name)
 
 
 ## HeroCard tap handler. Per GDD #22 AC-22-01: instantiate Hero Detail modal
