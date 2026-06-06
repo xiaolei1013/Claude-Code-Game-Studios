@@ -44,6 +44,17 @@ extends Node
 ## briefly between replay-complete and Return-to-App-screen-acknowledge per
 ## OQ-OE-1; Sprint 13+ scope).
 ##
+## Meta keys are the ADR-0014-sanctioned escape hatch for new per-replay
+## accumulators that would otherwise require a field (and thus a version bump).
+## Currently un-promoted meta keys, all set during run_offline_replay and read
+## by the Return-to-App screen via get_meta:
+##   "_kills_by_tier"   Dictionary[int, int]  — kills per enemy tier
+##   "_biomes_unlocked" Array[String]         — biomes newly available offline
+## When a save-schema version bump is next budgeted, prefer promoting these to
+## typed fields the way floors_cleared_in_window was (the "_floors_cleared" meta
+## is converted to that field before the summary leaves the engine) rather than
+## adding more raw meta keys.
+##
 ## V1.0 forward-compat field flagged in GDD §C.1 line 74:
 ##   var hero_levels_gained: Dictionary[int, int]  # hero_id → levels gained
 class OfflineSummary extends RefCounted:

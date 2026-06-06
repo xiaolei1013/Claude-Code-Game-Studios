@@ -58,7 +58,7 @@ stories:
     status: review
     owner: "godot-gdscript-specialist"
     estimate_days: 1.5
-    blocker: "Impl + 9 tests GREEN. Pending /code-review; PR MERGE gated on S28-M1 PASS (sprint rule #6)"
+    blocker: "Impl + 13 tests GREEN. /code-review APPROVE (2026-06-06); PR #197 marked READY. MERGE held for S28-M1 PASS (sprint rule #6)."
     completed: ""
 
   - id: "28-S2"
@@ -85,8 +85,8 @@ stories:
     name: "Offline-unlock surfacing at return-to-app"
     file: ""
     priority: nice-to-have
-    status: review
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 1.0
-    blocker: "Impl + 7 tests GREEN (5 screen, 2 engine). PR open; merge per sprint rule #6 (M1 playtest)."
-    completed: ""
+    blocker: ""
+    completed: "2026-06-06"
