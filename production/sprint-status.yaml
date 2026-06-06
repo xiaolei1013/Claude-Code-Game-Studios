@@ -85,8 +85,8 @@ stories:
     name: "Offline-unlock surfacing at return-to-app"
     file: ""
     priority: nice-to-have
-    status: backlog
-    owner: ""
+    status: review
+    owner: "godot-gdscript-specialist"
     estimate_days: 1.0
-    blocker: ""
+    blocker: "Impl + 7 tests GREEN (5 screen, 2 engine). PR open; merge per sprint rule #6 (M1 playtest)."
     completed: ""

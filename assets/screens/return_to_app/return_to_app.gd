@@ -62,6 +62,10 @@ var _wire_built: bool = false
 ## "%d floors cleared" row.
 @onready var _floors_row: Label = $SummaryPanel/VBoxContainer/FloorsRow
 
+## "New region unlocked: %s" celebration row. Shown only when the offline window
+## unlocked one or more biomes (summary "_biomes_unlocked" meta is non-empty).
+@onready var _region_unlock_row: Label = $SummaryPanel/VBoxContainer/RegionUnlockRow
+
 ## Offline-cap advisory — shown only when seconds_clipped > 0.
 @onready var _cap_notice: Label = $SummaryPanel/VBoxContainer/CapNotice
 
@@ -91,6 +95,7 @@ func _ready() -> void:
 	_acknowledge_button.text = tr("return_to_app_acknowledge_button")
 	_cap_notice.visible = false
 	_no_summary_label.visible = false
+	_region_unlock_row.visible = false
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +229,12 @@ func _render_summary(summary: OfflineProgressionEngine.OfflineSummary) -> void:
 		"return_to_app_floors_format", [summary.floors_cleared_in_window.size()]
 	)
 
+	# Region-unlock row — surfaces biomes the offline window unlocked (set by
+	# OfflineProgressionEngine via the "_biomes_unlocked" meta snapshot-diff).
+	# Reuses the in-game biome_unlocked_toast_format string for one consistent
+	# "new region unlocked" voice across the toast and this summary.
+	_render_region_unlock_row(summary)
+
 	# Cap notice — show if any seconds were clipped (from summary or cached signal).
 	var clipped: int = maxi(summary.seconds_clipped, _pending_seconds_clipped)
 	if clipped > 0:
@@ -238,6 +249,45 @@ func _render_summary(summary: OfflineProgressionEngine.OfflineSummary) -> void:
 		_cap_notice.visible = false
 
 
+## Renders the "new region unlocked" celebration row from the summary's
+## "_biomes_unlocked" meta (a typed Array[String] of biome ids set by
+## OfflineProgressionEngine's snapshot-diff). Maps each biome id to its
+## localizable display name via BiomeDungeonDatabase, joining multiples with
+## a comma. Hides the row when the meta is absent or empty.
+##
+## Defensive against malformed meta (non-Array, non-String elements, unknown
+## biome ids): unknown ids fall back to the raw id so the player still sees a
+## non-empty celebration rather than a blank row.
+func _render_region_unlock_row(summary: OfflineProgressionEngine.OfflineSummary) -> void:
+	if not summary.has_meta("_biomes_unlocked"):
+		_region_unlock_row.visible = false
+		return
+	var raw: Variant = summary.get_meta("_biomes_unlocked")
+	if not (raw is Array) or (raw as Array).is_empty():
+		_region_unlock_row.visible = false
+		return
+
+	var names: Array[String] = []
+	for biome_id_v: Variant in (raw as Array):
+		var biome_id: String = String(biome_id_v)
+		if biome_id == "":
+			continue
+		var display: String = biome_id
+		var biome: Biome = BiomeDungeonDatabase.get_biome_by_id(biome_id)
+		if biome != null and String(biome.display_name) != "":
+			display = String(biome.display_name)
+		names.append(display)
+
+	if names.is_empty():
+		_region_unlock_row.visible = false
+		return
+
+	_region_unlock_row.text = UIFrameworkScript.format_localized(
+		"biome_unlocked_toast_format", [", ".join(names)]
+	)
+	_region_unlock_row.visible = true
+
+
 ## Renders a graceful fallback when no cached summary exists.
 ##
 ## Should not occur in production (OfflineProgressionEngine always routes via
@@ -250,6 +300,7 @@ func _render_no_summary_fallback() -> void:
 	_gold_row.text = ""
 	_kills_row.text = ""
 	_floors_row.text = ""
+	_region_unlock_row.visible = false
 	_cap_notice.visible = false
 	_no_summary_label.text = tr("return_to_app_no_summary_fallback")
 	_no_summary_label.visible = true

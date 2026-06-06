@@ -62,6 +62,11 @@ func _restore_initial_state() -> void:
 	OfflineProgressionEngine._replay_in_flight = false
 	OfflineProgressionEngine._pending_elapsed_seconds = 0
 	OfflineProgressionEngine._last_summary = null
+	# Restore the FloorUnlock provider to its production default so a test that
+	# injects a stub provider (Group I) cannot leak it into other tests.
+	OfflineProgressionEngine._floor_unlock_provider = (
+		func() -> Node: return OfflineProgressionEngine.get_node_or_null("/root/FloorUnlock")
+	)
 
 
 func before_test() -> void:
@@ -484,3 +489,93 @@ func test_e2e_replay_in_flight_changed_re_entrant_call_does_not_emit_extra_true(
 	# Cleanup
 	for c: Dictionary in OfflineProgressionEngine.replay_in_flight_changed.get_connections():
 		OfflineProgressionEngine.replay_in_flight_changed.disconnect(c["callable"])
+
+
+# ===========================================================================
+# Group I: Sprint 28 N2 — offline biome-unlock surfacing
+#
+# A biome that becomes available during the offline window is surfaced on the
+# summary via the "_biomes_unlocked" meta. The engine computes this as a
+# snapshot-diff of FloorUnlock.get_available_biomes() taken before the replay
+# loop vs after flush_offline_signals. These tests inject a stub FloorUnlock
+# provider so the diff is deterministic and decoupled from offline combat
+# outcomes (which floors a formation can actually clear).
+# ===========================================================================
+
+func test_e2e_offline_biome_unlock_surfaces_via_summary_meta() -> void:
+	## A biome newly available post-flush (but not pre-replay) is listed in the
+	## summary's "_biomes_unlocked" meta; a biome available all along is not.
+	# Arrange — stub reports ember_wastes newly available on the post-flush call.
+	var stub: _StubFloorUnlock = _StubFloorUnlock.new()
+	stub.before_set = ["forest_reach"]
+	stub.after_set = ["forest_reach", "ember_wastes"]
+	add_child(stub)
+	OfflineProgressionEngine._floor_unlock_provider = func() -> Node: return stub
+
+	var captured: Array = [null]
+	OfflineProgressionEngine.offline_rewards_collected.connect(
+		func(s): captured[0] = s, CONNECT_ONE_SHOT
+	)
+
+	# Act
+	OfflineProgressionEngine.run_offline_replay(60)
+	var fired: bool = await _pump_until_summary(captured, _PIPELINE_TIMEOUT_FRAMES)
+	assert_bool(fired).is_true()
+
+	# Assert — meta present; lists the newly-available biome, not the pre-existing one.
+	var summary: OfflineProgressionEngine.OfflineSummary = captured[0]
+	assert_bool(summary.has_meta("_biomes_unlocked")).override_failure_message(
+		"offline replay unlocked a biome but set no _biomes_unlocked meta"
+	).is_true()
+	var unlocked: Array = summary.get_meta("_biomes_unlocked")
+	assert_bool(unlocked.has("ember_wastes")).is_true()
+	assert_bool(unlocked.has("forest_reach")).is_false()
+
+	# Cleanup
+	stub.queue_free()
+	await get_tree().process_frame
+
+
+func test_e2e_offline_no_biome_unlock_sets_no_meta() -> void:
+	## When the available-biome set is unchanged across the window, the engine
+	## sets NO "_biomes_unlocked" meta (the common no-gate-crossed case — the
+	## screen then keeps its region-unlock row hidden).
+	# Arrange — stub reports the same set on both snapshot calls.
+	var stub: _StubFloorUnlock = _StubFloorUnlock.new()
+	stub.before_set = ["forest_reach"]
+	stub.after_set = ["forest_reach"]
+	add_child(stub)
+	OfflineProgressionEngine._floor_unlock_provider = func() -> Node: return stub
+
+	var captured: Array = [null]
+	OfflineProgressionEngine.offline_rewards_collected.connect(
+		func(s): captured[0] = s, CONNECT_ONE_SHOT
+	)
+
+	# Act
+	OfflineProgressionEngine.run_offline_replay(60)
+	var fired: bool = await _pump_until_summary(captured, _PIPELINE_TIMEOUT_FRAMES)
+	assert_bool(fired).is_true()
+
+	# Assert — no unlock meta.
+	var summary: OfflineProgressionEngine.OfflineSummary = captured[0]
+	assert_bool(summary.has_meta("_biomes_unlocked")).is_false()
+
+	# Cleanup
+	stub.queue_free()
+	await get_tree().process_frame
+
+
+## Stub FloorUnlock for the offline-unlock-capture tests. get_available_biomes()
+## returns [member before_set] on its first call (the engine's pre-replay
+## snapshot) and [member after_set] on every subsequent call (the post-flush
+## snapshot), deterministically simulating a biome unlocked during the offline
+## window without depending on real combat clearing a gate floor.
+class _StubFloorUnlock extends Node:
+	var before_set: Array[String] = ["forest_reach"]
+	var after_set: Array[String] = ["forest_reach"]
+	var _calls: int = 0
+
+	func get_available_biomes() -> Array[String]:
+		_calls += 1
+		return after_set if _calls >= 2 else before_set
