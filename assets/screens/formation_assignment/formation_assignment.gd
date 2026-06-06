@@ -112,6 +112,12 @@ var _fp_floors_by_biome: Dictionary = {}  # biome_id (String) → Array[Resource
 var _fp_selected_biome_id: String = ""
 var _fp_selected_floor_index: int = 0
 
+# S28-S1 — per-floor matchup hint label. Created once in _show_floor_picker()
+# as a sibling of PickerSelectButton inside PickerContent. Null until the
+# picker has been opened for the first time. Visible = false when no
+# recommendation is available for the selected floor.
+var _floor_recommendation_label: Label = null
+
 # ---------------------------------------------------------------------------
 # AC-FA-13 (S15-M2) — Mid-run reassignment confirm dialog gating
 # ---------------------------------------------------------------------------
@@ -649,6 +655,22 @@ func _show_floor_picker() -> void:
 			return int(a.floor_index) < int(b.floor_index)
 		)
 
+	# S28-S1: create FloorRecommendationLabel once (idempotent). The label is a
+	# sibling of PickerSelectButton inside PickerContent so it renders above the
+	# Select button. Visible = false until a floor with a valid recommendation is
+	# selected. Created in code (not .tscn) to avoid reparenting any existing node.
+	if _floor_recommendation_label == null:
+		var picker_content: Control = _floor_picker_select_button.get_parent() as Control
+		if picker_content != null:
+			var rec_label: Label = Label.new()
+			rec_label.name = "FloorRecommendationLabel"
+			rec_label.visible = false
+			# Insert before PickerSelectButton so it renders above it.
+			var select_idx: int = _floor_picker_select_button.get_index()
+			picker_content.add_child(rec_label)
+			picker_content.move_child(rec_label, select_idx)
+			_floor_recommendation_label = rec_label
+
 	# Step 2: render biome tabs.
 	_render_floor_picker_biome_tabs()
 
@@ -666,6 +688,9 @@ func _show_floor_picker() -> void:
 	else:
 		_floor_picker_select_button.disabled = true
 		_floor_picker_select_button.text = "No biomes available"
+		# No floor selected → hide any stale recommendation from a prior open.
+		if _floor_recommendation_label != null:
+			_floor_recommendation_label.visible = false
 
 	# Step 4: show the overlay.
 	_floor_picker_root.visible = true
@@ -675,20 +700,98 @@ func _hide_floor_picker() -> void:
 	_floor_picker_root.visible = false
 
 
-func _render_floor_picker_biome_tabs() -> void:
-	# Clear existing biome tabs (idempotent re-entry). Sprint 24 S24-M3
-	# uses UIFramework.clear_children_immediate.
-	UIFrameworkScript.clear_children_immediate(_floor_picker_biome_vbox)
-
-	# Build archetype → recommended-class map for the matchup-hint label.
-	var archetype_to_class: Dictionary[String, String] = {}
+## Builds an archetype → class display_name map from HeroClassDatabase.
+##
+## Iterates [method HeroClassDatabase.get_all_ids] (alphabetically sorted) and
+## maps each [code]counter_archetype[/code] to the corresponding class
+## [code]display_name[/code]. First-class-encountered wins on collision (because
+## get_all_ids is alphabetically sorted, this is deterministic and stable).
+## Classes with an empty [code]counter_archetype[/code] are skipped.
+##
+## Consumed by both the biome hint ([method _render_floor_picker_biome_tabs])
+## and the per-floor recommendation label ([method _update_floor_recommendation_label]).
+## The map is a cheap pure projection of HeroClassDatabase (≈7 O(1) lookups), so
+## each consumer rebuilds it on demand rather than sharing cached state — this
+## keeps the helper correct across the picker's multiple render entry points
+## (initial open + live floor-unlock re-render) with no invalidation surface.
+##
+## Returns a typed [Dictionary][String, String]: archetype → display_name.
+## Example: [code]{"bruiser": "Berserker", "caster": "Mage", ...}[/code]
+func _build_archetype_to_class_map() -> Dictionary[String, String]:
+	var map: Dictionary[String, String] = {}
 	for class_id: String in HeroClassDatabase.get_all_ids():
 		var cls: HeroClass = HeroClassDatabase.get_by_id(class_id)
 		if cls == null:
 			continue
 		var counter: String = String(cls.counter_archetype)
-		if counter != "" and not archetype_to_class.has(counter):
-			archetype_to_class[counter] = String(cls.display_name)
+		if counter != "" and not map.has(counter):
+			map[counter] = String(cls.display_name)
+	return map
+
+
+## Returns the recommended class display_name for the given floor's enemy composition.
+##
+## Algorithm:
+##   1. Tally total enemy counts per archetype by iterating [Floor.enemy_list]
+##      in order. Entries whose [code]enemy_id[/code] cannot be resolved by
+##      [EnemyDatabase.get_by_id] (returns null) or have an empty
+##      [code]archetype[/code] are skipped.
+##   2. The archetype with the highest total count is dominant. Tie-break:
+##      first-encountered archetype in [Floor.enemy_list] order wins
+##      (deterministic per the list's authoring order).
+##   3. Returns [code]archetype_to_class.get(dominant_archetype, "")[/code] —
+##      the counter class display_name, or [code]""[/code] if no archetype was
+##      tallied or the dominant archetype has no class counter mapped.
+##
+## [param floor_data] — the [Floor] resource to analyse.
+## [param archetype_to_class] — pre-built map from [method _build_archetype_to_class_map].
+## Returns [code]""[/code] on empty list, all-null enemy ids, or unmapped archetype.
+func _recommended_class_for_floor(
+		floor_data: Floor,
+		archetype_to_class: Dictionary[String, String]) -> String:
+	# Tally enemy counts per archetype. GDScript Dictionaries preserve insertion
+	# order (Godot 4.4+; the project relies on this per ADR-0012 / ADR-0013), so
+	# iterating `tally` yields archetypes in first-encountered order — exactly the
+	# tie-break we want, with no separate ordering array to maintain.
+	var tally: Dictionary[String, int] = {}
+	for entry: Dictionary in floor_data.enemy_list:
+		# Defensive reads: the Floor schema documents enemy_id:String + count:int,
+		# but nothing validates .tres entries at load (the Story-004 validator was
+		# never wired), so a present-but-null/non-string enemy_id would make a bare
+		# String() cast abort the whole selection chain. Type-check before trusting.
+		var raw_id: Variant = entry.get("enemy_id")
+		if typeof(raw_id) != TYPE_STRING or String(raw_id) == "":
+			continue
+		var enemy_data: EnemyData = EnemyDatabase.get_by_id(String(raw_id))
+		if enemy_data == null:
+			continue
+		var arch: String = String(enemy_data.archetype)
+		if arch == "":
+			continue
+		var raw_count: Variant = entry.get("count")
+		var count: int = int(raw_count) if (typeof(raw_count) == TYPE_INT or typeof(raw_count) == TYPE_FLOAT) else 0
+		tally[arch] = tally.get(arch, 0) + count
+	if tally.is_empty():
+		return ""
+	# Dominant archetype: highest total count; tie → first-encountered wins
+	# (tally insertion order == enemy_list first-seen order).
+	var dominant: String = ""
+	var dominant_count: int = -1
+	for arch: String in tally:
+		if tally[arch] > dominant_count:
+			dominant_count = tally[arch]
+			dominant = arch
+	return archetype_to_class.get(dominant, "")
+
+
+func _render_floor_picker_biome_tabs() -> void:
+	# Clear existing biome tabs (idempotent re-entry). Sprint 24 S24-M3
+	# uses UIFramework.clear_children_immediate.
+	UIFrameworkScript.clear_children_immediate(_floor_picker_biome_vbox)
+
+	# Build archetype → recommended-class map for the matchup-hint labels
+	# (biome hint + per-floor hint both consume this map).
+	var archetype_to_class: Dictionary[String, String] = _build_archetype_to_class_map()
 
 	# Per-biome tabs.
 	for biome: Resource in _fp_biomes:
@@ -722,7 +825,7 @@ func _render_floor_picker_biome_tabs() -> void:
 			if recommended.is_empty():
 				hint_label.text = "Common: %s" % ", ".join(archetypes)
 			else:
-				hint_label.text = "Recommended: %s" % ", ".join(recommended)
+				hint_label.text = tr("matchup_floor_recommended_format") % ", ".join(recommended)
 			biome_tab.add_child(hint_label)
 		# Floor buttons row.
 		var floor_row: HBoxContainer = HBoxContainer.new()
@@ -764,6 +867,39 @@ func _select_floor_in_picker(biome_id: String, floor_index: int) -> void:
 	else:
 		_floor_picker_select_button.disabled = true
 		_floor_picker_select_button.text = "Select (locked)"
+	# S28-S1: surface the per-floor matchup recommendation for the selected floor.
+	_update_floor_recommendation_label(biome_id, floor_index)
+
+
+## Updates the FloorRecommendationLabel for the currently selected floor.
+##
+## Resolves the [Floor] resource for (biome_id, floor_index) from the picker's
+## [member _fp_floors_by_biome] cache, derives the recommended class via
+## [method _recommended_class_for_floor], and shows "Recommended: <class>". When
+## the floor has no resolvable recommendation (empty/unmapped enemy_list), the
+## label is hidden so no empty "Recommended: " stub is ever shown.
+func _update_floor_recommendation_label(biome_id: String, floor_index: int) -> void:
+	if _floor_recommendation_label == null:
+		return
+	var floor_data: Floor = null
+	for f: Resource in (_fp_floors_by_biome.get(biome_id, []) as Array):
+		# Cast + null-guard BEFORE reading floor_index: the cache is sourced from
+		# a typed Array[Floor] today, but dungeon.gd documents a fallback to
+		# Array[Resource], so a stray non-Floor element must not abort here.
+		var candidate: Floor = f as Floor
+		if candidate != null and candidate.floor_index == floor_index:
+			floor_data = candidate
+			break
+	if floor_data == null:
+		_floor_recommendation_label.visible = false
+		return
+	var archetype_to_class: Dictionary[String, String] = _build_archetype_to_class_map()
+	var recommended: String = _recommended_class_for_floor(floor_data, archetype_to_class)
+	if recommended == "":
+		_floor_recommendation_label.visible = false
+	else:
+		_floor_recommendation_label.text = tr("matchup_floor_recommended_format") % recommended
+		_floor_recommendation_label.visible = true
 
 
 func _on_floor_picker_floor_pressed(biome_id: String, floor_index: int) -> void:
