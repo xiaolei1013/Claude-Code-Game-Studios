@@ -476,3 +476,150 @@ func test_summary_with_seconds_clipped_shows_cap_notice() -> void:
 	screen.on_exit()
 	screen.queue_free()
 	await get_tree().process_frame
+
+
+# ===========================================================================
+# Group G: Region-unlock celebration row (Sprint 28 N2)
+#
+# The offline engine sets a "_biomes_unlocked" meta (Array[String] of biome
+# ids) on the summary when the offline window unlocked one or more biomes. The
+# screen surfaces these as a "New region unlocked: <name>" row via the shared
+# biome_unlocked_toast_format string, mapping ids → display names.
+# ===========================================================================
+
+## G-01: summary with one unlocked biome shows the RegionUnlockRow with the
+## biome's display name (or id fallback) — asserted case-insensitively so the
+## test is robust to whether BiomeDungeonDatabase resolves the display name.
+func test_on_enter_with_unlocked_biome_shows_region_row() -> void:
+	# Arrange
+	var summary: OfflineProgressionEngine.OfflineSummary = _make_summary()
+	var unlocked: Array[String] = ["ember_wastes"]
+	summary.set_meta("_biomes_unlocked", unlocked)
+	OfflineProgressionEngine._last_summary = summary
+	var screen: Control = await _make_screen()
+
+	# Act
+	screen.on_enter()
+	await get_tree().process_frame
+
+	# Assert — RegionUnlockRow is visible and names the unlocked region.
+	var row: Label = screen.get_node(
+		"SummaryPanel/VBoxContainer/RegionUnlockRow"
+	) as Label
+	assert_bool(row.visible).is_true()
+	assert_bool(row.text.to_lower().contains("ember")).is_true()
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+## G-02: summary WITHOUT the "_biomes_unlocked" meta keeps the row hidden —
+## the common case (no biome crossed a gate offline).
+func test_on_enter_without_unlock_meta_hides_region_row() -> void:
+	# Arrange — _make_summary sets no "_biomes_unlocked" meta.
+	var summary: OfflineProgressionEngine.OfflineSummary = _make_summary()
+	OfflineProgressionEngine._last_summary = summary
+	var screen: Control = await _make_screen()
+
+	# Act
+	screen.on_enter()
+	await get_tree().process_frame
+
+	# Assert — RegionUnlockRow is hidden.
+	var row: Label = screen.get_node(
+		"SummaryPanel/VBoxContainer/RegionUnlockRow"
+	) as Label
+	assert_bool(row.visible).is_false()
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+## G-03: summary with multiple unlocked biomes joins the names (comma-separated)
+## and surfaces both in the row text.
+func test_on_enter_with_multiple_unlocked_biomes_joins_names() -> void:
+	# Arrange
+	var summary: OfflineProgressionEngine.OfflineSummary = _make_summary()
+	var unlocked: Array[String] = ["ember_wastes", "hollow_stair"]
+	summary.set_meta("_biomes_unlocked", unlocked)
+	OfflineProgressionEngine._last_summary = summary
+	var screen: Control = await _make_screen()
+
+	# Act
+	screen.on_enter()
+	await get_tree().process_frame
+
+	# Assert — both regions present, comma-joined.
+	var row: Label = screen.get_node(
+		"SummaryPanel/VBoxContainer/RegionUnlockRow"
+	) as Label
+	assert_bool(row.visible).is_true()
+	assert_bool(row.text.to_lower().contains("ember")).is_true()
+	assert_bool(row.text.to_lower().contains("hollow")).is_true()
+	assert_bool(row.text.contains(",")).is_true()
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+## G-04 (defensive): an empty "_biomes_unlocked" array keeps the row hidden
+## (guards the malformed-but-present meta edge the screen hardens against).
+func test_on_enter_with_empty_unlock_array_hides_region_row() -> void:
+	# Arrange
+	var summary: OfflineProgressionEngine.OfflineSummary = _make_summary()
+	var empty_unlocked: Array[String] = []
+	summary.set_meta("_biomes_unlocked", empty_unlocked)
+	OfflineProgressionEngine._last_summary = summary
+	var screen: Control = await _make_screen()
+
+	# Act
+	screen.on_enter()
+	await get_tree().process_frame
+
+	# Assert — RegionUnlockRow is hidden.
+	var row: Label = screen.get_node(
+		"SummaryPanel/VBoxContainer/RegionUnlockRow"
+	) as Label
+	assert_bool(row.visible).is_false()
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+## G-05: the fallback (no cached summary) path hides the region row even if a
+## prior render had shown it (re-use safety).
+func test_no_summary_fallback_hides_region_row() -> void:
+	# Arrange — first render a summary WITH an unlock so the row turns on...
+	var summary: OfflineProgressionEngine.OfflineSummary = _make_summary()
+	var unlocked: Array[String] = ["ember_wastes"]
+	summary.set_meta("_biomes_unlocked", unlocked)
+	OfflineProgressionEngine._last_summary = summary
+	var screen: Control = await _make_screen()
+	screen.on_enter()
+	await get_tree().process_frame
+	var row: Label = screen.get_node(
+		"SummaryPanel/VBoxContainer/RegionUnlockRow"
+	) as Label
+	assert_bool(row.visible).is_true()
+
+	# Act — clear the summary and re-enter (fallback path).
+	screen.on_exit()
+	OfflineProgressionEngine._last_summary = null
+	screen.on_enter()
+	await get_tree().process_frame
+
+	# Assert — row hidden under the fallback render.
+	assert_bool(row.visible).is_false()
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame

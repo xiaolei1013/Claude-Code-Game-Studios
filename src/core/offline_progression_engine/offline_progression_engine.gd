@@ -174,6 +174,19 @@ var _warning_logger: Callable = func(msg: String) -> void: push_warning(msg)
 @warning_ignore("unused_private_class_variable")
 var _error_logger: Callable = func(msg: String) -> void: push_error(msg)
 
+## Provider for the FloorUnlock autoload, used to surface biomes newly unlocked
+## during the offline window. Default resolves the live autoload; tests override
+## it with a stub so the unlock-capture path is deterministic and independent of
+## offline combat outcomes.
+##
+## The capture is a snapshot-diff: get_available_biomes() is read BEFORE the
+## replay loop and AFTER flush_offline_signals; the set difference is the list
+## of biomes that became available offline. Result is stashed as the summary
+## meta "_biomes_unlocked" — NOT a new OfflineSummary field — per ADR-0014
+## forbidden pattern OFFLINE_SUMMARY_FIELD_SET_EXPANSION_WITHOUT_VERSION_BUMP
+## (the same meta escape hatch the kills/floors accumulators use).
+var _floor_unlock_provider: Callable = func() -> Node: return get_node_or_null("/root/FloorUnlock")
+
 
 # ---------------------------------------------------------------------------
 # Built-in lifecycle
@@ -265,6 +278,13 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 		economy._is_offline_replay = true
 	if orchestrator != null:
 		orchestrator._is_offline_replay = true
+
+	# Snapshot available biomes BEFORE the replay so we can diff after flush and
+	# surface any biome that the offline first-clears unlocked (Sprint 28 N2).
+	# Suppressed first-clear signals only land at flush_offline_signals, so the
+	# pre-loop snapshot is guaranteed to predate any offline unlock advance.
+	var floor_unlock: Node = _floor_unlock_provider.call()
+	var biomes_before: Array[String] = _snapshot_available_biomes(floor_unlock)
 
 	# Batch chunking loop per GDD §C.2 pseudocode + ADR-0014 §C.2.
 	var replay_start_ms: int = Time.get_ticks_msec()
@@ -361,6 +381,20 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 	if orchestrator != null and orchestrator.has_method("flush_offline_signals"):
 		orchestrator.flush_offline_signals()
 
+	# Sprint 28 N2: surface biomes newly unlocked offline. flush_offline_signals
+	# above replays the suppressed first-clears, advancing FloorUnlock and seeding
+	# any newly gated biome — so the post-flush available set minus the pre-replay
+	# set is exactly the biomes the player unlocked while away. Stored as meta
+	# (NOT a field) per ADR-0014; the Return-to-App screen reads it for a
+	# "new region unlocked" celebration row.
+	var biomes_after: Array[String] = _snapshot_available_biomes(floor_unlock)
+	var newly_unlocked: Array[String] = []
+	for biome_id: String in biomes_after:
+		if biome_id not in biomes_before:
+			newly_unlocked.append(biome_id)
+	if not newly_unlocked.is_empty():
+		summary.set_meta("_biomes_unlocked", newly_unlocked)
+
 	# Cache summary BEFORE emitting so late subscribers (Return-to-App Screen)
 	# can read it via last_summary() in on_enter() even if the signal already
 	# fired before the screen was instantiated. See _last_summary doc comment.
@@ -400,6 +434,19 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 ## blocked by SceneManager via this flag.
 func is_replay_in_flight() -> bool:
 	return _replay_in_flight
+
+
+## Reads the currently-available biome ids from [param floor_unlock], coercing
+## to a typed Array[String]. Returns an empty array when the node is null or
+## lacks the API (test envs that boot without FloorUnlock) so the unlock-diff
+## degrades gracefully to "no unlocks surfaced" rather than erroring.
+func _snapshot_available_biomes(floor_unlock: Node) -> Array[String]:
+	var result: Array[String] = []
+	if floor_unlock == null or not floor_unlock.has_method("get_available_biomes"):
+		return result
+	for biome_id_v: Variant in floor_unlock.get_available_biomes():
+		result.append(String(biome_id_v))
+	return result
 
 
 ## Returns the most recently completed [OfflineSummary], or null if no replay

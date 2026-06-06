@@ -64,6 +64,15 @@ layout_mode = 2
 text = ""
 horizontal_alignment = 1
 
+; Sprint 28 N2: "new region unlocked" celebration row. Lantern Gold (#F2B83B,
+; DESIGN.md reward/progression highlight). Hidden until an offline unlock occurs.
+[node name="RegionUnlockRow" type="Label" parent="SummaryPanel/VBoxContainer"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.949, 0.722, 0.231, 1)
+visible = false
+
 [node name="CapNotice" type="Label" parent="SummaryPanel/VBoxContainer"]
 layout_mode = 2
 text = ""
