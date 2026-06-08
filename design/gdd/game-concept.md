@@ -51,7 +51,17 @@ You are a guildmaster. Your heroes aren't you — they're a growing roster of sp
 | **Fellowship** (social connection) | N/A | Single-player, no social features in MVP |
 | **Discovery** (exploration, secrets) | 4 | Unlocking new classes, biomes, synergies |
 | **Expression** (self-expression, creativity) | 6 | Formation composition choices |
-| **Submission** (relaxation, comfort zone) | **1 (primary)** | Session-based idle loop, offline progression, no fail-state |
+| **Submission** (relaxation, comfort zone) | **1 (primary)** | Session-based idle loop, offline progression, **recoverable** defeat (see pivot note below) |
+
+> **DEFEAT-STATE PIVOT (2026-06-08, owner decision):** the original "no fail-state"
+> framing is **superseded**. Runs can now be **lost** (a too-weak/mismatched party is
+> driven back — see GDD #34 Defeat & Injury System + ADR-0021). The cozy register is
+> preserved by making failure **recoverable, never permanent**: defeated heroes are
+> *injured* (temporary recovery), not killed; the floor stays available to retry after
+> you strengthen/recover. Submission stays the primary aesthetic *texture* (idle,
+> offline, no reflex play), but **Challenge rises** (matchup + level investment now
+> decide win/loss, not just clear speed). A formal aesthetic re-rank (Challenge vs
+> Submission weighting) is a follow-up; this note records the binding directional change.
 
 ### Key Dynamics (Emergent player behaviors)
 
@@ -88,9 +98,9 @@ You are a guildmaster. Your heroes aren't you — they're a growing roster of sp
 ### Flow State Design
 
 - **Onboarding curve**: First session = 5 min. Recruit starting class → assign to tutorial dungeon → see first offline reward notification. No tutorial text longer than one line per screen.
-- **Difficulty scaling**: Dungeon floors scale smoothly; no hard walls, only soft "efficiency cliffs" that suggest recruitment of a specific counter-class.
-- **Feedback clarity**: Return-to-app screen shows accumulated loot and a dungeon progress summary. Matchup effectiveness displayed as a clear multiplier badge.
-- **Recovery from failure**: There is no fail state. A losing run returns partial loot and a "try a different class" hint.
+- **Difficulty scaling**: Dungeon floors scale; a floor beyond your party's strength is a **real wall** — an under-leveled or mismatched party is *driven back* (defeat), which is the signal to level up or recruit a counter-class. (Updated by the 2026-06-08 defeat-state pivot — formerly "no hard walls, only soft efficiency cliffs"; see GDD #34.)
+- **Feedback clarity**: Return-to-app screen shows accumulated loot and a dungeon progress summary (or a "driven back at Floor X — recovering" notice on an offline defeat). Matchup effectiveness displayed as a clear multiplier badge.
+- **Recovery from failure**: Defeat is a **real but recoverable** outcome (2026-06-08 pivot — supersedes the former "no fail state"). A defeated run returns **no loot** and leaves the party **injured** (temporary recovery, **no permadeath**); the floor stays available to retry after you strengthen or recover. See GDD #34 (Defeat & Injury) + ADR-0021.
 
 ---
 
