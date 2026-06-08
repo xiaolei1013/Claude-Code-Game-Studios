@@ -298,6 +298,25 @@ func get_dispatched_floor_index() -> int:
 	return _dispatched_floor_index
 
 
+## Returns the 1-based floor index of the currently active run, or [code]0[/code]
+## when no run is active (state == NO_RUN or RUN_ENDED).
+##
+## Semantic alias for [method get_dispatched_floor_index] introduced by S28-G1
+## so Economy's foreground drip subscription ([code]Economy._on_tick[/code]) can
+## resolve the active floor with a name that reads naturally at the call site
+## ("active" vs "dispatched"). Both methods read the same underlying
+## [member _dispatched_floor_index] field; neither mutates state.
+##
+## Returns [code]0[/code] when:
+##   - State is NO_RUN (no dispatch has occurred this session).
+##   - State is RUN_ENDED (run finished; [member _dispatched_floor_index] reset to 0
+##     by [method _exit_active_foreground]).
+##
+## S28-G1 — Economy foreground drip (GDD §C.2.1 / §D.1).
+func get_active_floor_index() -> int:
+	return _dispatched_floor_index
+
+
 # ---------------------------------------------------------------------------
 # Offline replay infrastructure — Sprint 11 S11-X7 / OfflineProgressionEngine
 # GDD §F + OQ-OE-6 lockstep. Mirrors the Economy shape from S11-X6 / ADR-0013

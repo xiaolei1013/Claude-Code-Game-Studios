@@ -239,6 +239,24 @@ All formulas use integer arithmetic throughout (GDScript `int`). Where a formula
 drip_per_tick = floor(BASE_DRIP[floor_tier] * formation_strength_factor * matchup_drip_factor)
 ```
 
+> **Foreground implementation note (2026-06-08, S28-G1) — parity-exact accumulation.**
+> The `floor(...)` above describes the *per-tick magnitude*, but the foreground path
+> MUST NOT credit `floor(rate)` independently each tick: a per-tick floor accumulated
+> over N ticks (`floor(rate)·N`) diverges from the offline closed-form
+> `floori(rate · N)` whenever `rate` is non-integer (e.g. rate 6.4 over 10 ticks =
+> 60 vs offline 64), and over a full 576 000-tick offline cap the drift reaches
+> ~`frac(rate)·576000` gold — a direct violation of the Pillar-1 parity promise
+> (§"Determinism & Parity"). The shipped foreground (`Economy._on_tick`) therefore
+> tracks an **exact integer tick count per constant-rate segment** and credits
+> `segment_base + floori(rate · segment_ticks)` each tick — the *same* single
+> `rate · N` multiply-then-floor the offline `compute_offline_batch` uses — so
+> `Σ` over N foreground ticks `== floori(rate · N) ==` the offline total,
+> bit-for-bit. A segment restarts (banking its total into `segment_base`) on floor
+> change or formation-strength change. Both paths call the one shared
+> `_drip_rate_per_tick(floor, strength)` helper. Verified by
+> `tests/unit/economy/foreground_drip_test.gd` (parity at integer, fractional, and
+> matchup-bonus rates up to the 576 000-tick cap).
+
 **Variables:**
 
 | Variable | Type | Description |

@@ -160,6 +160,50 @@ var _floor_clear_bonus_credited: Dictionary[String, int] = {}
 ## ADR-0013 §Requirements — GDD §C.6
 var _is_offline_replay: bool = false
 
+## Foreground drip — current constant-rate "segment" state for the active run.
+## A segment is a maximal span of ticks with an unchanged per-tick rate; it
+## restarts on floor change or formation-strength change. Within a segment the
+## credited total is recomputed each tick as
+## [code]_fg_drip_segment_base + floori(rate * segment_ticks)[/code] — the SAME
+## single-multiply-then-floor expression the offline closed-form uses (see
+## [method compute_offline_batch]). This makes foreground/offline parity
+## BIT-EXACT for a static run (identical inputs → identical gold). A naive float
+## accumulator ([code]Σ += rate[/code]) would DRIFT because N additions ≠ 1
+## multiplication in IEEE-754 (6.4×10 ≠ 6.4+6.4+…). None of these are persisted —
+## they reset on run end; the offline batch re-derives the full total from scratch.
+##
+## 1-based floor of the current segment; [code]0[/code] when no run is active.
+var _fg_drip_active_floor: int = 0
+
+## Un-floored per-tick rate of the current segment (BASE_DRIP × strength × matchup).
+var _fg_drip_rate: float = 0.0
+
+## Ticks elapsed in the current segment — the exact integer counter that replaces
+## a drifting float accumulator. The parity-safe heart of S28-G1.
+var _fg_drip_segment_ticks: int = 0
+
+## Cumulative drip gold credited up to the START of the current segment.
+var _fg_drip_segment_base: int = 0
+
+## Total drip gold credited in the current run (cumulative across segments).
+## Reset to 0 on run end. NOT persisted.
+var _fg_drip_credited: int = 0
+
+## Test-only DI override for the foreground drip's active-floor resolution.
+## [code]-1[/code] (default) → [method _on_tick] resolves the active floor via
+## [code]DungeonRunOrchestrator.get_active_floor_index()[/code]. [code]>= 0[/code]
+## → [method _on_tick] uses this value directly (lets headless unit tests drive
+## the real [method _on_tick] active-drip path without a live orchestrator
+## autoload; [code]0[/code] simulates NO_RUN). Mirrors the
+## [member _offline_replay_formation_strength_override] seam. Test-only.
+var _fg_drip_floor_override: int = -1
+
+## Test-only DI override for the foreground drip's formation-strength resolution.
+## [code]< 0[/code] (default) → [method _on_tick] resolves via
+## [code]HeroRoster.get_formation_strength()[/code]. [code]>= 0.0[/code] → uses
+## this value directly. Test-only.
+var _fg_drip_strength_override: float = -1.0
+
 ## Cumulative gold delta accumulated during the current offline replay window.
 ## Per ADR-0013 Amendment #1 (Sprint 11 S11-X6): when [member _is_offline_replay]
 ## is true, add_gold + try_spend + try_award_floor_clear's gold side-effects
@@ -251,7 +295,128 @@ func _ready() -> void:
 		var sl: Node = get_node("/root/SaveLoadSystem")
 		if sl.has_signal("first_launch") and not sl.first_launch.is_connected(_on_first_launch):
 			sl.first_launch.connect(_on_first_launch)
-	# Tick subscription lands in Story 006.
+	# S28-G1: foreground per-tick drip subscription. TickSystem (rank 0) has
+	# completed _ready() before Economy (rank 3) per ADR-0003 rank ordering, so
+	# the subscription here is safe. Idempotent guard prevents double-connection
+	# on hot-reload. _on_tick() guards _is_offline_replay so offline batch never
+	# double-credits the drip path.
+	if not TickSystem.tick_fired.is_connected(_on_tick):
+		TickSystem.tick_fired.connect(_on_tick)
+
+
+## Computes the un-floored per-tick drip rate for a given floor and formation
+## strength. Shared by both the foreground accumulator path ([method _on_tick])
+## and the offline closed-form path ([method compute_offline_batch]) so both
+## paths use EXACTLY the same rate function — parity is guaranteed by
+## construction.
+##
+## Returns 0.0 when:
+## - [param floor_index] is out of [code][1, 5][/code].
+## - [member _config] is null.
+## - [member _config.BASE_DRIP] is shorter than [param floor_index] entries.
+## - [param formation_strength] is 0.0 (empty formation guard).
+##
+## Formula: [code]float(BASE_DRIP[floor_index-1]) * formation_strength * MATCHUP_DRIP_BONUS[/code]
+##
+## [param floor_index]: Active 1-based floor index.
+## [param formation_strength]: From [code]HeroRoster.get_formation_strength()[/code].
+##   Range [1.0, 3.0] per ADR-0012; 0.0 signals empty formation → zero drip.
+##
+## S28-G1 — GDD §D.1 + §C.2.1 accumulator note (2026-06-08).
+func _drip_rate_per_tick(floor_index: int, formation_strength: float) -> float:
+	if _config == null:
+		return 0.0
+	if floor_index < 1 or floor_index > _config.BASE_DRIP.size():
+		return 0.0
+	if formation_strength <= 0.0:
+		return 0.0
+	return float(_config.BASE_DRIP[floor_index - 1]) * formation_strength * _config.MATCHUP_DRIP_BONUS
+
+
+## Per-tick handler for the foreground drip path.
+##
+## Called via [signal TickSystem.tick_fired] (subscribed in [method _ready]).
+## Uses a count-based segment model: within a constant-rate segment the running
+## credited total is [code]_fg_drip_segment_base + floori(rate * segment_ticks)[/code]
+## — the SAME single-multiply-then-floor expression [method compute_offline_batch]
+## uses — so Σ over N ticks == floori(rate × N) == the offline closed-form,
+## BIT-EXACTLY. (A float accumulator would drift: N additions ≠ 1 multiplication
+## in IEEE-754.)
+##
+## Guards / transitions:
+## - [member _is_offline_replay] true → return (offline batch owns that path).
+## - No active run (floor == 0) → reset all segment state; return.
+## - Floor change OR rate change → bank the segment, start a new one.
+## - HeroRoster absent or empty formation (strength 0.0) → rate 0 → no credit.
+##
+## [param _n]: monotonic tick counter from TickSystem (the rate is per-tick, so we
+##   always advance the segment by exactly one tick).
+##
+## S28-G1 — GDD §C.2.1 + §D.1 (state table row: ACTIVE | tick_fired → _on_tick()).
+func _on_tick(_n: int) -> void:
+	# Offline batch owns the drip path during replay — never double-credit.
+	if _is_offline_replay:
+		return
+
+	# Resolve the active floor. Test seam first (lets unit tests drive this path
+	# without a live orchestrator); otherwise via DungeonRunOrchestrator, guarded
+	# by is_inside_tree() so an orphan Economy in a unit test stays at floor 0.
+	var active_floor: int = 0
+	if _fg_drip_floor_override >= 0:
+		active_floor = _fg_drip_floor_override
+	elif is_inside_tree():
+		var orchestrator: Node = get_node_or_null("/root/DungeonRunOrchestrator")
+		if orchestrator != null and orchestrator.has_method("get_active_floor_index"):
+			active_floor = int(orchestrator.get_active_floor_index())
+
+	# No active run → reset all segment state so nothing bleeds into the next run.
+	if active_floor == 0:
+		_fg_drip_active_floor = 0
+		_fg_drip_rate = 0.0
+		_fg_drip_segment_ticks = 0
+		_fg_drip_segment_base = 0
+		_fg_drip_credited = 0
+		return
+
+	# Resolve formation strength. Test seam first; otherwise via HeroRoster
+	# (is_inside_tree guarded). Absent roster / empty formation → 0.0 → no drip.
+	var formation_strength: float = 0.0
+	if _fg_drip_strength_override >= 0.0:
+		formation_strength = _fg_drip_strength_override
+	elif is_inside_tree():
+		var roster: Node = get_node_or_null("/root/HeroRoster")
+		if roster != null and roster.has_method("get_formation_strength"):
+			formation_strength = float(roster.get_formation_strength())
+
+	var rate: float = _drip_rate_per_tick(active_floor, formation_strength)
+
+	# New segment on floor change OR rate change: bank credited-so-far as the new
+	# segment base and restart the tick counter. Within a segment the rate is
+	# constant, so floori(rate * segment_ticks) matches the offline closed-form
+	# bit-for-bit (same single multiplication, not an accumulated sum).
+	if active_floor != _fg_drip_active_floor or not is_equal_approx(rate, _fg_drip_rate):
+		_fg_drip_segment_base = _fg_drip_credited
+		_fg_drip_segment_ticks = 0
+		_fg_drip_active_floor = active_floor
+		_fg_drip_rate = rate
+
+	_fg_drip_segment_ticks += 1
+	var target: int = _fg_drip_segment_base + floori(rate * float(_fg_drip_segment_ticks))
+	var delta: int = target - _fg_drip_credited
+	if delta > 0:
+		add_gold(delta)
+		_fg_drip_credited = target
+
+
+## Test-only seam: inject the foreground drip inputs so [method _on_tick] can be
+## driven from a headless unit test without live DungeonRunOrchestrator /
+## HeroRoster autoloads. Pass [param floor_index] [code]<= 0[/code] to simulate
+## NO_RUN, or a 1-based floor to simulate an active run; [param formation_strength]
+## [code]0.0[/code] simulates an empty formation. Mirrors the offline
+## [method set_offline_replay_inputs] test seam (ADR-0013 test-DI precedent).
+func set_foreground_drip_inputs_for_test(floor_index: int, formation_strength: float) -> void:
+	_fg_drip_floor_override = floor_index
+	_fg_drip_strength_override = formation_strength
 
 
 ## Seeds [member _gold_balance] to [member EconomyConfig.STARTING_GOLD] on
@@ -497,13 +662,14 @@ func compute_offline_batch(tick_budget: int) -> OfflineResult:
 		return result
 	_is_offline_replay = true
 	var balance_before: int = _gold_balance
-	# Closed-form drip: single multiplication, NOT a loop over ticks.
+	# Closed-form drip: single multiplication via the shared _drip_rate_per_tick helper.
+	# S28-G1: refactored from an inline formula to use _drip_rate_per_tick so the
+	# foreground and offline paths share EXACTLY one rate function — parity is
+	# guaranteed by construction. Algebraically identical to the old inline form:
+	#   float(BASE_DRIP[floor-1]) * formation_strength * MATCHUP_DRIP_BONUS * tick_budget
 	var formation_strength: float = _resolve_offline_replay_formation_strength()
 	var floor_index: int = _resolve_offline_replay_floor_index()
-	var base_drip: int = _config.BASE_DRIP[floor_index - 1]
-	var drip_total: int = floori(
-		float(base_drip) * formation_strength * _config.MATCHUP_DRIP_BONUS * float(tick_budget)
-	)
+	var drip_total: int = floori(_drip_rate_per_tick(floor_index, formation_strength) * float(tick_budget))
 	if drip_total > 0:
 		add_gold(drip_total)
 	# RunSnapshot kill events + floor clears — not yet integrated with the
