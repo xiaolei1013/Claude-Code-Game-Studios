@@ -4,6 +4,8 @@
 
 > **Pass 1 (this draft) scope locks**: hero-retirement-based prestige cost (no gold cost), flat global multiplier reward (×1.05 per prestige, capped at ×2.0 / 20 prestiges), level cap stays at 15 with multiplier compounding post-prestige (option b from OQ-31-4), Hall of Retired Heroes cosmetic surface, save schema V2 migration path. Cozy-register hard floor: prestige is ALWAYS voluntary, no FOMO timers, no urgency prompts (OQ-31-5 locked).
 
+> **Status update 2026-06-08 (S28-S2)**: `/design-review` COMPLETE — verdict **APPROVED WITH CONDITIONS**; the per-hero-retire → global-multiplier model is **RATIFIED** over the wireframe mock's pure-global ascension (pure-global is structurally a FOMO mechanism that fails the cozy-register "always-available > timed-event" design test). Full analysis: `design/gdd/reviews/prestige-system-review-log.md`. **Reality reconciliation**: the model documented here is ALREADY IMPLEMENTED in `src/` (`HeroRoster.prestige_hero()` at `hero_roster.gd:585`, multiplier applied to kill gold + XP in `dungeon_run_orchestrator.gd:1082-1132`, Hero Detail "Prestige Hero" button + confirm flow, guild_hall "Hall of Retired Heroes" tab, V1→V2 save migration, 6 dedicated test files) — so the "MVP ships with `prestige_multiplier = 1.0` hardcoded; implementation lives in a future epic" framing below is STALE. The 4 review conditions are doc-consistency fixes; 2 are resolved by the shipped reality (`prestige_hero()` wraps `remove_hero` internally per §C.2; `request_full_persist(reason)` is a real shipped Save/Load API at `save_load_system.gd:562`), and 2 factual cross-ref errors are corrected inline below (§C.5 migration method name, §E.1 invariant source). User ratification of the RATIFY recommendation pending end-of-batch verification.
+
 ---
 
 ## A. Overview
@@ -145,7 +147,7 @@ V1.0 introduces a **save schema V2** bump (current = V1 per `save-load-system.md
 
 `prestige_index` is the 1-based index of the prestige that retired this hero (1st retired hero gets index 1, 2nd gets index 2, etc.). Used for ordering + future "you've prestiged N heroes" stats.
 
-**V1→V2 migration body** (per `save-load-system.md` `_run_migration_chain`):
+**V1→V2 migration body** (per `save-load-system.md` `_migrate_v1_to_v2` — Rule 4 versioned migration path; the prior `_run_migration_chain` reference was a phantom name corrected 2026-06-08 per the S28-S2 review):
 ```gdscript
 func _migrate_v1_to_v2(payload_v1: Dictionary) -> Dictionary:
     var payload_v2: Dictionary = payload_v1.duplicate(true)
@@ -255,7 +257,7 @@ vs. pre-prestige: `floori(50 × 1.5 × 1.0) = 75`. Bonus is +3 gold per tier-3 b
 
 ## E. Edge Cases
 
-1. **Player prestiges their last hero**: HeroRoster's `remove_hero` enforces a "minimum-1-hero" invariant (per `hero-roster.md` §C.5 — first-launch seed guarantees at least one hero). If the player tries to prestige their only hero, `is_prestige_eligible` returns FALSE; the Prestige button is hidden. (V1.5+ could surface this hint inline; V1.0 first-pass relies on the button-hidden state.)
+1. **Player prestiges their last hero**: the "minimum-1-hero" protection is owned by `is_prestige_eligible` (this GDD's §C.1 eligibility gate — it returns FALSE when retiring the hero would empty the active roster), NOT by `remove_hero`, which has no such guard. (The prior `hero-roster.md` §C.5 citation was incorrect — that section is the Per-Class Name Pool rule, unrelated to roster-size protection; corrected 2026-06-08 per the S28-S2 review.) If the player tries to prestige their only hero, `is_prestige_eligible` returns FALSE; the Prestige button is hidden. (V1.5+ could surface this hint inline; V1.0 first-pass relies on the button-hidden state.)
 
 2. **Concurrent dispatch + prestige**: prestige action can only fire when the orchestrator is in NO_RUN state. During ACTIVE_FOREGROUND or ACTIVE_OFFLINE_REPLAY, the Hero Detail Modal's Prestige button is disabled (greyed out) with tooltip `tr("prestige_disabled_active_run_tooltip")`.
 
