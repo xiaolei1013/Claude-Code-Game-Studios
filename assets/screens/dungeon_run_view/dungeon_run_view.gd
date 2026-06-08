@@ -65,6 +65,18 @@ const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/d
 const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
 # Demo enemy sprites for the "Enemies ahead" lineup (no-op without demo assets).
 const EnemySpriteFactoryScript = preload("res://src/ui/enemy_sprite_factory.gd")
+const VfxKitScript = preload("res://src/ui/vfx_kit.gd")
+
+## S28-N1 VFX: gitignored demo burst texture path. Loaded best-effort in on_enter
+## (absent on CI / fresh clone → null → VfxKit no-ops, no crash).
+const VFX_BURST_TEXTURE_PATH: String = "res://assets/art/demo/vfx/vfx_aura_a.png"
+
+## S28-N1 VFX burst layer — created in on_enter, freed in on_exit. Kill-feedback
+## particle bursts spawn into it via VfxKit so they never pollute the screen's
+## direct children (e.g. the _live_toast_count() scan).
+var _vfx_layer: Node2D = null
+## Cached burst texture (may be null — see VFX_BURST_TEXTURE_PATH).
+var _vfx_burst_texture: Texture2D = null
 
 # ---------------------------------------------------------------------------
 # Constants (Story 013)
@@ -223,6 +235,18 @@ func on_enter() -> void:
 	if FloorUnlock.has_signal("biome_unlocked") and not FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked):
 		FloorUnlock.biome_unlocked.connect(_on_biome_unlocked)
 
+	# S28-N1 VFX: create the burst container + subscribe kill feedback. The demo
+	# texture is gitignored (load best-effort); absent → VfxKit no-ops (no crash).
+	# Disconnected + freed in on_exit (AC-5 lifecycle hygiene).
+	if _vfx_layer == null:
+		_vfx_layer = Node2D.new()
+		_vfx_layer.name = "VfxBurstLayer"
+		add_child(_vfx_layer)
+	if _vfx_burst_texture == null and FileAccess.file_exists(VFX_BURST_TEXTURE_PATH):
+		_vfx_burst_texture = load(VFX_BURST_TEXTURE_PATH) as Texture2D
+	if not DungeonRunOrchestrator.enemy_killed.is_connected(_on_enemy_killed_vfx):
+		DungeonRunOrchestrator.enemy_killed.connect(_on_enemy_killed_vfx)
+
 	# Initial render — snap labels to the current snapshot (covers the case
 	# where this screen is shown after DISPATCHING has already begun and ticks
 	# have already advanced the snapshot before on_enter fires).
@@ -271,6 +295,14 @@ func on_exit() -> void:
 	# Mirror the on_enter biome_unlocked subscription.
 	if FloorUnlock.has_signal("biome_unlocked") and FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked):
 		FloorUnlock.biome_unlocked.disconnect(_on_biome_unlocked)
+
+	# S28-N1 VFX: mirror the enemy_killed subscription + tear down the burst layer.
+	if DungeonRunOrchestrator.enemy_killed.is_connected(_on_enemy_killed_vfx):
+		DungeonRunOrchestrator.enemy_killed.disconnect(_on_enemy_killed_vfx)
+	if _vfx_layer != null:
+		_vfx_layer.queue_free()
+		_vfx_layer = null
+		_vfx_burst_texture = null
 
 
 ## Called by SceneManager when a modal overlay opens on top of this screen.
@@ -468,6 +500,26 @@ func _spawn_run_toast(text: String, node_name: String, emphasized: bool) -> void
 		LEVEL_UP_TOAST_LIFETIME_SEC - LEVEL_UP_TOAST_FADE_START_SEC
 	)
 	tween.tween_callback(toast.queue_free)
+
+
+## S28-N1: spawns a kill-feedback gold-burst when an enemy dies mid-run. Matchup-
+## advantaged kills burst brighter Lantern Gold; neutral kills Guild Amber; higher
+## tiers burst bigger (GDD #27 OQ-27-1 "gold-coin-burst sized by tier"). Origin is
+## the diorama centre — a feel-default that playtest tuning (S28-M1) will refine.
+## reduce_motion suppresses the burst (VfxKit snap-replace, OQ-27-3). No-op when the
+## gitignored demo texture is absent (CI / fresh clone).
+func _on_enemy_killed_vfx(tier: int, _archetype: String, advantaged: bool) -> void:
+	if _vfx_layer == null or _vfx_burst_texture == null:
+		return
+	var reduce_motion: bool = false
+	var sm: Node = get_node_or_null("/root/SceneManager")
+	if sm != null:
+		reduce_motion = bool(sm.get("reduce_motion"))
+	var tint: Color = VfxKitScript.LANTERN_GOLD if advantaged else VfxKitScript.GUILD_AMBER
+	var amount: int = clampi(6 + tier * 2, 6, 20)
+	var origin: Vector2 = size * Vector2(0.5, 0.42)
+	VfxKitScript.spawn_burst(
+		_vfx_layer, origin, _vfx_burst_texture, tint, amount, 0.55, reduce_motion)
 
 
 ## Counts currently-live toasts (level-up + biome-unlock) so newly-spawned
