@@ -18,7 +18,7 @@ goal: "Drain the compounded playtest backlog, lock the theme direction, and ship
 start: "2026-06-03"
 end: "2026-06-16"
 generated: "2026-06-03"
-updated: "2026-06-03"
+updated: "2026-06-08"
 
 stories:
   - id: "28-M1"
@@ -45,40 +45,40 @@ stories:
     name: "Theme skin ADR-0020: dark-mock vs light-parchment"
     file: "docs/architecture/ADR-0020-theme-skin-direction.md"
     priority: must-have
-    status: ready-for-dev
+    status: review
     owner: ""
     estimate_days: 0.5
-    blocker: "User design decision required"
+    blocker: "ADR-0020 WRITTEN 2026-06-08 — defensible default = ratify light-parchment (already locked in DESIGN.md; dark-mock rejected). Pending USER ratification at end-of-batch verification."
     completed: ""
 
   - id: "28-S1"
     name: "Per-floor matchup hint on floor picker"
     file: ""
     priority: should-have
-    status: review
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 1.5
-    blocker: "Impl + 13 tests GREEN. /code-review APPROVE (2026-06-06); PR #197 marked READY. MERGE held for S28-M1 PASS (sprint rule #6)."
-    completed: ""
+    blocker: ""
+    completed: "2026-06-08"
 
   - id: "28-S2"
     name: "Prestige GDD #31 /design-review → APPROVED (or pivot)"
-    file: "design/gdd/prestige-system.md"
+    file: "design/gdd/reviews/prestige-system-review-log.md"
     priority: should-have
-    status: backlog
-    owner: ""
+    status: review
+    owner: "systems-designer"
     estimate_days: 0.5
-    blocker: "Gated on S28-M1 PASS; GDD #31 already drafted (8 sections, model locked) — decision is ratify-vs-pivot, not author"
+    blocker: "design-review DONE 2026-06-08 → APPROVED WITH CONDITIONS; RATIFY per-hero model (recommendation). 2 doc-fixes applied, 2 resolved by shipped reality (prestige is ALREADY built+tested). Pending USER ratification of RATIFY rec."
     completed: ""
 
   - id: "28-N1"
-    name: "VFX: aura/bubble/batwing placeholder to real particle textures"
+    name: "VFX: particle layer (aura/bubble/batwing) wired to gameplay signals"
     file: ""
     priority: nice-to-have
-    status: backlog
-    owner: ""
+    status: in-progress
+    owner: "godot-gdscript-specialist"
     estimate_days: 1.0
-    blocker: ""
+    blocker: "Greenfield per GDD #27 OQ-27-1 taxonomy (no placeholder particles existed). Building this session."
     completed: ""
 
   - id: "28-N2"
@@ -90,3 +90,25 @@ stories:
     estimate_days: 1.0
     blocker: ""
     completed: "2026-06-06"
+
+  # --- GDD-gap stories surfaced 2026-06-08 by grep-first analysis (user directive:
+  # "all tasks in gdd and sprint plan"). Not in the Day-0 S28 plan. ---
+  - id: "28-G1"
+    name: "Foreground per-tick gold drip (economy GDD §C.2.1/§D.1 — MVP-scope, unbuilt)"
+    file: "design/gdd/economy-system.md"
+    priority: should-have
+    status: in-progress
+    owner: "godot-gdscript-specialist"
+    estimate_days: 1.0
+    blocker: "Scaffolded-but-unwired (economy.gd:238 'tick subscription still pending'). Building this session w/ offline-parity accumulator + TDD."
+    completed: ""
+
+  - id: "28-G2"
+    name: "Channel-light lantern: wire to a real mechanic OR formally cut"
+    file: "src/ui/wireframe_kit.gd"
+    priority: nice-to-have
+    status: blocked
+    owner: ""
+    estimate_days: 0.5
+    blocker: "USER DESIGN DECISION required — clicker-faucet vs cut vs keep-as-juice. Cozy-IDLE pillar risk if it becomes a cookie-clicker. Flagged for user; not unilaterally built."
+    completed: ""
