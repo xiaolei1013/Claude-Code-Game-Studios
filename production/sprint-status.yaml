@@ -75,11 +75,11 @@ stories:
     name: "VFX: particle layer (aura/bubble/batwing) wired to gameplay signals"
     file: ""
     priority: nice-to-have
-    status: in-progress
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 1.0
-    blocker: "Greenfield per GDD #27 OQ-27-1 taxonomy (no placeholder particles existed). Building this session."
-    completed: ""
+    blocker: "Merged PR #204 (VfxKit + enemy_killed gold-burst; tests green). Particle FEEL is playtest-advisory (S28-M1); remaining OQ-27-1 hooks are VfxKit-ready follow-ups."
+    completed: "2026-06-08"
 
   - id: "28-N2"
     name: "Offline-unlock surfacing at return-to-app"
@@ -97,11 +97,11 @@ stories:
     name: "Foreground per-tick gold drip (economy GDD §C.2.1/§D.1 — MVP-scope, unbuilt)"
     file: "design/gdd/economy-system.md"
     priority: should-have
-    status: in-progress
+    status: done
     owner: "godot-gdscript-specialist"
     estimate_days: 1.0
-    blocker: "Scaffolded-but-unwired (economy.gd:238 'tick subscription still pending'). Building this session w/ offline-parity accumulator + TDD."
-    completed: ""
+    blocker: "Merged PR #203 — bit-exact offline parity (segment-count model), 12 tests + full-suite CI green."
+    completed: "2026-06-08"
 
   - id: "28-G2"
     name: "Channel-light lantern: wire to a real mechanic OR formally cut"
