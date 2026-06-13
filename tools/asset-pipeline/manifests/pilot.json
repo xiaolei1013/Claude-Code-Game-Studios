@@ -1,0 +1,67 @@
+{
+  "_comment": "Pilot batch — ~6 representative assets across all four locked categories plus the risky 4-frame sprite-sheet attempt. Generate, review quality + actual API cost, THEN scale to the full bank. Output paths anchored to the consuming code (factories) and ADR-0022 audio paths. NOTE: assets/art/classes/ and assets/art/enemies/ are currently gitignored as demo IP placeholders — committing real generated art to those paths requires removing the matching .gitignore lines (see README).",
+
+  "audio": {
+    "sfx": [
+      {
+        "id": "ui_tap",
+        "out_wav": "assets/audio/sfx/ui_tap.wav",
+        "out_tres": "assets/data/sfx/ui_tap.tres",
+        "duration_seconds": 0.5,
+        "prompt": "A soft, warm, cozy UI confirm tap — a single gentle wooden-and-felt click with a faint lantern-warm chime tail. Clean, short, satisfying, low-key. No harsh transient, no reverb wash."
+      }
+    ],
+    "music": [
+      {
+        "id": "guild_hall_bed",
+        "out_ogg": "assets/audio/music/guild_hall_bed.ogg",
+        "out_tres": "assets/data/music/guild_hall_bed.tres",
+        "music_length_ms": 30000,
+        "loop": true,
+        "prompt": "A warm, cozy fantasy guild-hall ambient music bed. Gentle fingerpicked acoustic guitar and soft hammered dulcimer over a low hearth-fire warmth, relaxed and unhurried, seamlessly loopable, no percussion build, no vocals. Evokes a lantern-lit medieval hall at dusk where adventurers rest between dungeon runs."
+      }
+    ]
+  },
+
+  "images": {
+    "backgrounds": [
+      {
+        "id": "forest_reach",
+        "out": "assets/art/backgrounds/forest_reach.png",
+        "size": "1920x1080",
+        "aspect_ratio": "16:9",
+        "prompt": "Dungeon-biome backdrop diorama: 'Forest Reach' — an overgrown ancient woodland dungeon approach. Mossy stone arches, dappled green canopy light, drifting spores, a worn path leading into shadow. Moss Sage greens and Guild Amber warmth, Slate Ink shadow depth. Horizontal parallax-friendly composition, soft depth-of-field, no characters.",
+        "note": "WIRING GAP (review-only until wired): biome backgrounds are currently PROCEDURAL ColorRects driven by a hardcoded PALETTE in src/.../assets/screens/_shared/biome_background.gd — NO code loads a background PNG. Using real art requires swapping BiomeBackground's ColorRect for a Sprite2D/TextureRect + texture load (that file's own doc notes the swap is intended but undone). Generate to review quality/style; wiring is a follow-up."
+      }
+    ],
+    "portraits": [
+      {
+        "id": "warrior",
+        "out": "assets/art/classes/warrior/portrait.png",
+        "size": "512x512",
+        "isolated": true,
+        "prompt": "Character roster portrait, bust framing, facing slightly off-camera: a stalwart cozy-fantasy Warrior hero — weathered iron pauldrons, a warm scarf, a kind tired face lit by lantern glow. Guild Amber and Slate Ink with Lantern Gold rim light."
+      }
+    ],
+    "enemy_sprites": [
+      {
+        "id": "abyss_eel",
+        "out": "assets/art/enemies/abyss_eel/sprite.png",
+        "size": "256x256",
+        "isolated": true,
+        "prompt": "'Abyss Eel' — a pale, fast, patient eel-like dungeon enemy from a sunken-ruins biome. Side-view, full body centered, consistent silhouette, Dusk Purple and Slate Ink with a faint Lantern Gold eye-glow.",
+        "note": "Switched from a 4-frame strip to a single 256x256 still: EnemySpriteFactory.get_sprite loads the sprite as ONE Texture2D with NO frame slicing (src/ui/enemy_sprite_factory.gd), so a strip renders squashed in-game. Animation needs hframes slicing added to the factory first (follow-up). The isolated/chroma-key path gives a usable still now. A strip-mode (size like 1024x256 + frames N) would need _postprocess_image to scale-with-pad instead of square-scale — also a follow-up."
+      }
+    ],
+    "vfx": [
+      {
+        "id": "gold_sparkle",
+        "out": "assets/vfx/particles/gold_sparkle.png",
+        "size": "256x256",
+        "isolated": true,
+        "prompt": "A single small abstract light spark for a particle texture: one warm four-point star-burst flare with a bright Lantern Gold #F2B83B hot core fading out through Guild Amber #C8872A to soft feathered edges, radially symmetric and centred. ONLY the glowing light flare itself — absolutely no chest, coin, container, lantern, creature, ground or scenery.",
+        "note": "WIRING GAP (review-only until wired): no code currently loads this path. The sole VFX-texture consumer (assets/screens/dungeon_run_view/dungeon_run_view.gd, const VFX_BURST_TEXTURE_PATH) loads assets/art/demo/vfx/vfx_aura_a.png. To use this sparkle in-game, repoint that const (note: assets/art/demo/ is gitignored) or add a loader — wiring is a follow-up."
+      }
+    ]
+  }
+}

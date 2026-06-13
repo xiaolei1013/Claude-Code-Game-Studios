@@ -159,6 +159,14 @@ node_modules/
 *.key
 credentials.json
 secrets.json
+# Asset-pipeline API keys (ElevenLabs / Gemini). The .example template IS
+# committed; the real keys.env is NEVER committed.
+# NOTE: ignore the directory *contents* (`.secrets/*`), NOT the directory
+# (`.secrets/`) — git will not descend into an ignored directory, so a bare
+# `.secrets/` rule makes the negation below dead and keys.env.example
+# uncommittable. `.secrets/*` lets git descend so the `!` re-includes the template.
+.secrets/*
+!.secrets/*.example
 
 # === Large Binary Assets (use Git LFS instead) ===
 # Uncomment and configure with Git LFS for your project:
