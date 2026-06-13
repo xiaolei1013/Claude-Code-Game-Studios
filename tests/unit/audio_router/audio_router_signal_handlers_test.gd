@@ -38,9 +38,19 @@ func _reset_audio_router() -> void:
 	# Clear debug log.
 	if "_test_play_sfx_log" in ar:
 		ar._test_play_sfx_log.clear()
+	# Pin the throttle clock to a fixed, high value so the gold/synergy/prestige
+	# windows are deterministic regardless of engine-boot timing. Real engine
+	# uptime mis-fires the 2.0s windows in dir-scoped runs (see audio_router.gd
+	# _throttle_now_override_ms). With the clock pinned far above any window, the
+	# last-played clocks below reset cleanly to 0 and the first call always plays.
+	if "_throttle_now_override_ms" in ar:
+		ar._throttle_now_override_ms = 100000
 	# Reset gold throttle clock so tests start from a clean state.
 	if "_gold_chime_last_played_ms" in ar:
 		ar._gold_chime_last_played_ms = 0
+	# Reset class-synergy detection throttle clock.
+	if "_class_synergy_detected_last_played_ms" in ar:
+		ar._class_synergy_detected_last_played_ms = 0
 	# Reset prestige throttle clock (Sprint 21+ silent-MVP wiring).
 	if "_prestige_completed_last_played_ms" in ar:
 		ar._prestige_completed_last_played_ms = 0
@@ -52,6 +62,12 @@ func before_test() -> void:
 
 func after_test() -> void:
 	_reset_audio_router()
+	# Restore the production clock source so the live /root/AudioRouter autoload
+	# is not left pinned to the test override (100000ms) for any subsequent suite
+	# or in-session production code (live-autoload state-leak guard).
+	var ar: Node = _get_ar()
+	if ar != null and "_throttle_now_override_ms" in ar:
+		ar._throttle_now_override_ms = -1
 
 
 # ---------------------------------------------------------------------------
@@ -183,8 +199,11 @@ func test_gold_chime_fires_again_after_throttle_window() -> void:
 	ar._on_gold_changed(100, 10, "add_gold")
 	assert_int(_count_plays(&"sfx_reward_gold_collected")).is_equal(1)
 
-	# Simulate 300 ms elapsed by forcing the clock back 300 ms.
-	ar._gold_chime_last_played_ms = Time.get_ticks_msec() - 300
+	# Simulate 300 ms elapsed by forcing the clock back 300 ms — relative to the
+	# injected throttle clock (_throttle_now_ms), not real engine uptime, so the
+	# window math stays deterministic regardless of boot timing (mirrors the
+	# prestige sibling test_prestige_completed_throttle_releases_after_window).
+	ar._gold_chime_last_played_ms = ar._throttle_now_ms() - 300
 
 	# Act
 	ar._on_gold_changed(110, 10, "add_gold")
@@ -490,12 +509,43 @@ func test_prestige_completed_throttle_releases_after_window() -> void:
 
 	# Act — first emission, then rewind the throttle clock past the 2s window.
 	ar._on_prestige_completed(record, 1)
-	# Move the clock back 3s so the next call is past the throttle window.
-	ar._prestige_completed_last_played_ms = Time.get_ticks_msec() - 3000
+	# Move the clock back 3s (relative to the injected throttle clock) so the
+	# next call is past the throttle window.
+	ar._prestige_completed_last_played_ms = ar._throttle_now_ms() - 3000
 	ar._on_prestige_completed(record, 2)
 
 	# Assert: both plays recorded.
 	assert_int(_count_plays(&"sfx_prestige_completed")).is_equal(2)
+
+
+func test_prestige_completed_plays_at_low_engine_uptime() -> void:
+	# Regression for the CI-green / local-dir-scoped-red prestige flake AND the
+	# latent product bug behind it: a prestige fired while the throttle clock is
+	# below the 2.0s window must still play its fanfare. Seed the last-played
+	# clock to its production "never played" state (a value far in the past) and
+	# pin the clock to 50ms ("just booted"); the first call must NOT be throttled.
+	# Before the fix, last-played reset to 0 + an uptime below the window
+	# suppressed this first call (0 plays).
+	# Arrange
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+	ar._test_play_sfx_log.clear()
+	# "Never played" — older than any throttle window, mirroring the production
+	# member initializer (-_PRESTIGE_COMPLETED_THROTTLE_MS).
+	ar._prestige_completed_last_played_ms = -1_000_000
+	ar._throttle_now_override_ms = 50  # 50ms since boot, far below the 2.0s window
+	var record: Dictionary = {
+		"display_name": "Bram",
+		"class_id": "warrior",
+		"level_at_retirement": 12,
+		"prestige_index": 1,
+	}
+
+	# Act
+	ar._on_prestige_completed(record, 1)
+
+	# Assert: the fanfare plays despite the clock (50ms) being below the window.
+	assert_int(_count_plays(&"sfx_prestige_completed")).is_equal(1)
 
 
 func test_audio_router_subscribes_to_prestige_completed_signal_at_ready() -> void:

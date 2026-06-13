@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.99] - 2026-06-13 — Audio asset pipeline + AudioCue resolve layer (ADR-0022)
+
+> Ships the asset-generation **tooling** and the `AudioCue` resolve infrastructure.
+> The generated binary assets (images, SFX, music) are review-only and are **not**
+> included in this PR. Bundles a pre-existing audio-throttle flake fix (commit `cefecad`)
+> whose default change required updating the class-synergy integration tests.
+
+### Added
+
+- **`AudioCue` resource module** (`src/core/audio_router/audio_cue.gd`) — a `GameData`
+  subclass that wraps an `AudioStream` with a DataRegistry `id` + `display_name`, so audio
+  cues survive the DataRegistry boot-scan (a bare `AudioStream` `.tres` has no `id`). Per ADR-0022.
+- **Asset-generation pipeline** (`tools/asset-pipeline/`) — stdlib-only Python driver that
+  generates SFX/music (ElevenLabs) and images (Gemini) from a manifest, post-processes images
+  (auto-detected backdrop keyed to alpha + downscale via ffmpeg), and authors `AudioCue` `.tres`
+  wrappers. Atomic-swap writes (no truncated asset survives a crash), scope-aware key
+  requirements (`--only` requires only that provider's key), retry/backoff on rate limits,
+  and SET/UNSET-length-only key handling (values never logged). Dev-only; no game-runtime path.
+- **ADR-0022** — audio asset sourcing (AI-generated): records the `AudioCue`-wrapper pivot and
+  the generate → import → author workflow.
+
+### Changed
+
+- **`AudioRouter` resolves `AudioCue` wrappers** — three playback sites resolve an `AudioCue`
+  to its underlying stream via `_stream_from_resolved()`, with a documented silent-skip on a
+  null stream (ADR-0022 contract).
+
+### Fixed
+
+- **Audio throttle flake at low engine uptime** (commit `cefecad`) — class-synergy and prestige
+  chimes initialized their last-played clock to `0`, so a chime triggered within the throttle
+  window of engine boot was wrongly suppressed (a silent first-chime miss). Last-played clocks
+  now init to `-<window>` ("never played"), and a test-injectable clock seam
+  (`_throttle_now_override_ms`) makes throttling deterministically testable.
+
 ## [0.0.0.98] - 2026-06-03 — Demo art suite + offline loop + greybox wireframe pass
 
 > This entry consolidates 24 PRs (#170–#195) merged after the Sprint 27 version catch-up

@@ -141,19 +141,29 @@ var _music_volume_db: float = _DEFAULT_MUSIC_DB
 var _sfx_volume_db: float = _DEFAULT_SFX_DB
 var _master_muted: bool = _DEFAULT_MASTER_MUTED
 
-## Throttle clock for gold-chime anti-slot-machine filter (F.2).
-## Stores Time.get_ticks_msec() at the last played gold chime.
-var _gold_chime_last_played_ms: int = 0
+## Throttle clock for gold-chime anti-slot-machine filter (F.2). Stores
+## [method _throttle_now_ms] at the last played gold chime. Initialized to
+## -_GOLD_CHIME_THROTTLE_MS ("never played") so the first chime after launch is
+## never suppressed even when engine uptime is below the throttle window.
+var _gold_chime_last_played_ms: int = -_GOLD_CHIME_THROTTLE_MS
 
 ## Class Synergy V1.0 (Sprint 21 S21-S2 / Story 3) — throttle clock for
 ## the live-preview detection chime. Same pattern as `_gold_chime_last_played_ms`
 ## but with a longer window (2.0s vs 0.25s) since slot-toggle is naturally
 ## slower than gold-event spam.
-var _class_synergy_detected_last_played_ms: int = 0
+var _class_synergy_detected_last_played_ms: int = -_CLASS_SYNERGY_DETECTED_THROTTLE_MS
 
 ## Prestige V1.0 (Sprint 21+ silent-MVP wiring) — throttle clock for the
 ## prestige-completed fanfare. 2.0s window per audio-system.md §J.
-var _prestige_completed_last_played_ms: int = 0
+var _prestige_completed_last_played_ms: int = -_PRESTIGE_COMPLETED_THROTTLE_MS
+
+## Test seam for the throttle clock shared by the three windows above. Default
+## -1 means "use real engine uptime" ([method Time.get_ticks_msec]); tests assign
+## a fixed non-negative value so the 2.0s windows are deterministic. Engine
+## uptime is an unreliable clock for these windows when a directory-scoped test
+## run starts before uptime clears the window — the full CI suite passes (high
+## uptime) while a local dir-scoped run fails (the prestige-fanfare flake).
+var _throttle_now_override_ms: int = -1
 
 ## Currently-playing Ambient bed and its id. null = no bed playing.
 ## Tracked across crossfades so play_music can guard same-id no-ops.
@@ -341,7 +351,7 @@ func play_sfx(sfx_id: StringName, pitch_scale: float = 1.0, volume_mult: float =
 		if raw_id.begins_with("sfx_"):
 			raw_id = raw_id.substr(4)
 		if registry.has_method("resolve"):
-			stream = registry.resolve("sfx", raw_id) as AudioStream
+			stream = _stream_from_resolved(registry.resolve("sfx", raw_id))
 
 	if stream == null:
 		# No asset yet (E.1 / OQ-AS-6) — skip play silently.
@@ -361,6 +371,35 @@ func play_sfx(sfx_id: StringName, pitch_scale: float = 1.0, volume_mult: float =
 	# Queue-free when playback finishes to avoid AudioStreamPlayer leaks.
 	player.finished.connect(player.queue_free)
 	return player
+
+
+## Extracts the playable [AudioStream] from a DataRegistry-resolved resource.
+##
+## Per design/gdd/audio-system.md §C.6, audio cues ship as [AudioCue] wrappers
+## ([GameData] subclasses) that carry the DataRegistry [code]id[/code] and
+## reference the underlying [code].wav[/code] / [code].ogg[/code] via their
+## [code]stream[/code] field. (A bare AudioStream [code].tres[/code] cannot ship:
+## it has no [code]id[/code], so DataRegistry's boot scan rejects it with
+## ERROR_INVALID_ID — see ADR-0022. The old [code]as AudioStream[/code] cast here
+## was a never-exercised silent-MVP shortcut.)
+##
+## Tolerant by design — never crashes, always returns a stream or null:
+##   - [code]null[/code] in → [code]null[/code] out (silent skip).
+##   - a bare [AudioStream] resource → returned as-is.
+##   - any resource exposing a [code]stream[/code] property ([AudioCue]) →
+##     its [code].stream[/code] cast to [AudioStream].
+##   - anything else (e.g. a non-audio content resource) → [code]null[/code].
+##
+## Duck-typed on the [code]stream[/code] property so AudioRouter (engine layer)
+## stays decoupled from the [AudioCue] content class (data layer).
+func _stream_from_resolved(resolved: Resource) -> AudioStream:
+	if resolved == null:
+		return null
+	if resolved is AudioStream:
+		return resolved as AudioStream
+	if "stream" in resolved:
+		return resolved.stream as AudioStream
+	return null
 
 
 ## Crossfades to a new Music/Ambient bed per §F.4.
@@ -386,7 +425,7 @@ func play_music(music_id: StringName, fade_in_ms: int = _MUSIC_DEFAULT_FADE_MS) 
 		# Strip trailing "_bed" or "_stinger" suffix per ADR-0006 asset-path schema:
 		# asset is at assets/audio/music/<id_without_prefix>.ogg
 		if registry.has_method("resolve"):
-			stream = registry.resolve("music", raw_id) as AudioStream
+			stream = _stream_from_resolved(registry.resolve("music", raw_id))
 		# Demo fallback: when DataRegistry has no music assets (production art not
 		# yet delivered), try loading from assets/audio/demo/ using a name mapping
 		# that strips the trailing "_bed" / "_stinger" pattern.
@@ -602,6 +641,14 @@ func _on_hero_leveled(_instance_id: int, _old_level: int, _new_level: int) -> vo
 	play_sfx(&"sfx_reward_level_up_chime", 1.0, 1.2)
 
 
+## Monotonic millisecond clock backing the three throttle windows. Returns the
+## test override when set ([member _throttle_now_override_ms] >= 0), otherwise
+## real engine uptime. A single seam keeps all three throttle handlers on one
+## clock source and lets tests drive the windows deterministically.
+func _throttle_now_ms() -> int:
+	return _throttle_now_override_ms if _throttle_now_override_ms >= 0 else Time.get_ticks_msec()
+
+
 ## §F.2 / §E.7 / §K Story 3: gold chime with anti-slot-machine throttle.
 ## E.7: delta ≤ 0 is skipped (refunds, zero-delta routing events).
 ## F.2: throttle to ≤1 play per _GOLD_CHIME_THROTTLE_MS window.
@@ -610,7 +657,7 @@ func _on_gold_changed(_new_balance: int, delta: int, _reason: String) -> void:
 	if delta <= 0:
 		return
 	# F.2 throttle — compare against last-played timestamp.
-	var now: int = Time.get_ticks_msec()
+	var now: int = _throttle_now_ms()
 	if now - _gold_chime_last_played_ms < _GOLD_CHIME_THROTTLE_MS:
 		return
 	_gold_chime_last_played_ms = now
@@ -634,7 +681,7 @@ func _on_gold_changed(_new_balance: int, delta: int, _reason: String) -> void:
 ##   per-synergy variants.
 func _on_class_synergy_detected(_synergy_id: String) -> void:
 	# AC-CS-14: throttle to suppress rapid-toggle spam.
-	var now: int = Time.get_ticks_msec()
+	var now: int = _throttle_now_ms()
 	if now - _class_synergy_detected_last_played_ms < _CLASS_SYNERGY_DETECTED_THROTTLE_MS:
 		return
 	_class_synergy_detected_last_played_ms = now
@@ -672,7 +719,7 @@ func _on_prestige_completed(_record: Dictionary, _new_count: int) -> void:
 	# Hardening throttle: theoretical guard against back-to-back emissions.
 	# UI flow is one prestige-at-a-time but the throttle keeps the audio path
 	# defensible against future automation or test-emit bursts.
-	var now: int = Time.get_ticks_msec()
+	var now: int = _throttle_now_ms()
 	if now - _prestige_completed_last_played_ms < _PRESTIGE_COMPLETED_THROTTLE_MS:
 		return
 	_prestige_completed_last_played_ms = now
@@ -708,7 +755,7 @@ func _play_stinger(stinger_id: StringName) -> void:
 		if raw_id.begins_with("music_"):
 			raw_id = raw_id.substr(6)
 		if registry.has_method("resolve"):
-			stream = registry.resolve("music", raw_id) as AudioStream
+			stream = _stream_from_resolved(registry.resolve("music", raw_id))
 
 	var player: AudioStreamPlayer = AudioStreamPlayer.new()
 	player.stream = stream  # null-safe: silence if asset missing
