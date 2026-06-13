@@ -351,7 +351,7 @@ func play_sfx(sfx_id: StringName, pitch_scale: float = 1.0, volume_mult: float =
 		if raw_id.begins_with("sfx_"):
 			raw_id = raw_id.substr(4)
 		if registry.has_method("resolve"):
-			stream = registry.resolve("sfx", raw_id) as AudioStream
+			stream = _stream_from_resolved(registry.resolve("sfx", raw_id))
 
 	if stream == null:
 		# No asset yet (E.1 / OQ-AS-6) — skip play silently.
@@ -371,6 +371,35 @@ func play_sfx(sfx_id: StringName, pitch_scale: float = 1.0, volume_mult: float =
 	# Queue-free when playback finishes to avoid AudioStreamPlayer leaks.
 	player.finished.connect(player.queue_free)
 	return player
+
+
+## Extracts the playable [AudioStream] from a DataRegistry-resolved resource.
+##
+## Per design/gdd/audio-system.md §C.6, audio cues ship as [AudioCue] wrappers
+## ([GameData] subclasses) that carry the DataRegistry [code]id[/code] and
+## reference the underlying [code].wav[/code] / [code].ogg[/code] via their
+## [code]stream[/code] field. (A bare AudioStream [code].tres[/code] cannot ship:
+## it has no [code]id[/code], so DataRegistry's boot scan rejects it with
+## ERROR_INVALID_ID — see ADR-0022. The old [code]as AudioStream[/code] cast here
+## was a never-exercised silent-MVP shortcut.)
+##
+## Tolerant by design — never crashes, always returns a stream or null:
+##   - [code]null[/code] in → [code]null[/code] out (silent skip).
+##   - a bare [AudioStream] resource → returned as-is.
+##   - any resource exposing a [code]stream[/code] property ([AudioCue]) →
+##     its [code].stream[/code] cast to [AudioStream].
+##   - anything else (e.g. a non-audio content resource) → [code]null[/code].
+##
+## Duck-typed on the [code]stream[/code] property so AudioRouter (engine layer)
+## stays decoupled from the [AudioCue] content class (data layer).
+func _stream_from_resolved(resolved: Resource) -> AudioStream:
+	if resolved == null:
+		return null
+	if resolved is AudioStream:
+		return resolved as AudioStream
+	if "stream" in resolved:
+		return resolved.stream as AudioStream
+	return null
 
 
 ## Crossfades to a new Music/Ambient bed per §F.4.
@@ -396,7 +425,7 @@ func play_music(music_id: StringName, fade_in_ms: int = _MUSIC_DEFAULT_FADE_MS) 
 		# Strip trailing "_bed" or "_stinger" suffix per ADR-0006 asset-path schema:
 		# asset is at assets/audio/music/<id_without_prefix>.ogg
 		if registry.has_method("resolve"):
-			stream = registry.resolve("music", raw_id) as AudioStream
+			stream = _stream_from_resolved(registry.resolve("music", raw_id))
 		# Demo fallback: when DataRegistry has no music assets (production art not
 		# yet delivered), try loading from assets/audio/demo/ using a name mapping
 		# that strips the trailing "_bed" / "_stinger" pattern.
@@ -726,7 +755,7 @@ func _play_stinger(stinger_id: StringName) -> void:
 		if raw_id.begins_with("music_"):
 			raw_id = raw_id.substr(6)
 		if registry.has_method("resolve"):
-			stream = registry.resolve("music", raw_id) as AudioStream
+			stream = _stream_from_resolved(registry.resolve("music", raw_id))
 
 	var player: AudioStreamPlayer = AudioStreamPlayer.new()
 	player.stream = stream  # null-safe: silence if asset missing
