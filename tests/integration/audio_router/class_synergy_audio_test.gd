@@ -113,12 +113,14 @@ func test_notify_synergy_detected_emits_for_each_v10_synergy_id() -> void:
 # ===========================================================================
 
 func test_audio_router_detection_chime_throttle_state_field_exists() -> void:
-	# Structural check — the throttle state field exists. Live timing test
-	# is impractical at unit-test granularity (Time.get_ticks_msec is
-	# real-time monotonic; we'd need a test-injectable clock).
+	# Structural check — the throttle state field exists and initializes to its
+	# "never played" sentinel (-_CLASS_SYNERGY_DETECTED_THROTTLE_MS) so the first
+	# chime is never suppressed at low engine uptime (fixed in commit cefecad; a
+	# test-injectable clock seam now exists via _throttle_now_override_ms).
 	var router: Node = _make_router()
 	assert_bool("_class_synergy_detected_last_played_ms" in router).is_true()
-	assert_int(router._class_synergy_detected_last_played_ms).is_equal(0)
+	assert_int(router._class_synergy_detected_last_played_ms).is_equal(
+		-AudioRouterScript._CLASS_SYNERGY_DETECTED_THROTTLE_MS)
 
 
 func test_audio_router_detection_chime_throttle_constant_matches_2s() -> void:
@@ -164,27 +166,24 @@ func test_audio_router_detection_chime_handler_throttles_within_window() -> void
 	assert_int(clock_after_second).is_equal(clock_after_first)
 
 
-func test_audio_router_detection_chime_first_call_with_zero_clock_is_throttled() -> void:
-	# Documented behavior: with _class_synergy_detected_last_played_ms = 0
-	# (default initial state), the first call within 2s of Godot startup
-	# is throttled because (now - 0) < 2000ms. This is benign — production
-	# users won't be touching the formation_assignment screen within the
-	# first 2s of startup. Test pins the documented behavior.
+func test_audio_router_detection_chime_first_call_at_low_uptime_plays() -> void:
+	# Regression for the throttle flake fixed in commit cefecad (and the latent
+	# product bug behind it): with the last-played clock at its "never played"
+	# sentinel, the FIRST detection chime must play even when engine uptime is
+	# below the 2.0s window. The old code initialized last-played to 0, so
+	# (uptime - 0) < 2000ms wrongly suppressed the first chime within 2s of boot
+	# — a silent miss for any player who triggered a synergy that early. We pin a
+	# low uptime via the injectable clock seam and assert the play path ran (the
+	# throttle clock advanced to the injected "now").
 	var router: Node = _make_router()
-	assert_int(router._class_synergy_detected_last_played_ms).is_equal(0)
+	# "Never played" — mirrors the production member initializer.
+	router._class_synergy_detected_last_played_ms = -1_000_000
+	router._throttle_now_override_ms = 50  # 50ms since boot, far below the 2.0s window
 
 	router._on_class_synergy_detected("steel_wall")
 
-	# Clock did NOT advance — throttle blocked due to zero-init.
-	# (If the test happens to run >2s into the session, this would advance;
-	# in practice gdunit4 invocations run early enough that the throttle
-	# blocks. The test is structurally correct either way: the contract
-	# is "throttle if (now - last) < 2000ms"; both branches are valid.)
-	var clock_after: int = router._class_synergy_detected_last_played_ms
-	# Either it stayed at 0 (throttled) OR advanced (>2s into session).
-	# Both are correct per the throttle contract; the assert validates
-	# that the field is reachable + not corrupted, not the exact branch.
-	assert_int(clock_after).is_greater_equal(0)
+	# The first call was NOT throttled: the clock advanced to the injected now.
+	assert_int(router._class_synergy_detected_last_played_ms).is_equal(50)
 
 
 # ===========================================================================

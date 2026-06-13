@@ -62,6 +62,12 @@ func before_test() -> void:
 
 func after_test() -> void:
 	_reset_audio_router()
+	# Restore the production clock source so the live /root/AudioRouter autoload
+	# is not left pinned to the test override (100000ms) for any subsequent suite
+	# or in-session production code (live-autoload state-leak guard).
+	var ar: Node = _get_ar()
+	if ar != null and "_throttle_now_override_ms" in ar:
+		ar._throttle_now_override_ms = -1
 
 
 # ---------------------------------------------------------------------------
@@ -193,8 +199,11 @@ func test_gold_chime_fires_again_after_throttle_window() -> void:
 	ar._on_gold_changed(100, 10, "add_gold")
 	assert_int(_count_plays(&"sfx_reward_gold_collected")).is_equal(1)
 
-	# Simulate 300 ms elapsed by forcing the clock back 300 ms.
-	ar._gold_chime_last_played_ms = Time.get_ticks_msec() - 300
+	# Simulate 300 ms elapsed by forcing the clock back 300 ms — relative to the
+	# injected throttle clock (_throttle_now_ms), not real engine uptime, so the
+	# window math stays deterministic regardless of boot timing (mirrors the
+	# prestige sibling test_prestige_completed_throttle_releases_after_window).
+	ar._gold_chime_last_played_ms = ar._throttle_now_ms() - 300
 
 	# Act
 	ar._on_gold_changed(110, 10, "add_gold")
