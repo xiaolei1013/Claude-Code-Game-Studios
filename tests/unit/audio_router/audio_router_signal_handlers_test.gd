@@ -674,3 +674,54 @@ func test_screen_changed_non_victory_screen_plays_guild_hall_bed() -> void:
 		orch.state = saved_state
 	ar.stop_music(0)
 	ar._current_ambient_id = &""
+
+
+# ===========================================================================
+# §C.2 — Panel-open SFX fires on screen entry (ADR-0022 asset now sourced)
+# OQ-AS-6 deferral closed: ui_panel_open.tres wraps the generated cue, so the
+# previously skipped panel-open trigger is now wired in _on_screen_changed.
+# ===========================================================================
+
+func test_screen_changed_plays_panel_open_sfx() -> void:
+	# Arrange
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	# Act: any non-empty screen entry should fire the panel-open whoosh.
+	ar._on_screen_changed("recruitment", "guild_hall")
+
+	# Assert: exactly one panel-open play recorded.
+	assert_int(_count_plays(&"sfx_ui_panel_open")).is_equal(1)
+
+	# Cleanup (the call also runs the music path).
+	ar.stop_music(0)
+	ar._current_ambient_id = &""
+
+
+func test_screen_changed_panel_open_volume_mult_is_0_point_9() -> void:
+	# §C.2 / _CUE_VOLUME_MULT_MAP: panel whoosh sits at 0.9, just under the tap chime.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	ar._on_screen_changed("formation_editor", "guild_hall")
+
+	var entry: Dictionary = _last_play(&"sfx_ui_panel_open")
+	assert_float(float(entry.get("volume_mult", 0.0))).is_equal_approx(0.9, 0.001)
+
+	# Cleanup
+	ar.stop_music(0)
+	ar._current_ambient_id = &""
+
+
+func test_screen_changed_empty_screen_id_skips_panel_open_sfx() -> void:
+	# Guard: the boot / no-op transition (empty new_screen_id) must NOT whoosh.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	ar._on_screen_changed("", "guild_hall")
+
+	assert_int(_count_plays(&"sfx_ui_panel_open")).is_equal(0)
+
+	# Cleanup
+	ar.stop_music(0)
+	ar._current_ambient_id = &""
