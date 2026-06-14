@@ -35,16 +35,11 @@ assets/八方旅人*/
 # sources; local only — never commit placeholder derivative assets).
 assets/art/demo/
 assets/audio/demo/
-# tools/demo-asset-setup.py writes placeholder hero art to the production paths
-# the game references (HeroClass.tres sprite_path/portrait_path =
-# assets/art/classes/<id>/{sprite,portrait}.png), plus Godot's .import sidecars.
-# PORTRAITS are now ORIGINAL AI-generated ship art (committed — see
-# tools/asset-pipeline). Class in-dungeon SPRITES are still Octopath-derived
-# placeholders, so keep ONLY those ignored — a stray `git add -A` can never
-# commit Square Enix art. Delete the two sprite lines below once original class
-# sprites are authored too.
-assets/art/classes/*/sprite.png
-assets/art/classes/*/sprite.png.import
+# Class hero art (HeroClass.tres sprite_path/portrait_path =
+# assets/art/classes/<id>/{sprite,portrait}.png). BOTH portraits AND in-dungeon
+# sprites are now ORIGINAL AI-generated ship art (committed — see
+# tools/asset-pipeline), replacing the former Octopath-derived demo placeholders.
+# Sprites are 4-frame idle strips (768x432); portraits are single stills. Tracked in git.
 # Per-enemy sprites (EnemyData.sprite_path = assets/art/enemies/<id>/sprite.png)
 # are now ORIGINAL AI-generated ship art (committed — see tools/asset-pipeline),
 # replacing the former Octopath-derived demo placeholders. Tracked in git.

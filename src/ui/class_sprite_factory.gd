@@ -1,23 +1,22 @@
 ## ClassSpriteFactory — builds a looping idle animation for a hero class from
-## its demo sprite sheet and (optionally) attaches it to a [TextureRect].
+## its sprite sheet and (optionally) attaches it to a [TextureRect].
 ##
 ## The sheet lives at [code]assets/art/classes/[class_id]/sprite.png[/code] — a
-## horizontal strip of [constant FRAME_COUNT] equal-width frames produced by
-## tools/demo-asset-setup.py (see design/art/demo-asset-manifest.md). Each frame
-## becomes an [AtlasTexture] window over the shared sheet, so all frames share a
-## single GPU texture.
+## horizontal strip of [constant FRAME_COUNT] equal-width frames. Sprint 28: these
+## are original AI-generated 4-frame idle strips (768×432, locked-palette cozy
+## pixel-art look, authored via tools/asset-pipeline). Each frame becomes an
+## [AtlasTexture] window over the shared sheet, so all frames share a single GPU texture.
 ##
-## DEMO-BUILD ONLY: when the sheet is absent (production art not yet delivered,
-## or any non-demo build — the demo assets are gitignored), [method get_idle_frames]
+## When the sheet is absent for a class (art not yet authored), [method get_idle_frames]
 ## returns an empty array and [method animate] is a no-op, leaving whatever still
 ## texture the caller already set (a [ClassPortraitFactory] portrait or block).
-## This mirrors ClassPortraitFactory's disk-first / generate-fallback contract.
+## This mirrors ClassPortraitFactory's disk-first / null-fallback contract.
 ##
 ## Pure-utility, static-callable, frame-cache keyed by class_id.
 class_name ClassSpriteFactory
 extends RefCounted
 
-## Frame count of the demo idle strips (tools/demo-asset-setup.py assembles 4).
+## Frame count of the idle strips (tools/asset-pipeline authors 4-cell sheets).
 const FRAME_COUNT: int = 4
 
 ## Default idle playback rate. 6 fps reads as a calm "breathing" idle at the
@@ -44,7 +43,10 @@ static func get_idle_frames(class_id: String) -> Array:
 	var frames: Array = []
 	if not class_id.is_empty():
 		var path: String = "res://assets/art/classes/%s/sprite.png" % class_id
-		if FileAccess.file_exists(path):
+		# ResourceLoader.exists (NOT FileAccess.file_exists): export strips the
+		# source .png and ships only the imported .ctex, which ResourceLoader sees
+		# but FileAccess does not — so this also resolves real art in EXPORTED builds.
+		if ResourceLoader.exists(path):
 			var sheet: Texture2D = load(path) as Texture2D
 			frames = slice_sheet(sheet, FRAME_COUNT)
 	_frames_cache[class_id] = frames
