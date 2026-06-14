@@ -6,7 +6,7 @@
 script = ExtResource("1_combatcfg")
 id = "combat_config"
 display_name = "Combat Config"
-SPEED_BASE = 10
+SPEED_BASE = 90
 MATCHUP_THROUGHPUT_FACTOR_ADV = 1.5
 MATCHUP_THROUGHPUT_FACTOR_DIS = 0.67
 MATCHUP_PARTY_DISADVANTAGE = 1.0

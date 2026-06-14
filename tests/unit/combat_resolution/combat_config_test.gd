@@ -2,7 +2,7 @@
 #   - CombatConfig resource extends GameData with 4 @export tuning fields
 #   - _validate() returns Array[String]; empty on valid (ADR-0011)
 #   - combat_config.tres exists at canonical path with snake_case id
-#   - Defaults match GDD §G (SPEED_BASE=10, MATCHUP_THROUGHPUT_FACTOR_ADV=1.5,
+#   - Defaults match GDD §G (SPEED_BASE=90 Phase-2 calibrated, MATCHUP_THROUGHPUT_FACTOR_ADV=1.5,
 #     MATCHUP_THROUGHPUT_FACTOR_DIS=0.67, MATCHUP_PARTY_DISADVANTAGE=1.0)
 #
 # Phase 1 (GDD #34 / ADR-0021): LOSING_RUN_LOOT_FACTOR is RETIRED; the
@@ -20,9 +20,9 @@ const COMBAT_CONFIG_PATH := "res://assets/data/config/combat_config.tres"
 # Group A: schema fields exist with correct types and GDD §G defaults
 # ===========================================================================
 
-func test_combat_config_default_speed_base_is_ten() -> void:
+func test_combat_config_default_speed_base_is_ninety() -> void:
 	var cfg: CombatConfig = CombatConfigScript.new()
-	assert_int(cfg.SPEED_BASE).is_equal(10)
+	assert_int(cfg.SPEED_BASE).is_equal(90)
 
 
 func test_combat_config_default_matchup_throughput_factor_adv_is_1_5() -> void:
@@ -127,7 +127,7 @@ func test_combat_config_tres_loads_and_is_combat_config() -> void:
 func test_combat_config_tres_default_values_match_gdd() -> void:
 	var loaded: Resource = load(COMBAT_CONFIG_PATH)
 	var cfg: CombatConfig = loaded as CombatConfig
-	assert_int(cfg.SPEED_BASE).is_equal(10)
+	assert_int(cfg.SPEED_BASE).is_equal(90)
 	assert_float(cfg.MATCHUP_THROUGHPUT_FACTOR_ADV).is_equal_approx(1.5, 0.001)
 	assert_float(cfg.MATCHUP_THROUGHPUT_FACTOR_DIS).is_equal_approx(0.67, 0.001)
 	assert_float(cfg.MATCHUP_PARTY_DISADVANTAGE).is_equal_approx(1.0, 0.001)
@@ -157,7 +157,7 @@ func test_no_hardcoded_combat_constants_in_resolver_source() -> void:
 	# Resolver source files must NOT hardcode the GDD §G combat constants.
 	# The values appear ONLY in CombatConfig defaults + the .tres file.
 	#
-	# Constants checked: SPEED_BASE=10 → "= 10" outside doc-comments;
+	# Constants checked: SPEED_BASE=90 → "= 90" outside doc-comments;
 	# MATCHUP_THROUGHPUT_FACTOR_ADV=1.5 → "= 1.5"; etc.
 	# This is a soft lint — resolver code may legitimately use 1.0 / 0.5 for
 	# OTHER reasons. So we check for the EXACT GDD §G defaults appearing as
@@ -181,7 +181,7 @@ func test_no_hardcoded_combat_constants_in_resolver_source() -> void:
 			if trimmed.begins_with("#") or trimmed.begins_with("##"):
 				continue
 			# Reject const declarations with hardcoded combat balance values.
-			# This catches `const SPEED_BASE: int = 10` etc.
+			# This catches `const SPEED_BASE: int = 90` etc.
 			if trimmed.begins_with("const SPEED_BASE"):
 				assert_bool(false).override_failure_message(
 					"%s: SPEED_BASE hardcoded as const — must come from CombatConfig"

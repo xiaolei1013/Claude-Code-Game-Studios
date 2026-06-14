@@ -16,11 +16,11 @@ extends GdUnitTestSuite
 const DefaultCombatResolverScript = preload("res://src/core/combat/default_combat_resolver.gd")
 const CombatResolverScript = preload("res://src/core/combat/combat_resolver.gd")
 
-# SPEED_BASE in CombatConfig defaults to 10 per GDD §G; the test relies on
-# the .tres value being loadable via DataRegistry. When the config can't
-# resolve (FOLLOWUP-002-style test env breakage), the resolver falls back
-# to _FALLBACK_SPEED_BASE = 10 — same value, so tests still pass.
-const EXPECTED_SPEED_BASE := 10
+# SPEED_BASE in CombatConfig is the Phase-2 calibrated value (90); the test
+# relies on the .tres value being loadable via DataRegistry. When the config
+# can't resolve (FOLLOWUP-002-style test env breakage), the resolver falls back
+# to _FALLBACK_SPEED_BASE = 90 — same value, so tests still pass.
+const EXPECTED_SPEED_BASE := 90
 
 
 # ===========================================================================
@@ -78,33 +78,33 @@ func test_action_cooldown_ticks_speed_equals_speed_base_returns_one() -> void:
 
 
 func test_action_cooldown_ticks_speed_above_base_clamps_to_one() -> void:
-	# speed > SPEED_BASE → floori(10/99) = 0; maxi(1, 0) = 1 (TR-032 floor).
+	# speed > SPEED_BASE → floori(90/99) = 0; maxi(1, 0) = 1 (TR-032 floor).
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
 	assert_int(resolver.action_cooldown_ticks(99)).is_equal(1)
 
 
 func test_action_cooldown_ticks_speed_two_returns_floor_div() -> void:
-	# floori(10/2) = 5.
+	# floori(90/2) = 45.
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	assert_int(resolver.action_cooldown_ticks(2)).is_equal(5)
+	assert_int(resolver.action_cooldown_ticks(2)).is_equal(45)
 
 
-func test_action_cooldown_ticks_speed_three_returns_three() -> void:
-	# floori(10/3) = 3 (truncation of 3.333... — TR-011 integer arithmetic).
+func test_action_cooldown_ticks_speed_three_returns_thirty() -> void:
+	# floori(90/3) = 30 (exact — TR-011 integer arithmetic).
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	assert_int(resolver.action_cooldown_ticks(3)).is_equal(3)
+	assert_int(resolver.action_cooldown_ticks(3)).is_equal(30)
 
 
-func test_action_cooldown_ticks_speed_four_returns_two() -> void:
-	# floori(10/4) = 2 (truncation of 2.5).
+func test_action_cooldown_ticks_speed_four_returns_twentytwo() -> void:
+	# floori(90/4) = 22 (truncation of 22.5).
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	assert_int(resolver.action_cooldown_ticks(4)).is_equal(2)
+	assert_int(resolver.action_cooldown_ticks(4)).is_equal(22)
 
 
-func test_action_cooldown_ticks_speed_seven_returns_one() -> void:
-	# floori(10/7) = 1 (truncation of 1.428...).
+func test_action_cooldown_ticks_speed_seven_returns_twelve() -> void:
+	# floori(90/7) = 12 (truncation of 12.857...).
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	assert_int(resolver.action_cooldown_ticks(7)).is_equal(1)
+	assert_int(resolver.action_cooldown_ticks(7)).is_equal(12)
 
 
 # ===========================================================================
@@ -153,12 +153,12 @@ func test_is_stub_marker_contains_default_combat_resolver_substring() -> void:
 # ===========================================================================
 
 func test_action_cooldown_ticks_works_even_with_fallback_speed_base() -> void:
-	# The resolver's _resolve_speed_base() falls back to _FALLBACK_SPEED_BASE=10
-	# when DataRegistry can't resolve combat_config. EXPECTED_SPEED_BASE=10
+	# The resolver's _resolve_speed_base() falls back to _FALLBACK_SPEED_BASE=90
+	# when DataRegistry can't resolve combat_config. EXPECTED_SPEED_BASE=90
 	# matches both the .tres value AND the fallback constant — so this test
 	# passes regardless of DataRegistry state. If the fallback diverges from
-	# the GDD default in the future, this test will catch the drift.
+	# the calibrated default in the future, this test will catch the drift.
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
 	# speed=1 produces cooldown=SPEED_BASE; whether SPEED_BASE comes from
-	# config or fallback, the value should be 10.
-	assert_int(resolver.action_cooldown_ticks(1)).is_equal(10)
+	# config or fallback, the value should be 90.
+	assert_int(resolver.action_cooldown_ticks(1)).is_equal(90)

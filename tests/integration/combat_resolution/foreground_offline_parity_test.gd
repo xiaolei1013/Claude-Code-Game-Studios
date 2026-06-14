@@ -189,15 +189,18 @@ func test_compute_offline_batch_first_clear_only_set_at_loops_per_run_completion
 func test_compute_offline_batch_lost_hp_race_marks_run_not_won() -> void:
 	# Arrange — enemies now deal damage (base_attack × base_speed) and the party
 	# HP pool is small, so the two-sided HP race ends in DEFEAT before the floor
-	# clears. party_damage_by(T_clear-1=20) = 5·min(20,7)+5·min(20,14)+5·min(20,20)
+	# clears. base_attack is scaled to the Phase-2 SPEED_BASE (90) so each enemy's
+	# per-tick damage stays the round dmg_rate = atk·spd/SPEED_BASE = 45·10/90 = 5
+	# the worked arithmetic uses (independent of the calibration value):
+	#   party_damage_by(T_clear-1=20) = 5·min(20,7)+5·min(20,14)+5·min(20,20)
 	#   = 35 + 70 + 100 = 205 ≥ 50 = formation_total_hp → DEFEAT (GDD #34 §D).
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
 	var s: CombatRunSnapshot = _make_snapshot()
 	s.formation_total_hp = 50
 	s.enemy_list = [
-		{"id": &"e1", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10, "base_attack": 5, "base_speed": 10},
-		{"id": &"e2", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10, "base_attack": 5, "base_speed": 10},
-		{"id": &"e3", "archetype": &"bruiser", "tier": 2, "is_boss": true, "base_hp": 10, "base_attack": 5, "base_speed": 10},
+		{"id": &"e1", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10, "base_attack": 45, "base_speed": 10},
+		{"id": &"e2", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10, "base_attack": 45, "base_speed": 10},
+		{"id": &"e3", "archetype": &"bruiser", "tier": 2, "is_boss": true, "base_hp": 10, "base_attack": 45, "base_speed": 10},
 	]
 
 	# Act

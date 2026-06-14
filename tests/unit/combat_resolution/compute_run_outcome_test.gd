@@ -7,13 +7,19 @@
 #
 # All expected values are hand-computed against the resolver's documented model
 # with the project defaults that hold in the test env:
-#   SPEED_BASE = 10, MATCHUP_PARTY_DISADVANTAGE = 1.0,
+#   SPEED_BASE = 90 (Phase-2 calibrated), MATCHUP_PARTY_DISADVANTAGE = 1.0,
 #   MATCHUP_THROUGHPUT_FACTOR_ADV = 1.5 (enemies marked advantaged in the cache).
+#
+# Enemy attacks are scaled to SPEED_BASE so the per-tick damage rates stay the
+# round 20 / 10 the worked example below uses: dmg_rate = atk*spd/SPEED_BASE, so
+# A atk=180 → 180*10/90=20 and B atk=90 → 90*10/90=10. effective_dps is injected
+# directly (RAW_DPS), independent of SPEED_BASE, so every ttk/crossing-tick value
+# is unchanged from the Phase-1 example.
 #
 # Worked example used by most cases (dispatched_at = 100, raw_dps = 10.0,
 # both enemies advantaged → effective_dps = 10.0 * 1.5 = 15.0):
-#   Enemy A: base_hp=30 → ttk=ceil(30/15)=2 → rel_death=2; dmg_rate=20*10/10=20
-#   Enemy B: base_hp=45 → ttk=ceil(45/15)=3 → rel_death=5; dmg_rate=10*10/10=10
+#   Enemy A: base_hp=30 → ttk=ceil(30/15)=2 → rel_death=2; dmg_rate=180*10/90=20
+#   Enemy B: base_hp=45 → ttk=ceil(45/15)=3 → rel_death=5; dmg_rate=90*10/90=10
 #   T_clear = 5 (abs clear_tick = 105)
 #   party_damage_by(T) = 20*min(T,2) + 10*min(T,5)
 #     T=1 → 30   T=2 → 60   T=3 → 70   T=4 → 80   T=5 → 90
@@ -48,8 +54,8 @@ func _make_snapshot(party_hp: int) -> RefCounted:
 	var cache: Dictionary = {&"goblin": true}  # advantaged → factor 1.5
 	snap.matchup_cache = cache
 	var enemies: Array = [
-		_enemy(&"a", 30, 20, 10),
-		_enemy(&"b", 45, 10, 10),
+		_enemy(&"a", 30, 180, 10),  # dmg_rate = 180*10/90 = 20
+		_enemy(&"b", 45, 90, 10),   # dmg_rate =  90*10/90 = 10
 	]
 	snap.enemy_list = enemies
 	return snap

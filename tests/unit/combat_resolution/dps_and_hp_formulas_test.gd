@@ -53,7 +53,7 @@ func test_formation_dps_per_tick_uses_class_stats_at_level() -> void:
 	var class_data: Resource = DataRegistry.resolve("classes", WARRIOR_ID)
 	var expected_attack: int = class_data.stat_at_level(HeroClass.Stat.ATTACK, 1)
 	var expected_speed: int = class_data.stat_at_level(HeroClass.Stat.SPEED, 1)
-	var expected: float = float(expected_attack * expected_speed) / 10.0  # SPEED_BASE=10
+	var expected: float = float(expected_attack * expected_speed) / 90.0  # SPEED_BASE=90
 	var actual: float = resolver.formation_dps_per_tick(formation)
 	assert_float(actual).is_equal_approx(expected, 0.001)
 
@@ -84,7 +84,7 @@ func test_formation_dps_per_tick_three_heroes_sums_correctly() -> void:
 		+ class_m.stat_at_level(HeroClass.Stat.ATTACK, 1) * class_m.stat_at_level(HeroClass.Stat.SPEED, 1)
 		+ class_r.stat_at_level(HeroClass.Stat.ATTACK, 1) * class_r.stat_at_level(HeroClass.Stat.SPEED, 1)
 	)
-	var expected_dps: float = float(expected_sum) / 10.0  # SPEED_BASE
+	var expected_dps: float = float(expected_sum) / 90.0  # SPEED_BASE
 	assert_float(dps).is_equal_approx(expected_dps, 0.001)
 
 
