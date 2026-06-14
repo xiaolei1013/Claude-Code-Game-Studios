@@ -14,6 +14,9 @@
 #   C — Fallback behavior (unknown / empty biome_id)
 #   D — get_biome / biome_changed signal semantics
 #   E — Guild Hall + DungeonRunView scene integration
+#   F — Real-art swap-in (ADR-0019 §Decision 3): the BiomeArt TextureRect child
+#       shows the committed per-biome PNG, hides for biomes with no shipped art,
+#       and mirrors the boss-floor darken — without ever intercepting input.
 extends GdUnitTestSuite
 
 const BiomeBackgroundScene = preload("res://assets/screens/_shared/biome_background.tscn")
@@ -277,3 +280,102 @@ func test_orchestrator_exposes_public_dispatched_biome_id_getter() -> void:
 	# Idle state — no run dispatched yet in test env. Returns empty string.
 	var biome_id: String = DungeonRunOrchestrator.get_dispatched_biome_id()
 	assert_str(biome_id).is_equal("")
+
+
+# ===========================================================================
+# Group F — Real-art swap-in (ADR-0019 §Decision 3)
+# ===========================================================================
+
+# forest_reach ships a committed background PNG; guild_hall_tavern is the
+# palette-only baseline (no shipped art). These two anchor the "has art" /
+# "no art" branches of _update_art_layer.
+const ART_BIOME_WITH_ART: String = "forest_reach"
+const ART_BIOME_WITHOUT_ART: String = "guild_hall_tavern"
+const ART_LAYER_NODE_NAME: String = "BiomeArt"
+const BOSS_FLOOR_INDEX: int = 5  # mirrors BiomeBackground.BOSS_FLOOR_INDEX_MVP
+
+
+func test_biome_with_committed_art_shows_visible_texture_layer() -> void:
+	# set_biome() must add a "BiomeArt" TextureRect child, load the committed
+	# PNG, and make it visible above the palette ColorRect.
+	var bg: ColorRect = _make_instance()
+	# Precondition: the committed asset must be importable. A failure here means
+	# the PNG / .import sidecar wasn't committed — not a swap-in logic bug.
+	assert_bool(
+		ResourceLoader.exists("res://assets/art/backgrounds/%s.png" % ART_BIOME_WITH_ART)
+	).override_failure_message(
+		"Committed background art for '%s' is missing or un-imported. Group F "
+		% ART_BIOME_WITH_ART
+		+ "requires assets/art/backgrounds/%s.png + its .import sidecar committed "
+		% ART_BIOME_WITH_ART
+		+ "(CI regenerates .godot/imported/ from the sidecar)."
+	).is_true()
+
+	bg.set_biome(ART_BIOME_WITH_ART)
+
+	var art: TextureRect = bg.get_node_or_null(ART_LAYER_NODE_NAME) as TextureRect
+	assert_object(art).override_failure_message(
+		"set_biome('%s') must create a '%s' TextureRect child for the real art."
+		% [ART_BIOME_WITH_ART, ART_LAYER_NODE_NAME]
+	).is_not_null()
+	assert_bool(art.visible).is_true()
+	assert_object(art.texture).is_not_null()
+
+
+func test_biome_art_layer_never_intercepts_input() -> void:
+	# AC-26-15 parity: the real-art layer keeps mouse_filter=IGNORE + full-rect
+	# anchors so it composites edge-to-edge without stealing taps from the UI
+	# above it (z_index does NOT gate Godot input picking — taps route by tree
+	# order, so a non-IGNORE backdrop child would swallow button presses).
+	var bg: ColorRect = _make_instance()
+	bg.set_biome(ART_BIOME_WITH_ART)
+	var art: TextureRect = bg.get_node_or_null(ART_LAYER_NODE_NAME) as TextureRect
+	assert_object(art).is_not_null()
+	assert_int(art.mouse_filter).is_equal(Control.MOUSE_FILTER_IGNORE)
+	assert_float(art.anchor_right).is_equal(1.0)
+	assert_float(art.anchor_bottom).is_equal(1.0)
+
+
+func test_biome_without_committed_art_hides_layer_and_falls_back_to_palette() -> void:
+	# guild_hall_tavern ships NO background PNG. The BiomeArt layer (lazy-created
+	# on first set_biome) must be hidden + textureless so the flat palette
+	# ColorRect shows through.
+	var bg: ColorRect = _make_instance()
+	bg.set_biome(ART_BIOME_WITHOUT_ART)
+	var art: TextureRect = bg.get_node_or_null(ART_LAYER_NODE_NAME) as TextureRect
+	if art != null:
+		assert_bool(art.visible).override_failure_message(
+			"'%s' has no committed art; BiomeArt must be hidden so the palette "
+			% ART_BIOME_WITHOUT_ART
+			+ "ColorRect shows through."
+		).is_false()
+		assert_object(art.texture).is_null()
+	# Palette fallback still applies regardless of art presence.
+	assert_str(bg.get_biome()).is_equal(ART_BIOME_WITHOUT_ART)
+
+
+func test_biome_art_layer_darkens_on_boss_floor() -> void:
+	# Parity with the palette boss-floor modulation: a real-art boss floor
+	# (floor_index == BOSS_FLOOR_INDEX_MVP) darkens the texture via modulate so
+	# it reads as the same "dusk → night" transition the palette applies.
+	var bg: ColorRect = _make_instance()
+	bg.set_biome(ART_BIOME_WITH_ART, BOSS_FLOOR_INDEX)
+	var art: TextureRect = bg.get_node_or_null(ART_LAYER_NODE_NAME) as TextureRect
+	assert_object(art).is_not_null()
+	assert_bool(art.visible).is_true()
+	assert_float(art.modulate.r).override_failure_message(
+		"Boss-floor (floor %d) real art must be darkened (modulate.r < 1.0) to "
+		% BOSS_FLOOR_INDEX
+		+ "match the palette boss modulation. Got %s." % str(art.modulate.r)
+	).is_less(1.0)
+
+
+func test_biome_art_layer_full_brightness_on_regular_floor() -> void:
+	# Regular floors render the art at full brightness — modulate stays white
+	# so the daytime palette reads cozy, not dim.
+	var bg: ColorRect = _make_instance()
+	bg.set_biome(ART_BIOME_WITH_ART, 1)
+	var art: TextureRect = bg.get_node_or_null(ART_LAYER_NODE_NAME) as TextureRect
+	assert_object(art).is_not_null()
+	assert_bool(art.visible).is_true()
+	assert_float(art.modulate.r).is_equal(1.0)
