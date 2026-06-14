@@ -157,6 +157,15 @@ var _class_synergy_detected_last_played_ms: int = -_CLASS_SYNERGY_DETECTED_THROT
 ## prestige-completed fanfare. 2.0s window per audio-system.md §J.
 var _prestige_completed_last_played_ms: int = -_PRESTIGE_COMPLETED_THROTTLE_MS
 
+## Combat advantage chime (audio-system.md §C.2) — one-shot-per-run latch. The
+## chime plays ONCE per dungeon run, on the first enemy kill carrying a favourable
+## class-vs-biome matchup ([code]enemy_killed.advantaged == true[/code]). Re-armed
+## (set false) on each ACTIVE_FOREGROUND entry in [method _on_run_state_changed].
+## Combat is verdict-driven with no dispatch-time advantage signal, so the first
+## advantaged kill is the earliest in-combat beat that confirms the matchup edge.
+## A latch (not a throttle) because the intent is once-per-run, not rate-limiting.
+var _advantage_chime_fired_this_run: bool = false
+
 ## Test seam for the throttle clock shared by the three windows above. Default
 ## -1 means "use real engine uptime" ([method Time.get_ticks_msec]); tests assign
 ## a fixed non-negative value so the 2.0s windows are deterministic. Engine
@@ -522,7 +531,7 @@ func load_save_data(d: Dictionary) -> void:
 
 ## §C.2 / §K Story 3: UI panel SFX on screen entry.
 ## AC-AS-14, AC-AS-15 are in UIFramework scope, not here.
-func _on_screen_changed(new_screen_id: String, _old_screen_id: String) -> void:
+func _on_screen_changed(new_screen_id: String, old_screen_id: String) -> void:
 	# §C.2 panel-open cue: the asset (ui_panel_open) is now sourced + wrapped as an
 	# AudioCue .tres (ADR-0022), so OQ-AS-6's "asset not sourced" deferral is closed
 	# and the cue is wired. Fires once per screen transition — navigation is
@@ -534,6 +543,16 @@ func _on_screen_changed(new_screen_id: String, _old_screen_id: String) -> void:
 	# under the per-tap chime so navigation never feels louder than the tap itself.
 	if new_screen_id != "":
 		play_sfx(&"sfx_ui_panel_open", 1.0, 0.9)
+	# §C.2 panel-close cue (ADR-0022): the mirror whoosh for the screen sliding OUT.
+	# The cue id was pre-declared in _CUE_BUS_MAP / _CUE_VOLUME_MULT_MAP; its AudioCue
+	# .tres now exists, closing the wiring. Fires for the OLD screen (the panel
+	# folding away) — guarded on old_screen_id != "" so the boot transition (no prior
+	# screen) is silent. Paired with the open whoosh above, a screen swap reads as a
+	# single fold-away → unfold gesture. volume_mult 0.9 per §C.2, matching the open
+	# whoosh so neither side of the swap is louder than the other. Null-safe if the
+	# cue ever unresolves.
+	if old_screen_id != "":
+		play_sfx(&"sfx_ui_panel_close", 1.0, 0.9)
 	# Music transition for non-dungeon screens handled here — return to
 	# guild_hall bed whenever a non-dungeon screen appears AND we're not
 	# currently in an active dungeon run. In Sprint 12+, SceneManager.screen_id
@@ -562,6 +581,9 @@ func _on_screen_changed(new_screen_id: String, _old_screen_id: String) -> void:
 func _on_run_state_changed(new_state: int, _old_state: int) -> void:
 	# ACTIVE_FOREGROUND = 2, RUN_ENDED = 4 per DungeonRunState.State enum.
 	if new_state == 2:
+		# New run dispatched — re-arm the one-shot advantage chime latch so the
+		# next favourable-matchup kill fires the chime once for this run.
+		_advantage_chime_fired_this_run = false
 		# Entering ACTIVE_FOREGROUND: a boss floor gets the boss bed; otherwise
 		# the biome bed (empty biome → guild hall fallback per spec).
 		if _dispatched_floor_is_boss():
@@ -618,9 +640,17 @@ func _dispatched_floor_is_boss() -> bool:
 ## pitch_scale(tier) = 1.0 + (3 - tier) * 0.10
 ## No throttle on kill chime — E.6: 5 kills in a frame produces 5 overlapping
 ## chimes; that is intended behavior.
-func _on_enemy_killed(tier: int, _archetype: String, _advantaged: bool) -> void:
+func _on_enemy_killed(tier: int, _archetype: String, advantaged: bool) -> void:
 	var pitch: float = 1.0 + (3 - tier) * 0.10
 	play_sfx(&"sfx_combat_enemy_kill", pitch, 1.0)
+	# §C.2 advantage chime — one gentle two-note rising chime per run, on the FIRST
+	# advantaged kill (favourable class-vs-biome matchup). The latch prevents
+	# per-kill spam (E.6 allows overlapping kill chimes, but the advantage beat is
+	# a once-per-run confirmation, not per-kill). Re-armed on ACTIVE_FOREGROUND.
+	# volume_mult 0.8 per §C.2 / _CUE_VOLUME_MULT_MAP — sits under the kill chime.
+	if advantaged and not _advantage_chime_fired_this_run:
+		_advantage_chime_fired_this_run = true
+		play_sfx(&"sfx_combat_advantage_chime", 1.0, 0.8)
 
 
 ## §C.2 / §K Story 3: boss kill chime — distinct sample, volume_mult 1.4.
