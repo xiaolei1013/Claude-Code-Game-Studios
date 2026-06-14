@@ -1,14 +1,28 @@
-# ClassSpriteFactory tests — the demo idle-sprite frame builder consumed by the
+# ClassSpriteFactory tests — the idle-sprite frame builder consumed by the
 # Recruit pool cards and Hero Detail modal.
 #
-# The slicing math is exercised through the pure `slice_sheet(sheet, count)`
-# helper with SYNTHETIC textures, so these tests are deterministic and do NOT
-# depend on the gitignored demo sprite sheets (which are absent in CI). The
-# disk-loading wrapper `get_idle_frames` is verified only on its asset-absent
-# paths (empty / missing class), which are stable everywhere.
+# Three contracts under test:
+#   - Pure math: `slice_sheet(sheet, count)` is exercised with SYNTHETIC textures,
+#     so the region geometry is deterministic and independent of any on-disk asset.
+#   - Negative path: `get_idle_frames` returns empty for the empty / missing class
+#     (caller keeps its still portrait), which is stable everywhere.
+#   - Real-art path (Sprint 28 AI class sprites): a committed class loads its real
+#     4-frame idle strip and slices into FRAME_COUNT equal columns. This is the
+#     regression net against a reverted ResourceLoader.exists guard, a path typo,
+#     the strip files slipping back out of version control, or an import-dims drift
+#     that would misalign the 4-cell slice.
 extends GdUnitTestSuite
 
 const ClassSpriteFactoryScript = preload("res://src/ui/class_sprite_factory.gd")
+
+# A class id with committed real art (Sprint 28) at
+# assets/art/classes/<id>/sprite.png — a 4-frame idle strip authored by the asset
+# pipeline at the manifest-pinned 768×432 (images.class_sprites[].size in full.json).
+const _REAL_ART_CLASS_ID: String = "warrior"
+
+# Manifest-pinned strip dimensions; frame width is STRIP_WIDTH / FRAME_COUNT.
+const _STRIP_WIDTH: int = 768
+const _STRIP_HEIGHT: int = 432
 
 
 func before_test() -> void:
@@ -142,3 +156,28 @@ func test_animate_absent_sheet_attaches_no_animator() -> void:
 	ClassSpriteFactoryScript.animate(rect, "not_a_real_class_xyz")
 
 	assert_object(rect.get_node_or_null("_IdleAnimator")).is_null()
+
+
+# ===========================================================================
+# Group E — real-art binding (Sprint 28 — AI class idle strips)
+# ===========================================================================
+
+func test_real_art_class_loads_and_windows_quarter_width_columns() -> void:
+	# Arrange + Act — "warrior" has a committed 4-frame strip at
+	# assets/art/classes/warrior/sprite.png; get_idle_frames loads + slices it.
+	var frames: Array = ClassSpriteFactoryScript.get_idle_frames(_REAL_ART_CLASS_ID)
+	var expected_w: float = float(_STRIP_WIDTH) / float(ClassSpriteFactoryScript.FRAME_COUNT)
+
+	# Assert — the real strip slices into FRAME_COUNT equal cells. An empty/short
+	# array means the strip is missing/unimported or the ResourceLoader.exists guard
+	# regressed (e.g. reverted to FileAccess, which fails in exported builds); this
+	# leading count assert also stops a zero-frame strip from vacuously passing the
+	# loop below. A wrong frame WIDTH means the import dims drifted off the
+	# manifest-pinned 768×432, which would misalign every cell and jitter the loop.
+	assert_int(frames.size()).is_equal(ClassSpriteFactoryScript.FRAME_COUNT)
+	for i: int in range(frames.size()):
+		var atlas: AtlasTexture = frames[i] as AtlasTexture
+		assert_object(atlas).is_not_null()
+		assert_float(atlas.region.position.x).is_equal_approx(expected_w * float(i), 0.5)
+		assert_float(atlas.region.size.x).is_equal_approx(expected_w, 0.5)
+		assert_float(atlas.region.size.y).is_equal_approx(float(_STRIP_HEIGHT), 0.5)

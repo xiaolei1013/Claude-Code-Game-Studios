@@ -10,7 +10,7 @@ Usage:
     python3 tools/asset-pipeline/generate.py --only sfx           # one section
     python3 tools/asset-pipeline/generate.py --manifest manifests/full.json
 
-Sections: audio (sfx, music), images (backgrounds, portraits, enemy_sprites, vfx).
+Sections: audio (sfx, music), images (backgrounds, portraits, enemy_sprites, class_sprites, vfx).
 
 NOTE: endpoint/param details for the ElevenLabs Music API and the Gemini image
 model are best-effort and may need a one-line tweak on first real run (we can't
@@ -472,6 +472,7 @@ _SECTIONS = [
     ("backgrounds",    "images", gen_image, _fmt_image,  "out"),
     ("portraits",      "images", gen_image, _fmt_image,  "out"),
     ("enemy_sprites",  "images", gen_image, _fmt_image,  "out"),
+    ("class_sprites",  "images", gen_image, _fmt_image,  "out"),
     ("vfx",            "images", gen_image, _fmt_image,  "out"),
 ]
 
@@ -557,7 +558,7 @@ def run(manifest: dict, only: str | None, keys: dict, skip_existing: bool = Fals
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="Lantern Guild asset generation")
     ap.add_argument("--manifest", default=str(Path(__file__).parent / "manifests" / "pilot.json"))
-    ap.add_argument("--only", choices=["audio", "images", "sfx", "music", "backgrounds", "portraits", "enemy_sprites", "vfx"])
+    ap.add_argument("--only", choices=["audio", "images", "sfx", "music", "backgrounds", "portraits", "enemy_sprites", "class_sprites", "vfx"])
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--author-tres", action="store_true", help="Only author AudioCue .tres wrappers (run after audio is imported).")
     ap.add_argument("--skip-existing", action="store_true", help="Skip assets whose output file already exists (protects approved assets; makes a large batch resumable).")
