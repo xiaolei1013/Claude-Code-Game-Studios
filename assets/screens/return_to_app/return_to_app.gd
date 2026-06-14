@@ -53,6 +53,11 @@ var _wire_built: bool = false
 ## Minutes-elapsed subhead — "You were away for %d minutes."
 @onready var _elapsed_subhead: Label = $SummaryPanel/VBoxContainer/ElapsedSubhead
 
+## "Driven back at Floor %d — your guild is recovering." offline-defeat notice.
+## Shown only when the offline window ended in DEFEAT (summary "_defeated_at_floor"
+## meta is set by OfflineProgressionEngine). GDD #34 Phase 5 / AC-34-10.
+@onready var _defeat_notice_row: Label = $SummaryPanel/VBoxContainer/DefeatNoticeRow
+
 ## "+%d gold earned" row.
 @onready var _gold_row: Label = $SummaryPanel/VBoxContainer/GoldRow
 
@@ -96,6 +101,7 @@ func _ready() -> void:
 	_cap_notice.visible = false
 	_no_summary_label.visible = false
 	_region_unlock_row.visible = false
+	_defeat_notice_row.visible = false
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +215,12 @@ func _render_summary(summary: OfflineProgressionEngine.OfflineSummary) -> void:
 		"return_to_app_seconds_credited_format", [minutes_away]
 	)
 
+	# Offline-defeat notice — surfaces the floor the formation was driven back at
+	# when the offline window ended in DEFEAT (set by OfflineProgressionEngine via
+	# the "_defeated_at_floor" meta). Rendered before the rewards rows so the
+	# narrative reads "away N min → driven back at Floor X → but still earned …".
+	_render_defeat_notice_row(summary)
+
 	# Gold row.
 	_gold_row.text = UIFrameworkScript.format_localized(
 		"return_to_app_gold_earned_format", [summary.gold_earned]
@@ -288,6 +300,35 @@ func _render_region_unlock_row(summary: OfflineProgressionEngine.OfflineSummary)
 	_region_unlock_row.visible = true
 
 
+## Renders the "Driven back at Floor X — your guild is recovering." offline-defeat
+## notice from the summary's "_defeated_at_floor" meta (an int floor index set by
+## OfflineProgressionEngine when an offline-replay window ended in DEFEAT). Reuses
+## the run_defeat_floor_format string the live dungeon-run defeat overlay uses
+## (dungeon_run_view._show_defeat_overlay) so the offline and foreground defeat
+## voices read identically. Hides the row when the meta is absent (a WINNING
+## window, the common case) or malformed.
+##
+## Defensive against a non-int meta: typeof-guards the read (memory:
+## project_dict_get_default_only_on_missing_key — a defaulted meta read can still
+## return a present-but-wrong-typed value) and hides the row rather than crash.
+func _render_defeat_notice_row(summary: OfflineProgressionEngine.OfflineSummary) -> void:
+	if not summary.has_meta("_defeated_at_floor"):
+		_defeat_notice_row.visible = false
+		return
+	var raw: Variant = summary.get_meta("_defeated_at_floor", 0)
+	if typeof(raw) != TYPE_INT and typeof(raw) != TYPE_FLOAT:
+		_defeat_notice_row.visible = false
+		return
+	var floor_index: int = int(raw)
+	if floor_index <= 0:
+		_defeat_notice_row.visible = false
+		return
+	_defeat_notice_row.text = UIFrameworkScript.format_localized(
+		"run_defeat_floor_format", [floor_index]
+	)
+	_defeat_notice_row.visible = true
+
+
 ## Renders a graceful fallback when no cached summary exists.
 ##
 ## Should not occur in production (OfflineProgressionEngine always routes via
@@ -301,6 +342,7 @@ func _render_no_summary_fallback() -> void:
 	_kills_row.text = ""
 	_floors_row.text = ""
 	_region_unlock_row.visible = false
+	_defeat_notice_row.visible = false
 	_cap_notice.visible = false
 	_no_summary_label.text = tr("return_to_app_no_summary_fallback")
 	_no_summary_label.visible = true

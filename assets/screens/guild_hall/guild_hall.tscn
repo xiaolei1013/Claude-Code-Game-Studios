@@ -250,6 +250,38 @@ horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
 
+; Sprint 28 Phase 5 (GDD #34 §E.4): all-injured recovery banner. Shown only
+; when EVERY roster hero is recovering from a defeat (no healthy hero left to
+; dispatch). Ember Rust label (#A84C2F — DESIGN.md setback register, same as
+; the offline-defeat notice) on a parchment panel. MOUSE_FILTER_IGNORE on both
+; panel + label so it never steals taps (Dispatch soft-blocks itself when no
+; party can be formed — this is an informational surface, not a gate; z_index
+; ≠ input picking per project memory). z_index 3 draws above the wireframe
+; greybox panels (z=2). Hidden by default; guild_hall.gd._refresh_all_injured_banner
+; toggles it on on_enter + the heroes_injured signal.
+[node name="AllInjuredBanner" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -260.0
+offset_top = 116.0
+offset_right = 260.0
+offset_bottom = 156.0
+grow_horizontal = 2
+mouse_filter = 2
+z_index = 3
+
+[node name="AllInjuredLabel" type="Label" parent="AllInjuredBanner"]
+layout_mode = 2
+mouse_filter = 2
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 3
+theme_override_colors/font_color = Color(0.659, 0.298, 0.184, 1)
+
 [node name="WarmLanternOverlay" type="ColorRect" parent="."]
 material = SubResource("ShaderMaterial_warm_lantern")
 layout_mode = 1

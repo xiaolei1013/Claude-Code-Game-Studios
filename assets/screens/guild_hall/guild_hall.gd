@@ -40,6 +40,12 @@ extends Screen
 @onready var _synergy_badge: PanelContainer = $SynergyBadge
 @onready var _synergy_label: Label = $SynergyBadge/SynergyLabel
 
+# Sprint 28 Phase 5 (GDD #34 §E.4) — all-injured recovery banner. Visible only
+# when every roster hero is still recovering from a defeat (no dispatchable hero
+# remains). Snapshot at on_enter + re-evaluated on the heroes_injured signal.
+@onready var _all_injured_banner: PanelContainer = $AllInjuredBanner
+@onready var _all_injured_label: Label = $AllInjuredBanner/AllInjuredLabel
+
 const HeroDetailModalScene: PackedScene = preload(
 	"res://assets/screens/hero_detail/hero_detail_modal.tscn"
 )
@@ -112,6 +118,11 @@ func on_enter() -> void:
 	# don't change the formation but the player may have returned from
 	# Formation Assignment with a different lineup.
 	_refresh_synergy_badge()
+	# Sprint 28 Phase 5 (GDD #34 §E.4) — snapshot the all-injured banner on entry
+	# so a player returning from a doomed run (or an offline defeat) sees the
+	# "your guild is recovering" surface immediately. Hidden if any hero is
+	# dispatchable. Re-evaluated live via the heroes_injured subscription below.
+	_refresh_all_injured_banner()
 	# Sprint 16 — biome progression gate. FloorUnlock emits biome_unlocked
 	# when a gated biome's prereq floor first-clears (e.g. clearing
 	# frostmire_f5 unlocks ember_wastes). Guild Hall surfaces a cozy toast.
@@ -387,6 +398,51 @@ func _refresh_synergy_badge() -> void:
 
 
 # ---------------------------------------------------------------------------
+# All-injured recovery banner (GDD #34 §E.4 — Defeat & Injury Phase 5)
+# ---------------------------------------------------------------------------
+
+## Shows the cozy "your guild is recovering" banner when EVERY roster hero is
+## still recovering from a defeat — the soft-block state where no healthy hero
+## remains to form a dispatch party. Hidden whenever at least one hero is
+## dispatchable, on an empty roster, or once the soonest hero recovers.
+##
+## Snapshot-based, not live-ticking: evaluated on on_enter and on the
+## heroes_injured signal (recovery is wall-clock, so passive time-elapse won't
+## refresh the banner until the next roster change — acceptable, matching the
+## per-card injury marks). The "ready in <time>" suffix is the soonest-recovery
+## delta humanized at snapshot time; it does not count down in place.
+func _refresh_all_injured_banner() -> void:
+	if _all_injured_banner == null or _all_injured_label == null:
+		return
+	var now_ms: int = TickSystem.now_ms()
+	if not HeroRoster.are_all_heroes_injured(now_ms):
+		_all_injured_banner.visible = false
+		return
+	var soonest_ms: int = HeroRoster.soonest_recovery_ms(now_ms)
+	var remaining_s: int = (soonest_ms - now_ms) / 1000 if soonest_ms > now_ms else 0
+	if remaining_s > 0:
+		_all_injured_label.text = tr("guild_hall_all_injured_format") % _humanize_recovery(remaining_s)
+	else:
+		# Defensive: soonest <= now should not happen while all-injured is true,
+		# but degrade to the timer-free copy rather than show "ready in 0s".
+		_all_injured_label.text = tr("guild_hall_all_injured_no_timer")
+	_all_injured_banner.visible = true
+
+
+## Humanizes a remaining-recovery duration (seconds) into a cozy, localized
+## "1h 12m" / "24m" / "less than a minute" string for the banner's
+## "ready in <time>" suffix.
+func _humanize_recovery(seconds: int) -> String:
+	var hours: int = seconds / 3600
+	var minutes: int = (seconds % 3600) / 60
+	if hours > 0:
+		return "%dh %dm" % [hours, minutes]
+	if minutes > 0:
+		return "%dm" % minutes
+	return tr("guild_hall_all_injured_under_minute")
+
+
+# ---------------------------------------------------------------------------
 # Roster panel (Guild Hall GDD #19 §C.4 + Hero Detail GDD #22 §C.2 wire-up)
 # ---------------------------------------------------------------------------
 
@@ -508,6 +564,10 @@ func _on_roster_changed(_a: Variant = null, _b: Variant = null, _c: Variant = nu
 	# (e.g. removing a hero from a slot via prestige clears that slot).
 	# Re-evaluate synergy so the badge stays in sync.
 	_refresh_synergy_badge()
+	# Sprint 28 Phase 5 (GDD #34 §E.4) — heroes_injured routes here too; the last
+	# healthy hero being injured (or a recruit adding a dispatchable hero) flips
+	# the all-injured state, so re-evaluate the recovery banner live.
+	_refresh_all_injured_banner()
 
 
 ## hero_leveled handler — refresh the roster (XP bar repaint) AND fire a

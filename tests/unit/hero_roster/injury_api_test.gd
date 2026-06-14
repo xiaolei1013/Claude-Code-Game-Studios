@@ -189,3 +189,76 @@ func test_get_injured_hero_ids_empty_when_all_recovered() -> void:
 func test_get_injured_hero_ids_empty_on_empty_roster() -> void:
 	var hr: Node = _make_fresh_roster()
 	assert_array(hr.get_injured_hero_ids(1_000)).is_empty()
+
+
+# ===========================================================================
+# Group E — are_all_heroes_injured (GDD #34 §E.4 all-injured surface)
+# ===========================================================================
+
+func test_are_all_heroes_injured_true_when_every_hero_injured() -> void:
+	# The E.4 soft-block state: no healthy hero remains to form a party.
+	var hr: Node = _make_fresh_roster()
+	_inject_hero(hr, 1, 5_000)
+	_inject_hero(hr, 2, 7_000)
+	assert_bool(hr.are_all_heroes_injured(4_000)).is_true()
+
+
+func test_are_all_heroes_injured_false_when_one_healthy() -> void:
+	# A single healthy hero means the player can still dispatch — not all-injured.
+	var hr: Node = _make_fresh_roster()
+	_inject_hero(hr, 1, 5_000)  # injured
+	_inject_hero(hr, 2, 0)      # healthy
+	assert_bool(hr.are_all_heroes_injured(4_000)).is_false()
+
+
+func test_are_all_heroes_injured_false_on_empty_roster() -> void:
+	# A fresh player with no heroes is NOT "recovering" — empty roster is not the
+	# all-injured state (no recovery to wait for).
+	var hr: Node = _make_fresh_roster()
+	assert_bool(hr.are_all_heroes_injured(1_000)).is_false()
+
+
+func test_are_all_heroes_injured_false_once_all_recovered() -> void:
+	# now == injured_until → recovered (strict >) → no longer all-injured.
+	var hr: Node = _make_fresh_roster()
+	_inject_hero(hr, 1, 5_000)
+	_inject_hero(hr, 2, 5_000)
+	assert_bool(hr.are_all_heroes_injured(5_000)).is_false()
+
+
+# ===========================================================================
+# Group F — soonest_recovery_ms (GDD #34 §E.4 soonest-recovery timer)
+# ===========================================================================
+
+func test_soonest_recovery_ms_returns_earliest_injured_until() -> void:
+	# The soonest a recovering hero becomes dispatchable = min injured_until.
+	var hr: Node = _make_fresh_roster()
+	_inject_hero(hr, 1, 9_000)
+	_inject_hero(hr, 2, 6_000)  # earliest
+	_inject_hero(hr, 3, 7_500)
+	assert_int(hr.soonest_recovery_ms(4_000)).is_equal(6_000)
+
+
+func test_soonest_recovery_ms_ignores_healthy_heroes() -> void:
+	# A healthy hero (injured_until 0) must not pull the soonest instant to 0.
+	var hr: Node = _make_fresh_roster()
+	_inject_hero(hr, 1, 0)      # healthy — ignored
+	_inject_hero(hr, 2, 8_000)  # only injured hero
+	assert_int(hr.soonest_recovery_ms(4_000)).is_equal(8_000)
+
+
+func test_soonest_recovery_ms_zero_when_none_injured() -> void:
+	# No injured hero → 0 (nothing to recover).
+	var hr: Node = _make_fresh_roster()
+	_inject_hero(hr, 1, 0)
+	_inject_hero(hr, 2, 0)
+	assert_int(hr.soonest_recovery_ms(4_000)).is_equal(0)
+
+
+func test_soonest_recovery_ms_excludes_already_recovered() -> void:
+	# A hero whose injury already elapsed (injured_until ≤ now) is not counted;
+	# the soonest is the still-pending one.
+	var hr: Node = _make_fresh_roster()
+	_inject_hero(hr, 1, 3_000)  # already recovered at now=4_000
+	_inject_hero(hr, 2, 9_000)  # still pending
+	assert_int(hr.soonest_recovery_ms(4_000)).is_equal(9_000)

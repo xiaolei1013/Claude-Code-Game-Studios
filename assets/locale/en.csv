@@ -72,6 +72,9 @@ matchup_floor_locked_tooltip_format,Clear floor %d first
 matchup_floor_recommended_format,Recommended: %s
 guild_hall_roster_tab_active,Active
 guild_hall_roster_tab_retired,Retired
+guild_hall_all_injured_format,Your guild is recovering — ready in %s.
+guild_hall_all_injured_no_timer,Your guild is recovering.
+guild_hall_all_injured_under_minute,less than a minute
 pause_menu_title,Paused
 pause_menu_resume_button,Resume
 pause_menu_settings_button,Settings

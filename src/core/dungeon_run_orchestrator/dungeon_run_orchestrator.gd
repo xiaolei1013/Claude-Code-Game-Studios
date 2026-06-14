@@ -489,6 +489,16 @@ var _offline_replay_cursor: int = 0
 ## `compute_run_outcome` preserve the pre-pivot always-clear behavior.
 var _offline_run_won: bool = true
 
+## Phase 5 (GDD #34 §E.3/§E.5 / ADR-0021): the offline window's START instant in
+## wall-clock ms, set by [method set_offline_window_start_ms] before the
+## OfflineProgressionEngine drives the replay chunks. A DEFEATED offline run
+## anchors its injury-recovery clock HERE (window start), NOT at resume — so for
+## a long absence the recovery has already elapsed and heroes are healthy at
+## resume (consistent with the wall-clock recovery model, AC-34-05/E.5). Defaults
+## 0 ("unset"); [method compute_offline_batch] then falls back to
+## [code]TickSystem.now_ms()[/code] (foreground parity).
+var _offline_window_start_ms: int = 0
+
 ## Test-injection seam mirroring [code]Economy.set_offline_replay_inputs[/code].
 ## Production leaves these empty/zero and the live HeroRoster formation +
 ## dispatched floor/biome are resolved instead.
@@ -1388,12 +1398,25 @@ func _end_run_defeated() -> void:
 	_set_state(next_state)
 
 
-## Injures every hero in the dispatched formation when a foreground run is
-## DEFEATED (GDD #34 Phase 3 / ADR-0021 — AC-34-04/05). Each hero's
-## [code]injured_until[/code] is set to a WALL-CLOCK recovery instant
-## ([code]TickSystem.now_ms() + HeroRoster.injury_recovery_seconds() * 1000[/code]).
+## Foreground defeat-injury entry point (GDD #34 Phase 3 / ADR-0021 — AC-34-04/05).
+## Delegates to [method _apply_defeat_injuries_at] anchored at the current
+## wall-clock instant — a foreground run is defeated NOW, so recovery begins now.
+func _apply_defeat_injuries() -> void:
+	_apply_defeat_injuries_at(TickSystem.now_ms())
+
+
+## Injures every hero in the dispatched formation when a run is DEFEATED, with the
+## recovery clock anchored at [param anchor_ms] (GDD #34 Phase 3/5 / ADR-0021 —
+## AC-34-04/05). Each hero's [code]injured_until[/code] is set to a WALL-CLOCK
+## recovery instant ([code]anchor_ms + HeroRoster.injury_recovery_seconds() * 1000[/code]).
 ## Wall-clock — NOT sim-ticks — so recovery keeps elapsing while the game is
 ## backgrounded or fully offline (AC-34-05).
+##
+## The anchor lets the offline path (Phase 5, §E.3/§E.5) start the recovery at the
+## OFFLINE WINDOW START rather than at resume: a doomed run is defeated on its
+## first loop ≈ the window start, so for a long absence the recovery has already
+## elapsed and the heroes are healthy at resume. The foreground path passes
+## [code]TickSystem.now_ms()[/code] (defeat == now), preserving Phase 3 behavior.
 ##
 ## The ids come from the frozen-at-dispatch [member run_snapshot].formation_snapshot
 ## so a mid-run roster edit or re-dispatch cannot change who is penalised. Unknown
@@ -1401,7 +1424,7 @@ func _end_run_defeated() -> void:
 ##
 ## Safe no-op when [member run_snapshot] is null, the HeroRoster autoload is
 ## absent (lean test envs), or the snapshot carries no formation ids.
-func _apply_defeat_injuries() -> void:
+func _apply_defeat_injuries_at(anchor_ms: int) -> void:
 	if run_snapshot == null:
 		return
 	var roster: Node = (
@@ -1415,7 +1438,7 @@ func _apply_defeat_injuries() -> void:
 	if ids.is_empty():
 		return
 	var recovery_seconds: int = int(roster.injury_recovery_seconds())
-	var until_ms: int = TickSystem.now_ms() + recovery_seconds * 1000
+	var until_ms: int = anchor_ms + recovery_seconds * 1000
 	roster.injure_heroes(ids, until_ms)
 
 
@@ -1710,6 +1733,18 @@ func compute_offline_batch(tick_budget: int) -> Dictionary:
 		# active run.
 		if run_snapshot == null:
 			run_snapshot = _build_run_snapshot(formation, floor_index, biome_id, _offline_combat_snapshot)
+		# Phase 5 (GDD #34 §E.3/§E.5 / ADR-0021 — AC-34-04/05): a DEFEATED offline
+		# run injures the dispatched formation, exactly ONCE here on the first chunk
+		# (the lazy-init block runs once per replay cycle). The recovery clock is
+		# anchored at the WINDOW START — where the doomed run is first defeated —
+		# NOT at resume, so a long absence lets the wall-clock recovery elapse and
+		# the heroes are healthy by the time the player returns. Falls back to
+		# now_ms() when the engine did not record a window start (foreground parity).
+		if not _offline_run_won:
+			var injury_anchor_ms: int = (
+				_offline_window_start_ms if _offline_window_start_ms > 0 else TickSystem.now_ms()
+			)
+			_apply_defeat_injuries_at(injury_anchor_ms)
 	if _offline_combat_snapshot == null:
 		return empty
 
@@ -1797,6 +1832,16 @@ func set_offline_replay_inputs(formation: Array, floor_index: int, biome_id: Str
 	_offline_replay_formation_override = formation
 	_offline_replay_floor_index_override = floor_index
 	_offline_replay_biome_id_override = biome_id
+
+
+## Phase 5 (GDD #34 §E.3/§E.5 / ADR-0021): records the offline window's START
+## instant in wall-clock ms. The OfflineProgressionEngine calls this once with
+## [code]TickSystem.now_ms() - elapsed_seconds * 1000[/code] before driving the
+## replay chunks, so a DEFEATED offline run anchors its injury-recovery clock at
+## the window start (where the doomed run is first defeated) rather than at resume.
+## Pass 0 to clear (the offline-batch path then falls back to now_ms()).
+func set_offline_window_start_ms(window_start_ms: int) -> void:
+	_offline_window_start_ms = window_start_ms
 
 
 ## Resolves the formation for the offline replay snapshot. Precedence:
