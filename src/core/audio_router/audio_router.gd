@@ -521,14 +521,19 @@ func load_save_data(d: Dictionary) -> void:
 # ---------------------------------------------------------------------------
 
 ## §C.2 / §K Story 3: UI panel SFX on screen entry.
-## MVP note: panel-open SFX deferred (§C.2 trigger is non-blocking UI path;
-## asset sourcing OQ-AS-6 applies). Skeleton retained for Sprint 12+ wiring.
 ## AC-AS-14, AC-AS-15 are in UIFramework scope, not here.
 func _on_screen_changed(new_screen_id: String, _old_screen_id: String) -> void:
-	# Panel open SFX is DEFERRED for MVP (non-critical per task spec item 5).
-	# Document the skip: sfx_ui_panel_open would fire here; dropping in MVP
-	# because UIFramework.wire_touch_feedback owns the tap-chime surface and
-	# the panel-open asset isn't sourced yet (OQ-AS-6).
+	# §C.2 panel-open cue: the asset (ui_panel_open) is now sourced + wrapped as an
+	# AudioCue .tres (ADR-0022), so OQ-AS-6's "asset not sourced" deferral is closed
+	# and the cue is wired. Fires once per screen transition — navigation is
+	# user-initiated (a tap), not a signal storm, so no throttle is needed.
+	# UIFramework.wire_touch_feedback still owns the per-tap chime; this layers the
+	# parchment-panel whoosh as the new screen slides in. No-ops on the boot/no-op
+	# transition (empty new_screen_id) and is null-safe if the cue ever unresolves.
+	# volume_mult 0.9 per §C.2 / _CUE_VOLUME_MULT_MAP — the panel whoosh sits just
+	# under the per-tap chime so navigation never feels louder than the tap itself.
+	if new_screen_id != "":
+		play_sfx(&"sfx_ui_panel_open", 1.0, 0.9)
 	# Music transition for non-dungeon screens handled here — return to
 	# guild_hall bed whenever a non-dungeon screen appears AND we're not
 	# currently in an active dungeon run. In Sprint 12+, SceneManager.screen_id
