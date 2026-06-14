@@ -317,19 +317,14 @@ func compute_run_outcome(snapshot: CombatRunSnapshot) -> CombatRunOutcome:
 		# No enemies / unkillable formation → no race → trivial win.
 		return outcome
 
-	var speed_base: int = _resolve_speed_base()
-	var disadvantage: float = _resolve_matchup_party_disadvantage()
 	var party_hp: float = float(snapshot.formation_total_hp)
 
 	# Per-enemy relative death tick + per-tick damage rate, in schedule order.
+	# Shared with [method party_hp_remaining_at] so the verdict and the HP curve
+	# read from byte-identical arrays (truthful bar/verdict parity, ADR-0021).
 	var rel_death: Array[int] = []
 	var dmg_rate: Array[float] = []
-	for idx: int in range(schedule.size()):
-		rel_death.append(int(schedule[idx]["kill_tick"]) - dispatched_at)
-		var entry: Dictionary = snapshot.enemy_list[idx] as Dictionary
-		var atk: int = int(entry.get("base_attack", 0))
-		var spd: int = int(entry.get("base_speed", 0))
-		dmg_rate.append((float(atk * spd) / float(speed_base)) * disadvantage)
+	_build_race_arrays(snapshot, schedule, rel_death, dmg_rate)
 
 	var t_clear: int = rel_death[rel_death.size() - 1]
 	outcome.clear_tick = dispatched_at + t_clear
@@ -365,6 +360,74 @@ func _party_damage_by(t: int, rel_death: Array[int], dmg_rate: Array[float]) -> 
 	for j: int in range(rel_death.size()):
 		total += dmg_rate[j] * float(mini(t, rel_death[j]))
 	return total
+
+
+## Internal: fills the per-enemy race arrays — `rel_death` (relative death tick,
+## anchored at dispatch) and `dmg_rate` (per-tick damage the enemy draws from the
+## shared party HP pool while alive) — in [param schedule] order, indices aligned
+## with [code]snapshot.enemy_list[/code].
+##
+## Out-param style ([param rel_death_out] / [param dmg_rate_out] mutated in place)
+## so the two consumers — [method compute_run_outcome] (verdict) and
+## [method party_hp_remaining_at] (HP curve) — build IDENTICAL arrays from one
+## code path. dmg_rate formula (GDD #34 §D):
+## [code](base_attack * base_speed) / SPEED_BASE * MATCHUP_PARTY_DISADVANTAGE[/code].
+##
+## Pure: reads config via the same silent-fallback accessors the rest of the
+## resolver uses; no state, no caching across calls.
+func _build_race_arrays(snapshot: CombatRunSnapshot, schedule: Array[Dictionary],
+		rel_death_out: Array[int], dmg_rate_out: Array[float]) -> void:
+	var dispatched_at: int = snapshot.dispatched_at_tick
+	var speed_base: int = _resolve_speed_base()
+	var disadvantage: float = _resolve_matchup_party_disadvantage()
+	for idx: int in range(schedule.size()):
+		rel_death_out.append(int(schedule[idx]["kill_tick"]) - dispatched_at)
+		var entry: Dictionary = snapshot.enemy_list[idx] as Dictionary
+		var atk: int = int(entry.get("base_attack", 0))
+		var spd: int = int(entry.get("base_speed", 0))
+		dmg_rate_out.append((float(atk * spd) / float(speed_base)) * disadvantage)
+
+
+## Party HP remaining at relative tick [param rel_tick] (ticks since dispatch).
+## Drives the watchable-battle HP bar (GDD #34 Phase 4) — a TRUTHFUL read from the
+## same two-sided-race math as [method compute_run_outcome], so for a losing run
+## the value reaches 0 at exactly the resolver's [code]defeat_tick[/code] (no faked
+## interpolation; bar/verdict parity by construction, ADR-0021).
+##
+## Per-loop reset (GDD §E.3): the party HP pool refills at each loop boundary, so
+## the result is the CURRENT loop's remaining HP via
+## [code]rel_tick % ticks_per_loop[/code]. Clamp: [code]maxi(0, ceili(party_hp -
+## damage))[/code] — ceili so a barely-alive party reads ≥ 1 (never an empty bar
+## while still fighting), and exactly 0 only once damage ≥ party_hp (the wipe).
+##
+## Edge cases:
+##   - null snapshot → 0 (no run → empty bar; callers should hide the bar).
+##   - [param rel_tick] <= 0 → full [code]formation_total_hp[/code] (pre-dispatch /
+##     clock-rewind reads show full HP, never a spurious wipe).
+##   - empty / unkillable enemy_list → full HP (no threat).
+##
+## Pure, allocation-light (two transient arrays per call) — called at most once per
+## 20 Hz UI tick by the dungeon-run-view, well within the idle-game frame budget.
+##
+## GDD #34 §D / Phase 4 — ADR-0021
+func party_hp_remaining_at(snapshot: CombatRunSnapshot, rel_tick: int) -> int:
+	if snapshot == null:
+		return 0
+	var party_hp: int = snapshot.formation_total_hp
+	if rel_tick <= 0:
+		return party_hp
+	var schedule: Array[Dictionary] = _kill_schedule_for_loop(snapshot)
+	if schedule.is_empty():
+		return party_hp  # No enemies → no damage → full HP.
+	var rel_death: Array[int] = []
+	var dmg_rate: Array[float] = []
+	_build_race_arrays(snapshot, schedule, rel_death, dmg_rate)
+	var ticks_per_loop: int = rel_death[rel_death.size() - 1]
+	if ticks_per_loop <= 0:
+		return party_hp  # Degenerate single-tick clear → no damage window.
+	var loop_tick: int = rel_tick % ticks_per_loop
+	var damage: float = _party_damage_by(loop_tick, rel_death, dmg_rate)
+	return maxi(0, ceili(float(party_hp) - damage))
 
 
 ## Internal: fetch MATCHUP_PARTY_DISADVANTAGE with silent fallback to 1.0

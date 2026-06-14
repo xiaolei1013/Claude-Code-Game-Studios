@@ -6,8 +6,17 @@
 ##      labels O(1) from [member DungeonRunOrchestrator.run_snapshot] (no allocs).
 ##   2. [signal DungeonRunOrchestrator.state_changed] → detects RUN_ENDED,
 ##      shows the run-end overlay (Story 012 AC-6 preferred path), and
-##      auto-routes to victory_moment via [method SceneManager.request_screen]
-##      (Story 013 AC-1 / AC-7).
+##      auto-routes via [method SceneManager.request_screen] (Story 013 AC-1/AC-7).
+##      Defeat & Injury Phase 4 (GDD #34 §I) forks this route on the run verdict:
+##      a WIN routes to victory_moment; a DEFEAT shows a distinct defeat overlay
+##      and routes to guild_hall (the injured-party recovery surface).
+##   3. [signal DungeonRunOrchestrator.run_defeated] → the dedicated DEFEAT moment;
+##      surfaces the distinct defeat overlay the instant the run is lost (Phase 4).
+##
+## A watchable-battle read-model (Phase 4) also polls four orchestrator getters
+## each tick (current_party_hp / max_party_hp / enemies_remaining / enemy_total)
+## to drive a party HP bar + enemy-depletion count so the two-sided HP race is
+## visible in real time.
 ##
 ## Acceptance Criteria (8 ACs from Story 012, Sprint 8 S8-M2):
 ##   AC-1: Live tick display — refreshes on every tick_fired; lags ≤1 tick.
@@ -158,6 +167,16 @@ var _routed: bool = false
 var _wire_built: bool = false
 var _float_layer: Control = null
 
+## Watchable-battle read-model widgets (Defeat & Injury Phase 4, GDD #34 §I).
+## Built additively inside the wireframe HUD; refreshed per tick from the
+## orchestrator's party-HP + enemy-lineup getters so the player can WATCH the
+## two-sided HP race deplete in real time (and read the defeat moment, L4).
+## All three are null until [method _build_wireframe_once] runs; every refresh
+## path null-guards them.
+var _party_hp_bar: ProgressBar = null
+var _party_hp_label: Label = null
+var _enemies_remaining_label: Label = null
+
 
 # ---------------------------------------------------------------------------
 # Built-in lifecycle (_ready — tap-target + label localisation)
@@ -222,6 +241,15 @@ func on_enter() -> void:
 	# Subscribe to state_changed — preferred RUN_ENDED detection path (AC-6).
 	if not DungeonRunOrchestrator.state_changed.is_connected(_on_state_changed):
 		DungeonRunOrchestrator.state_changed.connect(_on_state_changed)
+
+	# Defeat & Injury Phase 4 (GDD #34 §I): subscribe run_defeated so the DEFEAT
+	# moment surfaces its own distinct overlay (NOT the victory run-end overlay).
+	# Fires the instant the run is lost, just before the FSM transition to
+	# RUN_ENDED. The ROUTE decision (guild_hall vs victory_moment) lives in
+	# _on_state_changed, which consults was_last_run_defeated() so it stays
+	# correct even if this signal is missed. Disconnected in on_exit.
+	if not DungeonRunOrchestrator.run_defeated.is_connected(_on_run_defeated):
+		DungeonRunOrchestrator.run_defeated.connect(_on_run_defeated)
 
 	# Sprint 10 S10-M4: subscribe to HeroRoster.hero_leveled so the orchestrator's
 	# stub XP grant on floor-clear surfaces a player-visible toast. Disconnected
@@ -294,6 +322,10 @@ func on_exit() -> void:
 	if DungeonRunOrchestrator.state_changed.is_connected(_on_state_changed):
 		DungeonRunOrchestrator.state_changed.disconnect(_on_state_changed)
 
+	# Defeat & Injury Phase 4: mirror the on_enter run_defeated subscription.
+	if DungeonRunOrchestrator.run_defeated.is_connected(_on_run_defeated):
+		DungeonRunOrchestrator.run_defeated.disconnect(_on_run_defeated)
+
 	# Sprint 10 S10-M4: mirror the on_enter hero_leveled subscription.
 	if HeroRoster.hero_leveled.is_connected(_on_hero_leveled):
 		HeroRoster.hero_leveled.disconnect(_on_hero_leveled)
@@ -352,9 +384,15 @@ func _on_tick_fired(_tick_number: int) -> void:
 	if orch_snapshot == null:
 		return
 
-	# HOT PATH: two str(int) label writes — the only work done at 20 Hz.
+	# HOT PATH: two str(int) label writes — the cheap O(1) tick/kill readout.
 	_tick_label.text = str(orch_snapshot.current_tick)
 	_kill_count_label.text = str(orch_snapshot.kill_count)
+
+	# Watchable-battle HP bar + enemy depletion (Defeat & Injury Phase 4). Polls
+	# the orchestrator getters each tick — this rebuilds a small per-loop kill
+	# schedule array per call, an acceptable cost at 20 Hz for an idle game with
+	# a handful of enemies (the project is "never CPU-bound", per the perf budget).
+	_refresh_battle_status()
 
 
 # ---------------------------------------------------------------------------
@@ -363,11 +401,24 @@ func _on_tick_fired(_tick_number: int) -> void:
 
 ## Handles [signal DungeonRunOrchestrator.state_changed].
 ##
-## When [param new_state] == RUN_ENDED, shows the run-end overlay (Story 012)
-## and auto-routes to victory_moment via SceneManager.request_screen (Story 013 AC-1).
+## When [param new_state] == RUN_ENDED this is the SOLE run-end routing decision
+## point. It consults [method DungeonRunOrchestrator.was_last_run_defeated] and
+## forks:
+##   - WIN   → victory run-end overlay (Story 012) + route to victory_moment
+##             (Story 013 AC-1).
+##   - DEFEAT→ distinct defeat overlay (GDD #34 §I) + route to guild_hall, the
+##             injured-party recovery surface (Phase 3 already shows injured
+##             cards there). NEVER victory_moment.
+##
+## Reading the verdict from the getter (rather than only from the run_defeated
+## signal) keeps routing correct even when run_defeated was missed — e.g. a very
+## short doomed run whose defeat fired before this screen subscribed, replayed by
+## SceneManager at transition_complete. [method _on_run_defeated] still shows the
+## defeat overlay early when the signal IS observed; here it is re-shown
+## idempotently as the fallback.
 ##
 ## Two distinct idempotency guards cooperate here:
-##   [member _overlay_shown] — prevents the overlay from being shown twice.
+##   [member _overlay_shown] — prevents either overlay from being shown twice.
 ##   [member _routed]        — prevents request_screen from being called twice
 ##                             (AC-5 Story 013; a second call while TRANSITIONING
 ##                             would overwrite the queue with push_warning).
@@ -376,11 +427,10 @@ func _on_tick_fired(_tick_number: int) -> void:
 ## call, making this handler async. The [member _routed] flag is set BEFORE
 ## the await so any re-entrant emission during the dwell is a no-op.
 ## Sprint 9 S9-M2: default RUN_END_DWELL_MS = 1500 — overlay holds for 1.5 s
-## before the cross-fade to victory_moment fires.
+## before the cross-fade fires.
 ##
-## AC-7 Story 013: request_screen("victory_moment", CROSS_FADE) is the sole
-## screen-change call — no SceneTree.change_scene_to_* call anywhere in
-## this handler.
+## AC-7 Story 013: request_screen(...) is the sole screen-change call — no
+## SceneTree.change_scene_to_* call anywhere in this handler.
 func _on_state_changed(new_state: int, _old_state: int) -> void:
 	if new_state != DungeonRunStateScript.State.RUN_ENDED:
 		return
@@ -388,18 +438,29 @@ func _on_state_changed(new_state: int, _old_state: int) -> void:
 		return  # AC-5 idempotency — route already requested; ignore duplicate.
 	_routed = true
 
-	# Show run-end overlay (Story 012 surface). _overlay_shown guards double-show.
-	var final_kills: int = 0
-	if DungeonRunOrchestrator.run_snapshot != null:
-		final_kills = DungeonRunOrchestrator.run_snapshot.kill_count
-	_show_run_end_overlay(final_kills)
+	# Fork on the run verdict. was_last_run_defeated() survives into RUN_ENDED
+	# (reset only at the next dispatch), so it is authoritative here even if the
+	# run_defeated signal was missed during a transition-replay.
+	var defeated: bool = DungeonRunOrchestrator.was_last_run_defeated()
+	if defeated:
+		# Defeat moment — normally already shown by _on_run_defeated; _show_defeat_
+		# overlay is idempotent so this is a harmless re-show on the fallback path.
+		_show_defeat_overlay(DungeonRunOrchestrator.get_dispatched_floor_index())
+	else:
+		# Victory run-end overlay (Story 012). _overlay_shown guards double-show.
+		var final_kills: int = 0
+		if DungeonRunOrchestrator.run_snapshot != null:
+			final_kills = DungeonRunOrchestrator.run_snapshot.kill_count
+		_show_run_end_overlay(final_kills)
 
 	# Optional dwell before routing (AC-3 Story 013, expanded by Sprint 9 S9-M2).
 	# RUN_END_DWELL_MS = 1500 (Sprint 9 S9-M2) — await holds the overlay for ≥1500 ms.
 	if RUN_END_DWELL_MS > 0:
 		await get_tree().create_timer(RUN_END_DWELL_MS / 1000.0).timeout
 
-	SceneManager.request_screen("victory_moment", SceneManager.TransitionType.CROSS_FADE)
+	# DEFEAT → guild_hall recovery surface; WIN → victory_moment (Story 013 AC-1).
+	var destination: String = "guild_hall" if defeated else "victory_moment"
+	SceneManager.request_screen(destination, SceneManager.TransitionType.CROSS_FADE)
 
 
 # ---------------------------------------------------------------------------
@@ -416,9 +477,35 @@ func _refresh_display() -> void:
 	if orch_snapshot == null:
 		_tick_label.text = "0"
 		_kill_count_label.text = "0"
+		_refresh_battle_status()
 		return
 	_tick_label.text = str(orch_snapshot.current_tick)
 	_kill_count_label.text = str(orch_snapshot.kill_count)
+	_refresh_battle_status()
+
+
+## Refreshes the watchable-battle party HP bar + enemy-depletion count from the
+## orchestrator read-model getters (Defeat & Injury Phase 4, GDD #34 §I). Pure
+## display — reads four getters, writes the bar value + two numeric labels. All
+## widgets are null until [method _build_wireframe_once] runs, so every write is
+## null-guarded; the call is a harmless no-op before the HUD is built.
+##
+## Truthful bar: [method DungeonRunOrchestrator.current_party_hp] delegates to the
+## resolver's defeat-verdict curve, so the bar reaches 0 exactly at the run's
+## defeat_tick (ADR-0021). The numeric "cur/max" + "remaining/total" labels keep
+## the readout colorblind-safe (never color-only).
+func _refresh_battle_status() -> void:
+	var cur_hp: int = DungeonRunOrchestrator.current_party_hp()
+	var max_hp: int = DungeonRunOrchestrator.max_party_hp()
+	var remaining: int = DungeonRunOrchestrator.enemies_remaining()
+	var total: int = DungeonRunOrchestrator.enemy_total()
+	if _party_hp_bar != null:
+		_party_hp_bar.max_value = maxf(1.0, float(max_hp))
+		_party_hp_bar.value = float(cur_hp)
+	if _party_hp_label != null:
+		_party_hp_label.text = "HP %d/%d" % [cur_hp, max_hp]
+	if _enemies_remaining_label != null:
+		_enemies_remaining_label.text = "Enemies %d/%d" % [remaining, total]
 
 
 # ---------------------------------------------------------------------------
@@ -550,10 +637,48 @@ func _live_toast_count() -> int:
 ## AC-3: overlay visible and non-blocking (does not freeze the tree;
 ## requires no player input to continue — Story 013 owns the auto-route).
 func _show_run_end_overlay(final_kill_count: int) -> void:
+	if _overlay_shown:
+		return
 	_overlay_shown = true
 	# S10-N1: hoisted safe-format pattern via UIFramework.format_localized.
 	_run_end_label.text = UIFrameworkScript.format_localized(
 		"run_complete_kill_count_format", [final_kill_count]
+	)
+	if _stats_panel != null:
+		_stats_panel.visible = false
+	_run_end_overlay.visible = true
+
+
+# ---------------------------------------------------------------------------
+# Defeat moment — distinct run-end surface (Defeat & Injury Phase 4, GDD #34 §I)
+# ---------------------------------------------------------------------------
+
+## Handles [signal DungeonRunOrchestrator.run_defeated] — the dedicated DEFEAT
+## moment (GDD #34 §I / ADR-0021 AC-34-04/05). Fires the instant the in-flight
+## run is lost, just BEFORE the FSM transition to RUN_ENDED, so the defeat overlay
+## appears on the same frame the player's party is driven back.
+##
+## This handler shows the overlay only — the screen ROUTE (to guild_hall, not
+## victory_moment) is owned by [method _on_state_changed], which fires immediately
+## afterward in the same call stack and consults
+## [method DungeonRunOrchestrator.was_last_run_defeated] so routing stays correct
+## even if this signal was never observed (transition-replay of a short run).
+func _on_run_defeated(floor_index: int, _biome_id: String) -> void:
+	_show_defeat_overlay(floor_index)
+
+
+## Shows the DEFEAT moment overlay (GDD #34 §I) — distinct copy from the victory
+## run-end overlay, reusing the same RunEndOverlay container + label (one overlay
+## surface, two messages). Cozy, non-punishing framing per the game's tone:
+## "Driven back at Floor N — your guild is recovering." Idempotent via
+## [member _overlay_shown] so the signal path and the _on_state_changed fallback
+## path never double-show or fight over the label text.
+func _show_defeat_overlay(floor_index: int) -> void:
+	if _overlay_shown:
+		return
+	_overlay_shown = true
+	_run_end_label.text = UIFrameworkScript.format_localized(
+		"run_defeat_floor_format", [floor_index]
 	)
 	if _stats_panel != null:
 		_stats_panel.visible = false
@@ -607,6 +732,11 @@ func _build_wireframe_once() -> void:
 	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_float_layer = layer
 
+	# Snap the watchable-battle widgets to the current run state now that they
+	# exist (on_enter's earlier _refresh_display ran before this build, so the
+	# bar/labels were still null then).
+	_refresh_battle_status()
+
 
 func _reposition_existing_nodes_drv() -> void:
 	var header: Label = get_node_or_null("HeaderLabel") as Label
@@ -630,6 +760,31 @@ func _build_party_hud() -> void:
 	add_child(panel)
 	_place(panel, 0, 0, 0, 0, 14.0, 14.0, 324.0, 232.0)
 	var body: VBoxContainer = WireframeKitScript.body_of(panel)
+
+	# Watchable-battle aggregate party HP bar (Defeat & Injury Phase 4, GDD #34 §I).
+	# The combat resolver models party HP as a SINGLE pool driving the two-sided
+	# race, so one aggregate bar is the truthful representation — per-hero bars
+	# would be a fiction the model can't back. Built BEFORE the formation tiles +
+	# the empty-party early-return so the bar exists even on a dev-nav idle DRV.
+	# A numeric "cur/max" label rides alongside the bar so the readout stays
+	# colorblind-safe (never color-only) per the UI accessibility contract.
+	var hp_wrap: VBoxContainer = VBoxContainer.new()
+	hp_wrap.name = "PartyHpRow"
+	hp_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp_wrap.add_theme_constant_override("separation", 2)
+	_party_hp_label = WireframeKitScript.caption("HP —/—", WireframeKitScript.TEXT, 12)
+	_party_hp_label.name = "PartyHpLabel"
+	hp_wrap.add_child(_party_hp_label)
+	_party_hp_bar = ProgressBar.new()
+	_party_hp_bar.name = "PartyHpBar"
+	_party_hp_bar.custom_minimum_size = Vector2(0, 14)
+	_party_hp_bar.show_percentage = false
+	_party_hp_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_party_hp_bar.max_value = 100.0
+	_party_hp_bar.value = 100.0
+	hp_wrap.add_child(_party_hp_bar)
+	body.add_child(hp_wrap)
+
 	var party: Array = []
 	if HeroRoster != null:
 		party = HeroRoster.get_formation_heroes()
@@ -664,6 +819,16 @@ func _build_enemy_lineup_drv() -> void:
 	add_child(panel)
 	_place(panel, 0.5, 0, 0.5, 0, -280.0, 188.0, 280.0, 384.0)
 	var body: VBoxContainer = WireframeKitScript.body_of(panel)
+
+	# Watchable-battle live lineup-depletion count (Defeat & Injury Phase 4, GDD
+	# #34 §I): "Enemies remaining / total", polled per tick. Distinct from the
+	# static sprite cells below (which show WHAT is on the floor) — this numeric
+	# readout shows HOW MANY are left as the party focus-fires through them.
+	# Added before the empty-list early-return so the count is always present.
+	_enemies_remaining_label = WireframeKitScript.caption("Enemies —/—", WireframeKitScript.TEXT, 13)
+	_enemies_remaining_label.name = "EnemiesRemainingLabel"
+	_enemies_remaining_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	body.add_child(_enemies_remaining_label)
 
 	var enemies: Array = _resolve_floor_enemies()
 	if enemies.is_empty():
