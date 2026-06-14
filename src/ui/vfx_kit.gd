@@ -37,7 +37,7 @@ const DEFAULT_LIFETIME: float = 0.6
 ##
 ## [param parent]: a [Node2D]/[Control]/[CanvasItem] already in the tree.
 ## [param local_position]: burst origin in [param parent]'s local space.
-## [param texture]: particle sprite (e.g. res://assets/art/demo/vfx/vfx_aura_a.png).
+## [param texture]: particle sprite (e.g. res://assets/vfx/particles/gold_sparkle.png).
 ## [param tint]: per-particle color — pass a VfxKit palette constant.
 ## [param amount]: particle count (Steam Deck budget: keep ≤ ~24 per burst).
 ## [param lifetime]: seconds each particle lives.

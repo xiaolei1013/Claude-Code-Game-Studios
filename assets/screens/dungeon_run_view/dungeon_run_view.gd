@@ -67,9 +67,10 @@ const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
 const EnemySpriteFactoryScript = preload("res://src/ui/enemy_sprite_factory.gd")
 const VfxKitScript = preload("res://src/ui/vfx_kit.gd")
 
-## S28-N1 VFX: gitignored demo burst texture path. Loaded best-effort in on_enter
-## (absent on CI / fresh clone → null → VfxKit no-ops, no crash).
-const VFX_BURST_TEXTURE_PATH: String = "res://assets/art/demo/vfx/vfx_aura_a.png"
+## S28-N1 VFX: kill-burst particle texture (committed product art, gold sparkle).
+## Loaded best-effort in on_enter; still tolerates a missing texture (un-imported
+## on a fresh clone before the asset import runs → null → VfxKit no-ops, no crash).
+const VFX_BURST_TEXTURE_PATH: String = "res://assets/vfx/particles/gold_sparkle.png"
 
 ## S28-N1 VFX burst layer — created in on_enter, freed in on_exit. Kill-feedback
 ## particle bursts spawn into it via VfxKit so they never pollute the screen's
@@ -235,14 +236,19 @@ func on_enter() -> void:
 	if FloorUnlock.has_signal("biome_unlocked") and not FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked):
 		FloorUnlock.biome_unlocked.connect(_on_biome_unlocked)
 
-	# S28-N1 VFX: create the burst container + subscribe kill feedback. The demo
-	# texture is gitignored (load best-effort); absent → VfxKit no-ops (no crash).
+	# S28-N1 VFX: create the burst container + subscribe kill feedback. The burst
+	# texture is committed product art (gold sparkle); load best-effort so a
+	# missing/un-imported texture still no-ops in VfxKit (no crash).
 	# Disconnected + freed in on_exit (AC-5 lifecycle hygiene).
 	if _vfx_layer == null:
 		_vfx_layer = Node2D.new()
 		_vfx_layer.name = "VfxBurstLayer"
 		add_child(_vfx_layer)
-	if _vfx_burst_texture == null and FileAccess.file_exists(VFX_BURST_TEXTURE_PATH):
+	# ResourceLoader.exists (not FileAccess.file_exists) so the texture resolves
+	# in an exported build, where the source .png is stripped and only the
+	# imported .ctex is packed — FileAccess on the .png would falsely report
+	# "missing" and silently drop the kill burst from the shipped game.
+	if _vfx_burst_texture == null and ResourceLoader.exists(VFX_BURST_TEXTURE_PATH):
 		_vfx_burst_texture = load(VFX_BURST_TEXTURE_PATH) as Texture2D
 	if not DungeonRunOrchestrator.enemy_killed.is_connected(_on_enemy_killed_vfx):
 		DungeonRunOrchestrator.enemy_killed.connect(_on_enemy_killed_vfx)

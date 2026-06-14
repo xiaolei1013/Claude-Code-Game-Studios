@@ -63,6 +63,13 @@ const PALETTE: Dictionary[String, Color] = {
 ## biome" register per the cozy onboarding fantasy.
 const FALLBACK_BIOME_ID: String = "forest_reach"
 
+## Directory holding per-biome background art (ADR-0019 §Decision 3 real-art
+## swap-in). A PNG named "<biome_id>.png" here is composited above the palette
+## ColorRect when present; biomes with no shipped art (e.g. guild_hall_tavern)
+## fall back to the flat palette color. This is the zero-`.tscn`-change swap
+## path the §Decision 3 note anticipated.
+const ART_DIR: String = "res://assets/art/backgrounds/"
+
 ## Floor index that triggers boss-floor visual modulation. MVP biomes all
 ## have exactly 5 floors (per Biome DB); this constant captures the
 ## "biome's terminal floor" assumption explicitly. When a V1.0 biome ships
@@ -87,6 +94,13 @@ var _current_biome_id: String = ""
 ## same biome+floor is a no-op, while a floor transition within the same
 ## biome (e.g., F4 → F5 boss) is correctly detected and re-rendered.
 var _current_floor_index: int = 0
+
+## Real-art layer (ADR-0019 §Decision 3 swap-in). A full-rect child
+## [TextureRect] that displays the biome's background PNG above the palette
+## ColorRect when one exists at [constant ART_DIR]. Created lazily on the first
+## [method set_biome]. Hidden (palette shows through) for biomes with no
+## shipped art. mouse_filter=IGNORE so it never intercepts taps on the UI above.
+var _art_layer: TextureRect = null
 
 
 ## Updates the visible palette to match [param biome_id], with optional
@@ -129,7 +143,11 @@ func set_biome(biome_id: String, floor_index: int = 0) -> void:
 	var old_id: String = _current_biome_id
 	_current_biome_id = resolved_id
 	_current_floor_index = floor_index
+	# The palette ColorRect is still set on every change — it is both the
+	# documented contract surface (biome_background_test.gd Group B asserts
+	# `color`) and the fallback shown when a biome has no shipped art.
 	color = modulated_color
+	_update_art_layer(resolved_id, floor_index)
 	if old_id != resolved_id:
 		biome_changed.emit(old_id, resolved_id)
 
@@ -138,3 +156,52 @@ func set_biome(biome_id: String, floor_index: int = 0) -> void:
 ## has not been called yet.
 func get_biome() -> String:
 	return _current_biome_id
+
+
+## Lazily creates the full-rect real-art [TextureRect] child (see
+## [member _art_layer]) and returns it. Idempotent — returns the existing
+## layer on subsequent calls. The layer fills the BiomeBackground rect, never
+## intercepts input, and starts hidden until a biome with art is set.
+func _ensure_art_layer() -> TextureRect:
+	if _art_layer != null and is_instance_valid(_art_layer):
+		return _art_layer
+	var layer: TextureRect = TextureRect.new()
+	layer.name = "BiomeArt"
+	# COVER so a 16:9 background fills the rect at any aspect (crops overflow)
+	# rather than letter-boxing — the cozy diorama should bleed to the edges.
+	layer.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	layer.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.visible = false
+	# Added as a child of the z=-1 ColorRect, so it composites at the same
+	# layer the tilt-shift BackBufferCopy captures (ADR-0019 §Decision 1) —
+	# the real art receives the HD-2D blur exactly like the placeholder did.
+	add_child(layer)
+	_art_layer = layer
+	return layer
+
+
+## Shows the biome's background PNG above the palette ColorRect when one exists
+## at [constant ART_DIR], darkened on the boss floor to match the palette
+## modulation; hides the layer (palette shows through) when the biome ships no
+## art. Uses [method ResourceLoader.exists] so an un-imported / missing texture
+## degrades to the palette fallback instead of erroring.
+func _update_art_layer(resolved_id: String, floor_index: int) -> void:
+	var layer: TextureRect = _ensure_art_layer()
+	var art_path: String = ART_DIR + resolved_id + ".png"
+	if not ResourceLoader.exists(art_path):
+		layer.visible = false
+		layer.texture = null
+		return
+	var tex: Texture2D = load(art_path) as Texture2D
+	if tex == null:
+		layer.visible = false
+		layer.texture = null
+		return
+	layer.texture = tex
+	layer.visible = true
+	# Mirror the boss-floor darken the palette applies, so a real-art boss
+	# floor reads as the same "dusk → night" transition (AC for parity).
+	var darken: float = BOSS_FLOOR_DARKEN_FACTOR if floor_index == BOSS_FLOOR_INDEX_MVP else 1.0
+	layer.modulate = Color(darken, darken, darken, 1.0)
