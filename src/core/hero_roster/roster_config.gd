@@ -45,6 +45,18 @@ extends GameData
 ## requests to [code][1, level_cap][/code]. Must be >= 1.
 @export_range(1, 50) var level_cap: int = 15
 
+## Defeat-injury recovery duration, in WALL-CLOCK seconds (GDD #34 Phase 3 /
+## ADR-0021). When a party is defeated, each dispatched hero's
+## [code]injured_until[/code] is set to [code]now_ms + injury_recovery_seconds * 1000[/code].
+## Default 1800 (30 min) per GDD #34 §G. Constraint: must be >= 0; the 0 value
+## is a valid designer dial meaning "injuries heal instantly" (no downtime).
+##
+## Seconds — NOT ticks — to match the project's [code]offline_cap_seconds[/code]
+## convention and because recovery is wall-clock (elapses while backgrounded /
+## offline per AC-34-05). This is the deliberate deviation from GDD #34's literal
+## "INJURY_RECOVERY_TICKS" naming; see ADR-0021 / the GDD §D/§G amendment.
+@export_range(0, 86_400) var injury_recovery_seconds: int = 1800
+
 
 # ---------------------------------------------------------------------------
 # Validation
@@ -61,6 +73,7 @@ extends GameData
 ##   2. [member formation_size] >= 1
 ##   3. [member max_roster_size] >= 1
 ##   4. [member level_cap] >= 1
+##   5. [member injury_recovery_seconds] >= 0 (GDD #34 Phase 3; 0 == instant heal)
 ##
 ## ADR-0011 §Decision — per-resource _validate() pattern.
 func _validate() -> Array[String]:
@@ -80,5 +93,10 @@ func _validate() -> Array[String]:
 
 	if level_cap < 1:
 		errors.append("level_cap must be >= 1; got %d" % level_cap)
+
+	if injury_recovery_seconds < 0:
+		errors.append(
+			"injury_recovery_seconds must be >= 0; got %d" % injury_recovery_seconds
+		)
 
 	return errors

@@ -99,6 +99,13 @@ func on_enter() -> void:
 		HeroRoster.hero_removed.connect(_on_roster_changed)
 	if not HeroRoster.hero_leveled.is_connected(_on_hero_leveled):
 		HeroRoster.hero_leveled.connect(_on_hero_leveled)
+	# GDD #34 Phase 3 — re-render the roster when a defeat injures heroes so the
+	# faded "Injured" marks appear live if the player is on this screen (e.g.
+	# returning from a doomed run). _on_roster_changed accepts up to 3 optional
+	# args; heroes_injured emits 2 (ids, until_ms), both ignored — we rebuild
+	# from current roster state.
+	if not HeroRoster.heroes_injured.is_connected(_on_roster_changed):
+		HeroRoster.heroes_injured.connect(_on_roster_changed)
 
 	# Sprint 20 S20-M5 — refresh synergy badge per current formation.
 	# Re-evaluates on each roster change since recruits / removals / level-ups
@@ -150,6 +157,8 @@ func on_exit() -> void:
 		HeroRoster.hero_removed.disconnect(_on_roster_changed)
 	if HeroRoster.hero_leveled.is_connected(_on_hero_leveled):
 		HeroRoster.hero_leveled.disconnect(_on_hero_leveled)
+	if HeroRoster.heroes_injured.is_connected(_on_roster_changed):
+		HeroRoster.heroes_injured.disconnect(_on_roster_changed)
 	if FloorUnlock.has_signal("biome_unlocked") and FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked):
 		FloorUnlock.biome_unlocked.disconnect(_on_biome_unlocked)
 	if _settings_gear_button != null and _settings_gear_button.pressed.is_connected(_on_settings_gear_pressed):
@@ -476,6 +485,17 @@ func _build_hero_card(hero: RefCounted) -> Button:
 	card.pressed.connect(_on_hero_card_pressed.bind(instance_id))
 	# Touch-feedback pulse + UI tap chime per Art Bible §7 / ADR-0008 §wire_touch_feedback.
 	UIFrameworkScript.wire_touch_feedback(card)
+
+	# GDD #34 Phase 3 (Defeat & Injury / ADR-0021 AC-34-09): a hero still
+	# recovering from a defeat reads as faded + an "Injured · <countdown>" badge
+	# so the player sees at a glance who can't be dispatched. injured_until is a
+	# wall-clock Unix-ms instant (0 = healthy); is-injured = injured_until > now.
+	# The mark is purely additive (badge child + modulate dim) — it never moves
+	# the existing card subtree. Recovered heroes render unmarked on the next refresh.
+	var injured_until: int = int(hero.get("injured_until"))
+	var now_ms: int = TickSystem.now_ms()
+	if injured_until > now_ms:
+		UIFrameworkScript.mark_injured(card, (injured_until - now_ms) / 1000)
 	return card
 
 

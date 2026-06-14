@@ -2,6 +2,8 @@ keys,en
 formation_assignment_instructional_header,Send your guild to:
 slot_empty_label,Empty
 slot_selected_badge,Selected
+injured_badge_label,Injured
+injured_badge_format,Injured · %s
 dispatch_button,Dispatch
 dispatch_error_empty_formation,Assign at least one hero to your formation.
 dispatch_error_floor_locked,That floor is locked.

@@ -470,3 +470,101 @@ static func synergy_effect_text(synergy_id: String) -> String:
 	if synergy_id == "":
 		return ""
 	return TranslationServer.translate("class_synergy_effect_" + synergy_id)
+
+
+# ---------------------------------------------------------------------------
+# Injury marks (GDD #34 Phase 3 / ADR-0021 — AC-34-09)
+# ---------------------------------------------------------------------------
+
+## Node name of the additive injury badge Label attached to a hero card / slot.
+## Stable so screen tests can locate it via [code]get_node_or_null[/code] and so
+## [method mark_injured] can update an existing badge in place rather than
+## stacking duplicates across panel refreshes.
+const INJURED_BADGE_NAME: StringName = &"InjuredBadge"
+
+## Modulate alpha applied to an injured hero card / slot. A 50% fade reads as
+## "unavailable" WITHOUT relying on hue (colorblind-safe per ui-code rules —
+## the literal "Injured" badge text is the primary, non-color signal). Mirrors
+## the existing toast [code]modulate.a[/code] fade idiom rather than introducing
+## a palette Color literal (DESIGN.md / ADR-0008 §no-Color-literals).
+const INJURED_DIM_ALPHA: float = 0.5
+
+## Theme type variation the injury badge resolves against, so a future
+## parchment_theme.tres pass can style it (warm "field-dressing" tag look)
+## without touching call sites. Falls back to default Label styling until then.
+const INJURED_BADGE_VARIATION: StringName = &"InjuredBadge"
+
+
+## Formats a wall-clock recovery remainder (in whole seconds) as a compact
+## human countdown for the injury badge. Coarsens to the largest meaningful
+## unit so a 30-minute recovery reads "30m" rather than "1800s":
+##   [code]3725[/code] → [code]"1h 2m"[/code]
+##   [code]1800[/code] → [code]"30m"[/code]
+##   [code]90[/code]   → [code]"1m"[/code]
+##   [code]45[/code]   → [code]"45s"[/code]
+##   [code]0[/code] / negative → [code]""[/code] (caller renders the bare
+##   "Injured" label; recovery is effectively complete).
+##
+## Pure function (no Node / autoload / locale dependency) → directly unit-testable.
+static func format_recovery_countdown(remaining_seconds: int) -> String:
+	if remaining_seconds <= 0:
+		return ""
+	var hours: int = remaining_seconds / 3600
+	var minutes: int = (remaining_seconds % 3600) / 60
+	var seconds: int = remaining_seconds % 60
+	if hours > 0:
+		return "%dh %dm" % [hours, minutes]
+	if minutes > 0:
+		return "%dm" % minutes
+	return "%ds" % seconds
+
+
+## Marks [param card] (a hero card Button or formation slot Button) as injured:
+## dims it to [constant INJURED_DIM_ALPHA] and attaches (or updates) an additive,
+## non-interactive [constant INJURED_BADGE_NAME] Label showing "Injured · <countdown>".
+##
+## ADDITIVE contract (project memory: screen-node hard-path coupling — never
+## reparent): the badge is a NEW child of [param card]; nothing in the existing
+## card subtree moves. The badge is [code]MOUSE_FILTER_IGNORE[/code] so taps pass
+## straight through to the parent Button (an injured hero is still tappable for
+## inspection / slot assignment — only DISPATCH is gated, per AC-34-04). Anchored
+## top-right so it doesn't obscure the hero name/level text drawn top-left.
+##
+## Idempotent: re-marking an already-marked card updates the badge text in place
+## instead of stacking a second Label (safe to call every panel refresh).
+##
+## ADR-0008 §mouse_filter defaults (decorative overlays IGNORE).
+static func mark_injured(card: Control, remaining_seconds: int) -> void:
+	if card == null:
+		push_error("[UIFramework] mark_injured called with null card.")
+		return
+	card.modulate.a = INJURED_DIM_ALPHA
+	var badge: Label = card.get_node_or_null(NodePath(INJURED_BADGE_NAME)) as Label
+	if badge == null:
+		badge = Label.new()
+		badge.name = INJURED_BADGE_NAME
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge.theme_type_variation = INJURED_BADGE_VARIATION
+		# Top-right corner — keeps the name/level (drawn top-left) legible.
+		badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		badge.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		card.add_child(badge)
+	var countdown: String = format_recovery_countdown(remaining_seconds)
+	if countdown.is_empty():
+		badge.text = format_localized("injured_badge_label", [])
+	else:
+		badge.text = format_localized("injured_badge_format", [countdown])
+
+
+## Reverses [method mark_injured]: restores full opacity and removes the injury
+## badge if present. A no-op on a card that was never marked. Provided for
+## symmetry / live recovery without a full panel rebuild; the screens currently
+## rebuild cards each refresh, so a recovered hero simply renders unmarked.
+static func clear_injured(card: Control) -> void:
+	if card == null:
+		return
+	card.modulate.a = 1.0
+	var badge: Node = card.get_node_or_null(NodePath(INJURED_BADGE_NAME))
+	if badge != null:
+		card.remove_child(badge)
+		badge.queue_free()

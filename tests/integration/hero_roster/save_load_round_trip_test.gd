@@ -82,7 +82,7 @@ func test_get_save_data_next_instance_id_is_int() -> void:
 	assert_int(d["next_instance_id"]).is_equal(1)  # default at boot
 
 
-func test_get_save_data_heroes_entries_are_5key_to_dict() -> void:
+func test_get_save_data_heroes_entries_are_6key_to_dict() -> void:
 	var hr: Node = _make_fresh_roster()
 	_inject_hero(hr, 1, "warrior", "Theron", 7, 0)
 	_inject_hero(hr, 2, "mage", "Eldra", 3, 0)
@@ -91,12 +91,54 @@ func test_get_save_data_heroes_entries_are_5key_to_dict() -> void:
 	assert_int(heroes.size()).is_equal(2)
 	for entry in heroes:
 		var dict: Dictionary = entry as Dictionary
-		assert_int(dict.size()).is_equal(5)
+		# 6 keys = 5 original + injured_until (GDD #34 Phase 3 save migration).
+		assert_int(dict.size()).is_equal(6)
 		assert_bool(dict.has("instance_id")).is_true()
 		assert_bool(dict.has("class_id")).is_true()
 		assert_bool(dict.has("display_name")).is_true()
 		assert_bool(dict.has("current_level")).is_true()
 		assert_bool(dict.has("xp")).is_true()
+		assert_bool(dict.has("injured_until")).is_true()
+
+
+func test_injured_until_survives_save_load_round_trip() -> void:
+	# GDD #34 Phase 3 save migration: a hero defeated (injured) before a save
+	# loads back still injured, with the exact wall-clock recovery instant.
+	var src_hr: Node = _make_fresh_roster()
+	var injured: RefCounted = _inject_hero(src_hr, 1, "warrior", "Theron", 7, 0)
+	injured.injured_until = 1_733_000_000_000
+	_inject_hero(src_hr, 2, "mage", "Eldra", 3, 0)  # healthy control
+	var snapshot: Dictionary = src_hr.get_save_data()
+
+	var dst_hr: Node = _make_fresh_roster()
+	dst_hr.load_save_data(snapshot)
+	var h1: HeroInstance = dst_hr.get_hero_by_id(1)
+	var h2: HeroInstance = dst_hr.get_hero_by_id(2)
+	assert_object(h1).is_not_null()
+	assert_int(h1.injured_until).is_equal(1_733_000_000_000)
+	assert_object(h2).is_not_null()
+	assert_int(h2.injured_until).is_equal(0)
+
+
+func test_legacy_hero_without_injured_until_loads_healthy() -> void:
+	# A pre-Phase-3 save omits injured_until entirely → the hero hydrates with
+	# the 0 healthy sentinel (from_dict default), never injured. No crash.
+	var hr: Node = _make_fresh_roster()
+	hr.load_save_data({
+		"heroes": [{
+			"instance_id": 1,
+			"class_id": "warrior",
+			"display_name": "Theron",
+			"current_level": 7,
+			"xp": 0,
+		}],
+		"formation_slots": [0, 0, 0],
+		"next_instance_id": 2,
+	})
+	var hero: HeroInstance = hr.get_hero_by_id(1)
+	assert_object(hero).is_not_null()
+	assert_int(hero.injured_until).is_equal(0)
+	assert_bool(hr.is_hero_injured(1, 1_000_000_000_000)).is_false()
 
 
 # ===========================================================================

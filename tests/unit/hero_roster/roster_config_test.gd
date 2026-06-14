@@ -27,6 +27,12 @@ func test_roster_config_default_level_cap_is_fifteen() -> void:
 	assert_int(cfg.level_cap).is_equal(15)
 
 
+func test_roster_config_default_injury_recovery_seconds_is_1800() -> void:
+	# GDD #34 Phase 3 §G default: 30-minute recovery (wall-clock seconds).
+	var cfg: RosterConfig = RosterConfigScript.new()
+	assert_int(cfg.injury_recovery_seconds).is_equal(1800)
+
+
 func test_roster_config_extends_gamedata() -> void:
 	var cfg: RosterConfig = RosterConfigScript.new()
 	# GameData provides id + display_name fields.
@@ -99,6 +105,24 @@ func test_roster_config_validate_rejects_zero_level_cap() -> void:
 	assert_str(joined).contains("level_cap")
 
 
+func test_roster_config_validate_rejects_negative_injury_recovery_seconds() -> void:
+	# GDD #34 Phase 3: recovery duration must be >= 0 (0 == instant heal).
+	var cfg: RosterConfig = RosterConfigScript.new()
+	cfg.injury_recovery_seconds = -1
+	var errors: Array[String] = cfg._validate()
+	assert_int(errors.size()).is_greater(0)
+	var joined: String = ", ".join(errors)
+	assert_str(joined).contains("injury_recovery_seconds")
+
+
+func test_roster_config_validate_accepts_zero_injury_recovery_seconds() -> void:
+	# Boundary: 0 is a valid designer dial (injuries heal instantly — no downtime).
+	var cfg: RosterConfig = RosterConfigScript.new()
+	cfg.injury_recovery_seconds = 0
+	var errors: Array[String] = cfg._validate()
+	assert_int(errors.size()).is_equal(0)
+
+
 # ===========================================================================
 # Group E: roster_config.tres exists, loads, and validates clean (TR-030)
 # ===========================================================================
@@ -121,6 +145,7 @@ func test_roster_config_tres_default_values_match_gdd() -> void:
 	assert_int(cfg.max_roster_size).is_equal(30)
 	assert_int(cfg.formation_size).is_equal(3)
 	assert_int(cfg.level_cap).is_equal(15)
+	assert_int(cfg.injury_recovery_seconds).is_equal(1800)
 
 
 func test_roster_config_tres_validates_clean() -> void:
@@ -151,6 +176,7 @@ func test_hero_roster_autoload_accessors_return_gdd_defaults() -> void:
 	assert_int(hr.max_roster_size()).is_equal(30)
 	assert_int(hr.formation_size()).is_equal(3)
 	assert_int(hr.level_cap()).is_equal(15)
+	assert_int(hr.injury_recovery_seconds()).is_equal(1800)
 
 
 func test_hero_roster_formation_slots_sized_from_config() -> void:
