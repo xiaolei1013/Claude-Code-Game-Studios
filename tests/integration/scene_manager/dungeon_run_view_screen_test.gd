@@ -476,6 +476,110 @@ func test_dungeon_run_view_screen_on_exit_disconnects_state_changed_subscription
 
 
 # ===========================================================================
+# VFX particle wiring (GDD #27 OQ-27-1): level-up shimmer + first-floor-clear
+# glow. The kill-burst is covered by vfx_kit_test (VfxKit.spawn_burst) + manual
+# screenshot; these guard the SCREEN-side wiring — the connection hygiene that
+# stops the floor-clear signal from leaking or going unwired, and the losing-run
+# gate. reduce_motion is set false (snapshot+restored) so VfxKit actually emits.
+# ===========================================================================
+
+## Counts the live CPUParticles2D bursts under the VFX layer. A burst is "live"
+## until VfxKit's finished→queue_free fires (well after these synchronous asserts).
+func _count_particles(layer: Node) -> int:
+	if layer == null:
+		return 0
+	var n: int = 0
+	for child: Node in layer.get_children():
+		if child is CPUParticles2D:
+			n += 1
+	return n
+
+
+func test_floor_cleared_first_time_connected_on_enter_disconnected_on_exit() -> void:
+	# Arrange
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	# Pre-assert: the floor-clear feedback is wired while the screen is active.
+	# (Regression net: the signal had NO screen-side consumer before this — the
+	# exact "scaffolded-but-unwired" gap this wiring closes.)
+	assert_bool(
+		DungeonRunOrchestrator.floor_cleared_first_time.is_connected(screen._on_floor_cleared_vfx)
+	).override_failure_message(
+		"floor_cleared_first_time must be connected while dungeon_run_view is active"
+	).is_true()
+
+	# Act
+	screen.on_exit()
+
+	# Assert — subscription disconnected (no orphaned connection / leak).
+	assert_bool(
+		DungeonRunOrchestrator.floor_cleared_first_time.is_connected(screen._on_floor_cleared_vfx)
+	).is_false()
+
+	# Cleanup
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_floor_clear_burst_respects_losing_run_gate() -> void:
+	# Arrange
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)  # ensure VfxKit emits (snap-replace off)
+
+	# Act + Assert — a LOSING-run clear is gated (the floor stays the retry
+	# target → no celebration burst).
+	screen.call("_on_floor_cleared_vfx", 5, "forest_reach", true)
+	assert_int(_count_particles(screen._vfx_layer)).override_failure_message(
+		"losing-run floor clear must NOT spawn a celebration burst"
+	).is_equal(0)
+
+	# Act + Assert — a WINNING-run first clear spawns exactly one lantern-glow
+	# burst. This also nets the committed lantern_glow asset (winning→1 requires
+	# the texture to load; CI regenerates the .ctex from the committed PNG).
+	screen.call("_on_floor_cleared_vfx", 5, "forest_reach", false)
+	assert_int(_count_particles(screen._vfx_layer)).override_failure_message(
+		"winning-run first floor clear should spawn exactly one lantern-glow burst"
+	).is_equal(1)
+
+	# Cleanup — restore live autoload state (test isolation).
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_level_up_spawns_parchment_shimmer_burst() -> void:
+	# Arrange
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+
+	# Act — a routine level-up. (Nets the regenerated parchment_shimmer asset:
+	# the shimmer rides the existing hero_leveled toast handler.)
+	screen.call("_on_hero_leveled", 7001, 4, 5)
+
+	# Assert — exactly one shimmer burst in the VFX layer. The level-up Label
+	# toast lives directly under the screen, not the layer, so it is not counted.
+	assert_int(_count_particles(screen._vfx_layer)).override_failure_message(
+		"a level-up should spawn one parchment-shimmer burst into the VFX layer"
+	).is_equal(1)
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+# ===========================================================================
 # AC-8: Routed via SceneManager.request_screen (structural file + extends check)
 # ===========================================================================
 

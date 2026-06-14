@@ -76,17 +76,23 @@ const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
 const EnemySpriteFactoryScript = preload("res://src/ui/enemy_sprite_factory.gd")
 const VfxKitScript = preload("res://src/ui/vfx_kit.gd")
 
-## S28-N1 VFX: kill-burst particle texture (committed product art, gold sparkle).
-## Loaded best-effort in on_enter; still tolerates a missing texture (un-imported
+## VFX particle textures (committed product art). All loaded best-effort in
+## on_enter via _ensure_vfx_texture; each tolerates a missing texture (un-imported
 ## on a fresh clone before the asset import runs → null → VfxKit no-ops, no crash).
+## GDD #27 OQ-27-1 event→texture taxonomy: kill→gold-sparkle, level-up→parchment-
+## shimmer, first floor-clear→lantern-glow.
 const VFX_BURST_TEXTURE_PATH: String = "res://assets/vfx/particles/gold_sparkle.png"
+const VFX_LEVELUP_TEXTURE_PATH: String = "res://assets/vfx/particles/parchment_shimmer.png"
+const VFX_FLOOR_CLEAR_TEXTURE_PATH: String = "res://assets/vfx/particles/lantern_glow.png"
 
-## S28-N1 VFX burst layer — created in on_enter, freed in on_exit. Kill-feedback
-## particle bursts spawn into it via VfxKit so they never pollute the screen's
-## direct children (e.g. the _live_toast_count() scan).
+## VFX burst layer — created in on_enter, freed in on_exit. All event bursts
+## (kill, level-up, floor-clear) spawn into it via VfxKit so they never pollute
+## the screen's direct children (e.g. the _live_toast_count() scan).
 var _vfx_layer: Node2D = null
-## Cached burst texture (may be null — see VFX_BURST_TEXTURE_PATH).
+## Cached burst textures (each may be null — see the *_TEXTURE_PATH consts).
 var _vfx_burst_texture: Texture2D = null
+var _vfx_levelup_texture: Texture2D = null
+var _vfx_floor_clear_texture: Texture2D = null
 
 # ---------------------------------------------------------------------------
 # Constants (Story 013)
@@ -264,22 +270,24 @@ func on_enter() -> void:
 	if FloorUnlock.has_signal("biome_unlocked") and not FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked):
 		FloorUnlock.biome_unlocked.connect(_on_biome_unlocked)
 
-	# S28-N1 VFX: create the burst container + subscribe kill feedback. The burst
-	# texture is committed product art (gold sparkle); load best-effort so a
-	# missing/un-imported texture still no-ops in VfxKit (no crash).
-	# Disconnected + freed in on_exit (AC-5 lifecycle hygiene).
+	# VFX: create the shared burst container + load the three event textures
+	# (committed product art); subscribe the kill + first-floor-clear feedback
+	# signals. (level-up rides the existing hero_leveled subscription above.)
+	# All disconnected + freed in on_exit (AC-5 lifecycle hygiene).
 	if _vfx_layer == null:
 		_vfx_layer = Node2D.new()
 		_vfx_layer.name = "VfxBurstLayer"
 		add_child(_vfx_layer)
-	# ResourceLoader.exists (not FileAccess.file_exists) so the texture resolves
-	# in an exported build, where the source .png is stripped and only the
-	# imported .ctex is packed — FileAccess on the .png would falsely report
-	# "missing" and silently drop the kill burst from the shipped game.
-	if _vfx_burst_texture == null and ResourceLoader.exists(VFX_BURST_TEXTURE_PATH):
-		_vfx_burst_texture = load(VFX_BURST_TEXTURE_PATH) as Texture2D
+	_vfx_burst_texture = _ensure_vfx_texture(_vfx_burst_texture, VFX_BURST_TEXTURE_PATH)
+	_vfx_levelup_texture = _ensure_vfx_texture(_vfx_levelup_texture, VFX_LEVELUP_TEXTURE_PATH)
+	_vfx_floor_clear_texture = _ensure_vfx_texture(_vfx_floor_clear_texture, VFX_FLOOR_CLEAR_TEXTURE_PATH)
 	if not DungeonRunOrchestrator.enemy_killed.is_connected(_on_enemy_killed_vfx):
 		DungeonRunOrchestrator.enemy_killed.connect(_on_enemy_killed_vfx)
+	# First-time floor clear → ceremonial lantern-glow (GDD #27 OQ-27-1, frontier
+	# beat). No existing screen consumes this signal for feedback, so wire it here
+	# where the player is watching the run.
+	if not DungeonRunOrchestrator.floor_cleared_first_time.is_connected(_on_floor_cleared_vfx):
+		DungeonRunOrchestrator.floor_cleared_first_time.connect(_on_floor_cleared_vfx)
 
 	# Initial render — snap labels to the current snapshot (covers the case
 	# where this screen is shown after DISPATCHING has already begun and ticks
@@ -334,13 +342,17 @@ func on_exit() -> void:
 	if FloorUnlock.has_signal("biome_unlocked") and FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked):
 		FloorUnlock.biome_unlocked.disconnect(_on_biome_unlocked)
 
-	# S28-N1 VFX: mirror the enemy_killed subscription + tear down the burst layer.
+	# VFX: mirror the on_enter subscriptions + tear down the burst layer.
 	if DungeonRunOrchestrator.enemy_killed.is_connected(_on_enemy_killed_vfx):
 		DungeonRunOrchestrator.enemy_killed.disconnect(_on_enemy_killed_vfx)
+	if DungeonRunOrchestrator.floor_cleared_first_time.is_connected(_on_floor_cleared_vfx):
+		DungeonRunOrchestrator.floor_cleared_first_time.disconnect(_on_floor_cleared_vfx)
 	if _vfx_layer != null:
 		_vfx_layer.queue_free()
 		_vfx_layer = null
 		_vfx_burst_texture = null
+		_vfx_levelup_texture = null
+		_vfx_floor_clear_texture = null
 
 
 ## Called by SceneManager when a modal overlay opens on top of this screen.
@@ -547,6 +559,16 @@ func _on_hero_leveled(instance_id: int, _old_level: int, new_level: int) -> void
 	var text: String = UIFrameworkScript.format_localized(loc_key, [display_name, new_level])
 	_spawn_run_toast(text, "LevelUpToast_%d" % instance_id, is_milestone)
 
+	# GDD #27 OQ-27-1: a parchment-shimmer accompanies the level-up toast, spawned
+	# at the toast anchor (top-centre). MOSS_SAGE is the level-up accent tint;
+	# milestones burst a little brighter/larger. VfxKit no-ops on reduce_motion or
+	# a missing texture, so this is safe even before the asset imports.
+	if _vfx_layer != null:
+		var shimmer_amount: int = 14 if is_milestone else 9
+		VfxKitScript.spawn_burst(
+			_vfx_layer, size * Vector2(0.5, 0.2), _vfx_levelup_texture,
+			VfxKitScript.MOSS_SAGE, shimmer_amount, 0.7, _reduce_motion())
+
 
 ## Felt-progression: a new region unlocked mid-run (a gate floor cleared). Shows
 ## an emphasized toast naming the region. Defensive — skips if the biome can't be
@@ -604,15 +626,44 @@ func _spawn_run_toast(text: String, node_name: String, emphasized: bool) -> void
 func _on_enemy_killed_vfx(tier: int, _archetype: String, advantaged: bool) -> void:
 	if _vfx_layer == null or _vfx_burst_texture == null:
 		return
-	var reduce_motion: bool = false
-	var sm: Node = get_node_or_null("/root/SceneManager")
-	if sm != null:
-		reduce_motion = bool(sm.get("reduce_motion"))
 	var tint: Color = VfxKitScript.LANTERN_GOLD if advantaged else VfxKitScript.GUILD_AMBER
 	var amount: int = clampi(6 + tier * 2, 6, 20)
 	var origin: Vector2 = size * Vector2(0.5, 0.42)
 	VfxKitScript.spawn_burst(
-		_vfx_layer, origin, _vfx_burst_texture, tint, amount, 0.55, reduce_motion)
+		_vfx_layer, origin, _vfx_burst_texture, tint, amount, 0.55, _reduce_motion())
+
+
+## GDD #27 OQ-27-1: the first-time clear of a floor earns a ceremonial lantern-glow
+## (the frontier fantasy beat). Skipped on a losing run — the floor stays as the
+## retry target, so there is no celebration. Bigger + longer than the kill burst
+## (Art Bible §7: ≤1500 ms ceremonial). VfxKit no-ops on reduce_motion or a missing
+## texture (CI / fresh clone before import).
+func _on_floor_cleared_vfx(_floor_index: int, _biome_id: String, losing_run: bool) -> void:
+	if _vfx_layer == null or _vfx_floor_clear_texture == null or losing_run:
+		return
+	VfxKitScript.spawn_burst(
+		_vfx_layer, size * Vector2(0.5, 0.42), _vfx_floor_clear_texture,
+		VfxKitScript.LANTERN_GOLD, 16, 1.0, _reduce_motion())
+
+
+## Best-effort load of a committed VFX texture, idempotent. Returns [param cached]
+## unchanged when already loaded; otherwise loads via ResourceLoader.exists — NOT
+## FileAccess.file_exists, which falsely reports "missing" in an exported build
+## where the source .png is stripped and only the imported .ctex is packed. A
+## genuinely absent / un-imported texture yields null and VfxKit no-ops (no crash).
+func _ensure_vfx_texture(cached: Texture2D, path: String) -> Texture2D:
+	if cached != null:
+		return cached
+	if ResourceLoader.exists(path):
+		return load(path) as Texture2D
+	return null
+
+
+## Live accessibility preference; true → VfxKit suppresses all emission (snap-
+## replace, GDD #27 OQ-27-3). Safe before the SceneManager autoload exists.
+func _reduce_motion() -> bool:
+	var sm: Node = get_node_or_null("/root/SceneManager")
+	return sm != null and bool(sm.get("reduce_motion"))
 
 
 ## Counts currently-live toasts (level-up + biome-unlock) so newly-spawned
