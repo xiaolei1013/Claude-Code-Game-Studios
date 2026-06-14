@@ -103,14 +103,27 @@ irrelevant after the win; no injury. (The legacy `losing_run`/`LOSING_RUN_LOOT_F
 
 ### C.4 — Injury & recovery
 
-- `hero.injured_until: int` (tick timestamp; `0` = healthy). A hero is injured iff
-  `injured_until > TickSystem.now()`.
+- `hero.injured_until: int` (**wall-clock Unix epoch milliseconds**; `0` = healthy). A hero
+  is injured iff `injured_until > TickSystem.now_ms()` (**strict `>`**). **Phase-3 shipped
+  deviation from the tick-based draft** — see the implementation note at the end of this
+  subsection.
 - **Dispatch gate**: `FormationAssignment` / the orchestrator rejects a dispatch whose
   formation contains any injured hero (validation_failed reason `"hero_injured"`), and the
-  roster/formation UI marks injured heroes (greyed + a recovery countdown).
+  roster/formation UI marks injured heroes (faded to 50% opacity + an "Injured · <countdown>"
+  badge — colorblind-safe: the literal badge text, not hue, is the primary signal).
 - **Recovery**: purely time-based for the first pass (no gold-cost heal in v1 — that is a
-  documented future knob). When `TickSystem.now() ≥ injured_until`, the hero is healthy
+  documented future knob). When `TickSystem.now_ms() ≥ injured_until`, the hero is healthy
   again automatically; the roster surfaces "Recovered" on next view.
+
+> **Phase 3 implementation note (shipped).** The draft above wrote `injured_until` as a
+> *tick timestamp* against `TickSystem.now()` and a knob `INJURY_RECOVERY_TICKS`. As shipped
+> in Phase 3, `injured_until` is a **wall-clock Unix-ms instant** read against
+> `TickSystem.now_ms()`, and the recovery knob is **`injury_recovery_seconds: int` (default
+> `1800` = 30 min)** on `RosterConfig` (see §D, §G). This deviation is **deliberate and
+> load-bearing for AC-34-05**: recovery must elapse while the game is closed. `TickSystem`'s
+> wall-clock `now_ms()` advances across an offline gap; an engine-tick counter would not, so
+> a tick-based `injured_until` could never recover offline. Wall-clock ms is therefore the
+> correct unit, not a shortcut.
 - **All-injured edge**: if every roster hero is injured, the player cannot dispatch until
   one recovers — the offline drip stops (no active run). The guild_hall surfaces "Your
   guild is recovering — back at <time>." (See E.4.)
@@ -137,7 +150,8 @@ primary balance-revalidation surface (§G, Phase 2).
 | `T_clear` | `Σ over enemies ticks_to_kill(enemy)` (existing kill schedule) |
 | `party_damage_by(T)` | `Σ_j enemy[j].attack·speed/SPEED_BASE × min(T, death_tick[j])` |
 | **Outcome** | `DEFEAT` if `∃ T < T_clear: party_damage_by(T) ≥ party_hp`, else `WIN` |
-| `injured_until` | `TickSystem.now() + INJURY_RECOVERY_TICKS` (set on defeat) |
+| `injured_until` | `TickSystem.now_ms() + injury_recovery_seconds × 1000` (wall-clock ms, set on defeat) |
+| `is_injured(now_ms)` | `injured_until > now_ms` (strict `>`; `0` = healthy) |
 
 **Worked sanity check** (post-SPEED_BASE-reconciliation, Phase 2 calibrates the exact
 numbers): an appropriately-leveled, matchup-correct party clears with HP to spare (WIN);
@@ -192,7 +206,7 @@ proving the intended floors are winnable by the intended formation tier and losa
 | `SPEED_BASE` | reconcile shipped 10 vs GDD 2400 | run duration + the whole race timescale (highest-leverage) |
 | per-floor enemy `attack`/`speed`/`hp` | existing, retuned | which formation tier wins vs loses each floor |
 | `matchup_party_disadvantage` | e.g. 1.25 (mismatch takes 25% more) | how punishing a wrong matchup is |
-| `INJURY_RECOVERY_TICKS` | e.g. 30 min wall-clock | how long a defeat sets you back |
+| `injury_recovery_seconds` | `1800` (= 30 min wall-clock) on `RosterConfig` | how long a defeat sets you back. **Shipped as a seconds-valued wall-clock knob, not the draft's `INJURY_RECOVERY_TICKS`** — see §C.4 implementation note (wall-clock is load-bearing for AC-34-05 offline recovery). |
 | `loops_per_run` | currently 1 (hardcoded) | whether a run is one rotation or many |
 
 ---
@@ -207,6 +221,7 @@ proving the intended floors are winnable by the intended formation tier and losa
 - AC-34-06 — `injured_until` round-trips through save/load; missing field loads as healthy.
 - AC-34-07 — Per-floor calibration table proves each MVP floor is winnable by its intended formation tier and losable below it (Phase 2 evidence).
 - AC-34-08 — Drip (S28-G1) earned within a defeated run is forfeit (not credited); a defeated run's net gold delta is 0.
+- AC-34-09 — The guild-hall roster and the formation-assignment screen **visually mark** injured heroes — faded to `INJURED_DIM_ALPHA` (0.5) opacity + an "Injured · <countdown>" badge — in **both** the roster picker and any occupied formation slot. The badge is `MOUSE_FILTER_IGNORE` so the card stays tappable (only Dispatch is gated — AC-34-04). The mark updates **live** on the `heroes_injured` signal and is absent for healthy heroes / past-`injured_until` (recovered) heroes / empty slots. *(Phase 3 — shipped; tests: `ui_framework_injury_test.gd`, `roster_injury_mark_test.gd`, `formation_injury_mark_test.gd`.)*
 
 ---
 

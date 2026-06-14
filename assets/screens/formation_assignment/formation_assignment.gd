@@ -224,6 +224,12 @@ func on_enter() -> void:
 	# only invoked dispatch; Story 012 assumed DungeonRunView was already
 	# current. The screen-transition wiring on dispatch success was missing.
 	DungeonRunOrchestrator.state_changed.connect(_on_orchestrator_state_changed)
+	# GDD #34 Phase 3 (Defeat & Injury / ADR-0021): re-render roster + formation
+	# marks the moment a hero is injured or recovers, so the player sees the fade
+	# + badge update live without leaving the screen (guard idempotent — the
+	# signal is autoload-scoped and connecting twice would double-refresh).
+	if not HeroRoster.heroes_injured.is_connected(_on_heroes_injured):
+		HeroRoster.heroes_injured.connect(_on_heroes_injured)
 
 	# Static UI button wiring — these nodes are .tscn-defined (not refresh-rebuilt)
 	# so we connect them once here, mirroring on_exit. Dynamic hero/slot buttons
@@ -292,6 +298,9 @@ func on_exit() -> void:
 		DungeonRunOrchestrator.validation_failed.disconnect(_on_validation_failed)
 	if DungeonRunOrchestrator.state_changed.is_connected(_on_orchestrator_state_changed):
 		DungeonRunOrchestrator.state_changed.disconnect(_on_orchestrator_state_changed)
+	# GDD #34 Phase 3: mirror the heroes_injured subscription.
+	if HeroRoster.heroes_injured.is_connected(_on_heroes_injured):
+		HeroRoster.heroes_injured.disconnect(_on_heroes_injured)
 	# S22-M4: GoldCounter live-update subscription cleanup.
 	if Economy.gold_changed.is_connected(_on_gold_changed):
 		Economy.gold_changed.disconnect(_on_gold_changed)
@@ -388,6 +397,8 @@ func _refresh_roster_panel() -> void:
 		if counter != "":
 			class_to_counter[class_id] = counter
 
+	# GDD #34 Phase 3 — single wall-clock read per refresh for the injury marks below.
+	var now_ms: int = TickSystem.now_ms()
 	for hero: Variant in heroes:
 		var btn: Button = Button.new()
 		# Label format: "<display_name> (<class_id> Lv<level> · vs <archetype>)"
@@ -410,6 +421,13 @@ func _refresh_roster_panel() -> void:
 		_roster_list.add_child(btn)
 		UIFrameworkScript.assert_tap_target_min(btn)
 		UIFrameworkScript.wire_touch_feedback(btn)
+		# GDD #34 Phase 3 (Defeat & Injury / ADR-0021 AC-34-09): fade + badge an
+		# injured hero in the picker so the player sees who can't be dispatched
+		# BEFORE assigning them. Assignment stays allowed (only Dispatch is gated,
+		# AC-34-04); the mark is additive (badge child + dim), no reparent.
+		var injured_until: int = int(hero.get("injured_until"))
+		if injured_until > now_ms:
+			UIFrameworkScript.mark_injured(btn, (injured_until - now_ms) / 1000)
 
 
 ## Rebuilds the formation slot buttons from the live HeroRoster state.
@@ -424,11 +442,15 @@ func _refresh_formation_panel() -> void:
 	# UIFramework.clear_children_immediate.
 	UIFrameworkScript.clear_children_immediate(_slots_hbox)
 
-	# Build instance_id → display_name lookup from the full hero list.
+	# Build instance_id → hero lookup from the full hero list. Holds the hero
+	# object (not just display_name) so GDD #34 Phase 3 can read injured_until
+	# per occupied slot below.
 	var hero_map: Dictionary = {}
 	for hero: Variant in HeroRoster.get_all_heroes():
-		hero_map[hero.instance_id] = hero.display_name
+		hero_map[hero.instance_id] = hero
 
+	# GDD #34 Phase 3 — single wall-clock read per refresh for the injury marks below.
+	var now_ms: int = TickSystem.now_ms()
 	var slot_count: int = HeroRoster.formation_size()
 	for i: int in range(slot_count):
 		var slot_id: int = _get_formation_slot_id(i)
@@ -436,7 +458,7 @@ func _refresh_formation_panel() -> void:
 		if slot_id == 0 or not hero_map.has(slot_id):
 			btn.text = tr("slot_empty_label")
 		else:
-			btn.text = str(hero_map[slot_id])
+			btn.text = str(hero_map[slot_id].display_name)
 		btn.custom_minimum_size = Vector2(180, 80)
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -452,6 +474,15 @@ func _refresh_formation_panel() -> void:
 		_slots_hbox.add_child(btn)
 		UIFrameworkScript.assert_tap_target_min(btn)
 		UIFrameworkScript.wire_touch_feedback(btn)
+		# GDD #34 Phase 3 (Defeat & Injury / ADR-0021 AC-34-09): fade + badge an
+		# injured occupant so the player sees a formation can't dispatch BEFORE
+		# tapping Dispatch (only Dispatch is gated, AC-34-04). Additive mark, no
+		# reparent; the SelectedBadge below is an independent child.
+		if slot_id != 0 and hero_map.has(slot_id):
+			var occupant: Variant = hero_map[slot_id]
+			var injured_until: int = int(occupant.get("injured_until"))
+			if injured_until > now_ms:
+				UIFrameworkScript.mark_injured(btn, (injured_until - now_ms) / 1000)
 		# S9-M1 active-slot affordance: add a "Selected" badge Label as a child
 		# of the active slot button. MOUSE_FILTER_IGNORE per ADR-0008 §mouse_filter
 		# defaults ("decorative TextureRects IGNORE") — taps pass straight through
@@ -1037,6 +1068,15 @@ func _on_hero_list_changed(_instance: RefCounted) -> void:
 
 ## Signal relay: hero removed from roster.
 func _on_hero_removed(_instance_id: int, _class_id: String, _display_name: String) -> void:
+	_refresh_roster_panel()
+	_refresh_formation_panel()
+	UIFrameworkScript.suppress_keyboard_focus(self)
+
+
+## Signal relay: one or more heroes were injured (GDD #34 Phase 3 / ADR-0021).
+## Rebuilds both panels so the injury fade + badge appear (or clear on recovery)
+## live. Payload is ignored — a full refresh re-reads injured_until per hero.
+func _on_heroes_injured(_instance_ids: Array, _injured_until_ms: int) -> void:
 	_refresh_roster_panel()
 	_refresh_formation_panel()
 	UIFrameworkScript.suppress_keyboard_focus(self)

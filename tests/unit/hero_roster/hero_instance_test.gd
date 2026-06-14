@@ -1,8 +1,10 @@
-# Tests for Sprint 6 hero-roster Story 001: HeroInstance RefCounted + 5-field schema + to_dict/from_dict.
+# Tests for Sprint 6 hero-roster Story 001: HeroInstance RefCounted + to_dict/from_dict.
 # Covers: TR-hero-roster-001 (RefCounted, NOT Resource),
-#         TR-hero-roster-002 (5 fields with correct types and defaults),
-#         TR-hero-roster-003 (to_dict / from_dict round-trip — exactly 5 keys),
+#         TR-hero-roster-002 (named fields with correct types and defaults),
+#         TR-hero-roster-003 (to_dict / from_dict round-trip),
 #         TR-hero-roster-004 (no mutation methods exposed).
+# GDD #34 Phase 3 (2026-06-14): adds the 6th field `injured_until` (wall-clock
+#         Unix-ms; 0 == healthy) + is_injured() query — Group E. Schema = 6 keys.
 extends GdUnitTestSuite
 
 const HeroInstanceScript = preload("res://src/core/hero_roster/hero_instance.gd")
@@ -85,16 +87,17 @@ func test_hero_instance_field_types() -> void:
 # Group C: TR-003 — to_dict / from_dict round-trip
 # ===========================================================================
 
-func test_hero_instance_to_dict_has_exactly_five_keys() -> void:
+func test_hero_instance_to_dict_has_exactly_six_keys() -> void:
 	var inst: HeroInstance = HeroInstanceScript.new()
 	var d: Dictionary = inst.to_dict()
-	assert_int(d.size()).is_equal(5)
-	# Verify all 5 expected keys
+	assert_int(d.size()).is_equal(6)
+	# Verify all 6 expected keys (5 original + injured_until per GDD #34 Phase 3)
 	assert_bool(d.has("instance_id")).is_true()
 	assert_bool(d.has("class_id")).is_true()
 	assert_bool(d.has("display_name")).is_true()
 	assert_bool(d.has("current_level")).is_true()
 	assert_bool(d.has("xp")).is_true()
+	assert_bool(d.has("injured_until")).is_true()
 
 
 func test_hero_instance_to_dict_values_match_fields() -> void:
@@ -147,6 +150,8 @@ func test_hero_instance_from_dict_uses_defaults_on_missing_keys() -> void:
 	assert_str(inst.display_name).is_equal("")
 	assert_int(inst.current_level).is_equal(1)
 	assert_int(inst.xp).is_equal(0)
+	# injured_until defaults to 0 (healthy) — legacy pre-Phase-3 saves omit it.
+	assert_int(inst.injured_until).is_equal(0)
 
 
 # C-05: Defensive type coercion on wrong-type input (per QA review GAP-001).
@@ -197,9 +202,81 @@ func test_hero_instance_from_dict_ignores_extra_keys() -> void:
 	assert_int(inst.xp).is_equal(0)
 	# Round-trip drops the extras
 	var d: Dictionary = inst.to_dict()
-	assert_int(d.size()).is_equal(5)
+	assert_int(d.size()).is_equal(6)
 	assert_bool(d.has("bonus_key")).is_false()
 	assert_bool(d.has("another_extra")).is_false()
+
+
+# ===========================================================================
+# Group E: GDD #34 Phase 3 — injured_until field + is_injured() query
+# ---------------------------------------------------------------------------
+# `injured_until` is an absolute WALL-CLOCK Unix-ms timestamp (NOT a sim-tick),
+# so injury recovery elapses during background/offline time per AC-34-05. The
+# 0 sentinel means "healthy". A hero is injured while now_ms < injured_until;
+# at the recovery instant (now_ms == injured_until) the hero is recovered.
+# ===========================================================================
+
+func test_hero_instance_default_injured_until_is_zero() -> void:
+	var inst: HeroInstance = HeroInstanceScript.new()
+	# 0 is the healthy sentinel — a fresh hero is never injured.
+	assert_int(inst.injured_until).is_equal(0)
+
+
+func test_hero_instance_is_injured_false_for_healthy_sentinel() -> void:
+	# Arrange — healthy hero (sentinel 0).
+	var inst: HeroInstance = HeroInstanceScript.new()
+	inst.injured_until = 0
+	# Act / Assert — never injured, regardless of the clock value.
+	assert_bool(inst.is_injured(0)).is_false()
+	assert_bool(inst.is_injured(1_000_000_000_000)).is_false()
+
+
+func test_hero_instance_is_injured_true_while_recovery_pending() -> void:
+	# Arrange — recovery completes at t=5000ms (wall-clock).
+	var inst: HeroInstance = HeroInstanceScript.new()
+	inst.injured_until = 5_000
+	# Act / Assert — now strictly before injured_until → still injured.
+	assert_bool(inst.is_injured(0)).is_true()
+	assert_bool(inst.is_injured(4_999)).is_true()
+
+
+func test_hero_instance_is_injured_false_at_and_after_recovery_instant() -> void:
+	# Arrange — recovery completes at t=5000ms (wall-clock).
+	var inst: HeroInstance = HeroInstanceScript.new()
+	inst.injured_until = 5_000
+	# Boundary: now == injured_until → recovery complete → NOT injured.
+	assert_bool(inst.is_injured(5_000)).is_false()
+	# Past the recovery instant → healthy.
+	assert_bool(inst.is_injured(5_001)).is_false()
+
+
+func test_hero_instance_round_trip_preserves_injured_until() -> void:
+	# Wall-clock ms survives a to_dict → mutate → from_dict round-trip.
+	var inst: HeroInstance = HeroInstanceScript.new()
+	inst.instance_id = 2
+	inst.injured_until = 1_733_000_000_000  # plausible wall-clock Unix ms
+	var snapshot: Dictionary = inst.to_dict()
+	# Mutate after snapshot, then hydrate — injured_until snaps back.
+	inst.injured_until = 0
+	inst.from_dict(snapshot)
+	assert_int(inst.injured_until).is_equal(1_733_000_000_000)
+
+
+func test_hero_instance_from_dict_coerces_float_injured_until_to_int() -> void:
+	# JSON save/load returns large ints as TYPE_FLOAT (JSON int round-trip).
+	# from_dict must int()-coerce so the wall-clock ms is preserved as an int.
+	var inst: HeroInstance = HeroInstanceScript.new()
+	inst.from_dict({
+		"instance_id": 1,
+		"class_id": "warrior",
+		"display_name": "Theron",
+		"current_level": 1,
+		"xp": 0,
+		"injured_until": 1733000000000.0,  # float, as JSON.parse_string yields
+	})
+	assert_int(inst.injured_until).is_equal(1_733_000_000_000)
+	# typeof must be TYPE_INT after coercion (not TYPE_FLOAT).
+	assert_int(typeof(inst.injured_until)).is_equal(TYPE_INT)
 
 
 # ===========================================================================

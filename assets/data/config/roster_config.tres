@@ -9,3 +9,4 @@ display_name = "Roster Config"
 max_roster_size = 30
 formation_size = 3
 level_cap = 15
+injury_recovery_seconds = 1800

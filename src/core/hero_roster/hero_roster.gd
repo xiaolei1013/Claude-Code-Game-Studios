@@ -51,6 +51,11 @@ const HeroInstanceScript = preload("res://src/core/hero_roster/hero_instance.gd"
 const _FALLBACK_MAX_ROSTER_SIZE: int = 30
 const _FALLBACK_FORMATION_SIZE: int = 3
 const _FALLBACK_LEVEL_CAP: int = 15
+# GDD #34 Phase 3: defeat-injury recovery duration in wall-clock seconds
+# (default 30 min). Fallback when roster_config.tres omits the field — e.g. a
+# pre-Phase-3 config or a non-RosterConfig resource that passes the duck-type
+# schema check (which does NOT require injury_recovery_seconds).
+const _FALLBACK_INJURY_RECOVERY_SECONDS: int = 1800
 
 # Fallback XP threshold curve constants per Hero Leveling GDD #15 §C.3 defaults.
 # Used when Economy.get_config() returns null (boot order / test fixture).
@@ -226,6 +231,17 @@ signal orphan_heroes_notice(count: int)
 @warning_ignore("unused_signal")
 signal prestige_completed_signal(record: Dictionary, new_count: int)
 
+## GDD #34 Phase 3 (Defeat & Injury System / ADR-0021) — emitted by
+## [method injure_heroes] when one or more heroes are marked injured after a
+## party defeat. Subscribers (Formation / Roster screens) refresh injury marks.
+## [param instance_ids] is the list of hero ids actually found-and-marked (unknown
+## ids are skipped); [param injured_until_ms] is the shared wall-clock Unix-ms
+## recovery instant. Suppressed during save-load hydration (see
+## [member _suppress_signals]). Screens may also poll [method get_injured_hero_ids]
+## on enter rather than connecting — this signal is the live-update channel.
+@warning_ignore("unused_signal")
+signal heroes_injured(instance_ids: Array, injured_until_ms: int)
+
 
 # ---------------------------------------------------------------------------
 # Prestige V1.0 — Sprint 21 / Story 1 constants per `prestige-system.md` §G.
@@ -391,6 +407,17 @@ func level_cap() -> int:
 	if _config != null and "level_cap" in _config:
 		return _config.get("level_cap") as int
 	return _FALLBACK_LEVEL_CAP
+
+
+## Defeat-injury recovery duration in WALL-CLOCK seconds (GDD #34 Phase 3).
+## From `roster_config.tres` (default 1800 = 30 min), with
+## [code]_FALLBACK_INJURY_RECOVERY_SECONDS[/code] fallback when the config failed
+## to load OR omits the field (the duck-type schema check does not require it,
+## so a pre-Phase-3 config still loads and falls back here for this knob).
+func injury_recovery_seconds() -> int:
+	if _config != null and "injury_recovery_seconds" in _config:
+		return _config.get("injury_recovery_seconds") as int
+	return _FALLBACK_INJURY_RECOVERY_SECONDS
 
 
 # ---------------------------------------------------------------------------
@@ -716,6 +743,43 @@ func set_hero_level(id: int, new_level: int) -> bool:
 	return true
 
 
+## Marks each hero in [param instance_ids] as injured until the wall-clock
+## Unix-ms instant [param until_ms] (GDD #34 Phase 3 / ADR-0021). Called by the
+## DungeonRunOrchestrator when a party is defeated.
+##
+## Semantics:
+##   - Sets [code]injured_until = until_ms[/code] on every id present in the
+##     roster; unknown ids are skipped with a push_warning (a defeated formation
+##     should contain only live heroes, so an unknown id signals a desync).
+##   - Idempotent overwrite: re-injuring an already-injured hero replaces its
+##     recovery instant — callers pass a freshly-computed ABSOLUTE instant, not
+##     a delta, so a later defeat simply resets the timer.
+##   - Emits [signal heroes_injured] once with the list of ids actually marked,
+##     unless [member _suppress_signals] is set (save-load hydration) or no id
+##     was found.
+##   - [param until_ms] is an ABSOLUTE wall-clock instant
+##     ([code]TickSystem.now_ms() + injury_recovery_seconds() * 1000[/code]),
+##     NOT a duration — wall-clock so recovery elapses offline (AC-34-05).
+##
+## GDD #34 §C.3 / §D — ADR-0021
+func injure_heroes(instance_ids: Array, until_ms: int) -> void:
+	var marked: Array[int] = []
+	for raw_id: Variant in instance_ids:
+		var id: int = int(raw_id)
+		if not _heroes.has(id):
+			push_warning("[HeroRoster] injure_heroes: unknown id %d (skipped)" % id)
+			continue
+		var instance: RefCounted = _heroes[id]
+		if instance == null:
+			continue
+		instance.injured_until = until_ms
+		marked.append(id)
+	if marked.is_empty():
+		return
+	if not _suppress_signals:
+		heroes_injured.emit(marked, until_ms)
+
+
 ## Returns the XP required to advance a hero from [param current_level] to
 ## [code]current_level + 1[/code]. Pure linear curve per Hero Leveling GDD
 ## #15 §C.3 / §D.3:
@@ -1030,6 +1094,31 @@ func get_hero_by_id(instance_id: int) -> HeroInstance:
 	if not _heroes.has(instance_id):
 		return null
 	return _heroes[instance_id] as HeroInstance
+
+
+## Returns true iff the hero with [param instance_id] exists and has an active
+## (not-yet-elapsed) defeat injury at wall-clock [param now_ms]. Unknown ids and
+## the 0 (empty-slot) sentinel return false. GDD #34 Phase 3.
+##
+## [param now_ms] is wall-clock Unix ms (callers pass [code]TickSystem.now_ms()[/code]).
+func is_hero_injured(instance_id: int, now_ms: int) -> bool:
+	var hero: HeroInstance = get_hero_by_id(instance_id)
+	if hero == null:
+		return false
+	return hero.is_injured(now_ms)
+
+
+## Returns the instance_ids of all roster heroes currently injured at wall-clock
+## [param now_ms] (GDD #34 Phase 3). Fresh Array each call; order follows
+## [member _heroes] iteration. Used by the Formation / Roster UI to render injury
+## marks and by the dispatch gate to detect an injured formation.
+func get_injured_hero_ids(now_ms: int) -> Array[int]:
+	var out: Array[int] = []
+	for id: int in _heroes:
+		var hero: HeroInstance = _heroes[id] as HeroInstance
+		if hero != null and hero.is_injured(now_ms):
+			out.append(id)
+	return out
 
 
 ## Returns all heroes in the roster, sorted per [param sort_mode].

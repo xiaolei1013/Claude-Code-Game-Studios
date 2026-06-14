@@ -802,6 +802,32 @@ func dispatch(formation: Array, floor_index: int, biome_id: String) -> void:
 			))
 			return
 
+	# Validation 3: injured-hero gate (GDD #34 Phase 3 / ADR-0021 — AC-34-04).
+	# A formation containing any hero still recovering from a defeat injury
+	# cannot be dispatched until recovery elapses (wall-clock, so it heals while
+	# offline). Checked AFTER the floor-lock so a locked floor still reports
+	# `floor_locked`. Fail-open when HeroRoster is absent (lean test envs),
+	# mirroring the floor-lock null guard. injured_ids carries the offenders so
+	# the UI can highlight them.
+	var roster_for_injury: Node = (
+		get_node_or_null("/root/HeroRoster") if get_tree() != null else null
+	)
+	if roster_for_injury != null:
+		var injury_now_ms: int = TickSystem.now_ms()
+		var injured_ids: Array[int] = []
+		for hero: Variant in formation:
+			if hero == null or not ("instance_id" in hero):
+				continue
+			var hid: int = int(hero.get("instance_id"))
+			if roster_for_injury.is_hero_injured(hid, injury_now_ms):
+				injured_ids.append(hid)
+		if not injured_ids.is_empty():
+			validation_failed.emit("hero_injured", {"injured_ids": injured_ids})
+			_set_state(DungeonRunStateScript.validate_transition(
+				state, DungeonRunStateScript.TRIGGER_RUN_ENDED
+			))
+			return
+
 	# Validation passed. Build the orchestrator + combat snapshots, transition
 	# to ACTIVE_FOREGROUND (which fires the tick subscription via _set_state).
 	#
@@ -1279,11 +1305,46 @@ func _process_kill_events(events: Variant) -> void:
 ## win path uses. Credits NOTHING — the caller ([method _on_tick_fired]) has
 ## already skipped all kill/gold/XP processing for the defeat path.
 func _end_run_defeated() -> void:
+	# GDD #34 Phase 3 / ADR-0021 (AC-34-04): apply injuries BEFORE notifying
+	# subscribers, so any run_defeated listener (UI, audio) observes a roster
+	# that already reflects the injured party.
+	_apply_defeat_injuries()
 	run_defeated.emit(_dispatched_floor_index, _dispatched_biome_id)
 	var next_state: int = DungeonRunStateScript.validate_transition(
 		state, DungeonRunStateScript.TRIGGER_RUN_ENDED
 	)
 	_set_state(next_state)
+
+
+## Injures every hero in the dispatched formation when a foreground run is
+## DEFEATED (GDD #34 Phase 3 / ADR-0021 — AC-34-04/05). Each hero's
+## [code]injured_until[/code] is set to a WALL-CLOCK recovery instant
+## ([code]TickSystem.now_ms() + HeroRoster.injury_recovery_seconds() * 1000[/code]).
+## Wall-clock — NOT sim-ticks — so recovery keeps elapsing while the game is
+## backgrounded or fully offline (AC-34-05).
+##
+## The ids come from the frozen-at-dispatch [member run_snapshot].formation_snapshot
+## so a mid-run roster edit or re-dispatch cannot change who is penalised. Unknown
+## ids are tolerated by [method HeroRoster.injure_heroes] (it skips + warns).
+##
+## Safe no-op when [member run_snapshot] is null, the HeroRoster autoload is
+## absent (lean test envs), or the snapshot carries no formation ids.
+func _apply_defeat_injuries() -> void:
+	if run_snapshot == null:
+		return
+	var roster: Node = (
+		get_node_or_null("/root/HeroRoster") if get_tree() != null else null
+	)
+	if roster == null:
+		return
+	var fs: Dictionary = run_snapshot.formation_snapshot
+	var ids_v: Variant = fs.get("instance_ids", [])
+	var ids: Array = ids_v as Array if ids_v is Array else []
+	if ids.is_empty():
+		return
+	var recovery_seconds: int = int(roster.injury_recovery_seconds())
+	var until_ms: int = TickSystem.now_ms() + recovery_seconds * 1000
+	roster.injure_heroes(ids, until_ms)
 
 
 ## Phase 1 drip gate (GDD #34 / ADR-0021 — AC-34-08). True when the in-flight
