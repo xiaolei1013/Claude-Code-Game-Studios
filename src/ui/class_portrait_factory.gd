@@ -1,18 +1,19 @@
-## ClassPortraitFactory — programmatic 96×96 placeholder portraits per class_id.
+## ClassPortraitFactory — class portraits by class_id: real AI-generated art
+## when present, else a programmatic placeholder so the UI never gets null.
 ##
 ## Sprint 23 S23-S3 (third carry from S20-N1 → S21-S2 → dropped S22; promoted
 ## to Should Have per the "3rd carry → Should Have minimum" process rule).
+## Sprint 28: original AI-generated portraits authored to the canonical path
+## (tools/asset-pipeline); the factory now loads real art first and the 96×96
+## colored-block placeholder is the fallback for classes that have no art yet.
 ##
-## Each class_id deterministically maps to a distinct solid-color background
-## with an inset border + a centered class-initial glyph. No real-art binding
-## needed; the textures are generated on demand and cached. Used by:
-##   - Recruit Screen pool-entry rows (ClassPortrait TextureRect, 96×96)
+## [method get_portrait_texture] first tries the real portrait at
+## [code]res://assets/art/classes/[id]/portrait.png[/code]. If absent, it
+## returns a deterministic solid-color block with an inset border + centered
+## class-initial mark. Textures are cached. Used by:
+##   - Recruit Screen pool-entry rows (ClassPortrait TextureRect, 96×96 slot)
 ##   - Hero Detail Modal portrait slot (ClassPortrait TextureRect)
 ##   - Future surfaces wired by class_id alone
-##
-## When real product art lands, the factory's fallback path remains valid —
-## consumers can read `HeroClass.portrait_path` first and fall back to
-## [method get_portrait_texture] when the file is absent or empty.
 ##
 ## Pure-utility class (no scene tree dependency). Marked static-callable so
 ## callers don't need an instance; the cache is module-level by design.
@@ -40,10 +41,10 @@ const _INITIAL_GLYPH_LEN: int = 1
 static var _cache: Dictionary = {}
 
 
-## Returns a 96×96 portrait for [param class_id]. First tries to load from
-## the canonical production path ([code]assets/art/classes/[id]/portrait.png[/code]).
-## If the file is absent, falls back to the programmatic colored-block
-## placeholder so the UI never receives null.
+## Returns a portrait for [param class_id]. First tries to load real art from
+## the canonical production path ([code]assets/art/classes/[id]/portrait.png[/code]);
+## real portraits load at their native resolution. If absent, falls back to the
+## programmatic 96×96 colored-block placeholder so the UI never receives null.
 ##
 ## Cached after the first build; repeat calls are O(1) dictionary lookups.
 ## If [param class_id] is empty, returns a neutral grey block (defensive).
@@ -51,10 +52,13 @@ static func get_portrait_texture(class_id: String) -> Texture2D:
 	var key: String = class_id
 	if _cache.has(key):
 		return _cache[key]
-	# Production / demo path: HeroClass.portrait_path convention is
+	# Production path: HeroClass.portrait_path convention is
 	# "assets/art/classes/[id]/portrait.png" — try it before generating.
+	# ResourceLoader.exists (NOT FileAccess.file_exists): export strips the
+	# source .png and ships only the imported .ctex, which ResourceLoader sees
+	# but FileAccess does not — so this also resolves real art in EXPORTED builds.
 	var disk_path: String = "res://assets/art/classes/%s/portrait.png" % class_id
-	if not class_id.is_empty() and FileAccess.file_exists(disk_path):
+	if not class_id.is_empty() and ResourceLoader.exists(disk_path):
 		var loaded: Variant = load(disk_path)
 		if loaded is Texture2D:
 			_cache[key] = loaded as Texture2D

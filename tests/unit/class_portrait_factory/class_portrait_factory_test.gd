@@ -1,8 +1,9 @@
 # Sprint 23 S23-S3 — ClassPortraitFactory tests.
 #
-# Validates the programmatic-portrait contract that the Recruit Screen and
-# Hero Detail modal consume:
-#   - Texture has correct dimensions (96×96)
+# Validates the portrait contract that the Recruit Screen and Hero Detail modal
+# consume:
+#   - Placeholder (no-art class) texture has correct dimensions (96×96)
+#   - Real art (Sprint 28 AI portraits) loads at native resolution, not 96×96
 #   - Per-class colors are distinct (no two MVP classes get the same swatch)
 #   - Empty/missing class_id degrades to a neutral grey rather than crashing
 #   - Cache returns the same Texture2D instance on repeat calls (zero-alloc
@@ -10,6 +11,17 @@
 extends GdUnitTestSuite
 
 const ClassPortraitFactoryScript = preload("res://src/ui/class_portrait_factory.gd")
+
+# A class_id that will never have real art on disk, so the placeholder-path
+# tests (Groups A + E) exercise the programmatic colored-block builder
+# deterministically — even now that real portraits ship for the actual roster
+# classes (warrior, mage, …). Using a real class id here would load the real
+# 512×512 art and break the 96×96 / border-pixel assertions.
+const _NO_ART_CLASS_ID: String = "__test_no_art_placeholder__"
+
+# A class_id with committed real art (Sprint 28). The factory must load this at
+# native resolution. Used by Group F to prove the real-art binding stays wired.
+const _REAL_ART_CLASS_ID: String = "warrior"
 
 
 func before_test() -> void:
@@ -22,12 +34,12 @@ func after_test() -> void:
 
 
 # ===========================================================================
-# Group A — Texture dimensions
+# Group A — Placeholder texture dimensions
 # ===========================================================================
 
-func test_portrait_texture_is_96_by_96() -> void:
-	# Arrange + Act
-	var tex: Texture2D = ClassPortraitFactoryScript.get_portrait_texture("warrior")
+func test_placeholder_portrait_texture_is_96_by_96() -> void:
+	# Arrange + Act — a class with no real art falls back to the 96×96 builder.
+	var tex: Texture2D = ClassPortraitFactoryScript.get_portrait_texture(_NO_ART_CLASS_ID)
 
 	# Assert
 	assert_object(tex).is_not_null()
@@ -142,9 +154,9 @@ func _expected_border_color(class_id: String) -> Color:
 
 
 func test_border_top_left_corner_pixel_is_border_color() -> void:
-	# Arrange
-	var img: Image = _make_image_for_class("warrior")
-	var expected: Color = _expected_border_color("warrior")
+	# Arrange — placeholder-only id so the builder (not real art) is under test.
+	var img: Image = _make_image_for_class(_NO_ART_CLASS_ID)
+	var expected: Color = _expected_border_color(_NO_ART_CLASS_ID)
 
 	# Act — pixel (0, 0) is in the top-left corner of the top strip.
 	var actual: Color = img.get_pixel(0, 0)
@@ -156,9 +168,9 @@ func test_border_top_left_corner_pixel_is_border_color() -> void:
 
 
 func test_border_bottom_right_corner_pixel_is_border_color() -> void:
-	# Arrange
-	var img: Image = _make_image_for_class("warrior")
-	var expected: Color = _expected_border_color("warrior")
+	# Arrange — placeholder-only id so the builder (not real art) is under test.
+	var img: Image = _make_image_for_class(_NO_ART_CLASS_ID)
+	var expected: Color = _expected_border_color(_NO_ART_CLASS_ID)
 
 	# Act — pixel (95, 95) is the bottom-right corner; covered by the bottom strip.
 	var actual: Color = img.get_pixel(95, 95)
@@ -171,8 +183,9 @@ func test_border_bottom_right_corner_pixel_is_border_color() -> void:
 
 func test_border_left_edge_inner_pixel_is_border_color() -> void:
 	# Arrange — Y=48 is mid-height; X=0 is the leftmost column of the left strip.
-	var img: Image = _make_image_for_class("warrior")
-	var expected: Color = _expected_border_color("warrior")
+	# Placeholder-only id so the builder (not real art) is under test.
+	var img: Image = _make_image_for_class(_NO_ART_CLASS_ID)
+	var expected: Color = _expected_border_color(_NO_ART_CLASS_ID)
 
 	# Act
 	var actual: Color = img.get_pixel(0, 48)
@@ -186,9 +199,10 @@ func test_border_left_edge_inner_pixel_is_border_color() -> void:
 func test_pixel_just_inside_border_is_background_color_not_border() -> void:
 	# Arrange — (4, 4) is the first pixel JUST inside the 4px frame. Should
 	# be bg color, NOT border color. Catches off-by-one strip-width bugs.
-	var img: Image = _make_image_for_class("warrior")
-	var bg: Color = ClassPortraitFactoryScript.get_portrait_color("warrior")
-	var border: Color = _expected_border_color("warrior")
+	# Placeholder-only id so the builder (not real art) is under test.
+	var img: Image = _make_image_for_class(_NO_ART_CLASS_ID)
+	var bg: Color = ClassPortraitFactoryScript.get_portrait_color(_NO_ART_CLASS_ID)
+	var border: Color = _expected_border_color(_NO_ART_CLASS_ID)
 
 	# Act
 	var actual: Color = img.get_pixel(4, 4)
@@ -205,3 +219,26 @@ func test_pixel_just_inside_border_is_background_color_not_border() -> void:
 		and absf(actual.b - border.b) < 0.005
 	)
 	assert_bool(matches_border).is_false()
+
+
+# ===========================================================================
+# Group F — Real-art binding (Sprint 28 — AI class portraits)
+#
+# Once original AI-generated portraits land under assets/art/classes/<id>/, the
+# factory must load the REAL texture (native resolution) for that class, not the
+# 96×96 placeholder. This is the regression net against accidental un-wiring —
+# a path typo, a reverted `ResourceLoader.exists` guard, or the portrait files
+# slipping back out of version control.
+# ===========================================================================
+
+func test_real_art_class_loads_native_resolution_portrait() -> void:
+	# Arrange + Act — "warrior" has committed real art at
+	# assets/art/classes/warrior/portrait.png (512×512).
+	var tex: Texture2D = ClassPortraitFactoryScript.get_portrait_texture(_REAL_ART_CLASS_ID)
+
+	# Assert — real art loads at its native size, larger than the 96×96
+	# placeholder. If this fails, the real portrait is missing/unimported and
+	# the factory silently fell back to the colored-block placeholder.
+	assert_object(tex).is_not_null()
+	assert_int(tex.get_width()).is_greater(96)
+	assert_int(tex.get_height()).is_greater(96)
