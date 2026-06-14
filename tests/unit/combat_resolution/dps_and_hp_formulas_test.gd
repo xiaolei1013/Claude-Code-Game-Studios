@@ -1,12 +1,15 @@
 # Tests for Sprint 7 combat-resolution Story 004:
 #   - formation_dps_per_tick: sum(attack × speed) / SPEED_BASE; range [0.0, 2.31]
-#   - formation_total_hp: sum(stat_at_level(HP, level)) helper
-#   - hp_bonus_factor: mini(formation_total_hp / floor_total_enemy_attack, 1.0); clamps at 1.0
-#   - survived: hp_bonus_factor >= 0.5 (inclusive boundary per TR-009)
+#   - formation_total_hp: sum(stat_at_level(HP, level)) helper — now the party
+#     HP pool consumed by the two-sided HP race (compute_run_outcome)
+#
+# Phase 1 / GDD #34 §C.3: the hp_bonus_factor saturation curve and the
+# survived() boundary method were removed — survival is no longer a DPS
+# throttle; it is resolved by the HP race in compute_run_outcome (covered by
+# compute_run_outcome_test.gd). The Group C/D tests for those methods are gone.
 #
 # Covers: TR-combat-006 (formation_dps_per_tick formula),
-#         TR-combat-008 (hp_bonus_factor formula + 1.0 ceiling),
-#         TR-combat-009 (survived := hp_bonus_factor >= 0.5; inclusive).
+#         formation_total_hp helper (party-HP-pool building block).
 extends GdUnitTestSuite
 
 const DefaultCombatResolverScript = preload("res://src/core/combat/default_combat_resolver.gd")
@@ -139,100 +142,10 @@ func test_formation_total_hp_returns_int_type() -> void:
 
 
 # ===========================================================================
-# Group C: TR-008 — hp_bonus_factor formula
-# ===========================================================================
-
-func test_hp_bonus_factor_clamps_at_one_when_hp_exceeds_attack() -> void:
-	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	# 1000 HP / 100 attack = 10.0; clamps to 1.0.
-	assert_float(resolver.hp_bonus_factor(1000, 100)).is_equal_approx(1.0, 0.001)
-
-
-func test_hp_bonus_factor_proportional_when_below_one() -> void:
-	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	# 50 HP / 100 attack = 0.5.
-	assert_float(resolver.hp_bonus_factor(50, 100)).is_equal_approx(0.5, 0.001)
-
-
-func test_hp_bonus_factor_zero_floor_total_enemy_attack_returns_one() -> void:
-	# Defensive: empty floor / corrupt data → 1.0 (no threat, no penalty).
-	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	assert_float(resolver.hp_bonus_factor(100, 0)).is_equal_approx(1.0, 0.001)
-
-
-func test_hp_bonus_factor_zero_formation_hp_returns_zero() -> void:
-	# 0 HP / 100 attack = 0.0.
-	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	assert_float(resolver.hp_bonus_factor(0, 100)).is_equal_approx(0.0, 0.001)
-
-
-func test_hp_bonus_factor_output_in_zero_one_range() -> void:
-	# Sweep representative inputs; output always in [0.0, 1.0].
-	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	var inputs: Array = [
-		[10, 100], [50, 100], [99, 100], [100, 100], [101, 100], [500, 100],
-	]
-	for pair: Array in inputs:
-		var hp: int = pair[0]
-		var atk: int = pair[1]
-		var f: float = resolver.hp_bonus_factor(hp, atk)
-		assert_float(f).override_failure_message(
-			"hp_bonus_factor(%d, %d) = %f (expected in [0.0, 1.0])" % [hp, atk, f]
-		).is_greater_equal(0.0)
-		assert_float(f).override_failure_message(
-			"hp_bonus_factor(%d, %d) = %f exceeds 1.0" % [hp, atk, f]
-		).is_less_equal(1.0)
-
-
-# ===========================================================================
-# Group D: TR-009 — survived inclusive boundary at 0.5
-# ===========================================================================
-
-func test_survived_at_exactly_half_returns_true() -> void:
-	# TR-009 inclusive boundary: hp_bonus_factor == 0.5 → survived TRUE.
-	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	assert_bool(resolver.survived(0.5)).is_true()
-
-
-func test_survived_just_below_half_returns_false() -> void:
-	# 0.4999... → NOT survived (boundary is strict at the 0.5 threshold).
-	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	assert_bool(resolver.survived(0.4999)).is_false()
-
-
-func test_survived_zero_returns_false() -> void:
-	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	assert_bool(resolver.survived(0.0)).is_false()
-
-
-func test_survived_one_returns_true() -> void:
-	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	assert_bool(resolver.survived(1.0)).is_true()
-
-
-func test_losing_run_is_not_survived() -> void:
-	# Per TR-009: losing_run = !survived. The `survived` method is the
-	# canonical source of truth; losing_run is a derivation done by callers.
-	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	# Sub-threshold hp_bonus → losing run.
-	var losing_run: bool = not resolver.survived(0.49)
-	assert_bool(losing_run).is_true()
-	# At-or-above-threshold → not losing.
-	losing_run = not resolver.survived(0.5)
-	assert_bool(losing_run).is_false()
-
-
-# ===========================================================================
-# Group E: TR-011 — formation_dps return type is float (not int)
+# Group C: TR-011 — formation_dps return type is float (not int)
 # ===========================================================================
 
 func test_formation_dps_per_tick_returns_float_type() -> void:
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
 	var result: Variant = resolver.formation_dps_per_tick([])
-	assert_int(typeof(result)).is_equal(TYPE_FLOAT)
-
-
-func test_hp_bonus_factor_returns_float_type() -> void:
-	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	var result: Variant = resolver.hp_bonus_factor(50, 100)
 	assert_int(typeof(result)).is_equal(TYPE_FLOAT)

@@ -204,6 +204,14 @@ var _fg_drip_floor_override: int = -1
 ## this value directly. Test-only.
 var _fg_drip_strength_override: float = -1.0
 
+## Test-only DI override for the foreground drip's DEFEAT resolution (GDD #34 /
+## ADR-0021). [code]-1[/code] (default) → [method _on_tick] resolves defeat via
+## [code]DungeonRunOrchestrator.is_active_run_defeated()[/code]. [code]0[/code] →
+## force not-defeated; [code]1[/code] → force DEFEATED (drip forfeits). Lets a
+## headless unit test drive the real defeat-forfeit branch without a live
+## orchestrator autoload. Mirrors [member _fg_drip_floor_override]. Test-only.
+var _fg_drip_defeated_override: int = -1
+
 ## Cumulative gold delta accumulated during the current offline replay window.
 ## Per ADR-0013 Amendment #1 (Sprint 11 S11-X6): when [member _is_offline_replay]
 ## is true, add_gold + try_spend + try_award_floor_clear's gold side-effects
@@ -378,6 +386,27 @@ func _on_tick(_n: int) -> void:
 		_fg_drip_credited = 0
 		return
 
+	# Phase 1 (GDD #34 / ADR-0021) defeat-forfeit gate (AC-34-08): a DEFEATED run
+	# earns ZERO drip for its entire duration. The WIN/DEFEAT verdict is resolved
+	# once at dispatch, so is_active_run_defeated() is true from tick 1 of a doomed
+	# run → the whole run forfeits the drip, mirroring the offline batch's
+	# zero-credit window. Reset the segment state (same as NO_RUN) so no partial
+	# credit bleeds, then return without crediting.
+	var run_is_defeated: bool = false
+	if _fg_drip_defeated_override >= 0:
+		run_is_defeated = _fg_drip_defeated_override == 1
+	elif is_inside_tree():
+		var def_orch: Node = get_node_or_null("/root/DungeonRunOrchestrator")
+		if def_orch != null and def_orch.has_method("is_active_run_defeated"):
+			run_is_defeated = bool(def_orch.is_active_run_defeated())
+	if run_is_defeated:
+		_fg_drip_active_floor = 0
+		_fg_drip_rate = 0.0
+		_fg_drip_segment_ticks = 0
+		_fg_drip_segment_base = 0
+		_fg_drip_credited = 0
+		return
+
 	# Resolve formation strength. Test seam first; otherwise via HeroRoster
 	# (is_inside_tree guarded). Absent roster / empty formation → 0.0 → no drip.
 	var formation_strength: float = 0.0
@@ -417,6 +446,15 @@ func _on_tick(_n: int) -> void:
 func set_foreground_drip_inputs_for_test(floor_index: int, formation_strength: float) -> void:
 	_fg_drip_floor_override = floor_index
 	_fg_drip_strength_override = formation_strength
+
+
+## Test-only seam: force the foreground drip's DEFEAT verdict so [method _on_tick]'s
+## defeat-forfeit gate (GDD #34 / ADR-0021 / AC-34-08) can be driven from a headless
+## unit test without a live DungeonRunOrchestrator. Pass [code]true[/code] to force a
+## DEFEATED run (drip forfeits), [code]false[/code] to force a normal (won) run.
+## Mirrors [method set_foreground_drip_inputs_for_test].
+func set_foreground_drip_defeated_for_test(is_defeated: bool) -> void:
+	_fg_drip_defeated_override = 1 if is_defeated else 0
 
 
 ## Seeds [member _gold_balance] to [member EconomyConfig.STARTING_GOLD] on

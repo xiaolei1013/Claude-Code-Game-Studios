@@ -159,21 +159,22 @@ func test_advantaged_kill_yields_higher_gold_at_every_tier() -> void:
 # ===========================================================================
 
 func test_advantaged_matchup_produces_higher_effective_dps_than_disadvantaged() -> void:
-	# Combat per-enemy DPS scaling: effective_dps = raw * factor * hp_bonus.
+	# Combat per-enemy DPS scaling: effective_dps = raw * factor (Phase 1 / GDD
+	# #34 §C.3 — the hp_bonus throttle was removed; survival is now resolved by
+	# the two-sided HP race, not a DPS multiplier).
 	# Advantaged: factor = MATCHUP_THROUGHPUT_FACTOR_ADV (1.5).
 	# Disadvantaged: factor = MATCHUP_THROUGHPUT_FACTOR_DIS (0.67).
 	# Verify advantaged > disadvantaged effective DPS for the same raw inputs.
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
 	var raw_dps: float = 1.0
-	var hp_bonus: float = 1.0
 
 	# Act — call effective_dps with each factor.
-	var adv_eff: float = resolver.effective_dps(raw_dps, 1.5, hp_bonus)
-	var dis_eff: float = resolver.effective_dps(raw_dps, 0.67, hp_bonus)
+	var adv_eff: float = resolver.effective_dps(raw_dps, 1.5)
+	var dis_eff: float = resolver.effective_dps(raw_dps, 0.67)
 
 	# Assert
 	assert_float(adv_eff).is_greater(dis_eff)
-	# Sanity: 1.0 * 1.5 * 1.0 = 1.5; 1.0 * 0.67 * 1.0 = 0.67
+	# Sanity: 1.0 * 1.5 = 1.5; 1.0 * 0.67 = 0.67
 	assert_float(adv_eff).is_equal_approx(1.5, 0.001)
 	assert_float(dis_eff).is_equal_approx(0.67, 0.001)
 

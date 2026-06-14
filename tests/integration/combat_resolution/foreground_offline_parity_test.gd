@@ -10,7 +10,9 @@
 # Covers: TR-combat-002 (compute_offline_batch entry point),
 #         TR-combat-003 (single source of truth — same _kill_schedule_for_loop
 #                        helper as foreground emit),
-#         TR-combat-015 (CombatBatchResult 7-field population),
+#         TR-combat-015 (CombatBatchResult 6-field population),
+#         GDD #34 §C.5 (offline batch carries the `won` verdict from the
+#                       two-sided HP race; defeat forfeits loot — AC-34-08),
 #         TR-combat-021 (determinism + input safety),
 #         TR-combat-022 (parity invariant: foreground union == offline aggregate),
 #         TR-combat-023 (no per-event Array retained for long offline windows).
@@ -22,14 +24,18 @@ const CombatRunSnapshotScript = preload("res://src/core/combat/combat_run_snapsh
 
 # Build a snapshot with the same canonical 3-enemy list used in the foreground
 # emit tests, so per-enemy ticks_to_kill arithmetic is shared and predictable.
-# With raw_dps=1.0, factor_adv=1.5, hp_bonus=1.0, base_hp=10:
+# With raw_dps=1.0, factor_adv=1.5, base_hp=10:
 #   effective_dps = 1.5; ticks_to_kill = ceili(10/1.5) = 7
 #   Per-loop kill_ticks (dispatched_at_tick=0): 7, 14, 21
 #   ticks_per_loop = 21
+# The enemies carry no base_attack/base_speed → dmg_rate = 0 in the two-sided
+# HP race, and formation_total_hp is large, so compute_run_outcome resolves a
+# clean WIN (result.won == true) for every parity/determinism scenario here.
+# Defeat propagation is exercised separately by the dedicated DEFEAT test below.
 func _make_snapshot(loops_per_run: int = 3, dispatched_at_tick: int = 0) -> CombatRunSnapshot:
 	var s: CombatRunSnapshot = CombatRunSnapshotScript.new()
 	s.formation_dps_per_tick = 1.0
-	s.hp_bonus_factor = 1.0
+	s.formation_total_hp = 1000
 	s.matchup_cache = {&"bruiser": true}
 	s.enemy_list = [
 		{"id": &"e1", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10},
@@ -104,7 +110,6 @@ func test_compute_offline_batch_empty_enemy_list_returns_empty_result() -> void:
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
 	var s: CombatRunSnapshot = CombatRunSnapshotScript.new()
 	s.formation_dps_per_tick = 1.0
-	s.hp_bonus_factor = 1.0
 	s.enemy_list = []
 	s.matchup_cache = {}
 	s.loops_per_run = 1
@@ -117,10 +122,10 @@ func test_compute_offline_batch_empty_enemy_list_returns_empty_result() -> void:
 
 
 # ===========================================================================
-# Group B: TR-015 — 7-field CombatBatchResult population
+# Group B: TR-015 — 6-field CombatBatchResult population
 # ===========================================================================
 
-func test_compute_offline_batch_full_run_populates_all_seven_fields() -> void:
+func test_compute_offline_batch_full_run_populates_all_six_fields() -> void:
 	# Arrange — 3 loops × 3 enemies, schedule ends at tick 63.
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
 	var s: CombatRunSnapshot = _make_snapshot(3)
@@ -128,7 +133,7 @@ func test_compute_offline_batch_full_run_populates_all_seven_fields() -> void:
 	# Act — budget covers full schedule (63 ticks).
 	var result: CombatBatchResult = resolver.compute_offline_batch(s, 63)
 
-	# Assert all 7 fields populated correctly.
+	# Assert all 6 fields populated correctly.
 	# kills_by_archetype: 9 bruiser kills (3 enemies × 3 loops).
 	assert_int(int(result.kills_by_archetype[&"bruiser"])).is_equal(9)
 	# kills_by_tier: 6 tier-1 + 3 tier-2 (e3 is tier 2 in canonical fixture).
@@ -138,10 +143,9 @@ func test_compute_offline_batch_full_run_populates_all_seven_fields() -> void:
 	assert_int(result.loops_completed).is_equal(3)
 	# first_clear_tick = 63 (3rd loop's last enemy = first floor-clear).
 	assert_int(result.first_clear_tick).is_equal(63)
-	# hp_bonus_factor copied verbatim.
-	assert_float(result.hp_bonus_factor).is_equal(1.0)
-	# survived = (1.0 >= 0.5) = true.
-	assert_bool(result.survived).is_true()
+	# won: the two-sided HP race — enemies deal no damage (no base_attack) and
+	# formation_total_hp is large, so the party survives → WIN (GDD #34 §C.5).
+	assert_bool(result.won).is_true()
 	# final_tick: schedule exhausted exactly at budget → last event tick = 63.
 	assert_int(result.final_tick).is_equal(63)
 
@@ -182,18 +186,28 @@ func test_compute_offline_batch_first_clear_only_set_at_loops_per_run_completion
 	assert_int(result.loops_completed).is_equal(2)
 
 
-func test_compute_offline_batch_hp_bonus_below_threshold_marks_losing_run() -> void:
-	# Arrange — hp_bonus = 0.4 < 0.5 → survived = false.
+func test_compute_offline_batch_lost_hp_race_marks_run_not_won() -> void:
+	# Arrange — enemies now deal damage (base_attack × base_speed) and the party
+	# HP pool is small, so the two-sided HP race ends in DEFEAT before the floor
+	# clears. party_damage_by(T_clear-1=20) = 5·min(20,7)+5·min(20,14)+5·min(20,20)
+	#   = 35 + 70 + 100 = 205 ≥ 50 = formation_total_hp → DEFEAT (GDD #34 §D).
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
 	var s: CombatRunSnapshot = _make_snapshot()
-	s.hp_bonus_factor = 0.4
+	s.formation_total_hp = 50
+	s.enemy_list = [
+		{"id": &"e1", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10, "base_attack": 5, "base_speed": 10},
+		{"id": &"e2", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10, "base_attack": 5, "base_speed": 10},
+		{"id": &"e3", "archetype": &"bruiser", "tier": 2, "is_boss": true, "base_hp": 10, "base_attack": 5, "base_speed": 10},
+	]
 
 	# Act
 	var result: CombatBatchResult = resolver.compute_offline_batch(s, 1000)
 
-	# Assert — survived field reflects threshold (TR-009 inclusive boundary).
-	assert_float(result.hp_bonus_factor).is_equal_approx(0.4, 0.001)
-	assert_bool(result.survived).is_false()
+	# Assert — the party lost the HP race → DEFEAT (AC-34-08).
+	assert_bool(result.won).is_false()
+	# Kills still aggregate — the verdict is orthogonal to the kill stream; the
+	# loot forfeit is enforced downstream (OfflineProgressionEngine), not here.
+	assert_int(int(result.kills_by_archetype[&"bruiser"])).is_equal(9)
 
 
 # ===========================================================================

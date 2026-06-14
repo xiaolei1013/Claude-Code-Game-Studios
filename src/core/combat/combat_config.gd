@@ -41,8 +41,8 @@ extends GameData
 
 ## Per-enemy throughput multiplier for matchup-advantaged kills.
 ##
-## Applied to [code]formation_dps_per_tick * hp_bonus_factor[/code] when the
-## enemy's archetype is in the snapshot's matchup_cache as advantaged.
+## Applied to [code]formation_dps_per_tick[/code] when the enemy's archetype is
+## in the snapshot's matchup_cache as advantaged.
 ## Default 1.5 = 50% boost on advantaged kills.
 ## Safe range: 1.0 – 3.0.
 ## GDD §G row: MATCHUP_THROUGHPUT_FACTOR_ADV.
@@ -50,8 +50,8 @@ extends GameData
 
 ## Per-enemy throughput multiplier for matchup-DISADVANTAGED kills.
 ##
-## Applied to [code]formation_dps_per_tick * hp_bonus_factor[/code] when the
-## enemy's archetype is NOT in the snapshot's matchup_cache as advantaged.
+## Applied to [code]formation_dps_per_tick[/code] when the enemy's archetype is
+## NOT in the snapshot's matchup_cache as advantaged.
 ## Default 0.67 ≈ 33% throughput penalty on neutral/bad-matchup kills.
 ## Safe range: 0.1 – 0.99 (must be strictly < 1.0; 1.0 = no penalty = wrong).
 ## GDD §G row: MATCHUP_THROUGHPUT_FACTOR_DIS.
@@ -59,15 +59,25 @@ extends GameData
 
 
 # ---------------------------------------------------------------------------
-# Losing-run loot factor (GDD §G row LOSING_RUN_LOOT_FACTOR / Pillar 3 hook)
+# Enemy → party damage multiplier (GDD #34 §D / §G row MATCHUP_PARTY_DISADVANTAGE)
 # ---------------------------------------------------------------------------
 
-## Multiplier applied to per-kill gold when the run is LOSING (survived=false
-## per TR-009 hp_bonus_factor < 0.5). Default 0.5 = half loot on losing runs.
-## Safe range: 0.0 – 1.0 (0.0 = no loot on losing; 1.0 = no penalty).
-## Reasonable values: 0.3 – 0.7.
-## GDD §G row: LOSING_RUN_LOOT_FACTOR.
-@export_range(0.0, 1.0, 0.05) var LOSING_RUN_LOOT_FACTOR: float = 0.5
+## Flat multiplier applied to the enemy → party damage rate in the two-sided
+## HP race (GDD #34 §D): each still-alive enemy deals
+## [code](enemy.attack * enemy.speed) / SPEED_BASE * MATCHUP_PARTY_DISADVANTAGE[/code]
+## per tick to the shared party HP pool.
+##
+## Default 1.0 = neutral (Phase 1). Phase 2 calibration raises this (GDD §G
+## suggests ~1.25) so a mismatched party takes meaningfully more damage and
+## can be defeated even on a floor it would otherwise out-DPS. Values > 1.0
+## make defeats more likely; values < 1.0 make the party tankier.
+## Safe range: 0.5 – 3.0.
+## GDD §G row: MATCHUP_PARTY_DISADVANTAGE.
+@export_range(0.5, 3.0, 0.05) var MATCHUP_PARTY_DISADVANTAGE: float = 1.0
+
+# Phase 1 (GDD #34 / ADR-0021): LOSING_RUN_LOOT_FACTOR (half-loot on a losing
+# run) is RETIRED. The pivot replaces the losing-run-with-half-loot state with a
+# binary WIN (full loot) / DEFEAT (zero loot) outcome from the two-sided HP race.
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +95,7 @@ extends GameData
 ##   3. [member MATCHUP_THROUGHPUT_FACTOR_DIS] strictly < 1.0 (must be a penalty;
 ##      1.0 would mean disadvantaged kills throughput == neutral, defeating
 ##      Pillar 3 — TR-005 / TR-019 of matchup-resolver)
-##   4. [member LOSING_RUN_LOOT_FACTOR] in [0.0, 1.0]
+##   4. [member MATCHUP_PARTY_DISADVANTAGE] > 0.0
 ##
 ## ADR-0011 §Decision — per-resource _validate() pattern.
 func _validate() -> Array[String]:
@@ -106,10 +116,10 @@ func _validate() -> Array[String]:
 			% MATCHUP_THROUGHPUT_FACTOR_DIS
 		)
 
-	if LOSING_RUN_LOOT_FACTOR < 0.0 or LOSING_RUN_LOOT_FACTOR > 1.0:
+	if MATCHUP_PARTY_DISADVANTAGE <= 0.0:
 		errors.append(
-			"LOSING_RUN_LOOT_FACTOR must be in [0.0, 1.0]; got %f"
-			% LOSING_RUN_LOOT_FACTOR
+			"MATCHUP_PARTY_DISADVANTAGE must be > 0.0; got %f"
+			% MATCHUP_PARTY_DISADVANTAGE
 		)
 
 	return errors

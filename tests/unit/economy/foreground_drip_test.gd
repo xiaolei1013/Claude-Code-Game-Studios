@@ -312,6 +312,54 @@ func test_parity_large_n_8h_cap_non_integer_rate() -> void:
 
 
 # ---------------------------------------------------------------------------
+# Test 11b — DEFEAT forfeit (GDD #34 / ADR-0021 / AC-34-08): a DEFEATED run
+# credits ZERO foreground drip for its entire duration. The verdict is known at
+# dispatch (is_active_run_defeated() is true from tick 1), so the drip gate fires
+# every tick → no gold lands, mirroring the offline batch's zero-credit window.
+# Driven through the REAL _on_tick via the defeat DI seam.
+# ---------------------------------------------------------------------------
+func test_defeat_run_forfeits_all_foreground_drip() -> void:
+	# Arrange — an active run on floor 2 with a positive rate (4*1.6=6.4) that
+	# WOULD drip 6+ gold/tick, but the run is DEFEATED.
+	var economy: Node = _make_economy([2, 4, 7, 12, 8], 1.0)
+	economy.set_foreground_drip_inputs_for_test(2, 1.6)
+	economy.set_foreground_drip_defeated_for_test(true)
+	var gold_before: int = economy.get_gold_balance()
+
+	# Act — drive 10 ticks of a doomed run.
+	for i: int in range(1, 11):
+		economy._on_tick(i)
+
+	# Assert — ZERO gold credited; segment state never advanced (gate returns early
+	# every tick, same as NO_RUN).
+	assert_int(economy.get_gold_balance()).is_equal(gold_before)
+	assert_int(economy._fg_drip_segment_ticks).is_equal(0)
+	assert_int(economy._fg_drip_credited).is_equal(0)
+
+	economy.free()
+
+
+# ---------------------------------------------------------------------------
+# Test 11c — DEFEAT control: with the SAME inputs but the run NOT defeated, the
+# drip credits normally. Proves the forfeit in 11b is the defeat verdict's doing,
+# not the inputs. floori(6.4×10) = 64 (the Test 3 schedule).
+# ---------------------------------------------------------------------------
+func test_won_run_with_same_inputs_drips_normally() -> void:
+	var economy: Node = _make_economy([2, 4, 7, 12, 8], 1.0)
+	economy.set_foreground_drip_inputs_for_test(2, 1.6)
+	economy.set_foreground_drip_defeated_for_test(false)  # explicitly NOT defeated
+
+	for i: int in range(1, 11):
+		economy._on_tick(i)
+
+	# floori(6.4 × 10) = floori(64.0) = 64 — same as the Test 3 won-run schedule.
+	assert_int(economy.get_gold_balance()).is_equal(64)
+	assert_int(economy._fg_drip_credited).is_equal(64)
+
+	economy.free()
+
+
+# ---------------------------------------------------------------------------
 # Test 12 — PARITY: matchup_drip_bonus != 1.0
 #
 # rate = 4 * 1.0 * 1.2 = 4.8 (floor 2, FS=1.0, matchup=1.2).

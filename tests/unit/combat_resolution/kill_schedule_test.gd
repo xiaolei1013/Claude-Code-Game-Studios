@@ -1,5 +1,8 @@
 # Tests for Sprint 7 combat-resolution Story 005:
-#   - effective_dps(raw_dps, throughput_factor, hp_bonus) -> float
+#   - effective_dps(raw_dps, throughput_factor) -> float  (Phase 1 / GDD #34
+#     §C.3: the hp_bonus survival-throttle term was removed; party survival is
+#     now resolved by the two-sided HP race in compute_run_outcome, not folded
+#     into the kill rate)
 #   - ticks_to_kill(base_hp, effective_dps) -> int (ceili + maxi(1, ...) floor)
 #   - _kill_schedule_for_loop(snapshot) -> Array[Dictionary] — cumulative
 #     per-enemy kill_tick walk, preserving enemy_list order, applying
@@ -17,11 +20,12 @@ const DefaultCombatResolverScript = preload("res://src/core/combat/default_comba
 const CombatRunSnapshotScript = preload("res://src/core/combat/combat_run_snapshot.gd")
 
 
-func _make_snapshot(formation_dps: float, hp_bonus: float, enemy_list: Array,
+func _make_snapshot(formation_dps: float, _hp_bonus: float, enemy_list: Array,
 		matchup_cache: Dictionary, dispatched_at_tick: int = 0) -> CombatRunSnapshot:
+	# Phase 1 (GDD #34): hp_bonus_factor field is RETIRED — the param is kept
+	# (ignored) so the 10 positional call sites in this suite stay unchanged.
 	var s: CombatRunSnapshot = CombatRunSnapshotScript.new()
 	s.formation_dps_per_tick = formation_dps
-	s.hp_bonus_factor = hp_bonus
 	s.enemy_list = enemy_list
 	s.matchup_cache = matchup_cache
 	s.dispatched_at_tick = dispatched_at_tick
@@ -29,30 +33,30 @@ func _make_snapshot(formation_dps: float, hp_bonus: float, enemy_list: Array,
 
 
 # ===========================================================================
-# Group A: TR-007 — effective_dps multiplication chain
+# Group A: TR-007 — effective_dps multiplication chain (raw_dps × matchup factor)
 # ===========================================================================
 
-func test_effective_dps_neutral_factor_neutral_bonus() -> void:
+func test_effective_dps_neutral_factor() -> void:
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	# 1.0 raw * 1.0 factor * 1.0 bonus = 1.0
-	assert_float(resolver.effective_dps(1.0, 1.0, 1.0)).is_equal_approx(1.0, 0.001)
+	# 1.0 raw * 1.0 factor = 1.0
+	assert_float(resolver.effective_dps(1.0, 1.0)).is_equal_approx(1.0, 0.001)
 
 
-func test_effective_dps_advantaged_kill_with_full_hp_bonus() -> void:
+func test_effective_dps_advantaged_factor() -> void:
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	# 1.0 raw * 1.5 factor * 1.0 bonus = 1.5 (matchup advantage, full survival)
-	assert_float(resolver.effective_dps(1.0, 1.5, 1.0)).is_equal_approx(1.5, 0.001)
+	# 1.0 raw * 1.5 factor = 1.5 (matchup advantage)
+	assert_float(resolver.effective_dps(1.0, 1.5)).is_equal_approx(1.5, 0.001)
 
 
-func test_effective_dps_disadvantaged_kill_with_partial_hp_bonus() -> void:
+func test_effective_dps_disadvantaged_factor() -> void:
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	# 1.0 * 0.67 * 0.5 ≈ 0.335 (disadvantaged + half-HP losing run)
-	assert_float(resolver.effective_dps(1.0, 0.67, 0.5)).is_equal_approx(0.335, 0.001)
+	# 1.0 raw * 0.67 factor ≈ 0.67 (matchup disadvantage)
+	assert_float(resolver.effective_dps(1.0, 0.67)).is_equal_approx(0.67, 0.001)
 
 
 func test_effective_dps_returns_float_type() -> void:
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
-	var result: Variant = resolver.effective_dps(1.0, 1.5, 1.0)
+	var result: Variant = resolver.effective_dps(1.0, 1.5)
 	assert_int(typeof(result)).is_equal(TYPE_FLOAT)
 
 

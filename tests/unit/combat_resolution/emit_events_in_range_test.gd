@@ -19,12 +19,13 @@ const DefaultCombatResolverScript = preload("res://src/core/combat/default_comba
 const CombatRunSnapshotScript = preload("res://src/core/combat/combat_run_snapshot.gd")
 
 
-func _make_snapshot(formation_dps: float, hp_bonus: float, enemy_list: Array,
+func _make_snapshot(formation_dps: float, _hp_bonus: float, enemy_list: Array,
 		matchup_cache: Dictionary, dispatched_at_tick: int = 0,
 		loops_per_run: int = 1) -> CombatRunSnapshot:
+	# Phase 1 (GDD #34): hp_bonus_factor field is RETIRED — the param is kept
+	# (ignored) so the positional call sites in this suite stay unchanged.
 	var s: CombatRunSnapshot = CombatRunSnapshotScript.new()
 	s.formation_dps_per_tick = formation_dps
-	s.hp_bonus_factor = hp_bonus
 	s.enemy_list = enemy_list
 	s.matchup_cache = matchup_cache
 	s.dispatched_at_tick = dispatched_at_tick

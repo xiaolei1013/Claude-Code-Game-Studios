@@ -72,6 +72,19 @@ var run_snapshot: RunSnapshot = null
 ## Sprint 7 S7-M13 — ADR-0010
 var _combat_snapshot: RefCounted = null
 
+## Phase 1 defeat verdict (GDD #34 / ADR-0021). Computed ONCE at [method dispatch]
+## from [member _combat_snapshot] via the resolver's [code]compute_run_outcome[/code]
+## (the single source of truth shared with the offline batch — parity by
+## construction). [member _run_won] is true when the floor clears before
+## [code]formation_total_hp[/code] depletes; false = DEFEAT. [member _run_defeat_tick]
+## is the absolute tick at which HP→0 (relative to dispatch; -1 when the run wins
+## or the resolver is a spy without [code]compute_run_outcome[/code]).
+##
+## Spy resolvers default to WIN ([member _run_won] = true) so pre-pivot spy tests
+## that never built a real snapshot keep their always-clear behavior.
+var _run_won: bool = true
+var _run_defeat_tick: int = -1
+
 
 # ---------------------------------------------------------------------------
 # Signals — TR-orchestrator-026, TR-orchestrator-027
@@ -131,6 +144,20 @@ signal boss_killed(enemy_id: String)
 ##
 ## TR-orchestrator-022
 signal floor_cleared_first_time(floor_index: int, biome_id: String, losing_run: bool)
+
+## Phase 1 defeat (GDD #34 / ADR-0021 — AC-34-05). Fires ONCE per dispatch when a
+## run loses the two-sided HP race: the party's formation_total_hp depletes before
+## the floor clears. Emitted from [method _on_tick_fired] when the tick clock
+## reaches [member _run_defeat_tick], BEFORE the ACTIVE_FOREGROUND → RUN_ENDED
+## transition (so subscribers see the run still active). Carries the same dispatch
+## context as [signal floor_cleared_first_time] (the floor stays as the retry
+## frontier). A DEFEATED run credits ZERO loot — no [signal enemy_killed] /
+## [signal floor_cleared_first_time] fire on a defeat path.
+##
+## AudioRouter / Victory-Moment screen subscribe for the defeat cue + zero-loot
+## summary. The injured-party recovery (Phase 3) keys off this signal.
+@warning_ignore("unused_signal")
+signal run_defeated(floor_index: int, biome_id: String)
 
 ## Class Synergy V1.0 first-pass (Sprint 21 S21-S2 / Story 3) — dispatch-time
 ## signal fired when a run begins with an active synergy. Emitted from
@@ -208,10 +235,9 @@ const MATCHUP_MULT_ADV: float = 1.5
 ## disadvantaged factor for kill-attribution purposes.
 const MATCHUP_MULT_DIS: float = 0.7
 
-## Loot factor applied to a kill's gold reward when the run is a "losing_run"
-## (HP-bonus < 0.5; persisted explicitly in run_snapshot per ADR-0014 §B4).
-## Half-loot per the GDD.
-const LOSING_RUN_LOOT_FACTOR: float = 0.5
+# Phase 1 (GDD #34 / ADR-0021): LOSING_RUN_LOOT_FACTOR (half-loot on a losing run)
+# is RETIRED. A run now either WINS (full loot) or is DEFEATED (zero loot, ends
+# early — the per-kill loop never runs). There is no half-loot middle state.
 
 # ---------------------------------------------------------------------------
 # Class Synergy V1.0 first-pass — Sprint 21 S21-S1 (Story 2) constants.
@@ -380,6 +406,16 @@ var _offline_pending_kills_by_tier: Dictionary = {}
 ## negligible for an offline kill estimate.
 var _offline_combat_snapshot: RefCounted = null
 var _offline_replay_cursor: int = 0
+
+## Phase 1 (GDD #34 / ADR-0021): the offline replay's WIN/DEFEAT verdict, computed
+## ONCE on the first chunk via the resolver's `compute_run_outcome` — the SAME
+## source of truth the foreground dispatch uses, so offline + foreground agree by
+## construction (AC-34-03). DEFEAT means the dispatched formation loses the
+## two-sided HP race on this floor; offline progress is then forfeited entirely
+## (zero kills, zero floor-clear bonus, zero drip — the party is stuck dying on a
+## floor it cannot clear). Defaults true so spy resolvers without
+## `compute_run_outcome` preserve the pre-pivot always-clear behavior.
+var _offline_run_won: bool = true
 
 ## Test-injection seam mirroring [code]Economy.set_offline_replay_inputs[/code].
 ## Production leaves these empty/zero and the live HeroRoster formation +
@@ -781,19 +817,24 @@ func dispatch(formation: Array, floor_index: int, biome_id: String) -> void:
 	# stored cache, never re-resolve.
 	_combat_snapshot = _build_combat_snapshot(formation, floor_index, biome_id)
 	run_snapshot = _build_run_snapshot(formation, floor_index, biome_id, _combat_snapshot)
-	# Sprint 18 (post-S18-M4 playtest): compute losing_run from the combat
-	# snapshot's hp_bonus_factor via the resolver's `survived` predicate
-	# (TR-combat-008, ADR-0002). Was always-false since S7-M13 because
-	# hp_bonus_factor was hardcoded to 1.0; now that _build_combat_snapshot
-	# wires the real formula, losing_run becomes a meaningful gameplay state.
-	# Per dungeon-run-orchestrator.md §B4 + §C R5: losing_run is set EXPLICITLY
-	# (not re-derived from hp_bonus_factor on save/load) — the assignment here
-	# is the authoritative write site.
-	if _combat_resolver != null and _combat_resolver.has_method("survived"):
-		var survived_run: bool = bool(
-			_combat_resolver.call("survived", _combat_snapshot.hp_bonus_factor)
-		)
-		run_snapshot.losing_run = not survived_run
+	# Phase 1 (GDD #34 / ADR-0021): compute the run verdict ONCE here from the
+	# combat snapshot via the resolver's `compute_run_outcome` — the SINGLE source
+	# of truth also used by the offline batch, so foreground + offline agree by
+	# construction (AC-34-03). WIN = floor clears before formation_total_hp
+	# depletes; DEFEAT = HP→0 first, at `defeat_tick`. Spy resolvers without the
+	# method default to WIN (preserving the pre-pivot always-clear behavior those
+	# tests assert).
+	_run_won = true
+	_run_defeat_tick = -1
+	if _combat_resolver != null and _combat_resolver.has_method("compute_run_outcome"):
+		var outcome: RefCounted = _combat_resolver.call("compute_run_outcome", _combat_snapshot)
+		if outcome != null:
+			_run_won = bool(outcome.won)
+			_run_defeat_tick = int(outcome.defeat_tick)
+	# losing_run is RETIRED as a gameplay state (GDD #34): a run now WINS or is
+	# DEFEATED, with no half-loot middle. The legacy field stays pinned false for
+	# save-compat + the 3-arg floor_cleared_first_time signal contract.
+	run_snapshot.losing_run = false
 	# Sprint 8 S8-S3 (Story 006): capture dispatch context so the
 	# floor_cleared_first_time signal can carry biome_id + floor_index when
 	# the floor-clear marker fires later in the run.
@@ -989,6 +1030,17 @@ func _on_tick_fired(n: int) -> void:
 				% [n, run_snapshot.last_emitted_tick]
 			)
 		return  # Duplicate-tick guard (TR-009).
+	# Phase 1 defeat path (GDD #34 / ADR-0021 — AC-34-04): a DEFEATED run credits
+	# ZERO loot. Advance the tick clock but SKIP all kill/gold/XP processing; when
+	# the clock reaches the defeat tick, end the run via [signal run_defeated].
+	# (Enemies that "died" before the party fell grant nothing — defeat is
+	# all-or-nothing per the GDD.)
+	if not _run_won:
+		run_snapshot.current_tick = n
+		run_snapshot.last_emitted_tick = n
+		if _run_defeat_tick >= 0 and n >= _run_defeat_tick:
+			_end_run_defeated()
+		return
 	# Combat call. Sprint 7 S7-M13 data harness: pass the pre-built
 	# [member _combat_snapshot] (CombatRunSnapshot) — distinct from
 	# [member run_snapshot] (the FSM-ownership snapshot). When _combat_snapshot
@@ -1169,8 +1221,9 @@ func _process_kill_events(events: Variant) -> void:
 			# we mirror that here for early-return cleanliness.
 			assert(floor_idx >= 1 and floor_idx <= 5,
 					"floor_index out of range [1,5]: %d" % floor_idx)
-			if losing_run:
-				bonus = floori(float(bonus) * LOSING_RUN_LOOT_FACTOR)
+			# Phase 1 (GDD #34): no half-loot. The floor-clear block only runs on
+			# a WINNING run (a defeated run returns early in _on_tick_fired before
+			# any kill processing), so the full bonus always applies.
 			# Layer 3: Economy monotonic-credit gate.
 			var awarded: bool = false
 			if economy_can_add_gold and bonus > 0 and economy.has_method("try_award_floor_clear"):
@@ -1219,35 +1272,61 @@ func _process_kill_events(events: Variant) -> void:
 		_set_state(next_state)
 
 
+## Phase 1 defeat closure (GDD #34 / ADR-0021 — AC-34-04/05). Ends a DEFEATED
+## run: emits [signal run_defeated] with the dispatch context BEFORE the FSM
+## transition (so subscribers observe the run still in ACTIVE_FOREGROUND), then
+## transitions ACTIVE_FOREGROUND → RUN_ENDED via the same matrix trigger the
+## win path uses. Credits NOTHING — the caller ([method _on_tick_fired]) has
+## already skipped all kill/gold/XP processing for the defeat path.
+func _end_run_defeated() -> void:
+	run_defeated.emit(_dispatched_floor_index, _dispatched_biome_id)
+	var next_state: int = DungeonRunStateScript.validate_transition(
+		state, DungeonRunStateScript.TRIGGER_RUN_ENDED
+	)
+	_set_state(next_state)
+
+
+## Phase 1 drip gate (GDD #34 / ADR-0021 — AC-34-08). True when the in-flight
+## foreground run is doomed to DEFEAT (the verdict computed at dispatch was a
+## loss). The Economy's per-tick drip subscribes to this so a defeated run earns
+## ZERO passive gold while it plays out. Returns false once the run ends (state
+## leaves ACTIVE_FOREGROUND) or for any winning run.
+func is_active_run_defeated() -> bool:
+	return (not _run_won) and state == DungeonRunStateScript.State.ACTIVE_FOREGROUND
+
+
 ## Sprint 8 S8-S3 (Story 006 — TR-014): per-kill gold attribution formula.
 ##
-## Formula: [code]floori(BASE_KILL[tier] * matchup_mult * loot_factor)[/code]
+## Formula: [code]floori(BASE_KILL[tier] * matchup_mult * synergy_mult)[/code]
 ##
 ##   - [code]BASE_KILL[tier][/code]: base gold lookup, 0 for unmapped tiers
 ##   - [code]matchup_mult[/code]: [constant MATCHUP_MULT_ADV] (1.5) when
 ##     advantaged, [constant MATCHUP_MULT_DIS] (0.7) otherwise
-##   - [code]loot_factor[/code]: [constant LOSING_RUN_LOOT_FACTOR] (0.5) when
-##     [param losing_run], 1.0 otherwise
+##   - [code]synergy_mult[/code]: per-(synergy_id, archetype) multiplier
 ##
-## Output range for MVP tiers (1..5): floori(5*0.7*0.5)=1 lower bound,
-## floori(100*1.5*1.0)=150 upper bound. The story spec calls for [5, 120]
-## but the empirical bounds depend on MVP tier mix; this method returns the
-## arithmetic result without clamping (callers can cap if needed).
+## Phase 1 (GDD #34 / ADR-0021): the legacy [code]loot_factor[/code] (half-loot
+## on a losing run) is RETIRED. A run now WINS (full loot) or is DEFEATED (this
+## method never runs — the per-kill loop is skipped on defeat). [param losing_run]
+## is RETAINED in the signature for call-site compatibility but is IGNORED; it is
+## always false in production now (a defeated run credits nothing). A later
+## hygiene pass may drop the param once its ~40 call sites are migrated.
+##
+## Output range for MVP tiers (1..5): floori(5*0.7)=3 lower bound,
+## floori(100*1.5)=150 upper bound. Returns the arithmetic result without
+## clamping (callers can cap if needed).
 ##
 ## TR-orchestrator-014 — ADR-0013 §C
 ##
 ## Sprint 21 S21-S1 (Class Synergy V1.0 Story 2): extended with optional
-## [param synergy_id] + [param archetype] for the 4-factor (now 5-factor with
-## prestige in Sprint 22+) multiplicative formula. Backwards-compatible:
-## existing callers passing only (tier, advantaged, losing_run) get
-## synergy_id="" (no synergy) and the original 3-factor result. Per
-## `class-synergy-system.md` §C.3 + §D.2 + AC-CS-06..09.
+## [param synergy_id] + [param archetype] for the multiplicative synergy/prestige
+## formula. Per `class-synergy-system.md` §C.3 + §D.2 + AC-CS-06..09.
 func attribute_kill_gold(tier: int, advantaged: bool, losing_run: bool, synergy_id: String = "", archetype: String = "") -> int:
+	# Phase 1 (GDD #34): losing_run is ignored — retained for call-site compat.
+	var _unused_losing_run: bool = losing_run
 	var base: int = int(BASE_KILL.get(tier, 0))
 	var matchup_mult: float = MATCHUP_MULT_ADV if advantaged else MATCHUP_MULT_DIS
-	var loot_factor: float = LOSING_RUN_LOOT_FACTOR if losing_run else 1.0
 	var synergy_mult: float = _resolve_synergy_gold_multiplier(synergy_id, archetype)
-	return floori(float(base) * matchup_mult * loot_factor * synergy_mult)
+	return floori(float(base) * matchup_mult * synergy_mult)
 
 
 ## Sprint 21 S21-S1 (Class Synergy V1.0 Story 2): per-kill XP attribution
@@ -1413,13 +1492,23 @@ func flush_offline_signals() -> void:
 	# rebuilds a fresh snapshot + cursor (see compute_offline_batch).
 	_offline_combat_snapshot = null
 	_offline_replay_cursor = 0
+	_offline_run_won = true
 
 
 ## Offline-replay combat feeder — landed Story 010. Called once per
 ## OfflineProgressionEngine chunk while [member _is_offline_replay] is true.
 ## Returns a plain [Dictionary] (NOT the CombatBatchResult — the engine calls
 ## [code]result.has(...)[/code], which is Dictionary-only):
-##   [code]{kills_by_tier: Dictionary, floor_cleared: bool, floor_index: int}[/code]
+##   [code]{kills_by_tier: Dictionary, floor_cleared: bool, floor_index: int,
+##    floor_clear_bonus_gold: int, won: bool}[/code]
+##
+## Phase 1 (GDD #34 / ADR-0021): [code]won[/code] is the WIN/DEFEAT verdict of the
+## two-sided HP race, resolved ONCE on the first chunk via the resolver's shared
+## [code]compute_run_outcome[/code] (foreground/offline parity, AC-34-03). On DEFEAT
+## ([code]won == false[/code]) the batch credits nothing — zero kills, zero
+## floor-clear bonus — and the OfflineProgressionEngine reads [code]won[/code] to
+## ALSO skip the Economy drip batch, so a doomed offline run earns zero gold
+## (AC-34-08), mirroring the foreground drip forfeit.
 ##
 ## Mirrors the Economy offline-input resolution (formation + floor): the offline
 ## batch represents the player's live formation grinding the dispatched (or
@@ -1436,7 +1525,11 @@ func flush_offline_signals() -> void:
 ## follow-up — not wired here.
 func compute_offline_batch(tick_budget: int) -> Dictionary:
 	var floor_index: int = _resolve_offline_replay_floor_index()
-	var empty: Dictionary = {"kills_by_tier": {}, "floor_cleared": false, "floor_index": floor_index}
+	# Degenerate-path return: `won: true` so a missing/spy resolver does NOT forfeit
+	# the Economy drip (no combat verdict known → no defeat → drip runs as before).
+	var empty: Dictionary = {
+		"kills_by_tier": {}, "floor_cleared": false, "floor_index": floor_index, "won": true,
+	}
 	if tick_budget <= 0:
 		return empty
 	if _combat_resolver == null or not _combat_resolver.has_method("compute_offline_batch"):
@@ -1450,6 +1543,22 @@ func compute_offline_batch(tick_budget: int) -> Dictionary:
 		if _offline_combat_snapshot != null:
 			_offline_combat_snapshot.loops_per_run = _OFFLINE_LOOPS_CAP
 		_offline_replay_cursor = 0
+		# Phase 1 (GDD #34 / ADR-0021): resolve the WIN/DEFEAT verdict ONCE, here on
+		# the first chunk, via the SAME `compute_run_outcome` the foreground dispatch
+		# uses (AC-34-03 parity). A single-loop verdict is sufficient: the formation
+		# either clears this floor (and grinds it for the whole window) or is defeated
+		# on it (and is defeated on every retry → zero offline progress). Spy resolvers
+		# without the method leave `_offline_run_won` true (pre-pivot always-clear).
+		_offline_run_won = true
+		if (
+			_offline_combat_snapshot != null
+			and _combat_resolver.has_method("compute_run_outcome")
+		):
+			var outcome: RefCounted = _combat_resolver.call(
+				"compute_run_outcome", _offline_combat_snapshot
+			)
+			if outcome != null:
+				_offline_run_won = bool(outcome.won)
 		# Offline resume: run_snapshot is null (it's transient, never persisted).
 		# Build it so flush_offline_signals → _grant_xp_to_formation has a
 		# formation_snapshot to grant against. Guard: never clobber a genuinely
@@ -1458,6 +1567,21 @@ func compute_offline_batch(tick_budget: int) -> Dictionary:
 			run_snapshot = _build_run_snapshot(formation, floor_index, biome_id, _offline_combat_snapshot)
 	if _offline_combat_snapshot == null:
 		return empty
+
+	# Phase 1 (GDD #34 / ADR-0021) defeat-forfeit gate (AC-34-08): a DEFEATED
+	# offline run earns NOTHING for the whole window — no kills, no floor-clear
+	# bonus, no kill-XP. Runs on EVERY chunk (the verdict was cached on the first
+	# chunk above), so a multi-chunk window stays zero throughout. The `won: false`
+	# return tells OfflineProgressionEngine to ALSO skip the Economy drip batch, so
+	# foreground (drip gates on is_active_run_defeated) and offline forfeit alike.
+	if not _offline_run_won:
+		return {
+			"kills_by_tier": {},
+			"floor_cleared": false,
+			"floor_index": floor_index,
+			"floor_clear_bonus_gold": 0,
+			"won": false,
+		}
 
 	# Per-chunk window: re-anchor the schedule at the running cursor and count
 	# this chunk's budget — O(chunk), no cumulative re-walk.
@@ -1515,6 +1639,8 @@ func compute_offline_batch(tick_budget: int) -> Dictionary:
 		# Floor-clear bonus credited this chunk (0 unless a genuine first-clear) —
 		# surfaced onto summary.gold_earned by the engine.
 		"floor_clear_bonus_gold": floor_clear_bonus_gold,
+		# Phase 1 (GDD #34): WIN verdict — the engine runs the Economy drip batch.
+		"won": true,
 	}
 
 
@@ -1873,7 +1999,7 @@ func resolve_floor_by_snapshot_id(floor_id: String) -> Resource:
 
 ## Builds the combat-side [CombatRunSnapshot] at DISPATCHING. Uses the
 ## injected [member _combat_resolver] (when it's a [DefaultCombatResolver])
-## to compute formation_dps_per_tick + hp_bonus_factor; falls back to
+## to compute formation_dps_per_tick + formation_total_hp; falls back to
 ## sentinel values when the injected resolver lacks those methods (spy
 ## injection paths).
 ##
@@ -1893,13 +2019,17 @@ func _build_combat_snapshot(formation: Array, floor_index: int, biome_id: String
 		snap.formation_dps_per_tick = float(_combat_resolver.call("formation_dps_per_tick", formation))
 	else:
 		snap.formation_dps_per_tick = 1.0
-	# hp_bonus_factor — computed below from formation_total_hp + floor_total_enemy_attack
-	# AFTER enemy_list resolution (so we can sum base_attack across enemies).
-	# Sprint 18 (post-S18-M4 playtest signal): wired the real LOSING-run computation
-	# per ADR-0002 + the explicit-bool semantics in dungeon-run-orchestrator.md §B4.
-	# Was hardcoded to 1.0 since the S7-M13 MVP harness; now reads through the
-	# combat resolver's existing hp_bonus_factor formula (TR-combat-008).
-	snap.hp_bonus_factor = 1.0  # provisional; overwritten below after enemy_list materializes
+	# Phase 1 (GDD #34 / ADR-0021): formation_total_hp is the party's HP pool for
+	# the two-sided HP race — the resolver's compute_run_outcome depletes it by
+	# enemy DPS each tick and declares DEFEAT if it hits 0 before the floor clears.
+	# Computed via the injected resolver when available (DefaultCombatResolver has
+	# formation_total_hp); spy resolvers lacking it default to a large sentinel so
+	# any verdict resolves to WIN (preserving pre-pivot always-clear behavior).
+	# Replaces the retired hp_bonus_factor DPS-throttle (removed in Phase 1 L1).
+	if _combat_resolver != null and _combat_resolver.has_method("formation_total_hp"):
+		snap.formation_total_hp = int(_combat_resolver.call("formation_total_hp", formation))
+	else:
+		snap.formation_total_hp = 1_000_000
 	# enemy_list — fetched from Floor data via DataRegistry. Floor lookup is
 	# composite-keyed: biome_id + floor_index. The biome-dungeon-database
 	# epic Story 003 (Forest Reach MVP content) provides the data; for the
@@ -1910,10 +2040,9 @@ func _build_combat_snapshot(formation: Array, floor_index: int, biome_id: String
 		# Sprint 18 post-S18-M4 playtest fix: real Floor.enemy_list stores
 		# {enemy_id, count} pairs per ADR-0011 §Decision; combat expects
 		# the materialized shape {id, archetype, tier, is_boss, base_hp,
-		# base_attack}. Pre-fix this shape mismatch silently degenerated
-		# combat on every real floor (base_hp=0 → instant-kill cascades,
-		# archetype="" → matchup advantage never fired, floor_total_enemy_attack=0
-		# → hp_bonus_factor defensively returned 1.0 → losing_run always false).
+		# base_attack, base_speed}. Pre-fix this shape mismatch silently
+		# degenerated combat on every real floor (base_hp=0 → instant-kill
+		# cascades, archetype="" → matchup advantage never fired).
 		# Materialize via DataRegistry; pass synthetic shape through unchanged
 		# so existing tests stay green.
 		snap.enemy_list = _materialize_enemy_list(
@@ -1921,11 +2050,13 @@ func _build_combat_snapshot(formation: Array, floor_index: int, biome_id: String
 		)
 	else:
 		# Synthetic 3-enemy default: gives integration tests a deterministic
-		# floor to drive ticks against.
+		# floor to drive ticks against. base_speed is low (Phase 1: enemy→party
+		# DPS = base_attack×base_speed/SPEED_BASE) so the synthetic floor's threat
+		# stays well under any real formation HP → resolves to WIN by default.
 		snap.enemy_list = [
-			{"id": &"e1", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10, "base_attack": 1},
-			{"id": &"e2", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10, "base_attack": 1},
-			{"id": &"e3", "archetype": &"bruiser", "tier": 2, "is_boss": true, "base_hp": 15, "base_attack": 2},
+			{"id": &"e1", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10, "base_attack": 1, "base_speed": 1},
+			{"id": &"e2", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10, "base_attack": 1, "base_speed": 1},
+			{"id": &"e3", "archetype": &"bruiser", "tier": 2, "is_boss": true, "base_hp": 15, "base_attack": 2, "base_speed": 1},
 		]
 	# Build matchup_cache by inspecting enemy archetypes + invoking the
 	# injected matchup resolver. Empty when matchup_resolver is null/spy
@@ -1944,41 +2075,7 @@ func _build_combat_snapshot(formation: Array, floor_index: int, biome_id: String
 	# loops_per_run: 1 for MVP (single rotation through enemy_list = floor clear).
 	# Story 004 will compute this from floor difficulty + formation throughput.
 	snap.loops_per_run = 1
-	# Sprint 18 (post-S18-M4 playtest): compute the real hp_bonus_factor via
-	# the combat resolver's existing TR-combat-008 formula. Replaces the
-	# S7-M13 placeholder 1.0. Drives the losing_run determination at dispatch.
-	# Fail-safe: if the resolver lacks either method (test spies), stays at
-	# the provisional 1.0 = always-survives, matching prior behavior.
-	if (
-		_combat_resolver != null
-		and _combat_resolver.has_method("formation_total_hp")
-		and _combat_resolver.has_method("hp_bonus_factor")
-	):
-		var formation_hp: int = int(_combat_resolver.call("formation_total_hp", formation))
-		var floor_enemy_attack: int = _floor_total_enemy_attack(snap.enemy_list)
-		snap.hp_bonus_factor = float(
-			_combat_resolver.call("hp_bonus_factor", formation_hp, floor_enemy_attack)
-		)
 	return snap
-
-
-## Sums [code]base_attack[/code] across the floor's enemy_list. The
-## denominator of [method DefaultCombatResolver.hp_bonus_factor].
-##
-## Pure function. Returns 0 for an empty list (caller must defend; the
-## combat resolver's hp_bonus_factor returns 1.0 for floor_total_enemy_attack
-## <= 0 to avoid div-by-zero).
-##
-## Per design/gdd/dungeon-run-orchestrator.md §B4: this is the canonical
-## per-floor threat input. Sprint 18 wired it through after the S18-M4
-## playtest signal asked "do we have failed dispatch if defeated?" surfaced
-## the missing wiring (was hardcoded to 1.0 since S7-M13).
-func _floor_total_enemy_attack(enemy_list: Array) -> int:
-	var total: int = 0
-	for entry: Variant in enemy_list:
-		if entry is Dictionary:
-			total += int((entry as Dictionary).get("base_attack", 0))
-	return total
 
 
 ## Sprint 18 post-S18-M4 playtest fix: expands a Floor.enemy_list of
@@ -2007,10 +2104,9 @@ func _floor_total_enemy_attack(enemy_list: Array) -> int:
 ## every dispatch with no LOSING-run possibility, no matchup advantage,
 ## no real synergy effect.
 ##
-## Paired with [method _floor_total_enemy_attack]: the materializer fills
-## in the [code]base_attack[/code] field that the attack-sum helper reads,
-## so [method DefaultCombatResolver.hp_bonus_factor] receives a meaningful
-## denominator instead of 0.
+## Phase 1 (GDD #34 / ADR-0021): also materializes [code]base_speed[/code] so
+## compute_run_outcome can compute the enemy→party DPS rate for the two-sided
+## HP race. (Replaces the retired hp_bonus_factor throttle path.)
 func _materialize_enemy_list(floor_enemy_list: Array) -> Array:
 	var materialized: Array = []
 	for entry: Variant in floor_enemy_list:
@@ -2051,6 +2147,9 @@ func _materialize_enemy_list(floor_enemy_list: Array) -> Array:
 			"is_boss": bool(enemy_data.get("is_boss")) if "is_boss" in enemy_data else false,
 			"base_hp": int(enemy_data.get("base_hp")) if "base_hp" in enemy_data else 0,
 			"base_attack": int(enemy_data.get("base_attack")) if "base_attack" in enemy_data else 0,
+			# Phase 1 (GDD #34 / ADR-0021): base_speed feeds the enemy→party DPS
+			# rate (base_attack×base_speed/SPEED_BASE) in compute_run_outcome.
+			"base_speed": int(enemy_data.get("base_speed")) if "base_speed" in enemy_data else 0,
 		}
 		for i: int in count:
 			materialized.append(template.duplicate(true))

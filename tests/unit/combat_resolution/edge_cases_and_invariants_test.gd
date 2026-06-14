@@ -77,7 +77,6 @@ func test_compute_offline_batch_empty_formation_snapshot_returns_empty_no_divisi
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
 	var s: CombatRunSnapshot = CombatRunSnapshotScript.new()
 	s.formation_dps_per_tick = 0.0  # empty/all-bad formation post-aggregate
-	s.hp_bonus_factor = 1.0
 	s.matchup_cache = {&"bruiser": true}
 	s.enemy_list = [
 		{"id": &"e1", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10},
@@ -230,7 +229,6 @@ func test_emit_events_in_range_first_clear_in_range_fires_every_time_in_range() 
 	var resolver: RefCounted = DefaultCombatResolverScript.new()
 	var s: CombatRunSnapshot = CombatRunSnapshotScript.new()
 	s.formation_dps_per_tick = 1.0
-	s.hp_bonus_factor = 1.0
 	s.matchup_cache = {&"bruiser": true}
 	s.enemy_list = [
 		{"id": &"e1", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10},
