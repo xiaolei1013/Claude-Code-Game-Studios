@@ -43,6 +43,7 @@ const DUNGEON_RUN_VIEW_GD_PATH: String = "res://assets/screens/dungeon_run_view/
 
 const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/dungeon_run_state.gd")
 const RunSnapshotScript = preload("res://src/core/dungeon_run_orchestrator/run_snapshot.gd")
+const CombatRunSnapshotScript = preload("res://src/core/combat/combat_run_snapshot.gd")
 
 # ---------------------------------------------------------------------------
 # Per-test state snapshots for isolation
@@ -52,6 +53,13 @@ const RunSnapshotScript = preload("res://src/core/dungeon_run_orchestrator/run_s
 var _orch_state_snapshot: int = DungeonRunStateScript.State.NO_RUN
 var _orch_run_snapshot_snapshot: RunSnapshot = null
 var _orch_last_dispatch_ms_snapshot: int = 0
+## Phase 4 watchable-battle tests seed _combat_snapshot to drive the HP bar +
+## enemy-depletion count; snapshot + restore so it never leaks between tests.
+var _orch_combat_snapshot_snapshot: RefCounted = null
+## Phase 4 defeat-routing tests flip _run_won to false to exercise the
+## defeat → guild_hall fork; snapshot + restore (and reset to the WIN default in
+## before_test) so a defeated verdict never leaks into the win-path tests.
+var _orch_run_won_snapshot: bool = true
 ## Dispatched biome/floor drive the "Enemies ahead" lineup; snapshot + restore
 ## so a lineup test's mutation never leaks into another test.
 var _orch_dispatched_biome_snapshot: String = ""
@@ -85,6 +93,16 @@ func before_test() -> void:
 	DungeonRunOrchestrator.run_snapshot = null
 	DungeonRunOrchestrator._last_dispatch_ms = 0
 
+	# Snapshot + clear the combat snapshot (Phase 4 watchable-battle read-model).
+	_orch_combat_snapshot_snapshot = DungeonRunOrchestrator._combat_snapshot
+	DungeonRunOrchestrator._combat_snapshot = null
+
+	# Snapshot + reset the run verdict to the WIN default (Phase 4 defeat-routing).
+	# Defeat tests set _run_won = false; resetting here keeps the win-path tests
+	# correct regardless of execution order.
+	_orch_run_won_snapshot = DungeonRunOrchestrator._run_won
+	DungeonRunOrchestrator._run_won = true
+
 	# Snapshot dispatched biome/floor (mutated by the enemy-lineup tests).
 	_orch_dispatched_biome_snapshot = DungeonRunOrchestrator._dispatched_biome_id
 	_orch_dispatched_floor_snapshot = DungeonRunOrchestrator._dispatched_floor_index
@@ -108,6 +126,8 @@ func after_test() -> void:
 	DungeonRunOrchestrator._last_dispatch_ms = _orch_last_dispatch_ms_snapshot
 	DungeonRunOrchestrator._dispatched_biome_id = _orch_dispatched_biome_snapshot
 	DungeonRunOrchestrator._dispatched_floor_index = _orch_dispatched_floor_snapshot
+	DungeonRunOrchestrator._combat_snapshot = _orch_combat_snapshot_snapshot
+	DungeonRunOrchestrator._run_won = _orch_run_won_snapshot
 
 
 # ---------------------------------------------------------------------------
@@ -141,6 +161,32 @@ func _seed_run_snapshot(current_tick: int, kill_count: int) -> RunSnapshot:
 	snap.last_emitted_tick = current_tick
 	snap.kill_count = kill_count
 	DungeonRunOrchestrator.run_snapshot = snap
+	return snap
+
+
+# ---------------------------------------------------------------------------
+# Helper: seed the watchable-battle combat snapshot (Phase 4) on the orchestrator.
+# Worked example (mirrors party_hp_curve_test.gd): dispatched_at=100, two enemies
+# a(dmg 20) + b(dmg 10), both advantaged; party_damage_by(T)=20*min(T,2)+10*min(T,5);
+# party_hp=100 -> rel 0 reads 100, rel 2 reads 40. enemy_total = 2 * loops.
+# ---------------------------------------------------------------------------
+
+func _seed_combat_snapshot(party_hp: int, loops: int = 1) -> RefCounted:
+	var snap: RefCounted = CombatRunSnapshotScript.new()
+	snap.formation_dps_per_tick = 10.0
+	snap.formation_total_hp = party_hp
+	snap.dispatched_at_tick = 100
+	snap.loops_per_run = loops
+	var cache: Dictionary = {&"goblin": true}
+	snap.matchup_cache = cache
+	var enemies: Array = [
+		{"id": &"a", "archetype": &"goblin", "tier": 1, "is_boss": false,
+			"base_hp": 30, "base_attack": 180, "base_speed": 10},
+		{"id": &"b", "archetype": &"goblin", "tier": 1, "is_boss": false,
+			"base_hp": 45, "base_attack": 90, "base_speed": 10},
+	]
+	snap.enemy_list = enemies
+	DungeonRunOrchestrator._combat_snapshot = snap
 	return snap
 
 
@@ -597,3 +643,299 @@ func test_biome_unlock_spawns_live_toast_naming_the_region() -> void:
 	var toast: Label = _find_toast(screen, "BiomeUnlockToast")
 	assert_object(toast).is_not_null()
 	assert_str(toast.text).contains("Ember Wastes")
+
+
+# ===========================================================================
+# Watchable battle — party HP bar + enemy-depletion count (Defeat & Injury
+# Phase 4, GDD #34 §I). The bar/labels poll the orchestrator read-model
+# getters (current_party_hp/max_party_hp/enemies_remaining/enemy_total), which
+# delegate the HP curve to the resolver's defeat-verdict math.
+# ===========================================================================
+
+func test_party_hp_bar_reflects_combat_snapshot_on_enter() -> void:
+	# Arrange — full HP at dispatch tick (rel 0 -> no damage yet).
+	_seed_combat_snapshot(100, 1)
+	_seed_run_snapshot(100, 0)  # current_tick == dispatched_at -> rel 0
+
+	# Act
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var bar: ProgressBar = screen.find_child("PartyHpBar", true, false) as ProgressBar
+	var label: Label = screen.find_child("PartyHpLabel", true, false) as Label
+
+	# Assert — bar reads full, numeric label reads "HP 100/100".
+	assert_object(bar).is_not_null()
+	assert_float(bar.max_value).is_equal(100.0)
+	assert_float(bar.value).is_equal(100.0)
+	assert_object(label).is_not_null()
+	assert_str(label.text).is_equal("HP 100/100")
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_party_hp_bar_depletes_on_tick() -> void:
+	# Arrange — start full at dispatch tick.
+	_seed_combat_snapshot(100, 1)
+	var snap: RunSnapshot = _seed_run_snapshot(100, 0)
+
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var bar: ProgressBar = screen.find_child("PartyHpBar", true, false) as ProgressBar
+	var label: Label = screen.find_child("PartyHpLabel", true, false) as Label
+	assert_object(bar).is_not_null()
+	assert_float(bar.value).is_equal(100.0)
+
+	# Act — advance to current_tick 102 (rel 2 -> party_damage_by(2)=60 -> 40 HP).
+	snap.current_tick = 102
+	snap.last_emitted_tick = 102
+	DungeonRunOrchestrator.run_snapshot = snap
+	TickSystem.tick_fired.emit(102)
+	await get_tree().process_frame
+
+	# Assert — bar dropped to 40, label tracks it.
+	assert_float(bar.value).is_equal(40.0)
+	assert_str(label.text).is_equal("HP 40/100")
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_enemies_remaining_label_reflects_kills() -> void:
+	# Arrange — 2 enemies * 3 loops = 6 total; 1 killed -> 5 remaining.
+	_seed_combat_snapshot(100, 3)
+	_seed_run_snapshot(100, 1)
+
+	# Act
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var label: Label = screen.find_child("EnemiesRemainingLabel", true, false) as Label
+
+	# Assert
+	assert_object(label).is_not_null()
+	assert_str(label.text).is_equal("Enemies 5/6")
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_party_hp_bar_safe_with_no_combat_snapshot() -> void:
+	# Arrange — dev-nav idle DRV: no combat snapshot, no run.
+	DungeonRunOrchestrator._combat_snapshot = null
+	DungeonRunOrchestrator.run_snapshot = null
+
+	# Act — must not crash; bar present but reads a safe 0/clamped-max.
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var bar: ProgressBar = screen.find_child("PartyHpBar", true, false) as ProgressBar
+	var label: Label = screen.find_child("PartyHpLabel", true, false) as Label
+	var enemies_label: Label = screen.find_child("EnemiesRemainingLabel", true, false) as Label
+
+	# Assert — widgets exist, HP reads 0/0, enemies read 0/0 (view hides/ignores).
+	assert_object(bar).is_not_null()
+	assert_float(bar.value).is_equal(0.0)
+	assert_str(label.text).is_equal("HP 0/0")
+	assert_object(enemies_label).is_not_null()
+	assert_str(enemies_label.text).is_equal("Enemies 0/0")
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+# ===========================================================================
+# Defeat moment + correct routing (Defeat & Injury Phase 4, GDD #34 §I / L4).
+# A WIN routes to victory_moment; a DEFEAT shows a distinct defeat overlay and
+# routes to guild_hall (the injured-party recovery surface). The route decision
+# reads DungeonRunOrchestrator.was_last_run_defeated() so it stays correct even
+# when the run_defeated signal is missed (transition-replay of a short run).
+#
+# The route fires after RUN_END_DWELL_MS (1500 ms) — the awaiting tests wait
+# 1.7 s so the screen's own dwell timer fires (and its coroutine completes)
+# within the test boundary, before after_test restores SceneManager state.
+# ===========================================================================
+
+func test_run_defeated_emits_distinct_defeat_overlay() -> void:
+	# Arrange — navigate (no RUN_ENDED, so no auto-route coroutine is spawned).
+	_seed_run_snapshot(8, 1)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var overlay: Control = screen.get_node_or_null("RunEndOverlay") as Control
+	var run_label: Label = screen.get_node_or_null("RunEndOverlay/RunEndLabel") as Label
+	assert_object(overlay).is_not_null()
+	assert_object(run_label).is_not_null()
+	assert_bool(overlay.visible).is_false()
+
+	# Act — the dedicated defeat moment fires for floor 4.
+	DungeonRunOrchestrator.run_defeated.emit(4, "forest_reach")
+	await get_tree().process_frame
+
+	# Assert — overlay visible with the DEFEAT copy (names floor "4"), NOT the
+	# victory "Run Complete" copy.
+	assert_bool(overlay.visible).is_true()
+	assert_str(run_label.text).contains("4")
+	assert_bool(run_label.text.contains("Run Complete")).is_false()
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_defeat_verdict_routes_to_guild_hall() -> void:
+	# Arrange — a DEFEATED run in ACTIVE_FOREGROUND (verdict already a loss).
+	var snap: RunSnapshot = _seed_run_snapshot(10, 2)
+	DungeonRunOrchestrator.state = DungeonRunStateScript.State.ACTIVE_FOREGROUND
+	DungeonRunOrchestrator._run_won = false
+	DungeonRunOrchestrator._dispatched_floor_index = 3
+
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var overlay: Control = screen.get_node_or_null("RunEndOverlay") as Control
+	var run_label: Label = screen.get_node_or_null("RunEndOverlay/RunEndLabel") as Label
+	assert_object(overlay).is_not_null()
+
+	# Pre-arm SceneManager → TRANSITIONING so the route queues into _queued_request
+	# rather than calling _execute_transition (assert-crashes without MainRoot).
+	SceneManager.state = SceneManager.State.TRANSITIONING
+	SceneManager._queued_request = {}
+
+	# Act — defeat moment, then the FSM transition to RUN_ENDED (mirrors
+	# orchestrator._end_run_defeated: run_defeated emits BEFORE _set_state).
+	DungeonRunOrchestrator.run_defeated.emit(3, "forest_reach")
+	DungeonRunOrchestrator.state = DungeonRunStateScript.State.RUN_ENDED
+	DungeonRunOrchestrator.run_snapshot = snap
+	DungeonRunOrchestrator.state_changed.emit(
+		DungeonRunStateScript.State.RUN_ENDED,
+		DungeonRunStateScript.State.ACTIVE_FOREGROUND
+	)
+
+	# Assert (synchronous) — the DEFEAT overlay is shown and the RUN_ENDED
+	# transition did NOT overwrite it with the victory "Run Complete" copy.
+	assert_bool(overlay.visible).is_true()
+	assert_str(run_label.text).contains("3")
+	assert_bool(run_label.text.contains("Run Complete")).is_false()
+
+	# Wait out the RUN_END_DWELL_MS = 1500 dwell so the route fires.
+	await get_tree().create_timer(1.7).timeout
+
+	# Assert — routed to guild_hall (recovery surface), NOT victory_moment.
+	assert_str(String(SceneManager._queued_request.get("screen_id", ""))).is_equal("guild_hall")
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_defeat_routes_to_guild_hall_even_without_run_defeated_signal() -> void:
+	# Arrange — DEFEATED verdict, but the run_defeated signal is NEVER emitted
+	# (simulates a transition-replay where the view subscribed too late to catch
+	# it). Routing must still fork to guild_hall via was_last_run_defeated().
+	var snap: RunSnapshot = _seed_run_snapshot(10, 1)
+	DungeonRunOrchestrator.state = DungeonRunStateScript.State.ACTIVE_FOREGROUND
+	DungeonRunOrchestrator._run_won = false
+	DungeonRunOrchestrator._dispatched_floor_index = 2
+
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var overlay: Control = screen.get_node_or_null("RunEndOverlay") as Control
+	var run_label: Label = screen.get_node_or_null("RunEndOverlay/RunEndLabel") as Label
+	assert_object(overlay).is_not_null()
+
+	SceneManager.state = SceneManager.State.TRANSITIONING
+	SceneManager._queued_request = {}
+
+	# Act — ONLY the RUN_ENDED transition (no run_defeated signal).
+	DungeonRunOrchestrator.state = DungeonRunStateScript.State.RUN_ENDED
+	DungeonRunOrchestrator.run_snapshot = snap
+	DungeonRunOrchestrator.state_changed.emit(
+		DungeonRunStateScript.State.RUN_ENDED,
+		DungeonRunStateScript.State.ACTIVE_FOREGROUND
+	)
+
+	# Assert (synchronous) — the fallback path detected the defeat and showed the
+	# DEFEAT overlay (floor "2"), not the victory copy.
+	assert_bool(overlay.visible).is_true()
+	assert_str(run_label.text).contains("2")
+	assert_bool(run_label.text.contains("Run Complete")).is_false()
+
+	# Wait out the dwell so the route fires.
+	await get_tree().create_timer(1.7).timeout
+
+	# Assert — still routes to guild_hall on the signal-missed fallback path.
+	assert_str(String(SceneManager._queued_request.get("screen_id", ""))).is_equal("guild_hall")
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_win_verdict_routes_to_victory_moment() -> void:
+	# Arrange — a WON run (default _run_won = true, reset in before_test). The
+	# defeat fork must NOT change the win path (regression guard).
+	var snap: RunSnapshot = _seed_run_snapshot(10, 7)
+	DungeonRunOrchestrator.state = DungeonRunStateScript.State.ACTIVE_FOREGROUND
+
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var overlay: Control = screen.get_node_or_null("RunEndOverlay") as Control
+	var run_label: Label = screen.get_node_or_null("RunEndOverlay/RunEndLabel") as Label
+	assert_object(overlay).is_not_null()
+
+	SceneManager.state = SceneManager.State.TRANSITIONING
+	SceneManager._queued_request = {}
+
+	# Act — RUN_ENDED with no defeat verdict → victory path.
+	DungeonRunOrchestrator.state = DungeonRunStateScript.State.RUN_ENDED
+	DungeonRunOrchestrator.run_snapshot = snap
+	DungeonRunOrchestrator.state_changed.emit(
+		DungeonRunStateScript.State.RUN_ENDED,
+		DungeonRunStateScript.State.ACTIVE_FOREGROUND
+	)
+
+	# Assert (synchronous) — the victory run-end overlay (names the kill count "7").
+	assert_bool(overlay.visible).is_true()
+	assert_str(run_label.text).contains("7")
+
+	# Wait out the dwell so the route fires.
+	await get_tree().create_timer(1.7).timeout
+
+	# Assert — routed to victory_moment (win path unchanged by the Phase 4 fork).
+	assert_str(String(SceneManager._queued_request.get("screen_id", ""))).is_equal("victory_moment")
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_on_exit_disconnects_run_defeated_subscription() -> void:
+	# Arrange — navigate (on_enter connects run_defeated).
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	# Pre-assert: run_defeated is connected while the screen is active.
+	assert_bool(
+		DungeonRunOrchestrator.run_defeated.is_connected(screen._on_run_defeated)
+	).is_true()
+
+	# Act
+	screen.on_exit()
+
+	# Assert — run_defeated subscription is disconnected (AC-5 lifecycle hygiene).
+	assert_bool(
+		DungeonRunOrchestrator.run_defeated.is_connected(screen._on_run_defeated)
+	).is_false()
+
+	# Cleanup
+	screen.queue_free()
+	await get_tree().process_frame

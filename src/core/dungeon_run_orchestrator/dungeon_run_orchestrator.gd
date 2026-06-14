@@ -344,6 +344,78 @@ func get_active_floor_index() -> int:
 
 
 # ---------------------------------------------------------------------------
+# Watchable-battle read-model — Defeat & Injury Phase 4 (GDD #34 §I).
+# Thin, side-effect-free getters that let DungeonRunView poll the live combat
+# state each tick (it already subscribes TickSystem.tick_fired) to draw a
+# TRUTHFUL party-HP bar + enemy-lineup count, without adding a per-tick signal
+# or touching the orchestrator hot path. All four read the persisted
+# [member _combat_snapshot] + [member run_snapshot]; none mutate state.
+# ---------------------------------------------------------------------------
+
+## Live party HP at the run's current tick, for the watchable-battle HP bar.
+## Delegates to the resolver's [code]party_hp_remaining_at[/code] — the SAME
+## two-sided-race curve that produced the run's WIN/DEFEAT verdict — so the bar
+## reaches 0 exactly at the resolver's defeat_tick (no faked interpolation, ADR-0021).
+##
+## The relative tick is [code]run_snapshot.current_tick - dispatched_at_tick[/code];
+## the resolver internally clamps a negative (pre-dispatch) or over-range
+## (per-loop reset, GDD §E.3) value.
+##
+## Returns [code]0[/code] when no combat snapshot exists (NO_RUN before the first
+## dispatch) — paired with [method max_party_hp] also returning 0, the view reads
+## a 0/0 "no run" bar and hides it.
+##
+## Usage:
+## [codeblock]
+##   var ratio: float = float(orch.current_party_hp()) / maxf(1.0, orch.max_party_hp())
+##   party_hp_bar.value = ratio * 100.0
+## [/codeblock]
+func current_party_hp() -> int:
+	if _combat_snapshot == null:
+		return 0
+	if _combat_resolver == null or not _combat_resolver.has_method("party_hp_remaining_at"):
+		return max_party_hp()
+	var rel_tick: int = 0
+	if run_snapshot != null:
+		rel_tick = run_snapshot.current_tick - int(_combat_snapshot.dispatched_at_tick)
+	return int(_combat_resolver.call("party_hp_remaining_at", _combat_snapshot, rel_tick))
+
+
+## Maximum party HP for the active run (the formation HP pool that refills each
+## loop, GDD §E.3). Equals [member CombatRunSnapshot.formation_total_hp]; returns
+## [code]0[/code] when no combat snapshot exists.
+func max_party_hp() -> int:
+	if _combat_snapshot == null:
+		return 0
+	return int(_combat_snapshot.formation_total_hp)
+
+
+## Total enemies the run must defeat across all loops:
+## [code]enemy_list.size() * loops_per_run[/code]. Drives the watchable-battle
+## lineup count ("Enemies N/M"). Returns [code]0[/code] when no combat snapshot
+## exists.
+func enemy_total() -> int:
+	if _combat_snapshot == null:
+		return 0
+	var per_loop: int = (_combat_snapshot.enemy_list as Array).size()
+	return per_loop * int(_combat_snapshot.loops_per_run)
+
+
+## Enemies still alive in the active run: [method enemy_total] minus the kills
+## counted so far ([member RunSnapshot.kill_count]), clamped at 0 (defensive —
+## a kill overcount never reads negative). Returns [code]0[/code] when no combat
+## snapshot exists.
+func enemies_remaining() -> int:
+	var total: int = enemy_total()
+	if total == 0:
+		return 0
+	var kills: int = 0
+	if run_snapshot != null:
+		kills = run_snapshot.kill_count
+	return maxi(0, total - kills)
+
+
+# ---------------------------------------------------------------------------
 # Offline replay infrastructure — Sprint 11 S11-X7 / OfflineProgressionEngine
 # GDD §F + OQ-OE-6 lockstep. Mirrors the Economy shape from S11-X6 / ADR-0013
 # Amendment #1. NOT persisted — transient per-replay-cycle state only.
@@ -1354,6 +1426,18 @@ func _apply_defeat_injuries() -> void:
 ## leaves ACTIVE_FOREGROUND) or for any winning run.
 func is_active_run_defeated() -> bool:
 	return (not _run_won) and state == DungeonRunStateScript.State.ACTIVE_FOREGROUND
+
+
+## Defeat & Injury Phase 4 (GDD #34 §I / ADR-0021). True when the LAST resolved
+## foreground run ended in DEFEAT. Unlike [method is_active_run_defeated] (which
+## only holds during ACTIVE_FOREGROUND), this survives into the RUN_ENDED state —
+## [member _run_won] is reset to true at the START of the next dispatch, not at
+## run end. The dungeon_run_view consults this at RUN_ENDED to route a defeated
+## run to the guild_hall recovery surface instead of victory_moment, robustly even
+## when the [signal run_defeated] emission was missed (e.g. it fired before the
+## view subscribed during a SceneManager transition-replay of a very short run).
+func was_last_run_defeated() -> bool:
+	return not _run_won
 
 
 ## Sprint 8 S8-S3 (Story 006 — TR-014): per-kill gold attribution formula.

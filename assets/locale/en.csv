@@ -14,6 +14,7 @@ dungeon_run_view_title,Dungeon Run
 tick_label_prefix,Tick:
 kill_count_label_prefix,Kills:
 run_complete_kill_count_format,Run Complete — %d kills
+run_defeat_floor_format,Driven back at Floor %d — your guild is recovering.
 hero_level_up_toast_format,%s reached level %d!
 hero_milestone_toast_format,Milestone! %s is now Level %d
 biome_unlocked_toast_format,New region unlocked: %s
