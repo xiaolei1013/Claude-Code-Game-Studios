@@ -28,11 +28,20 @@ extends GameData
 
 ## Reference speed value. action_cooldown_ticks(speed) = maxi(1, floori(SPEED_BASE / speed)).
 ##
-## Default 10 per GDD §G. Higher values lengthen the cooldown for a given
-## speed (slower combat); lower values shorten it. Must be >= 1.
-## Safe range: 5 – 20.
-## GDD §G row: SPEED_BASE.
-@export_range(1, 50) var SPEED_BASE: int = 10
+## This is the run-DURATION / watchability dial. SPEED_BASE sits in the
+## denominator of BOTH the party's kill throughput (Σ atk×spd / SPEED_BASE) AND
+## the enemy→party damage rate (Σ atk×spd / SPEED_BASE), so scaling it stretches
+## the whole two-sided HP race in TIME without changing who wins — it is
+## outcome-invariant. Higher = longer (slower) clears; lower = snappier clears.
+## Win/lose is governed by enemy stats + matchup, never by SPEED_BASE.
+##
+## Phase 2 (GDD #34 §D.7 calibration): raised from the Phase-1 placeholder of 10
+## (which collapsed every floor to a sub-second "instant combat" blur) to 90, the
+## value that lands Forest Reach floor clears in the watchable ~3–4 s window
+## empirically verified by floor_calibration_test.gd. Must be >= 1.
+## Safe range: 60 – 150 (run-duration only; re-tune freely, it cannot flip a
+## verdict). GDD §G row: SPEED_BASE.
+@export_range(1, 150) var SPEED_BASE: int = 90
 
 
 # ---------------------------------------------------------------------------

@@ -21,8 +21,9 @@ const _STUB_MARKER: String = "DefaultCombatResolver — Sprint 7 production impl
 
 ## Fallback SPEED_BASE used when DataRegistry cannot resolve combat_config
 ## (e.g., test environments where the config category isn't populated).
-## Matches the GDD §G default of 10.
-const _FALLBACK_SPEED_BASE: int = 10
+## Kept == the CombatConfig default (Phase 2: 90) so the resolve path and the
+## fallback path agree; cooldown_formula_test Group G guards against drift.
+const _FALLBACK_SPEED_BASE: int = 90
 
 
 func _init() -> void:
