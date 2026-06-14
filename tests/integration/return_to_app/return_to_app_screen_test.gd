@@ -623,3 +623,96 @@ func test_no_summary_fallback_hides_region_row() -> void:
 	screen.on_exit()
 	screen.queue_free()
 	await get_tree().process_frame
+
+
+# ===========================================================================
+# Group H: Offline-defeat notice row (GDD #34 Phase 5 / AC-34-10)
+#
+# When an OFFLINE-replay run is DEFEATED, OfflineProgressionEngine stamps the
+# floor the formation was driven back at onto the summary via the
+# "_defeated_at_floor" meta (set in offline_progression_engine.gd; tested in
+# offline_defeat_summary_test.gd). The Return-to-App screen surfaces this as a
+# "Driven back at Floor X — your guild is recovering." row, reusing the same
+# run_defeat_floor_format string the live DUNGEON-RUN defeat overlay uses, so
+# the offline and foreground defeat voices match. A WINNING window stamps no
+# meta and keeps the row hidden.
+# ===========================================================================
+
+## H-01: summary with the "_defeated_at_floor" meta shows the DefeatNoticeRow
+## naming the floor the party was driven back at.
+func test_on_enter_with_defeated_at_floor_meta_shows_defeat_row() -> void:
+	# Arrange
+	var summary: OfflineProgressionEngine.OfflineSummary = _make_summary()
+	summary.set_meta("_defeated_at_floor", 3)
+	OfflineProgressionEngine._last_summary = summary
+	var screen: Control = await _make_screen()
+
+	# Act
+	screen.on_enter()
+	await get_tree().process_frame
+
+	# Assert — DefeatNoticeRow visible and names the floor (3).
+	var row: Label = screen.get_node(
+		"SummaryPanel/VBoxContainer/DefeatNoticeRow"
+	) as Label
+	assert_bool(row.visible).is_true()
+	assert_bool(row.text.contains("3")).is_true()
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+## H-02: summary WITHOUT the defeat meta (the winning common case) keeps the
+## DefeatNoticeRow hidden.
+func test_on_enter_without_defeat_meta_hides_defeat_row() -> void:
+	# Arrange — _make_summary sets no "_defeated_at_floor" meta.
+	var summary: OfflineProgressionEngine.OfflineSummary = _make_summary()
+	OfflineProgressionEngine._last_summary = summary
+	var screen: Control = await _make_screen()
+
+	# Act
+	screen.on_enter()
+	await get_tree().process_frame
+
+	# Assert — DefeatNoticeRow hidden.
+	var row: Label = screen.get_node(
+		"SummaryPanel/VBoxContainer/DefeatNoticeRow"
+	) as Label
+	assert_bool(row.visible).is_false()
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+## H-03: the fallback (no cached summary) path hides the defeat row even if a
+## prior render had shown it (re-use safety — mirrors G-05).
+func test_no_summary_fallback_hides_defeat_row() -> void:
+	# Arrange — first render a DEFEATED summary so the row turns on...
+	var summary: OfflineProgressionEngine.OfflineSummary = _make_summary()
+	summary.set_meta("_defeated_at_floor", 5)
+	OfflineProgressionEngine._last_summary = summary
+	var screen: Control = await _make_screen()
+	screen.on_enter()
+	await get_tree().process_frame
+	var row: Label = screen.get_node(
+		"SummaryPanel/VBoxContainer/DefeatNoticeRow"
+	) as Label
+	assert_bool(row.visible).is_true()
+
+	# Act — clear the summary and re-enter (fallback path).
+	screen.on_exit()
+	OfflineProgressionEngine._last_summary = null
+	screen.on_enter()
+	await get_tree().process_frame
+
+	# Assert — row hidden under the fallback render.
+	assert_bool(row.visible).is_false()
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame

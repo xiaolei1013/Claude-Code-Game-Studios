@@ -49,6 +49,17 @@ layout_mode = 2
 text = ""
 horizontal_alignment = 1
 
+; Sprint 28 Phase 5 (GDD #34): offline-defeat notice. Ember Rust (#A84C2F,
+; DESIGN.md warning/setback register). Shown only when the offline window ended
+; in DEFEAT (summary "_defeated_at_floor" meta is set). Reuses run_defeat_floor_
+; format so the offline and foreground defeat voices match. Hidden by default.
+[node name="DefeatNoticeRow" type="Label" parent="SummaryPanel/VBoxContainer"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.659, 0.298, 0.184, 1)
+visible = false
+
 [node name="GoldRow" type="Label" parent="SummaryPanel/VBoxContainer"]
 layout_mode = 2
 text = ""

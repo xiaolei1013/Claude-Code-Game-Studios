@@ -222,6 +222,8 @@ proving the intended floors are winnable by the intended formation tier and losa
 - AC-34-07 — Per-floor calibration table proves each MVP floor is winnable by its intended formation tier and losable below it (Phase 2 evidence).
 - AC-34-08 — Drip (S28-G1) earned within a defeated run is forfeit (not credited); a defeated run's net gold delta is 0.
 - AC-34-09 — The guild-hall roster and the formation-assignment screen **visually mark** injured heroes — faded to `INJURED_DIM_ALPHA` (0.5) opacity + an "Injured · <countdown>" badge — in **both** the roster picker and any occupied formation slot. The badge is `MOUSE_FILTER_IGNORE` so the card stays tappable (only Dispatch is gated — AC-34-04). The mark updates **live** on the `heroes_injured` signal and is absent for healthy heroes / past-`injured_until` (recovered) heroes / empty slots. *(Phase 3 — shipped; tests: `ui_framework_injury_test.gd`, `roster_injury_mark_test.gd`, `formation_injury_mark_test.gd`.)*
+- AC-34-10 — When an **offline window ends in a defeat** (E.3), the offline summary stamps a `_defeated_at_floor` meta on `OfflineSummary` (ADR-0014-sanctioned meta key, not a field-set expansion) and the return-to-app screen surfaces a **Driven-back notice row** — `run_defeat_floor_format` ("Driven back at Floor %d — your guild is recovering."), Ember Rust setback register — above the gold/kill rewards. The row is **hidden** on a winning (no-defeat) window and on the no-summary fallback. The injured formation is the one anchored at **window-start** (Model B: `set_offline_window_start_ms(now − elapsed×1000)`), so wall-clock recovery counts from when the party actually fell. *(Phase 5 — shipped; tests: `offline_defeat_injury_test.gd`, `offline_defeat_summary_test.gd`, `return_to_app_screen_test.gd` Group H.)*
+- AC-34-11 — When **every roster hero is injured** (E.4), the guild hall shows an **all-injured recovery banner** — `guild_hall_all_injured_format` ("Your guild is recovering — ready in <time>.") with the soonest-recovery delta from `HeroRoster.soonest_recovery_ms(now)` humanized. The banner is **hidden** when any hero is dispatchable, on an empty roster (a fresh player is not "recovering"), and for past-`injured_until` (recovered) heroes; it updates **live** on the `heroes_injured` signal. It is `MOUSE_FILTER_IGNORE` (informational surface, never a tap target — Dispatch soft-blocks itself when no party can be formed). *(Phase 5 — shipped; helpers `are_all_heroes_injured` / `soonest_recovery_ms`; tests: `injury_api_test.gd` Groups E+F, `all_injured_banner_test.gd`.)*
 
 ---
 
@@ -240,8 +242,18 @@ proving the intended floors are winnable by the intended formation tier and losa
   save migration + formation/roster UI marks. TDD.
 - **Phase 4 — Watchable battle + defeat UX.** Dungeon-run-view party HP bar, enemy lineup
   depletion, kill-pops (VfxKit), defeat moment; return-to-app/guild-hall recovery surfaces.
-- **Phase 5 — Offline-defeat polish + retry loop.** Offline summary ("driven back at Floor
-  X"), all-injured handling, retry framing.
+- **Phase 5 — Offline-defeat polish + retry loop. *(Shipped.)*** Offline summary ("driven
+  back at Floor X" — AC-34-10), all-injured handling (the guild-hall recovery banner —
+  AC-34-11), retry framing. *Retry framing is satisfied by the existing copy + structure
+  rather than new UI: the floor is never marked cleared on defeat (§C.3), so it stays the
+  player's frontier in Dispatch/The Map; the defeat notice ("your guild is recovering") and
+  the all-injured banner ("ready in <time>") tell the player the recoverable next step
+  (wait/strengthen) without a separate "retry" prompt — the loop is **lose → recover/
+  strengthen → re-dispatch the same frontier floor → win** (§A).* Orchestrator injures the
+  window-start formation (Model B); engine stamps the `_defeated_at_floor` meta. Tests:
+  `offline_defeat_injury_test.gd`, `offline_defeat_summary_test.gd`,
+  `return_to_app_screen_test.gd` (Group H), `injury_api_test.gd` (Groups E+F),
+  `all_injured_banner_test.gd`.
 
 ---
 

@@ -1121,6 +1121,45 @@ func get_injured_hero_ids(now_ms: int) -> Array[int]:
 	return out
 
 
+## Returns true iff the roster is NON-EMPTY and EVERY hero is currently injured at
+## wall-clock [param now_ms] — the GDD #34 §E.4 "all heroes injured" state where no
+## healthy hero remains to form a party, so no run can be dispatched and the offline
+## drip stops. NOT a soft-lock: recovery is automatic (see [method soonest_recovery_ms]).
+##
+## An EMPTY roster returns false — a fresh player with no heroes is not "recovering";
+## there is no injury to wait out. The guild_hall surfaces a recovery banner when this
+## is true (Phase 5 / AC-34-11).
+##
+## [param now_ms] is wall-clock Unix ms (callers pass [code]TickSystem.now_ms()[/code]).
+func are_all_heroes_injured(now_ms: int) -> bool:
+	if _heroes.is_empty():
+		return false
+	for id: int in _heroes:
+		var hero: HeroInstance = _heroes[id] as HeroInstance
+		if hero == null or not hero.is_injured(now_ms):
+			return false
+	return true
+
+
+## Returns the EARLIEST [code]injured_until[/code] instant among heroes currently
+## injured at wall-clock [param now_ms] — the soonest a recovering hero becomes
+## dispatchable, for the GDD #34 §E.4 "soonest-recovery timer". Returns [code]0[/code]
+## when no hero is injured (nothing to recover). Already-elapsed injuries are excluded
+## (they read as recovered via [method HeroInstance.is_injured]'s strict [code]>[/code]).
+##
+## [param now_ms] is wall-clock Unix ms. The returned instant is also wall-clock ms,
+## suitable for a "back at <time>" countdown.
+func soonest_recovery_ms(now_ms: int) -> int:
+	var soonest: int = 0
+	for id: int in _heroes:
+		var hero: HeroInstance = _heroes[id] as HeroInstance
+		if hero == null or not hero.is_injured(now_ms):
+			continue
+		if soonest == 0 or hero.injured_until < soonest:
+			soonest = hero.injured_until
+	return soonest
+
+
 ## Returns all heroes in the roster, sorted per [param sort_mode].
 ## Default sort is [code]BY_CLASS[/code] (alphabetic class_id ordering with
 ## level-desc tiebreaker) — matches the Recruitment / Roster UI's taxonomy-

@@ -290,6 +290,23 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 	if orchestrator != null:
 		orchestrator._is_offline_replay = true
 
+	# Phase 5 (GDD #34 §E.3/§E.5 / ADR-0021 — AC-34-04/05): record the offline
+	# window's START instant on the orchestrator so a DEFEATED offline run anchors
+	# its injury-recovery clock there (Model B), NOT at resume — letting a long
+	# absence's wall-clock recovery elapse so heroes are healthy when the player
+	# returns. window_start uses the TRUE UNCAPPED elapsed_seconds (the real absence
+	# length, where the doomed run is first defeated), NOT `capped`: recovery elapses
+	# in real time regardless of the reward cap. Read synchronously here (before any
+	# await), so now_ms() reflects the resume instant. Guarded for legacy/test
+	# orchestrators lacking the setter; the orchestrator falls back to now_ms() when
+	# unset (foreground parity).
+	if orchestrator != null and orchestrator.has_method("set_offline_window_start_ms"):
+		var tick_system: Node = get_node_or_null("/root/TickSystem")
+		if tick_system != null and tick_system.has_method("now_ms"):
+			orchestrator.set_offline_window_start_ms(
+				int(tick_system.now_ms()) - elapsed_seconds * 1000
+			)
+
 	# Snapshot available biomes BEFORE the replay so we can diff after flush and
 	# surface any biome that the offline first-clears unlocked (Sprint 28 N2).
 	# Suppressed first-clear signals only land at flush_offline_signals, so the
@@ -318,6 +335,16 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 			var result = orchestrator.compute_offline_batch(chunk_ticks)
 			if result != null:
 				chunk_won = bool(result.get("won", true))
+				# Phase 5 (GDD #34 §I / ADR-0021 — AC-34-10): on a DEFEATED chunk, stamp
+				# the floor the formation was driven back at so the Return-to-App screen
+				# can render the "driven back at Floor X" notice. Stored as a meta key
+				# (NOT a new OfflineSummary field) per ADR-0014's forbidden pattern
+				# OFFLINE_SUMMARY_FIELD_SET_EXPANSION_WITHOUT_VERSION_BUMP — the same
+				# escape hatch _kills_by_tier / _biomes_unlocked use. The verdict is
+				# resolved once on the first chunk, so a multi-chunk doomed window
+				# re-stamps the identical floor value each chunk (idempotent).
+				if not chunk_won and result.has("floor_index"):
+					summary.set_meta("_defeated_at_floor", int(result.floor_index))
 				# Accumulate kills by tier (population is lazy; defaults to 0).
 				if result.has("kills_by_tier") and result.kills_by_tier is Dictionary:
 					for tier: int in result.kills_by_tier.keys():
