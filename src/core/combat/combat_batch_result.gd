@@ -1,6 +1,6 @@
 ## CombatBatchResult — output of [CombatResolver.compute_offline_batch].
 ##
-## Seven-field RefCounted (no .free() needed). Offline-replay aggregate; carries
+## Six-field RefCounted (no .free() needed). Offline-replay aggregate; carries
 ## per-archetype + per-tier kill counts (NOT per-event Array — TR-combat-023
 ## avoids retaining 15k+ KillEvent records for long offline runs).
 ##
@@ -17,19 +17,21 @@
 ##   - [member first_clear_tick]: int — absolute tick of the first floor-clear
 ##     within this batch, or [code]-1[/code] if no clear landed. Orchestrator
 ##     deduplicates per-dispatch (TR-018).
-##   - [member hp_bonus_factor]: float in [0.0, 1.0]; copied from snapshot at
-##     compute time so the result is self-describing for save/load.
-##   - [member survived]: bool; defined by [code]hp_bonus_factor >= 0.5[/code]
-##     (TR-009 inclusive boundary). Persisted explicitly per ADR-0014 §B4
-##     (NOT recomputed from hp_bonus_factor on load — float-boundary fix).
+##   - [member won]: bool — the run verdict from the two-sided HP race
+##     ([code]CombatResolver.compute_run_outcome[/code], GDD #34 §D). Defaults
+##     true; [code]false[/code] means the party was defeated before the floor
+##     cleared, in which case the orchestrator forfeits all loot for this batch
+##     (GDD #34 §F, AC-34-08). Same source the foreground path uses, so offline
+##     and foreground agree by construction (ADR-0021).
 ##   - [member final_tick]: int — absolute tick of the last event in this batch.
 ##     Equals [code]snapshot.dispatched_at_tick + tick_budget[/code] when the
 ##     batch consumes the full budget.
 ##
 ## Equality contract: [method equals] does field-by-field comparison with
 ## [method dict_equals] for Dictionaries (TR-combat-016 — hash-based equality
-## is forbidden for correctness; key-by-key walk is required) and
-## [method is_equal_approx] for floats (TR-combat-017).
+## is forbidden for correctness; key-by-key walk is required). All scalar
+## fields are int/bool, so they compare exactly (no float tolerance needed
+## since the Phase-1 hp_bonus_factor field was removed — ADR-0021).
 ##
 ## ADR-0010: Combat Resolver Snapshot + Parity (CombatBatchResult schema)
 class_name CombatBatchResult extends RefCounted
@@ -46,12 +48,9 @@ var loops_completed: int = 0
 ## Absolute tick of the first floor-clear within the batch; -1 if none.
 var first_clear_tick: int = -1
 
-## hp_bonus_factor at the time the batch was computed; range [0.0, 1.0].
-var hp_bonus_factor: float = 1.0
-
-## True iff [member hp_bonus_factor] >= 0.5 (TR-009 inclusive boundary).
-## Persisted explicitly — NOT re-derived on load (ADR-0014 §B4).
-var survived: bool = true
+## Run verdict from the two-sided HP race (GDD #34 §D). Defaults true; false
+## means the party was defeated before the floor cleared → loot forfeited.
+var won: bool = true
 
 ## Absolute tick of the last event in this batch.
 var final_tick: int = 0
@@ -68,11 +67,9 @@ func equals(other: CombatBatchResult) -> bool:
 		return false
 	if first_clear_tick != other.first_clear_tick:
 		return false
-	if survived != other.survived:
+	if won != other.won:
 		return false
 	if final_tick != other.final_tick:
-		return false
-	if not is_equal_approx(hp_bonus_factor, other.hp_bonus_factor):
 		return false
 	if not dict_equals(kills_by_archetype, other.kills_by_archetype):
 		return false

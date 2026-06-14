@@ -21,14 +21,13 @@ const CombatRunSnapshotScript = preload("res://src/core/combat/combat_run_snapsh
 
 
 # Build a synthetic snapshot suitable for the 576k-tick bench. Uses the
-# canonical 3-enemy bruiser fixture (base_hp=10, factor_adv=1.5, raw_dps=1.0,
-# hp_bonus=1.0 → ticks_to_kill=7 → ticks_per_loop=21). loops_per_run=30000
+# canonical 3-enemy bruiser fixture (base_hp=10, factor_adv=1.5, raw_dps=1.0
+# → ticks_to_kill=7 → ticks_per_loop=21). loops_per_run=30000
 # gives schedule_end = 630k ticks; budget 576k truncates the walk → algorithm
 # walks ~27k loops × 3 enemies ≈ 82k aggregate kills before cut-off.
 func _build_synthetic_576k_snapshot() -> CombatRunSnapshot:
 	var s: CombatRunSnapshot = CombatRunSnapshotScript.new()
 	s.formation_dps_per_tick = 1.0
-	s.hp_bonus_factor = 1.0
 	s.matchup_cache = {&"bruiser": true}
 	s.enemy_list = [
 		{"id": &"e1", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10},

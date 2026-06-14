@@ -112,10 +112,13 @@ func test_attribute_kill_gold_tier1_disadvantaged_winning_returns_3() -> void:
 	assert_int(orch.attribute_kill_gold(1, false, false)).is_equal(3)
 
 
-func test_attribute_kill_gold_tier5_advantaged_losing_returns_75() -> void:
-	# floori(100 * 1.5 * 0.5) = 75
+func test_attribute_kill_gold_tier5_advantaged_losing_flag_ignored_returns_150() -> void:
+	# Phase 1 (GDD #34 / ADR-0021): LOSING_RUN_LOOT_FACTOR is RETIRED, so the
+	# losing_run flag no longer halves loot. floori(100 * 1.5 * 1.0) = 150
+	# whether the flag is true or false.
 	var orch: Node = _make_orch()
-	assert_int(orch.attribute_kill_gold(5, true, true)).is_equal(75)
+	assert_int(orch.attribute_kill_gold(5, true, true)).is_equal(150)
+	assert_int(orch.attribute_kill_gold(5, true, false)).is_equal(150)
 
 
 func test_attribute_kill_gold_unmapped_tier_returns_zero() -> void:
@@ -124,10 +127,13 @@ func test_attribute_kill_gold_unmapped_tier_returns_zero() -> void:
 	assert_int(orch.attribute_kill_gold(99, true, false)).is_equal(0)
 
 
-func test_attribute_kill_gold_disadvantaged_losing_halves_again() -> void:
-	# tier=2: floori(10 * 0.7 * 0.5) = floori(3.5) = 3
+func test_attribute_kill_gold_disadvantaged_losing_flag_no_longer_halves() -> void:
+	# Phase 1: the losing_run flag is ignored. tier=2 disadvantaged:
+	# floori(10 * 0.7 * 1.0) = floori(7.0) = 7 (was 3 under the retired
+	# 0.5 loot factor). Both flag values yield the same gold.
 	var orch: Node = _make_orch()
-	assert_int(orch.attribute_kill_gold(2, false, true)).is_equal(3)
+	assert_int(orch.attribute_kill_gold(2, false, true)).is_equal(7)
+	assert_int(orch.attribute_kill_gold(2, false, false)).is_equal(7)
 
 
 # ===========================================================================
@@ -420,7 +426,11 @@ func test_floor_cleared_first_time_carries_losing_run_flag_correctly() -> void:
 	_reset_spies()
 	var orch: Node = _make_orch()
 	orch.run_snapshot = RunSnapshotScript.new()
-	orch.run_snapshot.losing_run = true  # below 0.5 hp_bonus → losing
+	# Phase 1 (GDD #34): losing_run is a vestigial always-false field in
+	# production (the WIN/DEFEAT verdict replaces it), but the 3-arg
+	# floor_cleared_first_time signal still carries it for backward-compat.
+	# This test forces it true to pin that the field flows through to the signal.
+	orch.run_snapshot.losing_run = true
 	orch._combat_snapshot = CombatRunSnapshotScript.new()
 	orch._combat_snapshot.matchup_cache = {}
 	orch._dispatched_floor_index = 3

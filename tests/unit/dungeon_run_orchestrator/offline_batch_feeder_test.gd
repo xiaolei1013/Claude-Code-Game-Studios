@@ -35,6 +35,21 @@ class _SpyResolver extends RefCounted:
 		return r
 
 
+# Minimal CombatRunOutcome stand-in: the offline verdict path reads only `.won`.
+class _DefeatOutcome extends RefCounted:
+	var won: bool = false
+	var clear_tick: int = -1
+	var defeat_tick: int = 5
+
+
+# Spy resolver reporting DEFEAT (compute_run_outcome → won=false). Its
+# compute_offline_batch still returns kills, so if the defeat-forfeit gate were
+# broken the leak would surface as a non-zero kill count (GDD #34 / AC-34-08).
+class _DefeatSpyResolver extends _SpyResolver:
+	func compute_run_outcome(_snapshot: Variant) -> RefCounted:
+		return _DefeatOutcome.new()
+
+
 func _make_orchestrator() -> Node:
 	var orch: Node = OrchestratorScript.new()
 	add_child(orch)
@@ -159,6 +174,61 @@ func test_flush_resets_offline_batch_state_for_next_resume() -> void:
 	orch.flush_offline_signals()
 	assert_object(orch._offline_combat_snapshot).is_null()
 	assert_int(orch._offline_replay_cursor).is_equal(0)
+
+
+# ===========================================================================
+# DEFEAT forfeit (GDD #34 / ADR-0021 / AC-34-08): a DEFEATED offline run earns
+# NOTHING for the whole window — zero kills, zero floor-clear bonus — and reports
+# won:false so the OfflineProgressionEngine ALSO skips the Economy drip batch.
+# ===========================================================================
+
+func _make_defeat_orchestrator() -> Node:
+	var orch: Node = OrchestratorScript.new()
+	add_child(orch)
+	auto_free(orch)
+	orch.set_combat_resolver(_DefeatSpyResolver.new())
+	var hero: RefCounted = HeroInstanceScript.new()
+	hero.instance_id = 1
+	hero.class_id = "warrior"
+	hero.current_level = 1
+	orch.set_offline_replay_inputs([hero], 1, "")
+	return orch
+
+
+func test_defeat_run_forfeits_all_offline_credit_and_reports_won_false() -> void:
+	# A 600-tick window that WOULD yield 6 kills + 2 loops (a floor clear) if won.
+	var orch: Node = _make_defeat_orchestrator()
+	var result: Dictionary = orch.compute_offline_batch(600)
+
+	assert_bool(result["won"]).override_failure_message(
+		"a defeated offline run must report won:false so the engine skips the drip"
+	).is_false()
+	assert_int((result["kills_by_tier"] as Dictionary).size()).override_failure_message(
+		"a defeated run must credit ZERO kills — the spy's 6 kills must be forfeited"
+	).is_equal(0)
+	assert_bool(result["floor_cleared"]).is_false()
+	assert_int(int(result["floor_clear_bonus_gold"])).is_equal(0)
+	# Nothing accumulated for the batched XP grant either.
+	assert_int(int(orch._offline_pending_kills_by_tier.get(1, 0))).is_equal(0)
+
+
+func test_defeat_verdict_persists_across_chunks() -> void:
+	# The verdict is computed ONCE (first chunk) and cached, so EVERY subsequent
+	# chunk of the doomed window also forfeits — not just the first.
+	var orch: Node = _make_defeat_orchestrator()
+	orch.compute_offline_batch(600)
+	var second: Dictionary = orch.compute_offline_batch(600)
+	assert_bool(second["won"]).is_false()
+	assert_int((second["kills_by_tier"] as Dictionary).size()).is_equal(0)
+
+
+func test_won_run_reports_won_true_and_credits_normally() -> void:
+	# Control: the _SpyResolver lacks compute_run_outcome → the verdict defaults to
+	# WIN, so kills credit as before and won:true tells the engine to drip.
+	var orch: Node = _make_orchestrator()
+	var result: Dictionary = orch.compute_offline_batch(600)
+	assert_bool(result["won"]).is_true()
+	assert_int(int((result["kills_by_tier"] as Dictionary).get(1, 0))).is_equal(6)
 
 
 # ===========================================================================

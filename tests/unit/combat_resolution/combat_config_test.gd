@@ -3,7 +3,11 @@
 #   - _validate() returns Array[String]; empty on valid (ADR-0011)
 #   - combat_config.tres exists at canonical path with snake_case id
 #   - Defaults match GDD §G (SPEED_BASE=10, MATCHUP_THROUGHPUT_FACTOR_ADV=1.5,
-#     MATCHUP_THROUGHPUT_FACTOR_DIS=0.67, LOSING_RUN_LOOT_FACTOR=0.5)
+#     MATCHUP_THROUGHPUT_FACTOR_DIS=0.67, MATCHUP_PARTY_DISADVANTAGE=1.0)
+#
+# Phase 1 (GDD #34 / ADR-0021): LOSING_RUN_LOOT_FACTOR is RETIRED; the
+# enemy→party damage multiplier MATCHUP_PARTY_DISADVANTAGE replaces it as the
+# 4th tuning knob.
 #
 # Covers: TR-combat-031 (combat_config.tres tuning constants).
 extends GdUnitTestSuite
@@ -31,9 +35,9 @@ func test_combat_config_default_matchup_throughput_factor_dis_is_0_67() -> void:
 	assert_float(cfg.MATCHUP_THROUGHPUT_FACTOR_DIS).is_equal_approx(0.67, 0.001)
 
 
-func test_combat_config_default_losing_run_loot_factor_is_0_5() -> void:
+func test_combat_config_default_matchup_party_disadvantage_is_1_0() -> void:
 	var cfg: CombatConfig = CombatConfigScript.new()
-	assert_float(cfg.LOSING_RUN_LOOT_FACTOR).is_equal_approx(0.5, 0.001)
+	assert_float(cfg.MATCHUP_PARTY_DISADVANTAGE).is_equal_approx(1.0, 0.001)
 
 
 func test_combat_config_extends_gamedata() -> void:
@@ -87,18 +91,20 @@ func test_combat_config_validate_rejects_matchup_dis_at_or_above_one() -> void:
 	assert_str(joined).contains("MATCHUP_THROUGHPUT_FACTOR_DIS")
 
 
-func test_combat_config_validate_rejects_losing_run_loot_factor_above_one() -> void:
+func test_combat_config_validate_rejects_party_disadvantage_zero() -> void:
+	# MATCHUP_PARTY_DISADVANTAGE must be > 0.0 (GDD #34 §D): a zero multiplier
+	# would make every enemy deal zero damage, so no run could ever be defeated.
 	var cfg: CombatConfig = CombatConfigScript.new()
-	cfg.LOSING_RUN_LOOT_FACTOR = 1.5
+	cfg.MATCHUP_PARTY_DISADVANTAGE = 0.0
 	var errors: Array[String] = cfg._validate()
 	assert_int(errors.size()).is_greater(0)
 	var joined: String = ", ".join(errors)
-	assert_str(joined).contains("LOSING_RUN_LOOT_FACTOR")
+	assert_str(joined).contains("MATCHUP_PARTY_DISADVANTAGE")
 
 
-func test_combat_config_validate_rejects_losing_run_loot_factor_negative() -> void:
+func test_combat_config_validate_rejects_party_disadvantage_negative() -> void:
 	var cfg: CombatConfig = CombatConfigScript.new()
-	cfg.LOSING_RUN_LOOT_FACTOR = -0.1
+	cfg.MATCHUP_PARTY_DISADVANTAGE = -0.1
 	var errors: Array[String] = cfg._validate()
 	assert_int(errors.size()).is_greater(0)
 
@@ -124,7 +130,7 @@ func test_combat_config_tres_default_values_match_gdd() -> void:
 	assert_int(cfg.SPEED_BASE).is_equal(10)
 	assert_float(cfg.MATCHUP_THROUGHPUT_FACTOR_ADV).is_equal_approx(1.5, 0.001)
 	assert_float(cfg.MATCHUP_THROUGHPUT_FACTOR_DIS).is_equal_approx(0.67, 0.001)
-	assert_float(cfg.LOSING_RUN_LOOT_FACTOR).is_equal_approx(0.5, 0.001)
+	assert_float(cfg.MATCHUP_PARTY_DISADVANTAGE).is_equal_approx(1.0, 0.001)
 
 
 func test_combat_config_tres_validates_clean() -> void:
@@ -186,8 +192,8 @@ func test_no_hardcoded_combat_constants_in_resolver_source() -> void:
 					"%s: MATCHUP_THROUGHPUT_FACTOR_* hardcoded — must come from CombatConfig"
 					% path
 				).is_true()
-			if trimmed.begins_with("const LOSING_RUN_LOOT_FACTOR"):
+			if trimmed.begins_with("const MATCHUP_PARTY_DISADVANTAGE"):
 				assert_bool(false).override_failure_message(
-					"%s: LOSING_RUN_LOOT_FACTOR hardcoded — must come from CombatConfig"
+					"%s: MATCHUP_PARTY_DISADVANTAGE hardcoded — must come from CombatConfig"
 					% path
 				).is_true()

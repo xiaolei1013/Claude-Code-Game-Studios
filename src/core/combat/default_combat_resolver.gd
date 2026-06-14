@@ -134,8 +134,9 @@ func formation_dps_per_tick(formation: Array, error_logger: Callable = Callable(
 	return float(raw_sum) / float(speed_base)
 
 
-## Computes formation total HP at DISPATCHING. Pure function helper used as
-## the numerator of [method hp_bonus_factor]. Sums [code]stat_at_level(HP, level)[/code]
+## Computes formation total HP at DISPATCHING. Pure function helper that
+## yields the shared party HP pool consumed by the two-sided HP race in
+## [method compute_run_outcome] (GDD #34 §D). Sums [code]stat_at_level(HP, level)[/code]
 ## across the formation; null class_data heroes contribute 0.
 ##
 ## Empty formation returns 0. Optional [param error_logger] follows the same
@@ -165,51 +166,21 @@ func formation_total_hp(formation: Array, error_logger: Callable = Callable()) -
 	return total
 
 
-## Computes the hp_bonus_factor saturation curve.
+## Computes effective per-enemy kill DPS from the dispatch-time raw DPS and the
+## matchup-throughput multiplier (advantage or disadvantage from the snapshot's
+## matchup_cache).
 ##
-## Formula (TR-combat-008): [code]mini(formation_total_hp / floor_total_enemy_attack, 1.0)[/code].
-## Output range: [0.0, 1.0] continuous; clamped at 1.0 ceiling (a tankier
-## formation than the floor's threat still gets at most full DPS, not >100%).
+## Formula (TR-combat-007, GDD #34 §C.3 — Phase 1 removed the survival-throttle
+## term): [code]effective_dps = raw_dps * matchup_throughput_factor[/code].
 ##
-## Defensive: when [param floor_total_enemy_attack] is 0 (empty floor or
-## corrupt data), returns 1.0 — no enemies = no threat = no penalty. Avoids
-## division by zero.
+## Both inputs are floats; the product is float. This is a pure-function scaling
+## step — no rounding here (rounding happens in [method ticks_to_kill]). The
+## party's survival is now resolved separately by the two-sided HP race in
+## [method compute_run_outcome] rather than folded into the kill rate.
 ##
-## TR-combat-008 — ADR-0010 §D.3
-func hp_bonus_factor(formation_total_hp_value: int, floor_total_enemy_attack: int) -> float:
-	if floor_total_enemy_attack <= 0:
-		return 1.0
-	var raw: float = float(formation_total_hp_value) / float(floor_total_enemy_attack)
-	return minf(raw, 1.0)
-
-
-## Returns true iff [param hp_bonus_factor_value] is at or above 0.5
-## (inclusive boundary per TR-009). The boundary is inclusive — exactly 0.5
-## counts as survived. This is the explicit-bool source of truth for
-## [code]losing_run = not survived[/code].
-##
-## Persisted in [CombatBatchResult] explicitly per ADR-0014 §B4 — NOT
-## re-derived from hp_bonus_factor on save/load. This method is the canonical
-## derivation point at compute time.
-##
-## TR-combat-009 — ADR-0010 §D.3 + ADR-0014 §B4
-func survived(hp_bonus_factor_value: float) -> bool:
-	return hp_bonus_factor_value >= 0.5
-
-
-## Computes effective per-enemy DPS from the dispatch-time raw DPS, the
-## matchup-throughput multiplier (advantage or disadvantage from the
-## snapshot's matchup_cache), and the hp_bonus_factor saturation curve.
-##
-## Formula (TR-combat-007):
-##   [code]effective_dps = raw_dps * matchup_throughput_factor * hp_bonus_factor[/code]
-##
-## All three inputs are floats; the product is float. This is a pure-function
-## scaling step — no rounding here (rounding happens in [method ticks_to_kill]).
-##
-## TR-combat-007 — ADR-0010 §D.4
-func effective_dps(raw_dps: float, matchup_throughput_factor: float, hp_bonus_factor_value: float) -> float:
-	return raw_dps * matchup_throughput_factor * hp_bonus_factor_value
+## TR-combat-007 — ADR-0010 §D.4 / ADR-0021
+func effective_dps(raw_dps: float, matchup_throughput_factor: float) -> float:
+	return raw_dps * matchup_throughput_factor
 
 
 ## Computes how many ticks it takes to kill an enemy with [param base_hp]
@@ -258,7 +229,7 @@ func ticks_to_kill(base_hp: int, effective_dps_value: float) -> int:
 ##   1. Looking up archetype in [code]snapshot.matchup_cache[/code] —
 ##      [code]true[/code] → use [code]MATCHUP_THROUGHPUT_FACTOR_ADV[/code];
 ##      [code]false[/code] (or absent) → [code]MATCHUP_THROUGHPUT_FACTOR_DIS[/code].
-##   2. Multiplying [code]snapshot.formation_dps_per_tick * factor * snapshot.hp_bonus_factor[/code].
+##   2. Multiplying [code]snapshot.formation_dps_per_tick * factor[/code].
 ##
 ## Schedule preserves [code]snapshot.enemy_list[/code] ordering — never
 ## reorders. Cumulative tick math anchors on [code]snapshot.dispatched_at_tick[/code]
@@ -272,7 +243,6 @@ func _kill_schedule_for_loop(snapshot: CombatRunSnapshot) -> Array[Dictionary]:
 		return schedule
 
 	var raw_dps: float = snapshot.formation_dps_per_tick
-	var hp_bonus: float = snapshot.hp_bonus_factor
 	var factor_adv: float = _resolve_throughput_factor_adv()
 	var factor_dis: float = _resolve_throughput_factor_dis()
 	var cumulative_tick: int = snapshot.dispatched_at_tick
@@ -281,7 +251,7 @@ func _kill_schedule_for_loop(snapshot: CombatRunSnapshot) -> Array[Dictionary]:
 		var archetype: StringName = entry.get("archetype", &"") as StringName
 		var advantaged: bool = bool(snapshot.matchup_cache.get(archetype, false))
 		var factor: float = factor_adv if advantaged else factor_dis
-		var ed: float = effective_dps(raw_dps, factor, hp_bonus)
+		var ed: float = effective_dps(raw_dps, factor)
 		var base_hp: int = int(entry.get("base_hp", 0))
 		var ttk: int = ticks_to_kill(base_hp, ed)
 		cumulative_tick += ttk
@@ -294,6 +264,117 @@ func _kill_schedule_for_loop(snapshot: CombatRunSnapshot) -> Array[Dictionary]:
 		})
 
 	return schedule
+
+
+## Computes the WIN / DEFEAT verdict for a single dungeon run — the two-sided
+## HP race of GDD #34 §D. This is the SINGLE SOURCE OF TRUTH for the verdict:
+## both the foreground dispatch path and the offline batch path call it, so
+## the outcome is identical across both (parity by construction, ADR-0021).
+##
+## Model (GDD #34 §D):
+##   - The party kills enemies SEQUENTIALLY via focus-fire — enemy `j` dies at
+##     `rel_death[j] = Σ_{k<=j} ticks_to_kill(k)` (cumulative, relative to
+##     dispatch), exactly as produced by [method _kill_schedule_for_loop].
+##   - `T_clear` = the last enemy's relative death tick = the single-loop floor
+##     clear.
+##   - Each still-alive enemy deals
+##     `dmg_rate[j] = (base_attack * base_speed) / SPEED_BASE * MATCHUP_PARTY_DISADVANTAGE`
+##     per tick to the shared party HP pool.
+##   - `party_damage_by(T) = Σ_j dmg_rate[j] * min(T, rel_death[j])`.
+##   - DEFEAT iff `∃ T < T_clear: party_damage_by(T) >= party_hp`, else WIN.
+##     Because `party_damage_by` is monotone non-decreasing in `T`, the
+##     existence check collapses to evaluating at `T = T_clear - 1`.
+##
+## Single-loop scope: party HP resets each loop (GDD §E.3) and all loops are
+## identical, so the run verdict equals the single-loop verdict — a party that
+## survives one loop survives all; a party that wipes does so in loop 1. The
+## verdict is therefore computed over the one-loop schedule.
+##
+## Tie rule (GDD §E.2): if party HP and the last enemy reach 0 on the SAME tick,
+## the party WINS. This falls out automatically — the verdict is evaluated
+## strictly before `T_clear` (at `T_clear - 1`), so damage landing exactly at
+## the clear tick does not count as a defeat.
+##
+## Edge cases:
+##   - null / empty enemy_list / empty schedule → trivial WIN (no threat).
+##   - `T_clear <= 1` → no time elapses before the clear → WIN regardless of
+##     enemy attack (even a lethal floor cannot land a tick of damage).
+##   - `party_hp <= 0` (degenerate / unplumbed formation) → DEFEAT on the first
+##     damaging tick.
+##
+## GDD #34 §D — ADR-0021
+func compute_run_outcome(snapshot: CombatRunSnapshot) -> CombatRunOutcome:
+	var outcome: CombatRunOutcome = CombatRunOutcome.new()
+	if snapshot == null:
+		return outcome  # default: won=true, clear_tick=0, defeat_tick=-1
+
+	var dispatched_at: int = snapshot.dispatched_at_tick
+	outcome.clear_tick = dispatched_at
+
+	var schedule: Array[Dictionary] = _kill_schedule_for_loop(snapshot)
+	if schedule.is_empty():
+		# No enemies / unkillable formation → no race → trivial win.
+		return outcome
+
+	var speed_base: int = _resolve_speed_base()
+	var disadvantage: float = _resolve_matchup_party_disadvantage()
+	var party_hp: float = float(snapshot.formation_total_hp)
+
+	# Per-enemy relative death tick + per-tick damage rate, in schedule order.
+	var rel_death: Array[int] = []
+	var dmg_rate: Array[float] = []
+	for idx: int in range(schedule.size()):
+		rel_death.append(int(schedule[idx]["kill_tick"]) - dispatched_at)
+		var entry: Dictionary = snapshot.enemy_list[idx] as Dictionary
+		var atk: int = int(entry.get("base_attack", 0))
+		var spd: int = int(entry.get("base_speed", 0))
+		dmg_rate.append((float(atk * spd) / float(speed_base)) * disadvantage)
+
+	var t_clear: int = rel_death[rel_death.size() - 1]
+	outcome.clear_tick = dispatched_at + t_clear
+
+	# No time for damage before the clear → win (handles T_clear of 0 or 1).
+	if t_clear <= 1:
+		return outcome
+
+	# Monotone in T → max pre-clear damage is at T_clear - 1.
+	if _party_damage_by(t_clear - 1, rel_death, dmg_rate) < party_hp:
+		return outcome  # WIN
+
+	# DEFEAT — binary-search the smallest T in [1, T_clear-1] that wipes the party.
+	var lo: int = 1
+	var hi: int = t_clear - 1
+	while lo < hi:
+		@warning_ignore("integer_division")
+		var mid: int = (lo + hi) / 2
+		if _party_damage_by(mid, rel_death, dmg_rate) >= party_hp:
+			hi = mid
+		else:
+			lo = mid + 1
+	outcome.won = false
+	outcome.defeat_tick = dispatched_at + lo
+	return outcome
+
+
+## Internal: cumulative enemy → party damage at relative tick [param t].
+## `Σ_j dmg_rate[j] * min(t, rel_death[j])` (GDD #34 §D). Pure helper for
+## [method compute_run_outcome]; no state, no allocation beyond the loop scalar.
+func _party_damage_by(t: int, rel_death: Array[int], dmg_rate: Array[float]) -> float:
+	var total: float = 0.0
+	for j: int in range(rel_death.size()):
+		total += dmg_rate[j] * float(mini(t, rel_death[j]))
+	return total
+
+
+## Internal: fetch MATCHUP_PARTY_DISADVANTAGE with silent fallback to 1.0
+## (GDD #34 §D Phase-1 neutral default). Mirrors [method _resolve_speed_base]'s
+## duck-typed read so the resolver tolerates config schema mutation + test envs
+## where DataRegistry can't resolve combat_config.
+func _resolve_matchup_party_disadvantage() -> float:
+	var cfg: Resource = DataRegistry.resolve("config", "combat_config")
+	if cfg == null or not ("MATCHUP_PARTY_DISADVANTAGE" in cfg):
+		return 1.0
+	return float(cfg.get("MATCHUP_PARTY_DISADVANTAGE"))
 
 
 ## Internal: fetch MATCHUP_THROUGHPUT_FACTOR_ADV with silent fallback to 1.5.
@@ -454,9 +535,12 @@ func _finalize_tick_events(result: CombatTickEvents, kills: Array[KillEvent],
 ##     LAST enemy fell in range (loop completion is the last enemy's kill)
 ##   - [code]first_clear_tick[/code]: absolute tick of the first floor-clear
 ##     in this batch (loop_idx == loops_per_run, last enemy), or -1 if none
-##   - [code]hp_bonus_factor[/code]: copied from snapshot
-##   - [code]survived[/code]: derived via [method survived] — persisted
-##     explicitly per ADR-0014 §B4 (NOT recomputed on save/load)
+##   - [code]won[/code]: the run verdict from [method compute_run_outcome] —
+##     the SAME two-sided HP-race source the foreground path uses, so the
+##     offline batch and foreground dispatch agree by construction (ADR-0021).
+##     [code]false[/code] = the party was defeated before the floor cleared;
+##     the orchestrator forfeits all loot for a defeated offline batch (GDD #34
+##     §F, AC-34-08).
 ##   - [code]final_tick[/code]: when budget is the limit → tick_hi; when
 ##     schedule is exhausted in range → the last enemy's kill_tick; on
 ##     empty/zero-budget paths → snapshot.dispatched_at_tick
@@ -471,10 +555,9 @@ func compute_offline_batch(snapshot: CombatRunSnapshot, tick_budget: int) -> Com
 	var result: CombatBatchResult = CombatBatchResult.new()
 	if snapshot == null:
 		return result
-	# hp_bonus_factor + survived populated up-front so an empty/invalid batch
-	# still carries self-describing per-ADR-0014 §B4 explicit persistence.
-	result.hp_bonus_factor = snapshot.hp_bonus_factor
-	result.survived = survived(snapshot.hp_bonus_factor)
+	# Verdict resolved up-front from the single-source-of-truth HP race so an
+	# empty/invalid batch still carries a self-describing won flag (ADR-0021).
+	result.won = compute_run_outcome(snapshot).won
 	result.final_tick = snapshot.dispatched_at_tick
 
 	if tick_budget <= 0:

@@ -3,8 +3,9 @@
 #   - run_snapshot.floor_clear_emitted gates per-dispatch first-clear (TR-016)
 #   - 3-layer idempotency: combat markers + orchestrator flag + Economy ledger
 #     all combine to prevent double-credit (TR-017)
-#   - Economy.try_award_floor_clear invoked once per genuine first-ever clear
-#     with LOSING factor pre-applied at orchestrator side (TR-018)
+#   - Economy.try_award_floor_clear invoked once per genuine first-ever clear,
+#     full bonus (Phase 1 / GDD #34 / ADR-0021: the LOSING_RUN_LOOT_FACTOR
+#     half-credit is RETIRED — a clear is only reached on a WIN) (TR-018)
 #
 # This is an integration test because it exercises the orchestrator + Economy
 # autoload + RunSnapshot together — the 3-layer contract spans those systems.
@@ -83,7 +84,7 @@ func test_floor_clear_bonus_table_has_no_entry_for_floor_0() -> void:
 
 
 # ===========================================================================
-# Group B: TR-018 — Economy.try_award_floor_clear invoked with LOSING factor
+# Group B: TR-018 — Economy.try_award_floor_clear invoked with full bonus
 # ===========================================================================
 
 func test_first_clear_credits_full_bonus_on_winning_run() -> void:
@@ -103,9 +104,11 @@ func test_first_clear_credits_full_bonus_on_winning_run() -> void:
 	assert_int(int(economy._floor_clear_bonus_credited.get("forest_reach_f1", 0))).is_equal(100)
 
 
-func test_first_clear_credits_half_bonus_on_losing_run() -> void:
-	# TR-018: losing_run pre-applies LOSING_RUN_LOOT_FACTOR (0.5) at the
-	# orchestrator side BEFORE calling Economy. floor 1 bonus 100 * 0.5 = 50.
+func test_first_clear_credits_full_bonus_even_with_losing_run_flag() -> void:
+	# Phase 1 (GDD #34 / ADR-0021): LOSING_RUN_LOOT_FACTOR is RETIRED. A floor
+	# clear is only ever reached on a WIN (a DEFEAT ends the run before clear
+	# and credits nothing), so the vestigial losing_run flag no longer halves
+	# the floor-clear bonus — floor 1 credits the full 100.
 	var economy: Node = _reset_economy_floor_clear_ledger()
 	if economy == null:
 		push_warning("Skipped")
@@ -116,9 +119,9 @@ func test_first_clear_credits_half_bonus_on_losing_run() -> void:
 	# Act
 	orch._process_kill_events(_make_first_clear_events())
 
-	# Assert
-	assert_int(int(economy._gold_balance) - pre_balance).is_equal(50)
-	assert_int(int(economy._floor_clear_bonus_credited.get("forest_reach_f1", 0))).is_equal(50)
+	# Assert — no half-loot: full 100 credited despite the losing_run flag.
+	assert_int(int(economy._gold_balance) - pre_balance).is_equal(100)
+	assert_int(int(economy._floor_clear_bonus_credited.get("forest_reach_f1", 0))).is_equal(100)
 
 
 func test_first_clear_credits_correct_bonus_for_floor_5() -> void:
@@ -213,33 +216,16 @@ func test_second_dispatch_at_same_floor_does_not_re_credit() -> void:
 	assert_int(int(economy._floor_clear_bonus_credited.get("forest_reach_f1", 0))).is_equal(100)
 
 
-func test_losing_first_clear_followed_by_winning_clear_credits_difference() -> void:
-	# ADR-0002 "Losing-First-Clear Reclaimable on Win": a losing-run first
-	# clear credits 50% bonus; if the player later clears the same floor on
-	# a winning run, Economy's monotonic ledger awards the DIFFERENCE
-	# (full bonus - already-credited losing portion).
-	# Floor 1: losing first = 50; winning second = 100 - 50 = 50 more.
-	var economy: Node = _reset_economy_floor_clear_ledger()
-	if economy == null:
-		push_warning("Skipped")
-		return
-	var pre_balance: int = int(economy._gold_balance)
-
-	# Act 1 — losing first-clear, +50.
-	var orch_a: Node = _make_orch_armed_for_floor(1, "forest_reach", true)
-	orch_a._process_kill_events(_make_first_clear_events())
-	var after_losing: int = int(economy._gold_balance)
-
-	# Act 2 — winning first-clear, +50 (delta to full 100 bonus).
-	var orch_b: Node = _make_orch_armed_for_floor(1, "forest_reach", false)
-	orch_b._process_kill_events(_make_first_clear_events())
-	var after_winning: int = int(economy._gold_balance)
-
-	# Assert
-	assert_int(after_losing - pre_balance).is_equal(50)
-	assert_int(after_winning - after_losing).is_equal(50)
-	# Ledger reflects the maximum-amount-ever-credited.
-	assert_int(int(economy._floor_clear_bonus_credited.get("forest_reach_f1", 0))).is_equal(100)
+# RETIRED (Phase 1 / GDD #34 / ADR-0021):
+# test_losing_first_clear_followed_by_winning_clear_credits_difference tested the
+# ADR-0002 "Losing-First-Clear Reclaimable on Win" partial-credit reclaim. That
+# mechanic depended on LOSING_RUN_LOOT_FACTOR crediting 50% on a losing first
+# clear. Under the WIN/DEFEAT pivot a defeat ENDS the run before the floor-clear
+# marker is ever reached, so a fractional first credit is unreachable — every
+# clear credits the full bonus once. The two behaviors that test pinned are now
+# covered by test_first_clear_credits_full_bonus_even_with_losing_run_flag (full
+# credit regardless of the flag) and the monotonic-ledger idempotency test
+# (a re-clear credits 0 more).
 
 
 # ===========================================================================

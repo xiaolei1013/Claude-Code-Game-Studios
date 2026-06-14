@@ -309,9 +309,15 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 		# never read — the if-branches consume `result` directly via has()/has_method()
 		# checks). If a future iteration needs to thread the per-chunk result into
 		# a cross-system summary, reintroduce the locals at that time.
+		# Phase 1 (GDD #34 / ADR-0021): the orchestrator reports the WIN/DEFEAT
+		# verdict per chunk via result.won. A DEFEATED run forfeits the whole
+		# window, so the Economy drip batch below is skipped when not won (AC-34-08).
+		# Defaults true so a null/legacy orchestrator (no `won` key) drips as before.
+		var chunk_won: bool = true
 		if orchestrator != null and orchestrator.has_method("compute_offline_batch"):
 			var result = orchestrator.compute_offline_batch(chunk_ticks)
 			if result != null:
+				chunk_won = bool(result.get("won", true))
 				# Accumulate kills by tier (population is lazy; defaults to 0).
 				if result.has("kills_by_tier") and result.kills_by_tier is Dictionary:
 					for tier: int in result.kills_by_tier.keys():
@@ -334,7 +340,11 @@ func run_offline_replay(elapsed_seconds: int) -> void:
 				# orchestrator's try_award_floor_clear) so summary gold matches balance.
 				summary.gold_earned += int(result.get("floor_clear_bonus_gold", 0))
 
-		if economy != null and economy.has_method("compute_offline_batch"):
+		# Economy drip — SKIPPED on a defeated run (chunk_won == false): the doomed
+		# formation earns zero gold offline, matching the foreground drip forfeit
+		# (Economy._on_tick gates on orchestrator.is_active_run_defeated). GDD #34
+		# §D / ADR-0021 / AC-34-08.
+		if chunk_won and economy != null and economy.has_method("compute_offline_batch"):
 			var economy_result: Variant = economy.compute_offline_batch(chunk_ticks)
 			# Surface the drip on the summary so the Return-to-App screen reports
 			# the gold the player ACTUALLY earned offline. economy.compute_offline_batch

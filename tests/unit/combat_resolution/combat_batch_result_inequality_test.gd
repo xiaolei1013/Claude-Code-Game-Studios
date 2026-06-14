@@ -1,18 +1,20 @@
 # Tests for US-029 (test-coverage-backfill):
 #   - CombatBatchResult.equals — per-field inequality short-circuit branches
-#     (loops_completed / first_clear_tick / survived / final_tick /
-#     hp_bonus_factor outside is_equal_approx tolerance / kills_by_archetype /
-#     kills_by_tier). The Group-D tests in value_types_and_equals_test.gd
-#     cover happy (all fields equal -> true), null edge, and float-tolerance
-#     INSIDE-tolerance edge; this suite closes the per-field inequality and
-#     float OUTSIDE-tolerance branches, plus the dict_equals
-#     same-size-different-keys branch (line 98-99 of combat_batch_result.gd).
+#     (loops_completed / first_clear_tick / won / final_tick /
+#     kills_by_archetype / kills_by_tier). The Group-D tests in
+#     value_types_and_equals_test.gd cover happy (all fields equal -> true) and
+#     null edge; this suite closes the per-field inequality branches, plus the
+#     dict_equals same-size-different-keys branch (line 98-99 of
+#     combat_batch_result.gd).
+#
+# Phase 1 / GDD #34 §C.5: the hp_bonus_factor + survived fields were removed
+# from CombatBatchResult in favour of the single `won` verdict (the two-sided
+# HP race), so this suite no longer exercises a float-tolerance branch — the
+# remaining scalar fields are all int/bool and compare exactly.
 #
 # Covers: TR-combat-015 (CombatBatchResult equals per-field walk),
 #         TR-combat-016 (Dictionary equality via key-by-key dict_equals —
-#                       key-not-present-in-other branch),
-#         TR-combat-017 (Float fields compared via is_equal_approx —
-#                       outside-tolerance branch).
+#                       key-not-present-in-other branch).
 extends GdUnitTestSuite
 
 const CombatBatchResultScript = preload("res://src/core/combat/combat_batch_result.gd")
@@ -38,11 +40,11 @@ func test_combat_batch_result_equals_returns_false_on_first_clear_tick_mismatch(
 	assert_bool(a.equals(b)).is_false()
 
 
-func test_combat_batch_result_equals_returns_false_on_survived_mismatch() -> void:
+func test_combat_batch_result_equals_returns_false_on_won_mismatch() -> void:
 	var a: CombatBatchResult = CombatBatchResultScript.new()
-	a.survived = true
+	a.won = true
 	var b: CombatBatchResult = CombatBatchResultScript.new()
-	b.survived = false
+	b.won = false
 	assert_bool(a.equals(b)).is_false()
 
 
@@ -51,17 +53,6 @@ func test_combat_batch_result_equals_returns_false_on_final_tick_mismatch() -> v
 	a.final_tick = 500
 	var b: CombatBatchResult = CombatBatchResultScript.new()
 	b.final_tick = 501
-	assert_bool(a.equals(b)).is_false()
-
-
-func test_combat_batch_result_equals_returns_false_on_hp_bonus_factor_outside_tolerance() -> void:
-	# TR-017 — float compared via is_equal_approx. The Group-D existing test
-	# covers within-tolerance equality (returns true); this exercises the
-	# false-return branch when the difference exceeds tolerance.
-	var a: CombatBatchResult = CombatBatchResultScript.new()
-	a.hp_bonus_factor = 0.5
-	var b: CombatBatchResult = CombatBatchResultScript.new()
-	b.hp_bonus_factor = 0.7  # 0.2 difference, well outside default tolerance
 	assert_bool(a.equals(b)).is_false()
 
 

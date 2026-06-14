@@ -14,17 +14,18 @@
 ## Fields:
 ##   - [member formation_dps_per_tick]: float — `sum(hero.attack * hero.speed) / SPEED_BASE`
 ##     computed at DISPATCHING. Range [0.0, 2.31] for MVP heroes.
-##   - [member hp_bonus_factor]: float — `mini(formation_total_hp / floor_total_enemy_attack, 1.0)`
-##     in [0.0, 1.0]. Copied into [CombatBatchResult] for self-describing
-##     persistence per ADR-0014 §B4.
 ##   - [member matchup_cache]: [code]Dictionary[StringName, bool][/code] —
 ##     per-archetype is_advantaged lookup, built once at DISPATCHING by
 ##     calling [MatchupResolver.resolve_formation_matchup] per distinct floor
 ##     enemy archetype (TR-combat-012; ≤5 calls per MVP floor).
+##   - [member formation_total_hp]: int — `sum(hero.HP(level))` across the
+##     formation, computed at DISPATCHING. The shared party HP pool consumed
+##     by the two-sided HP race (GDD #34 §D / §E.3). Resets each loop.
 ##   - [member enemy_list]: [code]Array[Dictionary][/code] — per-floor enemy
 ##     definitions sourced from [code]Floor.enemy_list[/code]. Each entry
 ##     carries `id` (StringName), `archetype` (StringName), `tier` (int),
-##     `is_boss` (bool), `base_hp` (int), `base_attack` (int).
+##     `is_boss` (bool), `base_hp` (int), `base_attack` (int), `base_speed`
+##     (int — drives the enemy → party damage rate per GDD #34 §D).
 ##   - [member dispatched_at_tick]: int — absolute tick at DISPATCHING entry.
 ##     Tick math is anchored here (TR-combat-026: closed-form schedule is
 ##     time-anchored; clock-rewind / frame-drop recovers via the range arg).
@@ -38,16 +39,17 @@
 ## SHOULD deep-copy from the live HeroRoster + Floor before producing this.
 ##
 ## ADR-0010: Combat Resolver Snapshot + Parity (immutable input contract)
-## ADR-0014: §B4 hp_bonus_factor + survived persistence semantics
+## ADR-0021: §Phase 1 — formation_total_hp drives the two-sided HP race; the
+##           legacy hp_bonus_factor DPS-throttle field is RETIRED (GDD #34).
 class_name CombatRunSnapshot extends RefCounted
 
 ## Formation DPS per tick — pre-computed at DISPATCHING.
 ## Range [0.0, 2.31] for MVP heroes (FORMATION_SIZE=3, attack≤11, speed≤7).
 var formation_dps_per_tick: float = 0.0
 
-## HP bonus factor — pre-computed at DISPATCHING.
-## Range [0.0, 1.0]; clamped at 1.0 ceiling.
-var hp_bonus_factor: float = 1.0
+## Formation total HP — pre-computed at DISPATCHING. The shared party HP pool
+## the two-sided HP race draws down (GDD #34 §D); resets each loop (§E.3).
+var formation_total_hp: int = 0
 
 ## Per-archetype matchup_advantaged lookup — built once at DISPATCHING via
 ## [code]MatchupResolver.resolve_formation_matchup[/code] per distinct
@@ -56,7 +58,7 @@ var matchup_cache: Dictionary = {}
 
 ## Per-floor enemy definitions, ordered as they appear in the loop schedule.
 ## Each entry: { id: StringName, archetype: StringName, tier: int,
-##               is_boss: bool, base_hp: int, base_attack: int }
+##               is_boss: bool, base_hp: int, base_attack: int, base_speed: int }
 var enemy_list: Array = []
 
 ## Absolute tick at DISPATCHING entry. All combat math is time-anchored from here.
@@ -76,9 +78,9 @@ func equals(other: CombatRunSnapshot) -> bool:
 		return false
 	if loops_per_run != other.loops_per_run:
 		return false
-	if not is_equal_approx(formation_dps_per_tick, other.formation_dps_per_tick):
+	if formation_total_hp != other.formation_total_hp:
 		return false
-	if not is_equal_approx(hp_bonus_factor, other.hp_bonus_factor):
+	if not is_equal_approx(formation_dps_per_tick, other.formation_dps_per_tick):
 		return false
 	# enemy_list is Array of Dicts — element-by-element comparison.
 	if enemy_list.size() != other.enemy_list.size():

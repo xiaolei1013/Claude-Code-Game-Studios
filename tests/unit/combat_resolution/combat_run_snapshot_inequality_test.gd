@@ -4,11 +4,11 @@
 #     covers happy (all fields equal -> true), null edge,
 #     dispatched_at_tick mismatch, and matchup_cache mismatch; this suite
 #     closes the remaining 5 short-circuit branches:
-#       * loops_per_run mismatch (line 77-78)
-#       * formation_dps_per_tick OUTSIDE is_equal_approx tolerance (line 79-80)
-#       * hp_bonus_factor OUTSIDE is_equal_approx tolerance (line 81-82)
-#       * enemy_list size mismatch (line 84-85)
-#       * enemy_list per-element dict_equals mismatch (line 86-90)
+#       * loops_per_run mismatch
+#       * formation_total_hp mismatch (int field, GDD #34 §D)
+#       * formation_dps_per_tick OUTSIDE is_equal_approx tolerance
+#       * enemy_list size mismatch
+#       * enemy_list per-element dict_equals mismatch
 #
 # Mirrors US-029 combat_batch_result_inequality_test.gd shape: one test per
 # field, each constructing two instances differing on EXACTLY ONE field and
@@ -17,8 +17,8 @@
 # Covers: TR-combat-013 (CombatRunSnapshot equals per-field walk),
 #         TR-combat-016 (Dictionary equality via key-by-key dict_equals —
 #                       per-element walk on enemy_list),
-#         TR-combat-017 (Float fields compared via is_equal_approx —
-#                       outside-tolerance branch for both float fields).
+#         TR-combat-017 (formation_dps_per_tick compared via is_equal_approx —
+#                       outside-tolerance branch).
 extends GdUnitTestSuite
 
 const CombatRunSnapshotScript = preload("res://src/core/combat/combat_run_snapshot.gd")
@@ -47,12 +47,13 @@ func test_combat_run_snapshot_equals_returns_false_on_formation_dps_per_tick_out
 	assert_bool(a.equals(b)).is_false()
 
 
-func test_combat_run_snapshot_equals_returns_false_on_hp_bonus_factor_outside_tolerance() -> void:
-	# TR-017 — float compared via is_equal_approx.
+func test_combat_run_snapshot_equals_returns_false_on_formation_total_hp_mismatch() -> void:
+	# GDD #34 §D — formation_total_hp is the int party-HP pool the two-sided
+	# race draws down; equals() compares it with `!=` (exact int branch).
 	var a: CombatRunSnapshot = CombatRunSnapshotScript.new()
-	a.hp_bonus_factor = 0.5
+	a.formation_total_hp = 240
 	var b: CombatRunSnapshot = CombatRunSnapshotScript.new()
-	b.hp_bonus_factor = 0.8  # 0.3 difference, well outside default tolerance
+	b.formation_total_hp = 300
 	assert_bool(a.equals(b)).is_false()
 
 

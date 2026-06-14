@@ -204,8 +204,7 @@ func test_combat_batch_result_default_fields() -> void:
 	assert_int(r.kills_by_tier.size()).is_equal(0)
 	assert_int(r.loops_completed).is_equal(0)
 	assert_int(r.first_clear_tick).is_equal(-1)
-	assert_float(r.hp_bonus_factor).is_equal_approx(1.0, 0.001)
-	assert_bool(r.survived).is_true()
+	assert_bool(r.won).is_true()
 	assert_int(r.final_tick).is_equal(0)
 
 
@@ -215,8 +214,7 @@ func test_combat_batch_result_equals_field_by_field() -> void:
 	a.kills_by_tier = {1: 4, 2: 3}
 	a.loops_completed = 3
 	a.first_clear_tick = 100
-	a.hp_bonus_factor = 0.75
-	a.survived = true
+	a.won = true
 	a.final_tick = 500
 
 	var b: CombatBatchResult = CombatBatchResultScript.new()
@@ -224,20 +222,9 @@ func test_combat_batch_result_equals_field_by_field() -> void:
 	b.kills_by_tier = {1: 4, 2: 3}
 	b.loops_completed = 3
 	b.first_clear_tick = 100
-	b.hp_bonus_factor = 0.75
-	b.survived = true
+	b.won = true
 	b.final_tick = 500
 
-	assert_bool(a.equals(b)).is_true()
-
-
-func test_combat_batch_result_equals_uses_is_equal_approx_for_hp_bonus() -> void:
-	# TR-017 — float fields must use is_equal_approx, not ==.
-	var a: CombatBatchResult = CombatBatchResultScript.new()
-	a.hp_bonus_factor = 0.5
-	var b: CombatBatchResult = CombatBatchResultScript.new()
-	b.hp_bonus_factor = 0.5 + 1e-7  # within is_equal_approx tolerance
-	# is_equal_approx default tolerance handles tiny float drift.
 	assert_bool(a.equals(b)).is_true()
 
 
@@ -272,7 +259,7 @@ func test_combat_batch_result_equals_returns_false_against_null() -> void:
 func test_combat_run_snapshot_default_fields() -> void:
 	var s: CombatRunSnapshot = CombatRunSnapshotScript.new()
 	assert_float(s.formation_dps_per_tick).is_equal_approx(0.0, 0.001)
-	assert_float(s.hp_bonus_factor).is_equal_approx(1.0, 0.001)
+	assert_int(s.formation_total_hp).is_equal(0)
 	assert_int(s.matchup_cache.size()).is_equal(0)
 	assert_int(s.enemy_list.size()).is_equal(0)
 	assert_int(s.dispatched_at_tick).is_equal(0)
@@ -282,7 +269,7 @@ func test_combat_run_snapshot_default_fields() -> void:
 func test_combat_run_snapshot_equals_field_by_field() -> void:
 	var a: CombatRunSnapshot = CombatRunSnapshotScript.new()
 	a.formation_dps_per_tick = 1.5
-	a.hp_bonus_factor = 0.8
+	a.formation_total_hp = 240
 	a.matchup_cache = {&"bruiser": true}
 	a.enemy_list = [{"id": &"e1", "tier": 1}]
 	a.dispatched_at_tick = 100
@@ -290,7 +277,7 @@ func test_combat_run_snapshot_equals_field_by_field() -> void:
 
 	var b: CombatRunSnapshot = CombatRunSnapshotScript.new()
 	b.formation_dps_per_tick = 1.5
-	b.hp_bonus_factor = 0.8
+	b.formation_total_hp = 240
 	b.matchup_cache = {&"bruiser": true}
 	b.enemy_list = [{"id": &"e1", "tier": 1}]
 	b.dispatched_at_tick = 100
