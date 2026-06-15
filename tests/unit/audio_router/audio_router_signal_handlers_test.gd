@@ -54,6 +54,10 @@ func _reset_audio_router() -> void:
 	# Reset prestige throttle clock (Sprint 21+ silent-MVP wiring).
 	if "_prestige_completed_last_played_ms" in ar:
 		ar._prestige_completed_last_played_ms = 0
+	# Reset the advantage-chime one-shot-per-run latch so the §C.2 chime tests are
+	# order-independent (the latch is a live-autoload bool that persists otherwise).
+	if "_advantage_chime_fired_this_run" in ar:
+		ar._advantage_chime_fired_this_run = false
 
 
 func before_test() -> void:
@@ -723,5 +727,132 @@ func test_screen_changed_empty_screen_id_skips_panel_open_sfx() -> void:
 	assert_int(_count_plays(&"sfx_ui_panel_open")).is_equal(0)
 
 	# Cleanup
+	ar.stop_music(0)
+	ar._current_ambient_id = &""
+
+
+# ===========================================================================
+# §C.2 — Panel-close SFX fires for the OUTGOING screen (ADR-0022 asset sourced)
+# Mirror of the panel-open whoosh: the old screen folding away gets its own cue,
+# guarded so the boot transition (no prior screen) stays silent.
+# ===========================================================================
+
+func test_screen_changed_plays_panel_close_sfx() -> void:
+	# Arrange
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	# Act: a transition WITH a prior screen should fire the close whoosh.
+	ar._on_screen_changed("recruitment", "guild_hall")
+
+	# Assert: exactly one panel-close play recorded for the outgoing screen.
+	assert_int(_count_plays(&"sfx_ui_panel_close")).is_equal(1)
+
+	# Cleanup (the call also runs the music path).
+	ar.stop_music(0)
+	ar._current_ambient_id = &""
+
+
+func test_screen_changed_panel_close_volume_mult_is_0_point_9() -> void:
+	# §C.2 / _CUE_VOLUME_MULT_MAP: the close whoosh matches the open whoosh at 0.9
+	# so neither side of a screen swap is louder than the other.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	ar._on_screen_changed("formation_editor", "guild_hall")
+
+	var entry: Dictionary = _last_play(&"sfx_ui_panel_close")
+	assert_float(float(entry.get("volume_mult", 0.0))).is_equal_approx(0.9, 0.001)
+
+	# Cleanup
+	ar.stop_music(0)
+	ar._current_ambient_id = &""
+
+
+func test_screen_changed_empty_old_screen_id_skips_panel_close_sfx() -> void:
+	# Guard: the boot transition (empty old_screen_id, no prior screen folding away)
+	# must NOT fire the close whoosh — only the open whoosh for the first screen.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	ar._on_screen_changed("guild_hall", "")
+
+	assert_int(_count_plays(&"sfx_ui_panel_close")).is_equal(0)
+
+	# Cleanup
+	ar.stop_music(0)
+	ar._current_ambient_id = &""
+
+
+# ===========================================================================
+# §C.2 — Combat advantage chime: one-shot-per-run on first advantaged kill
+# Latch re-arms on ACTIVE_FOREGROUND entry (new run dispatched).
+# ===========================================================================
+
+func test_advantaged_kill_plays_advantage_chime_once() -> void:
+	# Arrange: fresh run latch (reset in before_test).
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	# Act: a kill carrying a favourable matchup.
+	ar._on_enemy_killed(2, "orc", true)
+
+	# Assert: the advantage chime played exactly once.
+	assert_int(_count_plays(&"sfx_combat_advantage_chime")).is_equal(1)
+
+
+func test_advantage_chime_volume_mult_is_0_point_8() -> void:
+	# §C.2 / _CUE_VOLUME_MULT_MAP: the chime sits at 0.8, under the kill chime.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	ar._on_enemy_killed(2, "orc", true)
+
+	var entry: Dictionary = _last_play(&"sfx_combat_advantage_chime")
+	assert_float(float(entry.get("volume_mult", 0.0))).is_equal_approx(0.8, 0.001)
+
+
+func test_non_advantaged_kill_does_not_play_advantage_chime() -> void:
+	# Guard: a kill with no matchup edge must NOT fire the chime.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	ar._on_enemy_killed(2, "orc", false)
+
+	assert_int(_count_plays(&"sfx_combat_advantage_chime")).is_equal(0)
+
+
+func test_advantage_chime_fires_only_once_across_multiple_advantaged_kills() -> void:
+	# The latch makes the chime once-per-run: 3 advantaged kills → 1 chime
+	# (unlike the kill chime, which overlaps per E.6).
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	ar._on_enemy_killed(1, "a", true)
+	ar._on_enemy_killed(2, "b", true)
+	ar._on_enemy_killed(3, "c", true)
+
+	assert_int(_count_plays(&"sfx_combat_advantage_chime")).is_equal(1)
+
+
+func test_advantage_chime_rearms_on_active_foreground() -> void:
+	# A new run (ACTIVE_FOREGROUND entry) must re-arm the latch so the next run's
+	# first advantaged kill fires the chime again — proving it is per-run, not
+	# once-ever.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	# Run 1: first advantaged kill fires the chime.
+	ar._on_enemy_killed(2, "orc", true)
+	assert_int(_count_plays(&"sfx_combat_advantage_chime")).is_equal(1)
+
+	# New run dispatched — re-arms the latch (also runs the music path).
+	ar._on_run_state_changed(2, 0)
+
+	# Run 2: first advantaged kill fires the chime again → 2 total.
+	ar._on_enemy_killed(2, "orc", true)
+	assert_int(_count_plays(&"sfx_combat_advantage_chime")).is_equal(2)
+
+	# Cleanup the music side-effect of the state change.
 	ar.stop_music(0)
 	ar._current_ambient_id = &""
