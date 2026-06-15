@@ -268,12 +268,27 @@ func _ready() -> void:
 		# the cue resource is sourced.
 		if roster.has_signal("prestige_completed_signal") and not roster.prestige_completed_signal.is_connected(_on_prestige_completed):
 			roster.prestige_completed_signal.connect(_on_prestige_completed)
+		# Defeat-injury "bump" (§C.2 hero_damaged): verdict-driven combat emits no
+		# per-hit damage signal, so the cue rides heroes_injured — the moment a
+		# defeated run wounds the party. The emit is hydration-gated at the source
+		# (HeroRoster only emits when not suppressed), so no re-check is needed here.
+		if roster.has_signal("heroes_injured") and not roster.heroes_injured.is_connected(_on_heroes_injured):
+			roster.heroes_injured.connect(_on_heroes_injured)
 
 	# Economy (rank 3) — gold chime trigger (throttled per F.2).
 	if has_node("/root/Economy"):
 		var econ: Node = get_node("/root/Economy")
 		if econ.has_signal("gold_changed") and not econ.gold_changed.is_connected(_on_gold_changed):
 			econ.gold_changed.connect(_on_gold_changed)
+
+	# FloorUnlock — the class-unlock fanfare (§C.2) has no class-unlock flow in
+	# this design (classes are static content), so the cue rides biome_unlocked:
+	# a genuine, rare, triumphant progression beat fitting the "reserved for
+	# genuine unlocks" fanfare (the loudest single SFX in the game).
+	if has_node("/root/FloorUnlock"):
+		var fu: Node = get_node("/root/FloorUnlock")
+		if fu.has_signal("biome_unlocked") and not fu.biome_unlocked.is_connected(_on_biome_unlocked):
+			fu.biome_unlocked.connect(_on_biome_unlocked)
 
 
 # ---------------------------------------------------------------------------
@@ -658,11 +673,29 @@ func _on_boss_killed(_enemy_id: String) -> void:
 	play_sfx(&"sfx_combat_boss_kill", 1.0, 1.4)
 
 
+## §C.2 hero-damaged "bump" — soft, low, non-alarming. Verdict-driven combat has
+## no per-hit damage event, so this rides HeroRoster.heroes_injured: it fires once
+## per defeat that wounds the party. The signal carries the list of injured ids,
+## but the cue is a single party-level "ouch", so it plays once regardless of how
+## many heroes were marked. volume_mult 0.7 per §C.2 — quieter than the kill chime.
+func _on_heroes_injured(_instance_ids: Array, _injured_until_ms: int) -> void:
+	play_sfx(&"sfx_combat_hero_damaged", 1.0, 0.7)
+
+
 ## §C.2 + §C.3 / §K Story 5: floor clear fanfare (SFX/Reward) + Stinger
 ## (Music/Stinger with Ambient duck).
 func _on_floor_cleared_first_time(_floor_index: int, _biome_id: String, _losing_run: bool) -> void:
 	play_sfx(&"sfx_reward_floor_clear_fanfare", 1.0, 1.4)
 	_play_stinger(&"music_floor_clear_stinger")
+
+
+## §C.2 class-unlock fanfare — the loudest single SFX, reserved for genuine
+## unlocks. This design has no runtime class-unlock flow (classes are static
+## content), so the cue rides FloorUnlock.biome_unlocked: unlocking a new biome
+## is the rarest, most triumphant progression beat available. Biome unlocks are
+## infrequent, so no throttle is needed. volume_mult 1.5 per §C.2.
+func _on_biome_unlocked(_biome_id: String) -> void:
+	play_sfx(&"sfx_reward_class_unlock_fanfare", 1.0, 1.5)
 
 
 ## §E.8 / §K Story 3: level-up chime. Guards hydration suppression flag on
