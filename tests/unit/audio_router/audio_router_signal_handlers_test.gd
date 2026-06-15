@@ -856,3 +856,83 @@ func test_advantage_chime_rearms_on_active_foreground() -> void:
 	# Cleanup the music side-effect of the state change.
 	ar.stop_music(0)
 	ar._current_ambient_id = &""
+
+
+# ===========================================================================
+# §C.2 — Hero-damaged "bump" rides HeroRoster.heroes_injured (defeat wound)
+# Verdict-driven combat emits no per-hit signal; the cue plays once per defeat
+# that wounds the party (owner decision: wire to heroes_injured).
+# ===========================================================================
+
+func test_heroes_injured_plays_hero_damaged_sfx() -> void:
+	# Arrange
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	# Act: a defeat wounds two heroes.
+	ar._on_heroes_injured([1001, 1002], 1234567)
+
+	# Assert: a single party-level bump (not one-per-hero).
+	assert_int(_count_plays(&"sfx_combat_hero_damaged")).is_equal(1)
+
+
+func test_hero_damaged_volume_mult_is_0_point_7() -> void:
+	# §C.2 / _CUE_VOLUME_MULT_MAP: the bump sits at 0.7, under the kill chime.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	ar._on_heroes_injured([1001], 1234567)
+
+	var entry: Dictionary = _last_play(&"sfx_combat_hero_damaged")
+	assert_float(float(entry.get("volume_mult", 0.0))).is_equal_approx(0.7, 0.001)
+
+
+func test_audio_router_subscribes_to_heroes_injured_signal_at_ready() -> void:
+	# Subscription contract: AudioRouter._ready() connects HeroRoster.heroes_injured
+	# → _on_heroes_injured so defeat wounds reach the audio path automatically.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+	var roster: Node = get_tree().root.get_node_or_null("HeroRoster")
+	assert_object(roster).is_not_null()
+	assert_bool(roster.has_signal("heroes_injured")).is_true()
+	assert_bool(roster.heroes_injured.is_connected(ar._on_heroes_injured)).is_true()
+
+
+# ===========================================================================
+# §C.2 — Class-unlock fanfare rides FloorUnlock.biome_unlocked
+# No runtime class-unlock flow exists (classes are static), so the loudest cue
+# is reserved for the rarest progression beat: a biome unlock (owner decision).
+# ===========================================================================
+
+func test_biome_unlocked_plays_class_unlock_fanfare_sfx() -> void:
+	# Arrange
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	# Act: a new biome is unlocked.
+	ar._on_biome_unlocked("ember_wastes")
+
+	# Assert: the fanfare played once.
+	assert_int(_count_plays(&"sfx_reward_class_unlock_fanfare")).is_equal(1)
+
+
+func test_class_unlock_fanfare_volume_mult_is_1_point_5() -> void:
+	# §C.2 / _CUE_VOLUME_MULT_MAP: the fanfare is the loudest single SFX at 1.5.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	ar._on_biome_unlocked("frost_hollow")
+
+	var entry: Dictionary = _last_play(&"sfx_reward_class_unlock_fanfare")
+	assert_float(float(entry.get("volume_mult", 0.0))).is_equal_approx(1.5, 0.001)
+
+
+func test_audio_router_subscribes_to_biome_unlocked_signal_at_ready() -> void:
+	# Subscription contract: AudioRouter._ready() connects FloorUnlock.biome_unlocked
+	# → _on_biome_unlocked so biome unlocks reach the audio path automatically.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+	var fu: Node = get_tree().root.get_node_or_null("FloorUnlock")
+	assert_object(fu).is_not_null()
+	assert_bool(fu.has_signal("biome_unlocked")).is_true()
+	assert_bool(fu.biome_unlocked.is_connected(ar._on_biome_unlocked)).is_true()

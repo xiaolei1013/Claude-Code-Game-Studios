@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="AudioCue" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/core/audio_router/audio_cue.gd" id="1_cue"]
+[ext_resource type="AudioStream" path="res://assets/audio/sfx/reward_class_unlock_fanfare.wav" id="2_stream"]
+
+[resource]
+script = ExtResource("1_cue")
+id = "reward_class_unlock_fanfare"
+display_name = "Reward Class Unlock Fanfare"
+stream = ExtResource("2_stream")
