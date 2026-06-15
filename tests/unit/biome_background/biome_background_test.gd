@@ -286,11 +286,16 @@ func test_orchestrator_exposes_public_dispatched_biome_id_getter() -> void:
 # Group F — Real-art swap-in (ADR-0019 §Decision 3)
 # ===========================================================================
 
-# forest_reach ships a committed background PNG; guild_hall_tavern is the
-# palette-only baseline (no shipped art). These two anchor the "has art" /
-# "no art" branches of _update_art_layer.
+# forest_reach ships a committed background PNG, anchoring the "has art" branch.
+# As of Sprint 28 all 7 palette biomes ship committed art (guild_hall_tavern was
+# the last holdout), so no real biome reaches the "no art" branch via set_biome
+# anymore — an unknown id resolves to FALLBACK_BIOME_ID = forest_reach, which HAS
+# art. The graceful-degradation branch of _update_art_layer is still load-bearing
+# (a future biome added to PALETTE before its art ships, or a build with a
+# stripped PNG, must fall back to the palette ColorRect rather than error), so it
+# is pinned directly with a synthetic biome id that deliberately has no PNG.
 const ART_BIOME_WITH_ART: String = "forest_reach"
-const ART_BIOME_WITHOUT_ART: String = "guild_hall_tavern"
+const ART_BIOME_WITHOUT_ART: String = "__synthetic_biome_without_art__"
 const ART_LAYER_NODE_NAME: String = "BiomeArt"
 const BOSS_FLOOR_INDEX: int = 5  # mirrors BiomeBackground.BOSS_FLOOR_INDEX_MVP
 
@@ -322,6 +327,33 @@ func test_biome_with_committed_art_shows_visible_texture_layer() -> void:
 	assert_object(art.texture).is_not_null()
 
 
+func test_guild_hall_tavern_shows_committed_art_layer() -> void:
+	# Sprint 28: guild_hall_tavern now ships a committed interior backdrop
+	# (assets/art/backgrounds/guild_hall_tavern.png), so the Guild Hall and the
+	# Return-to-App screen (both use the tavern preset) show the warm tavern art
+	# above the palette ColorRect instead of the flat amber-wood fallback.
+	# Precondition: the PNG + .import sidecar must be committed (CI rebuilds
+	# .godot/imported/ from the sidecar).
+	assert_bool(
+		ResourceLoader.exists("res://assets/art/backgrounds/guild_hall_tavern.png")
+	).override_failure_message(
+		"guild_hall_tavern background art is missing or un-imported — commit the "
+		+ "PNG + its .import sidecar."
+	).is_true()
+
+	var bg: ColorRect = _make_instance()
+	bg.set_biome("guild_hall_tavern")
+
+	var art: TextureRect = bg.get_node_or_null(ART_LAYER_NODE_NAME) as TextureRect
+	assert_object(art).override_failure_message(
+		"set_biome('guild_hall_tavern') must create the '%s' art layer now that "
+		% ART_LAYER_NODE_NAME
+		+ "the tavern ships committed art."
+	).is_not_null()
+	assert_bool(art.visible).is_true()
+	assert_object(art.texture).is_not_null()
+
+
 func test_biome_art_layer_never_intercepts_input() -> void:
 	# AC-26-15 parity: the real-art layer keeps mouse_filter=IGNORE + full-rect
 	# anchors so it composites edge-to-edge without stealing taps from the UI
@@ -337,21 +369,37 @@ func test_biome_art_layer_never_intercepts_input() -> void:
 
 
 func test_biome_without_committed_art_hides_layer_and_falls_back_to_palette() -> void:
-	# guild_hall_tavern ships NO background PNG. The BiomeArt layer (lazy-created
-	# on first set_biome) must be hidden + textureless so the flat palette
-	# ColorRect shows through.
+	# A biome whose PNG is absent / un-imported must hide the BiomeArt layer and
+	# clear its texture so the flat palette ColorRect shows through (graceful
+	# degradation, not an error). All real biomes now ship art, so this branch is
+	# driven directly through _update_art_layer with a synthetic id that has no
+	# committed PNG — set_biome can no longer reach it (unknown ids resolve to
+	# FALLBACK_BIOME_ID, which has art).
 	var bg: ColorRect = _make_instance()
-	bg.set_biome(ART_BIOME_WITHOUT_ART)
+	# Invariant: the synthetic id must genuinely have no committed art, else the
+	# assertions below would be vacuous.
+	assert_bool(
+		ResourceLoader.exists("res://assets/art/backgrounds/%s.png" % ART_BIOME_WITHOUT_ART)
+	).override_failure_message(
+		"Test invariant broken: '%s' must have NO committed background PNG."
+		% ART_BIOME_WITHOUT_ART
+	).is_false()
+
+	bg._update_art_layer(ART_BIOME_WITHOUT_ART, 0)
+
 	var art: TextureRect = bg.get_node_or_null(ART_LAYER_NODE_NAME) as TextureRect
-	if art != null:
-		assert_bool(art.visible).override_failure_message(
-			"'%s' has no committed art; BiomeArt must be hidden so the palette "
-			% ART_BIOME_WITHOUT_ART
-			+ "ColorRect shows through."
-		).is_false()
-		assert_object(art.texture).is_null()
-	# Palette fallback still applies regardless of art presence.
-	assert_str(bg.get_biome()).is_equal(ART_BIOME_WITHOUT_ART)
+	# _update_art_layer lazily creates the layer (via _ensure_art_layer), then
+	# hides it + nulls the texture when no PNG exists.
+	assert_object(art).override_failure_message(
+		"_update_art_layer must lazily create the '%s' layer even when hiding it."
+		% ART_LAYER_NODE_NAME
+	).is_not_null()
+	assert_bool(art.visible).override_failure_message(
+		"'%s' has no committed art; BiomeArt must be hidden so the palette "
+		% ART_BIOME_WITHOUT_ART
+		+ "ColorRect shows through."
+	).is_false()
+	assert_object(art.texture).is_null()
 
 
 func test_biome_art_layer_darkens_on_boss_floor() -> void:
