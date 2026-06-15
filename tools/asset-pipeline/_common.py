@@ -68,6 +68,26 @@ STYLE_PREFIX_ISOLATED = (
     "#2C2838. No text, no watermark, no UI frame. "
 )
 
+# UI surface textures — flat, full-frame *materials* (parchment sheets, button
+# fills, HUD strips) that tile/stretch behind crisp UI chrome via a Godot
+# StyleBoxTexture 9-patch. Neither the SCENE prefix (which paints a depth
+# diorama) nor the ISOLATED prefix (which floats a single object on a flat
+# backdrop) fits a surface that must fill the WHOLE frame edge-to-edge with no
+# perspective. So this is a third, additive prefix; the SCENE and ISOLATED
+# prefixes above are unchanged (vfx/portraits/sprites depend on them). Per-asset
+# prompts carry the grain/border/corner specifics; the prefix only forbids
+# perspective/objects/scenery so the surface reads as a flat-lay material.
+STYLE_PREFIX_UI = (
+    "Flat full-frame UI surface texture for a cozy-fantasy game — a SINGLE "
+    "material that fills the ENTIRE frame edge to edge, viewed straight-on from "
+    "directly above (flat-lay, NO perspective, NO horizon line, NO 3D objects, "
+    "NO scenery, NO characters, NO depth diorama). Hand-painted pixel-art look "
+    "with soft lantern warmth and gentle grain. Locked palette: Guild Amber "
+    "#C8872A, Lantern Gold #F2B83B, Parchment Cream #EDE0C4, Dusk Purple #5B4A72, "
+    "Moss Sage #7A8C5E, Ember Rust #A84C2F, Slate Ink #2C2838. No text, no "
+    "watermark, no lettering, no buttons, no icons, no UI chrome. "
+)
+
 
 # ---------------------------------------------------------------------------
 # API keys
