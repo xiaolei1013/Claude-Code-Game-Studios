@@ -865,6 +865,19 @@ func _resolve_offline_replay_formation_strength() -> float:
 func _resolve_offline_replay_floor_index() -> int:
 	if _offline_replay_floor_index_override >= 1 and _offline_replay_floor_index_override <= 5:
 		return _offline_replay_floor_index_override
+	# CODE REVIEW 2026-06-16 (I8): production path — read the floor the player was on
+	# from the orchestrator's offline-resume accessor (restored from the persisted
+	# active_run at boot by code review I3). Mirrors _resolve_offline_replay_formation_
+	# strength's HeroRoster query. Previously this always returned 1, so a player who
+	# closed the app grinding floor 4 earned offline drip at floor 1's rate. Clamp to
+	# the BASE_DRIP range [1, 5]; fall back to floor 1 when no run was persisted.
+	var orch: Node = (
+		get_node_or_null("/root/DungeonRunOrchestrator") if get_tree() != null else null
+	)
+	if orch != null and orch.has_method("get_offline_resume_floor_index"):
+		var fi: int = int(orch.get_offline_resume_floor_index())
+		if fi >= 1 and fi <= 5:
+			return fi
 	return 1
 
 

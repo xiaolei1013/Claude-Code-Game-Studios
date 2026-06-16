@@ -297,6 +297,17 @@ var _dispatched_floor_index: int = 0
 ## Drives the floor_cleared_first_time signal payload. Reset to "" on RUN_ENDED.
 var _dispatched_biome_id: String = ""
 
+## CODE REVIEW 2026-06-16 (I3): offline-resume floor recovered from the persisted
+## active_run at boot ([method load_save_data]). DECOUPLED from
+## [member _dispatched_floor_index] on purpose: the foreground at-home drip reads
+## [method get_active_floor_index] (= _dispatched_floor_index), which MUST stay 0
+## after boot (no active foreground run = no drip). The offline replay resolvers
+## prefer these fields so offline rewards compute at the floor the player was on
+## (not floor 1); [method flush_offline_signals] clears them once the boot replay
+## cycle has consumed them. 0 / "" means "no active run was persisted".
+var _offline_resume_floor_index: int = 0
+var _offline_resume_biome_id: String = ""
+
 
 ## Returns the biome_id captured at dispatch() entry, or empty string if no
 ## run is currently dispatched. Sprint 19 S19-M3: DungeonRunView reads this
@@ -348,6 +359,15 @@ func get_dispatched_floor_index() -> int:
 ## S28-G1 — Economy foreground drip (GDD §C.2.1 / §D.1).
 func get_active_floor_index() -> int:
 	return _dispatched_floor_index
+
+
+## CODE REVIEW 2026-06-16 (I3/I8): the floor the player was on when the app closed
+## mid-run, recovered from the persisted active_run at boot. Returns 0 when no active
+## run was persisted. Economy reads this (NOT get_active_floor_index, which is the
+## foreground floor) to compute the offline drip at the correct floor. Consumed +
+## cleared by the boot offline-replay cycle (see flush_offline_signals).
+func get_offline_resume_floor_index() -> int:
+	return _offline_resume_floor_index
 
 
 # ---------------------------------------------------------------------------
@@ -1701,6 +1721,11 @@ func flush_offline_signals() -> void:
 	# rebuilds a fresh snapshot + cursor (see compute_offline_batch).
 	_offline_combat_snapshot = null
 	_offline_replay_cursor = 0
+	# CODE REVIEW 2026-06-16 (I3): the boot replay cycle has now consumed the
+	# resume floor — clear it so a later resume-from-background replay uses the LIVE
+	# dispatched floor (or floor 1 at home), not this stale cold-boot value.
+	_offline_resume_floor_index = 0
+	_offline_resume_biome_id = ""
 	_offline_run_won = true
 
 
@@ -1902,6 +1927,11 @@ func _resolve_offline_replay_formation() -> Array:
 func _resolve_offline_replay_floor_index() -> int:
 	if _offline_replay_floor_index_override >= 1:
 		return _offline_replay_floor_index_override
+	# CODE REVIEW 2026-06-16 (I3): prefer the floor restored from the persisted
+	# active_run at boot, so a cold-launch offline replay computes the combat verdict
+	# at the floor the player was on (the live _dispatched_floor_index is 0 at boot).
+	if _offline_resume_floor_index >= 1:
+		return _offline_resume_floor_index
 	var fi: int = get_dispatched_floor_index()
 	return fi if fi >= 1 else 1
 
@@ -1912,6 +1942,11 @@ func _resolve_offline_replay_floor_index() -> int:
 func _resolve_offline_replay_biome_id() -> String:
 	if not _offline_replay_biome_id_override.is_empty():
 		return _offline_replay_biome_id_override
+	# CODE REVIEW 2026-06-16 (I3): prefer the biome restored from the persisted
+	# active_run at boot (paired with _offline_resume_floor_index) so the offline
+	# combat snapshot rebuilds the REAL floor's enemies, not the synthetic fallback.
+	if not _offline_resume_biome_id.is_empty():
+		return _offline_resume_biome_id
 	return get_dispatched_biome_id()
 
 
@@ -2469,19 +2504,52 @@ func load_save_data(d: Dictionary) -> void:
 		# Saved state was NO_RUN — defaults preserved (state=NO_RUN, run_snapshot=null).
 		return
 	if d.has("active_run"):
-		# Sprint 11 minimal scope: discard with warning. Sprint 12+ adds
-		# OfflineProgressionEngine + signal-based orphan recovery.
-		push_warning(
-			"[DungeonRunOrchestrator] load_save_data: 'active_run' present in " +
-			"save dict but resume path is deferred to Sprint 12+ " +
-			"(OfflineProgressionEngine rank 15 unimplemented). Saved run " +
-			"discarded; orchestrator stays at NO_RUN. Sprint 12+ adds the " +
-			"actual replay + orphan-hero recovery per ADR-0014."
-		)
-		# Defaults preserved (state=NO_RUN, run_snapshot=null).
+		# CODE REVIEW 2026-06-16 (I3): recover the offline-resume floor. This is NOT a
+		# full FSM resume — the in-flight run is consumed by the boot offline replay —
+		# but it restores the floor the player was on into the DECOUPLED
+		# _offline_resume_* fields so offline rewards compute at that floor instead of
+		# floor 1 (the prior discard left the floor unknown → offline always ran at
+		# floor 1, a large underpayment). The foreground FSM stays NO_RUN and
+		# _dispatched_floor_index stays 0, so the at-home foreground drip is unchanged.
+		# Full active-run FSM resume (state = OFFLINE_REPLAY + formation-from-snapshot
+		# orphan recovery) remains future scope per ADR-0014.
+		_restore_offline_resume_floor(d.get("active_run"))
+		# Defaults otherwise preserved (state = NO_RUN, run_snapshot = null).
 		return
 	# Unknown schema variant — defensive log + preserve defaults.
 	push_warning(
 		"[DungeonRunOrchestrator] load_save_data: unknown save dict schema " +
 		"(keys=%s); preserving defaults." % str(d.keys())
 	)
+
+
+## CODE REVIEW 2026-06-16 (I3): recovers the offline-resume floor index + biome from
+## a persisted active_run dict (RunSnapshot.to_dict). The snapshot's composite floor_id
+## is built as `"%s_floor_%d" % [biome_id, floor_index]` (see _build_run_snapshot), so
+## we invert it by splitting on the LAST "_floor_" — robust to biome ids that
+## themselves contain underscores, and independent of DataRegistry (the downstream
+## _build_combat_snapshot + Economy clamp already tolerate an out-of-range / removed
+## floor via their synthetic-fallback + [1,5] clamp). Any unparseable floor_id leaves
+## the resume fields at 0 / "" so offline replay falls back to floor 1 (pre-fix
+## behavior), never crashing. Writes ONLY the decoupled _offline_resume_* fields —
+## never _dispatched_floor_index (which gates the foreground drip).
+func _restore_offline_resume_floor(active_run: Variant) -> void:
+	if not (active_run is Dictionary):
+		push_warning("[DungeonRunOrchestrator] load_save_data: active_run is not a Dictionary; offline floor not resumed.")
+		return
+	var floor_id: String = str((active_run as Dictionary).get("floor_id", ""))
+	var marker: String = "_floor_"
+	var marker_pos: int = floor_id.rfind(marker)
+	if marker_pos < 0:
+		# floor_id absent or not in the "<biome>_floor_<index>" shape (e.g. a legacy
+		# synthetic id) — leave resume unset; offline falls back to floor 1.
+		return
+	var biome: String = floor_id.substr(0, marker_pos)
+	var num_str: String = floor_id.substr(marker_pos + marker.length())
+	if biome.is_empty() or not num_str.is_valid_int():
+		return
+	var fidx: int = num_str.to_int()
+	if fidx < 1:
+		return
+	_offline_resume_floor_index = fidx
+	_offline_resume_biome_id = biome

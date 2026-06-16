@@ -374,3 +374,38 @@ func test_i7_chunked_window_equals_single_standalone_batch() -> void:
 	e2.free()
 
 	assert_int(chunked_total).is_equal(single_total)
+
+
+# ---------------------------------------------------------------------------
+# Test — code review 2026-06-16 (I8): offline drip floor comes from the
+# orchestrator's offline-resume accessor, not a hardcoded 1.
+#
+#   With no test override, _resolve_offline_replay_floor_index now reads the live
+#   DungeonRunOrchestrator.get_offline_resume_floor_index() (restored from the
+#   persisted active_run at boot by I3). Mutates the live autoload's resume field,
+#   so it snapshots + restores per the live-autoload test-isolation rule.
+# ---------------------------------------------------------------------------
+func test_i8_offline_floor_reads_orchestrator_resume_floor_with_clamp() -> void:
+	var orch: Node = get_tree().root.get_node_or_null("DungeonRunOrchestrator")
+	if orch == null:
+		push_warning("Skipped: DungeonRunOrchestrator autoload absent")
+		return
+	var saved_resume: int = orch._offline_resume_floor_index
+
+	# Economy must be in-tree so its get_tree()-guarded orchestrator lookup runs.
+	# No floor override → production path queries the orchestrator. (_config not
+	# needed: _resolve_offline_replay_floor_index only resolves the floor index.)
+	var economy: Node = EconomyScript.new()
+	add_child(economy)
+	auto_free(economy)
+
+	orch._offline_resume_floor_index = 4
+	assert_int(economy._resolve_offline_replay_floor_index()).is_equal(4)
+	# No active run persisted (resume 0) → floor-1 fallback.
+	orch._offline_resume_floor_index = 0
+	assert_int(economy._resolve_offline_replay_floor_index()).is_equal(1)
+	# Out-of-range resume → clamped to floor 1 (BASE_DRIP range is [1, 5]).
+	orch._offline_resume_floor_index = 99
+	assert_int(economy._resolve_offline_replay_floor_index()).is_equal(1)
+
+	orch._offline_resume_floor_index = saved_resume

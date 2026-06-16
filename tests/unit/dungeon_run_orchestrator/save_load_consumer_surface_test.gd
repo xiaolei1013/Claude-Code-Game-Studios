@@ -192,3 +192,44 @@ func test_orchestrator_get_save_data_method_exists() -> void:
 func test_orchestrator_load_save_data_method_exists() -> void:
 	var orch: Node = _make_orch()
 	assert_bool(orch.has_method("load_save_data")).is_true()
+
+
+# ===========================================================================
+# Group F — code review 2026-06-16 (I3): offline-resume floor recovery
+# ===========================================================================
+
+func test_load_save_data_active_run_recovers_offline_resume_floor_and_biome() -> void:
+	# I3: a persisted active_run restores the floor the player was on into the
+	# DECOUPLED offline-resume fields (parsed from the composite floor_id), so offline
+	# rewards compute at that floor instead of floor 1. The foreground FSM is NOT
+	# resumed — _dispatched_floor_index / get_active_floor_index stay 0 so the at-home
+	# foreground drip is unaffected.
+	var orch: Node = _make_orch()
+	orch.load_save_data({"active_run": {"floor_id": "forest_reach_floor_3", "current_tick": 80}})
+	assert_int(orch._offline_resume_floor_index).is_equal(3)
+	assert_str(orch._offline_resume_biome_id).is_equal("forest_reach")
+	assert_int(orch.get_offline_resume_floor_index()).is_equal(3)
+	# Foreground untouched.
+	assert_int(orch.state).is_equal(DungeonRunStateScript.State.NO_RUN)
+	assert_int(orch.get_active_floor_index()).is_equal(0)
+	assert_int(orch._dispatched_floor_index).is_equal(0)
+
+
+func test_load_save_data_resume_floor_parses_biome_with_underscores() -> void:
+	# The composite split must handle biome ids that themselves contain underscores
+	# (split on the LAST "_floor_").
+	var orch: Node = _make_orch()
+	orch.load_save_data({"active_run": {"floor_id": "ember_wastes_floor_5"}})
+	assert_int(orch._offline_resume_floor_index).is_equal(5)
+	assert_str(orch._offline_resume_biome_id).is_equal("ember_wastes")
+
+
+func test_load_save_data_unparseable_floor_id_leaves_resume_unset() -> void:
+	# A floor_id not in "<biome>_floor_<index>" shape → no resume; offline falls back
+	# to floor 1, orchestrator stays NO_RUN (matches the prior discard contract).
+	var orch: Node = _make_orch()
+	orch.load_save_data({"active_run": {"floor_id": "forest_reach:1"}})
+	assert_int(orch._offline_resume_floor_index).is_equal(0)
+	assert_str(orch._offline_resume_biome_id).is_equal("")
+	assert_int(orch.state).is_equal(DungeonRunStateScript.State.NO_RUN)
+	assert_object(orch.run_snapshot).is_null()
