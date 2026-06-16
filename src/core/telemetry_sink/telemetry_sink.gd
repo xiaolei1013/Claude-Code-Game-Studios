@@ -38,6 +38,7 @@ const _DEFAULT_SINK_DIR: String = "user://telemetry/"
 ## DungeonRunOrchestrator state enum mirrors (per dungeon_run_state.gd).
 ## Filtering state_changed by these values discriminates dispatch vs end.
 const _STATE_DISPATCHING: int = 1
+const _STATE_ACTIVE_FOREGROUND: int = 2
 const _STATE_RUN_ENDED: int = 4
 
 
@@ -181,13 +182,26 @@ func _on_hero_recruited(instance: RefCounted) -> void:
 
 
 ## §D.3 + §D.4 — both events derive from DungeonRunOrchestrator.state_changed.
-## Filter on new_state to discriminate dispatch (1) from end (4).
-func _on_run_state_changed(new_state: int, _old_state: int) -> void:
+##
+## CODE REVIEW 2026-06-16 (I14): trigger correctness.
+##   - run_dispatched fires on ACTIVE_FOREGROUND (2), NOT DISPATCHING (1). The
+##     orchestrator rebuilds run_snapshot only AFTER validations pass and
+##     transitions DISPATCHING → ACTIVE_FOREGROUND; reading run_snapshot at
+##     DISPATCHING logged the PRIOR run's snapshot (off-by-one) for every dispatch
+##     after the first. Validation failures go DISPATCHING → RUN_ENDED WITHOUT
+##     passing through ACTIVE_FOREGROUND, so this also stops phantom run_dispatched
+##     events for rejected dispatches.
+##   - run_completed fires only when the prior state was ACTIVE_FOREGROUND — i.e.
+##     a real foreground run actually ended. Gating on old_state suppresses the
+##     phantom run_completed (with a garbage gold delta against a stale baseline)
+##     that a failed-validation DISPATCHING → RUN_ENDED used to emit, and excludes
+##     offline-replay (ACTIVE_OFFLINE_REPLAY → RUN_ENDED), which has its own summary.
+func _on_run_state_changed(new_state: int, old_state: int) -> void:
 	if not _opt_in:
 		return
-	if new_state == _STATE_DISPATCHING:
+	if new_state == _STATE_ACTIVE_FOREGROUND:
 		_emit_run_dispatched()
-	elif new_state == _STATE_RUN_ENDED:
+	elif new_state == _STATE_RUN_ENDED and old_state == _STATE_ACTIVE_FOREGROUND:
 		_emit_run_completed()
 
 
