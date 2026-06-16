@@ -63,7 +63,8 @@ func is_stub() -> String:
 ## SPEED_BASE source: [code]DataRegistry.resolve("config", "combat_config")[/code]
 ## at call time. When config can't be resolved (e.g., unit-test env where
 ## DataRegistry is in ERROR), falls back to [constant _FALLBACK_SPEED_BASE]
-## (= 10, matches GDD §G default). The fallback is silent — no push_warning —
+## (= 90, the calibrated run-duration default per ADR-0021 Phase 2 — see
+## [code]combat_config.tres[/code] SPEED_BASE=90). The fallback is silent — no push_warning —
 ## because per-call DataRegistry probing in a hot path would flood logs.
 ##
 ## TR-combat-005 / TR-combat-011 / TR-combat-032 — ADR-0010
@@ -501,9 +502,9 @@ func emit_events_in_range(snapshot: CombatRunSnapshot, tick_lo: int, tick_hi: in
 
 	if tick_hi <= tick_lo:
 		push_warning(
-			"[CombatResolver] emit_events_in_range: descending or zero-length range "
+			("[CombatResolver] emit_events_in_range: descending or zero-length range "
 			+ "(tick_lo=%d, tick_hi=%d); returning empty events. "
-			+ "Caller must recover via a valid (tick_lo < tick_hi) range."
+			+ "Caller must recover via a valid (tick_lo < tick_hi) range.")
 			% [tick_lo, tick_hi]
 		)
 		return result

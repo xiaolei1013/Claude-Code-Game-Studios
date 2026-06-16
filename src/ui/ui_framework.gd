@@ -354,13 +354,21 @@ static func format_short_number(value: int) -> String:
 
 	if value < k_threshold:
 		return "%d" % value
-	if value < m_threshold:
-		return "%.1fK" % (float(value) / 1_000.0)
-	if value < b_threshold:
-		return "%.1fM" % (float(value) / 1_000_000.0)
-	if value < t_threshold:
-		return "%.1fB" % (float(value) / 1_000_000_000.0)
-	return "%.1fT" % (float(value) / 1_000_000_000_000.0)
+	# Round to the one-decimal display value FIRST, then promote to the next
+	# suffix when rounding lands on 1000.0 — e.g. 999_999 rounds to "1000.0K",
+	# which must render as "1.0M", not "1000.0K" (same guard at the M/B/T edges).
+	# Using the snapped value for BOTH the branch test and the display keeps them
+	# consistent (no double-rounding skew between the %.1f format and the test).
+	var q_k: float = snappedf(float(value) / 1_000.0, 0.1)
+	if value < m_threshold and q_k < 1000.0:
+		return "%.1fK" % q_k
+	var q_m: float = snappedf(float(value) / 1_000_000.0, 0.1)
+	if value < b_threshold and q_m < 1000.0:
+		return "%.1fM" % q_m
+	var q_b: float = snappedf(float(value) / 1_000_000_000.0, 0.1)
+	if value < t_threshold and q_b < 1000.0:
+		return "%.1fB" % q_b
+	return "%.1fT" % snappedf(float(value) / 1_000_000_000_000.0, 0.1)
 
 
 ## Internal — plays the 1.05× scale pulse via Tween. Centers
