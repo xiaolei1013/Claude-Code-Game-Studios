@@ -31,7 +31,14 @@
 ;                                       on Parchment Cream with Slate Ink outline.
 ;                                       Referenced by formation_assignment.gd:245.
 
-[gd_resource type="Theme" load_steps=11 format=3]
+[gd_resource type="Theme" load_steps=12 format=3]
+
+; Parchment panel surface — Gemini-generated painterly grain (the FILL) composed
+; with a deterministic crisp Slate Ink frame + rounded transparent corners (the
+; GEOMETRY) via tools/asset-pipeline/compose_ui_panel.py. Used as a 9-patch
+; StyleBoxTexture below (texture_margin = 14 px to match the composed corner zone).
+; Resolves OQ-DS-02 → "static PNG texture". See ADR-0023.
+[ext_resource type="Texture2D" uid="uid://dxbbhee8ph068" path="res://assets/art/ui/ui_panel_parchment.png" id="1_parchment_tex"]
 
 ; --------------------------------------------------------------------------
 ; Fonts — reverted to Godot's built-in default font (2026-06-03).
@@ -53,47 +60,38 @@
 
 ; Default panel — neutral parchment ground with thin Slate Ink border.
 ; Used by Panel + PanelContainer (default Control class).
-[sub_resource type="StyleBoxFlat" id="panel_default"]
+; NOTE: StyleBoxTexture (parchment 9-patch) — was StyleBoxFlat (flat cream) until
+; OQ-DS-02 resolved to a static PNG. Texture carries the baked 2px Slate Ink border
+; + 6px rounded transparent corners; content_margins preserve the prior padding.
+; StyleBoxTexture has no drop shadow — the ink border + grain define the panel edge.
+[sub_resource type="StyleBoxTexture" id="panel_default"]
 content_margin_left = 12.0
 content_margin_top = 10.0
 content_margin_right = 12.0
 content_margin_bottom = 10.0
-bg_color = Color(0.9294, 0.8784, 0.7686, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.1725, 0.1569, 0.2196, 1)
-corner_radius_top_left = 4
-corner_radius_top_right = 4
-corner_radius_bottom_right = 4
-corner_radius_bottom_left = 4
-shadow_color = Color(0.1725, 0.1569, 0.2196, 0.12)
-shadow_size = 4
-shadow_offset = Vector2(0, 2)
+texture = ExtResource("1_parchment_tex")
+texture_margin_left = 14.0
+texture_margin_top = 14.0
+texture_margin_right = 14.0
+texture_margin_bottom = 14.0
 
 ; ParchmentPanel theme variation — warmer document panel.
 ; Thicker Slate Ink border + extra padding + soft warm vignette via shadow.
 ; Use via panel.theme_type_variation = &"ParchmentPanel" or
 ; UIFramework.apply_parchment_panel(panel) once that helper lands (S10-M2).
-[sub_resource type="StyleBoxFlat" id="panel_parchment"]
+; StyleBoxTexture (parchment 9-patch) — same texture as panel_default; the warmer
+; ParchmentPanel register now comes from extra content padding (18/14 vs 12/10)
+; rather than a thicker drawn border. Was StyleBoxFlat (2px border + amber shadow).
+[sub_resource type="StyleBoxTexture" id="panel_parchment"]
 content_margin_left = 18.0
 content_margin_top = 14.0
 content_margin_right = 18.0
 content_margin_bottom = 14.0
-bg_color = Color(0.9294, 0.8784, 0.7686, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.1725, 0.1569, 0.2196, 1)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
-shadow_color = Color(0.7843, 0.5294, 0.1647, 0.18)
-shadow_size = 8
-shadow_offset = Vector2(0, 3)
+texture = ExtResource("1_parchment_tex")
+texture_margin_left = 14.0
+texture_margin_top = 14.0
+texture_margin_right = 14.0
+texture_margin_bottom = 14.0
 
 ; SlotButton — pattern #12 from interaction-patterns.md (Slot Button).
 ; Large button-as-content-container for formation slots. Visual register:

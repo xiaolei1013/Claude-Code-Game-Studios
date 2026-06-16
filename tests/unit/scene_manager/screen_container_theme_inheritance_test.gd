@@ -73,7 +73,11 @@ func test_screen_under_screen_container_inherits_parchment_theme() -> void:
 func test_screen_under_screen_container_inherits_panel_container_parchment_bg() -> void:
 	# Panel containers inside screens (e.g., Guild Hall's RosterPanel) should
 	# inherit the parchment theme's PanelContainer/styles/panel = panel_default
-	# StyleBox, which has bg_color = Parchment Cream.
+	# StyleBox. Per ADR-0023 that stylebox is now a StyleBoxTexture (the painterly
+	# parchment 9-patch), NOT Godot's default grey StyleBoxFlat — so receiving a
+	# StyleBoxTexture carrying our parchment asset proves the cascade reached this
+	# PanelContainer descendant (the original bg_color == Parchment Cream check no
+	# longer applies; StyleBoxTexture has no bg_color).
 	var main_root: Control = MainRootScene.instantiate() as Control
 	add_child(main_root)
 	auto_free(main_root)
@@ -91,10 +95,15 @@ func test_screen_under_screen_container_inherits_panel_container_parchment_bg() 
 
 	var stylebox: StyleBox = roster_panel.get_theme_stylebox("panel", "PanelContainer")
 	assert_object(stylebox).is_not_null()
-	assert_bool(stylebox is StyleBoxFlat).is_true()
-	var bg: Color = (stylebox as StyleBoxFlat).bg_color
-	assert_float(bg.r).override_failure_message(
-		"RosterPanel.bg_color.r must match Parchment Cream (0.9294) — got %f. "
-		+ "Parchment theme NOT cascading to PanelContainer descendants of screens."
-		% bg.r
-	).is_equal_approx(PARCHMENT_CREAM.r, 0.01)
+	assert_bool(stylebox is StyleBoxTexture).override_failure_message(
+		"RosterPanel panel stylebox must be the parchment StyleBoxTexture (ADR-0023) — "
+		+ "got %s. Parchment theme NOT cascading to PanelContainer descendants of screens."
+		% stylebox.get_class()
+	).is_true()
+	var tex: Texture2D = (stylebox as StyleBoxTexture).texture
+	assert_object(tex).override_failure_message(
+		"Parchment StyleBoxTexture.texture must be set (ADR-0023 ui_panel_parchment.png)."
+	).is_not_null()
+	assert_str(tex.resource_path).override_failure_message(
+		"Panel texture must be the parchment asset — got '%s'." % tex.resource_path
+	).contains("ui_panel_parchment")
