@@ -19,82 +19,72 @@ func _read_file(path: String) -> String:
 	return file.get_as_text()
 
 
-func _grep_emits_in_method(source: String, method_name: String) -> Array[String]:
-	## Extract all .emit() lines from a method in the source.
-	var emits: Array[String] = []
-	var in_method = false
-	var method_depth = 0
-
-	for line in source.split("\n"):
-		if "func %s" % method_name in line:
-			in_method = true
-			method_depth = 1
+func _extract_method_body(source: String, method_name: String) -> String:
+	## CODE REVIEW 2026-06-16 (I22): indentation-aware method-body extraction.
+	## GDScript scopes by INDENT, not braces — the prior brace-counting helper never
+	## scoped a method (and was dead code). Capture every line AFTER `func <method>`
+	## up to the next TOP-LEVEL `func` (column 0), so guard assertions are scoped to
+	## the SPECIFIC method instead of matching anywhere in the whole file (the prior
+	## file-wide `.contains` could not catch a guard removed from one method).
+	var lines: PackedStringArray = source.split("\n")
+	var body: PackedStringArray = PackedStringArray()
+	var in_method: bool = false
+	for line: String in lines:
+		if not in_method:
+			if line.begins_with("func %s" % method_name) or line.begins_with("static func %s" % method_name):
+				in_method = true
 			continue
-
-		if in_method:
-			# Track brace depth to know when method ends.
-			method_depth += line.count("{") - line.count("}")
-			if method_depth <= 0 and ".emit(" in line:
-				# This is unusual but handle it.
-				emits.append(line.strip_edges())
-				break
-			elif method_depth > 0:
-				if ".emit(" in line:
-					emits.append(line.strip_edges())
-
-	return emits
-
-
-func _has_offline_replay_guard(emit_line: String) -> bool:
-	## Check if an emit is guarded by `if not _is_offline_replay:` guard.
-	## This is a simple heuristic: looks for the pattern in the source.
-	## (A proper check would parse the AST, but grep-level heuristic is acceptable.)
-	return "not _is_offline_replay" in emit_line or "_is_offline_replay" in emit_line
+		# End of the method at the next top-level (column-0) func declaration.
+		if line.begins_with("func ") or line.begins_with("static func "):
+			break
+		body.append(line)
+	return "\n".join(body)
 
 
 # === Group A: Economy Signal Suppression Guards ===
 
 func test_economy_add_gold_emit_guarded() -> void:
-	## Economy.add_gold must guard gold_changed.emit() with _is_offline_replay check.
-	## The implementation uses `if _is_offline_replay: accumulate; else: emit` which is
-	## semantically equivalent to `if not _is_offline_replay: emit`.
+	## Economy.add_gold must guard gold_changed.emit() with the _is_offline_replay
+	## check INSIDE the method (`if _is_offline_replay: accumulate; else: emit`).
+	## Method-scoped: catches a guard removed from add_gold specifically.
 	var source = _read_file("res://src/core/economy/economy.gd")
-	assert_that(source).is_not_empty()
-
-	# Check the method and guard both exist. Accept either guard form.
-	assert_that(source).contains("add_gold")
-	assert_that(source).contains("_is_offline_replay")
+	var body: String = _extract_method_body(source, "add_gold")
+	assert_str(body).is_not_empty()
+	assert_bool(body.contains("gold_changed.emit")).is_true()
+	assert_bool(body.contains("_is_offline_replay")).is_true()
 
 
 func test_economy_try_spend_emit_guarded() -> void:
-	## Economy.try_spend must guard gold_changed.emit() with suppression flag.
+	## Economy.try_spend must guard gold_changed.emit() with the suppression flag
+	## inside the method body.
 	var source = _read_file("res://src/core/economy/economy.gd")
-	assert_that(source).is_not_empty()
-
-	# Guard exists in any form (if _is_offline_replay or if not _is_offline_replay).
-	assert_that(source).contains("_is_offline_replay")
+	var body: String = _extract_method_body(source, "try_spend")
+	assert_str(body).is_not_empty()
+	assert_bool(body.contains("gold_changed.emit")).is_true()
+	assert_bool(body.contains("_is_offline_replay")).is_true()
 
 
 func test_economy_try_award_floor_clear_emit_guarded() -> void:
-	## Economy.try_award_floor_clear must guard first_clear_awarded.emit().
+	## Economy.try_award_floor_clear must guard first_clear_awarded.emit() with the
+	## suppression flag inside the method body.
 	var source = _read_file("res://src/core/economy/economy.gd")
-	assert_that(source).is_not_empty()
-
-	# Verify the method exists and the guard field is present.
-	assert_that(source).contains("try_award_floor_clear")
-	assert_that(source).contains("_is_offline_replay")
+	var body: String = _extract_method_body(source, "try_award_floor_clear")
+	assert_str(body).is_not_empty()
+	assert_bool(body.contains("first_clear_awarded.emit")).is_true()
+	assert_bool(body.contains("_is_offline_replay")).is_true()
 
 
 # === Group B: Orchestrator Signal Suppression Guards ===
 
 func test_orchestrator_process_kill_events_emit_guarded() -> void:
-	## Orchestrator._process_kill_events must guard floor_cleared_first_time.emit().
-	## Implementation uses `if _is_offline_replay: accumulate; else: emit`.
+	## Orchestrator._process_kill_events must guard floor_cleared_first_time.emit()
+	## with the suppression flag inside the method (`if _is_offline_replay:
+	## accumulate into _offline_pending_first_clears; else: emit`). Method-scoped.
 	var source = _read_file("res://src/core/dungeon_run_orchestrator/dungeon_run_orchestrator.gd")
-	assert_that(source).is_not_empty()
-
-	assert_that(source).contains("_process_kill_events")
-	assert_that(source).contains("_is_offline_replay")
+	var body: String = _extract_method_body(source, "_process_kill_events")
+	assert_str(body).is_not_empty()
+	assert_bool(body.contains("floor_cleared_first_time.emit")).is_true()
+	assert_bool(body.contains("_is_offline_replay")).is_true()
 
 
 # === Group C: Exceptions to the Rule ===
@@ -176,3 +166,18 @@ func test_no_direct_gold_changed_emit_during_replay_path() -> void:
 						in_flush = true
 						break
 				assert_that(in_flush).override_failure_message("Unguarded gold_changed.emit at line %d" % (i + 1)).is_true()
+
+
+# === Group F: extractor is genuinely method-scoped (guards the I22 guard) ===
+
+func test_extract_method_body_is_method_scoped_not_file_wide() -> void:
+	## Proves _extract_method_body scopes to ONE method, so the guard assertions
+	## above can actually catch a guard removed from a specific method. add_gold's
+	## body must contain gold_changed.emit but NOT first_clear_awarded.emit (which
+	## lives only in try_award_floor_clear) nor the next method's `func try_spend`
+	## header — if extraction were file-wide, both would leak in.
+	var source = _read_file("res://src/core/economy/economy.gd")
+	var add_gold_body: String = _extract_method_body(source, "add_gold")
+	assert_bool(add_gold_body.contains("gold_changed.emit")).is_true()
+	assert_bool(add_gold_body.contains("first_clear_awarded.emit")).is_false()
+	assert_bool(add_gold_body.contains("func try_spend")).is_false()
