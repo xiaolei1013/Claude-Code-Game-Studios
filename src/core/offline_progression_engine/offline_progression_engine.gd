@@ -241,9 +241,12 @@ func _ready() -> void:
 ## [param elapsed_seconds]: the wall-clock delta to replay. Capped to
 ##   offline_cap_seconds before chunking.
 ##
-## Sprint 12 S12-M4 scope: this body is a STUB that emits cap_reached (if
-## clipped) + offline_rewards_collected with an empty summary. Sprint 12
-## S12-M5 lands the real chunked loop body per GDD §C.2 pseudocode.
+## Implements the full adaptive chunked replay loop per GDD §C.2 pseudocode +
+## ADR-0014: caps elapsed to offline_cap_seconds, drives the Orchestrator (combat
+## verdict per chunk) then Economy (drip accrual) inside a suppression window,
+## yields a frame per chunk (the budget mechanism), and emits the aggregate domain
+## signals via flush_offline_signals before offline_rewards_collected.
+## (History: Sprint 12 S12-M4 shipped a STUB; S12-M5 landed this real loop body.)
 func run_offline_replay(elapsed_seconds: int) -> void:
 	if _replay_in_flight:
 		_warning_logger.call(

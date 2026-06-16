@@ -223,6 +223,19 @@ var _fg_drip_defeated_override: int = -1
 ## Cleared by [method flush_offline_signals] post-emit.
 var _offline_pending_delta: int = 0
 
+## CODE REVIEW 2026-06-16 (I7): offline-drip parity counters. The
+## OfflineProgressionEngine drives [method compute_offline_batch] once per CHUNK;
+## crediting [code]floori(rate * chunk_i)[/code] per chunk and summing drifts BELOW
+## the closed form [code]floori(rate * total_ticks)[/code] for a fractional rate
+## (per-chunk flooring discards sub-unit remainders → underpayment). These mirror
+## the foreground segment model ([member _fg_drip_credited]): accumulate the
+## window's total ticks and credit [code]floori(rate * cumulative) − already
+## credited[/code], so the per-chunk marginals telescope to EXACTLY
+## [code]floori(rate * total_ticks)[/code] — bit-equal to the foreground drip.
+## Reset per window by [method flush_offline_signals] (0 at init / after each window).
+var _offline_drip_segment_ticks: int = 0
+var _offline_drip_credited: int = 0
+
 ## (biome_id, floor_index) pairs pending [signal first_clear_awarded] aggregate
 ## emission per ADR-0013 Amendment #1. When [member _is_offline_replay] is true
 ## and a [method try_award_floor_clear] call matches the first-clear gate, the
@@ -719,7 +732,23 @@ func compute_offline_batch(tick_budget: int) -> OfflineResult:
 	#   float(BASE_DRIP[floor-1]) * formation_strength * MATCHUP_DRIP_BONUS * tick_budget
 	var formation_strength: float = _resolve_offline_replay_formation_strength()
 	var floor_index: int = _resolve_offline_replay_floor_index()
-	var drip_total: int = floori(_drip_rate_per_tick(floor_index, formation_strength) * float(tick_budget))
+	var drip_total: int
+	if was_replay:
+		# CODE REVIEW 2026-06-16 (I7): engine-driven (per-chunk) path. Credit the
+		# telescoping marginal floori(rate * cumulative_ticks) − already_credited so
+		# the per-chunk amounts sum to EXACTLY floori(rate * total_ticks), eliminating
+		# the per-chunk floor() drift that underpaid a fractional-rate replay. This is
+		# the SAME segment model the foreground drip uses (_fg_drip_credited), applied
+		# per chunk instead of per tick — so offline == foreground by construction.
+		var rate: float = _drip_rate_per_tick(floor_index, formation_strength)
+		_offline_drip_segment_ticks += tick_budget
+		var drip_target: int = floori(rate * float(_offline_drip_segment_ticks))
+		drip_total = drip_target - _offline_drip_credited
+		_offline_drip_credited = drip_target
+	else:
+		# Standalone call (single batch covering the whole budget): the closed form
+		# floori(rate * tick_budget) is already exact — no chunking, no drift.
+		drip_total = floori(_drip_rate_per_tick(floor_index, formation_strength) * float(tick_budget))
 	if drip_total > 0:
 		add_gold(drip_total)
 	# RunSnapshot kill events + floor clears — not yet integrated with the
@@ -846,6 +875,10 @@ func flush_offline_signals() -> void:
 	# Clear accumulators + replay flag.
 	_offline_pending_delta = 0
 	_offline_pending_first_clears.clear()
+	# CODE REVIEW 2026-06-16 (I7): reset the offline-drip telescoping counters so the
+	# next window starts clean (they are 0 at init for the first window).
+	_offline_drip_segment_ticks = 0
+	_offline_drip_credited = 0
 	_is_offline_replay = false
 
 

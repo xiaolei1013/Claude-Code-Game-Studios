@@ -308,3 +308,69 @@ func test_compute_offline_batch_events_log_records_drip_arm() -> void:
 
 	# Cleanup
 	economy.free()
+
+
+# ---------------------------------------------------------------------------
+# Test — code review 2026-06-16 (I7): chunked replay has NO per-chunk floor drift.
+#
+#   The OfflineProgressionEngine drives compute_offline_batch once per CHUNK inside
+#   a suppression window (_is_offline_replay set around the whole loop). Crediting
+#   floori(rate * chunk_i) per chunk and summing drifts BELOW floori(rate * total)
+#   for a fractional rate — every chunk whose rate*chunk has a fractional part
+#   discards it. The telescoping fix must make the chunked sum EXACTLY equal the
+#   single-call closed form.
+#
+#   Rate 9.8 = BASE_DRIP[0]=49 × FS 0.2. Chunk size 501 (NOT 500) so 9.8×501 =
+#   4909.8 has a fractional part the OLD per-chunk floori() would discard — the
+#   review's reproduced underpayment. (9.8×500 = 4900.0 is whole and would hide it.)
+# ---------------------------------------------------------------------------
+func test_i7_chunked_window_total_equals_closed_form_no_drift() -> void:
+	var total_ticks: int = 576_000  # 8h @ 20 ticks/s
+	var rate: float = 49.0 * 0.2 * 1.0  # identical float expression to _drip_rate_per_tick
+	var closed_form: int = floori(rate * float(total_ticks))
+
+	var economy: Node = _make_economy([49, 0, 0, 0, 0], 1.0)
+	economy.set_offline_replay_inputs(0.2, 1)  # rate = BASE_DRIP[0]=49 × 0.2 = 9.8/tick
+
+	# Simulate the engine-managed window: flag set around the whole chunked loop.
+	economy._is_offline_replay = true
+	var ticks_left: int = total_ticks
+	var summed_marginals: int = 0
+	while ticks_left > 0:
+		var c: int = mini(501, ticks_left)
+		summed_marginals += int(economy.compute_offline_batch(c).total_gold)
+		ticks_left -= c
+
+	# Telescoping: per-chunk marginals sum to the closed form (no drift). The OLD
+	# code summed floori(rate * chunk) per chunk → strictly less for chunk 501.
+	assert_int(summed_marginals).is_equal(closed_form)
+	# The accumulated pending delta (what flush_offline_signals will emit) matches.
+	assert_int(economy._offline_pending_delta).is_equal(closed_form)
+	assert_int(economy.get_gold_balance()).is_equal(closed_form)
+
+	economy.free()
+
+
+func test_i7_chunked_window_equals_single_standalone_batch() -> void:
+	# Chunked engine-window total == a single standalone batch over the full budget
+	# (which is the closed form by construction). Proves foreground/offline parity
+	# holds regardless of how the engine slices the window into chunks.
+	var total_ticks: int = 576_000
+
+	var e1: Node = _make_economy([49, 0, 0, 0, 0], 1.0)
+	e1.set_offline_replay_inputs(0.2, 1)
+	var single_total: int = int(e1.compute_offline_batch(total_ticks).total_gold)
+	e1.free()
+
+	var e2: Node = _make_economy([49, 0, 0, 0, 0], 1.0)
+	e2.set_offline_replay_inputs(0.2, 1)
+	e2._is_offline_replay = true
+	var ticks_left: int = total_ticks
+	var chunked_total: int = 0
+	while ticks_left > 0:
+		var c: int = mini(501, ticks_left)
+		chunked_total += int(e2.compute_offline_batch(c).total_gold)
+		ticks_left -= c
+	e2.free()
+
+	assert_int(chunked_total).is_equal(single_total)
