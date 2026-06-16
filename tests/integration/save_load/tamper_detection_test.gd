@@ -675,3 +675,67 @@ func test_data_registry_error_at_load_emits_modal_required_and_aborts() -> void:
 
 	# Cleanup — restore DataRegistry state for downstream tests.
 	dr.state = dr_original_state
+
+
+# ===========================================================================
+# Group I — code review 2026-06-16 (I2): cross-version .bak recovery
+# ===========================================================================
+
+## Builds a VALID envelope at an arbitrary [param version], signed under the
+## current-build HMAC tag (so it passes HMAC) but masked + headered with the
+## given version (so the loader must re-parse the version to un-mask it).
+## Mirrors schema_migration_e2e_test._forge_envelope_with_version.
+func _forge_envelope_with_version(sl: Node, version: int) -> PackedByteArray:
+	var plaintext: PackedByteArray = JSON.stringify({}).to_utf8_buffer()
+	var mask_seed: PackedByteArray = sl._derive_mask_seed(version)
+	var mask: PackedByteArray = sl._generate_mask(mask_seed, plaintext.size())
+	var masked_payload: PackedByteArray = sl._apply_xor_mask(plaintext, mask)
+	var header: PackedByteArray = sl._compose_header(version, 0, masked_payload.size())
+	var hmac_placeholder := PackedByteArray()
+	hmac_placeholder.resize(32)
+	var envelope := PackedByteArray()
+	envelope.append_array(header)
+	envelope.append_array(masked_payload)
+	envelope.append_array(hmac_placeholder)
+	var tags: Array[PackedByteArray] = sl._derive_integrity_tags()
+	var hmac_input: PackedByteArray = envelope.slice(0, envelope.size() - 32)
+	var hmac: PackedByteArray = sl._integrity_wrap(tags[0], hmac_input)
+	for i: int in 32:
+		envelope.encode_u8(envelope.size() - 32 + i, hmac.decode_u8(i))
+	return envelope
+
+
+func test_i2_cross_version_bak_recovers_under_corrupt_dat_without_parse_error() -> void:
+	# A V1 .bak beside a corrupt V(current) .dat is the NORMAL post-update state.
+	# The .bak fallback must re-parse the version from the .bak header before
+	# un-masking: using the stale .dat version derives the wrong mask seed, garbles
+	# the V1 payload → JSON parse fails → spurious CORRUPT (ERR_PARSE_ERROR). With
+	# the fix the V1 payload un-masks cleanly and the load proceeds into the
+	# V1→current migration path (no parse error).
+	var sl: Node = get_tree().root.get_node_or_null("SaveLoadSystem")
+	_connect_spies(sl)
+
+	# Seed a real current-version .dat, then corrupt its HMAC so the load falls
+	# back to the .bak.
+	sl._state = SaveLoadScript.State.READY
+	sl.request_full_persist("i2_seed_dat")
+	sl._state = SaveLoadScript.State.UNLOADED
+	var dat_size: int = FileAccess.get_file_as_bytes(FIXTURE_SAVE_PATH).size()
+	_corrupt_byte_at_offset(FIXTURE_SAVE_PATH, dat_size - 5)
+
+	# Overwrite the .bak with a VALID version-1 envelope (older than the .dat).
+	var v1_bak: PackedByteArray = _forge_envelope_with_version(sl, 1)
+	var bf: FileAccess = FileAccess.open(FIXTURE_SAVE_PATH + ".bak", FileAccess.WRITE)
+	assert_object(bf).is_not_null()
+	bf.store_buffer(v1_bak)
+	bf.close()
+
+	_clear_spies()
+	sl.request_full_load("i2_cross_version_load")
+
+	# We took the .bak path (the .dat HMAC failed).
+	assert_int(_tamper_calls).is_equal(1)
+	# The V1 .bak un-masked correctly → NO JSON parse failure. (Pre-fix the V1
+	# payload, un-masked with the stale V-current seed, parse-failed here.)
+	for fail: Dictionary in _load_failed_calls:
+		assert_int(int(fail.error_code)).is_not_equal(ERR_PARSE_ERROR)
