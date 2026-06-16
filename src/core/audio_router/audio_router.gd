@@ -462,7 +462,12 @@ func play_music(music_id: StringName, fade_in_ms: int = _MUSIC_DEFAULT_FADE_MS) 
 			# the generic dungeon track. See design/art/demo-asset-manifest.md.
 			var track: String = _DEMO_MUSIC_MAP.get(base_name, _DEMO_MUSIC_DEFAULT)
 			var demo_path: String = "res://assets/audio/demo/bgm_%s.mp3" % track
-			if FileAccess.file_exists(demo_path):
+			# Use ResourceLoader.exists (NOT FileAccess.file_exists): the demo mp3
+			# is an imported asset, so on an exported build the source path is
+			# stripped while the import map still resolves via load(). Guarding
+			# with FileAccess would be stricter than the load() that follows it.
+			# Matches the project-wide ResourceLoader.exists export-safety convention.
+			if ResourceLoader.exists(demo_path):
 				stream = load(demo_path) as AudioStream
 
 	# Spawn new player at -80 dB baseline (near-silence per §F.4 -∞ intent;

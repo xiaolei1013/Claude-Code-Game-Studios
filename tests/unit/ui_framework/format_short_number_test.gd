@@ -89,3 +89,35 @@ func test_format_short_number_negative_value_prefixed_with_minus() -> void:
 
 func test_format_short_number_negative_below_k_threshold() -> void:
 	assert_str(UIFrameworkScript.format_short_number(-42)).is_equal("-42")
+
+
+# ===========================================================================
+# Group G — rounding-boundary promotion (regression: code review 2026-06-16, I15)
+# A value just under the next threshold must NOT render as "1000.0<suffix>";
+# the one-decimal rounding lands on 1000.0, which must promote to "1.0<next>".
+# These values (…999 / …999999 / …999999999999) sit safely off the .5 float
+# rounding boundary, so the assertion is deterministic.
+# ===========================================================================
+
+func test_format_short_number_999999_promotes_to_1m_not_1000k() -> void:
+	# 999_999 / 1000 = 999.999 → rounds to 1000.0K → must render "1.0M".
+	assert_str(UIFrameworkScript.format_short_number(999_999)).is_equal("1.0M")
+
+
+func test_format_short_number_999999999_promotes_to_1b_not_1000m() -> void:
+	assert_str(UIFrameworkScript.format_short_number(999_999_999)).is_equal("1.0B")
+
+
+func test_format_short_number_999999999999_promotes_to_1t_not_1000b() -> void:
+	assert_str(UIFrameworkScript.format_short_number(999_999_999_999)).is_equal("1.0T")
+
+
+func test_format_short_number_999000_stays_999k_no_early_promotion() -> void:
+	# Just below the rounding boundary — must still read "999.0K", proving the
+	# promotion guard does not fire early.
+	assert_str(UIFrameworkScript.format_short_number(999_000)).is_equal("999.0K")
+
+
+func test_format_short_number_negative_999999_promotes_to_minus_1m() -> void:
+	# Sign path recurses through the same branch logic.
+	assert_str(UIFrameworkScript.format_short_number(-999_999)).is_equal("-1.0M")
