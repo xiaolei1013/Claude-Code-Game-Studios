@@ -411,11 +411,17 @@ var _meta_slot_index: int = 0
 ## Story 013 Phase 2 — monotonic save-sequence counter persisted in `_meta`
 ## (TR-save-load-019).
 ##
-## Incremented on every successful [method request_full_persist] call so
-## the offline-progression math can detect out-of-order replay attacks
-## (a replayed older save would have a lower sequence number than the
-## in-memory value at load time). The counter starts at 0, is incremented
-## BEFORE the compose step, and is persisted in `_meta.save_sequence_number`.
+## Incremented on every successful [method request_full_persist] call. The
+## counter starts at 0, is incremented BEFORE the compose step, and is persisted
+## in `_meta.save_sequence_number`.
+##
+## INTENDED (NOT YET IMPLEMENTED — code review 2026-06-16 / I6): to let the
+## offline-progression math detect out-of-order replay (a replayed older save
+## would carry a lower sequence number than the in-memory value at load time).
+## The value is persisted + restored, but NO load-time comparison exists yet —
+## so this is a persisted-but-not-yet-validated MVP field, NOT an active
+## anti-replay protection. Implement the load-time compare in request_full_load
+## before relying on it for integrity.
 ##
 ## Set at persist time via [method _compose_meta_dict] and restored at load
 ## time via [method _hydrate_meta_dict].
@@ -958,6 +964,16 @@ func request_full_load(reason: String) -> void:
 			# Re-assign 'envelope' to the bak bytes and re-split for the JSON parse below.
 			envelope = bak_result.get("envelope_bytes", PackedByteArray())
 			parts = _split_envelope(envelope)
+			# CODE REVIEW 2026-06-16 (I2): re-parse the version from the .bak header.
+			# `version` (line ~880) came from the .dat header, but the .bak can carry a
+			# DIFFERENT version — the normal post-update state is a V(n-1) .bak beside a
+			# V(n) .dat. The mask seed is version-keyed, so un-masking the .bak payload
+			# (below) with the stale .dat version yields garbage → JSON parse fails →
+			# spurious CORRUPT, and the version<CURRENT migration step would never run —
+			# defeating the whole point of .bak rotation and risking overwrite of the
+			# recoverable lineage. The .bak envelope was already HMAC-verified by
+			# _load_envelope_from_path, so its header is trusted.
+			version = int(_parse_header(envelope).version)
 			# Queue a deferred re-persist so the recovered .bak data is promoted
 			# to .dat (with a fresh HMAC) on the next frame after load completes.
 			call_deferred("request_full_persist", "bak_recovery_repersist")
