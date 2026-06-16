@@ -51,6 +51,13 @@ const HeroDetailModalScene: PackedScene = preload(
 )
 const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
 
+# MVP UI icon set (DESIGN.md "Iconography") — crisp hand-authored pixel PNGs
+# wired onto the existing Guild Hall chrome: the gear button, the Dispatch CTA,
+# and the gold counter. Source: tools/asset-pipeline/compose_icons.py (ADR-0024).
+const ICON_SETTINGS_GEAR: Texture2D = preload("res://assets/art/ui/icons/settings_gear.png")
+const ICON_DISPATCH_ARROW: Texture2D = preload("res://assets/art/ui/icons/dispatch_arrow.png")
+const ICON_COIN: Texture2D = preload("res://assets/art/ui/icons/coin.png")
+
 # Prestige completion toast — fades over 4.0s matching the
 # formation_assignment + Recruitment toast pattern (GDD #21 §G).
 const TOAST_FADE_DURATION_SEC: float = 4.0
@@ -88,6 +95,10 @@ func on_enter() -> void:
 	# §Decision 3 programmatic-placeholder strategy.
 	if _biome_background != null:
 		_biome_background.set_biome("guild_hall_tavern")
+	# MVP icon: Guild Amber dispatch arrow alongside the CTA label (primary CTA
+	# = icon + text). NEAREST filter keeps the 24px pixel art crisp under stretch.
+	_dispatch_nav_button.icon = ICON_DISPATCH_ARROW
+	_dispatch_nav_button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	if not _dispatch_nav_button.pressed.is_connected(_on_dispatch_nav_pressed):
 		_dispatch_nav_button.pressed.connect(_on_dispatch_nav_pressed)
 
@@ -130,6 +141,11 @@ func on_enter() -> void:
 		FloorUnlock.biome_unlocked.connect(_on_biome_unlocked)
 
 	if _settings_gear_button != null:
+		# MVP icon: replace the "⚙" emoji placeholder with the hand-authored
+		# Slate Ink cog (icon-only button). NEAREST keeps the 24px art crisp.
+		_settings_gear_button.icon = ICON_SETTINGS_GEAR
+		_settings_gear_button.text = ""
+		_settings_gear_button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		if not _settings_gear_button.pressed.is_connected(_on_settings_gear_pressed):
 			_settings_gear_button.pressed.connect(_on_settings_gear_pressed)
 
@@ -718,9 +734,22 @@ func _reposition_existing_nodes() -> void:
 		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		title.z_index = 3
 	if _gold_counter != null:
-		_place(_gold_counter, 1, 0, 1, 0, -300.0, 8.0, -64.0, 46.0)
-		_gold_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		# Gold cluster: MVP coin icon + the balance label, tucked top-right just
+		# left of the gear. Left-align the label (was right) so the coin stays
+		# glued to its left; the ~208px box clears the gear for realistic gold.
+		_place(_gold_counter, 1, 0, 1, 0, -272.0, 8.0, -64.0, 46.0)
+		_gold_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		_gold_counter.z_index = 3
+		if not has_node("GoldCoinIcon"):
+			var coin := TextureRect.new()
+			coin.name = "GoldCoinIcon"
+			coin.texture = ICON_COIN
+			coin.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			coin.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			coin.mouse_filter = Control.MOUSE_FILTER_IGNORE  # decorative — never steals taps
+			coin.z_index = 3
+			add_child(coin)
+			_place(coin, 1, 0, 1, 0, -300.0, 15.0, -276.0, 39.0)  # 24x24, left of the gold box
 	if _settings_gear_button != null:
 		_place(_settings_gear_button, 1, 0, 1, 0, -56.0, 9.0, -14.0, 45.0)
 		_settings_gear_button.z_index = 3
