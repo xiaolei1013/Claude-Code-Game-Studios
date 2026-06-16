@@ -216,8 +216,14 @@ def gen_image(entry: dict, keys: dict) -> None:
 
     # Isolated assets (vfx/icons/portraits/sprites) get the asset prefix + a flat
     # chroma background we key to alpha in post; scenes get the diorama prefix.
+    # `style:"ui"` opts into the flat surface-texture prefix (parchment sheets,
+    # button fills) — these stay OPAQUE (isolated:false), so post-process scales
+    # them to size without colour-keying, exactly like a scene backdrop.
     isolated = bool(entry.get("isolated", False))
-    prefix = C.STYLE_PREFIX_ISOLATED if isolated else C.STYLE_PREFIX_SCENE
+    if entry.get("style") == "ui":
+        prefix = C.STYLE_PREFIX_UI
+    else:
+        prefix = C.STYLE_PREFIX_ISOLATED if isolated else C.STYLE_PREFIX_SCENE
     full_prompt = prefix + entry["prompt"]
     # No size hint in the prompt — Flash-Image ignores it (always ~1024²); we
     # downscale to `entry["size"]` deterministically in _postprocess_image.
@@ -474,6 +480,7 @@ _SECTIONS = [
     ("enemy_sprites",  "images", gen_image, _fmt_image,  "out"),
     ("class_sprites",  "images", gen_image, _fmt_image,  "out"),
     ("vfx",            "images", gen_image, _fmt_image,  "out"),
+    ("ui",             "images", gen_image, _fmt_image,  "out"),
 ]
 
 # Which API credential each manifest parent needs. Used to require ONLY the
@@ -558,7 +565,7 @@ def run(manifest: dict, only: str | None, keys: dict, skip_existing: bool = Fals
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="Lantern Guild asset generation")
     ap.add_argument("--manifest", default=str(Path(__file__).parent / "manifests" / "pilot.json"))
-    ap.add_argument("--only", choices=["audio", "images", "sfx", "music", "backgrounds", "portraits", "enemy_sprites", "class_sprites", "vfx"])
+    ap.add_argument("--only", choices=["audio", "images", "sfx", "music", "backgrounds", "portraits", "enemy_sprites", "class_sprites", "vfx", "ui"])
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--author-tres", action="store_true", help="Only author AudioCue .tres wrappers (run after audio is imported).")
     ap.add_argument("--skip-existing", action="store_true", help="Skip assets whose output file already exists (protects approved assets; makes a large batch resumable).")

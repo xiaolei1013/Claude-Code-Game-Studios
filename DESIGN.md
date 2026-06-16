@@ -168,7 +168,14 @@ Locked. Matchup triple uses **shape + color**: Lantern Gold ▲ (advantage) / Pa
 | `radius-modal` | 8px | Settings overlay, modal containers |
 | `radius-circle` | 9999px (full) | Settings gear icon button, hero portrait frames |
 
-### Panel style (StyleBoxFlat)
+### Panel style (StyleBoxFlat → StyleBoxTexture, ADR-0023)
+
+> **Implementation note (ADR-0023, OQ-DS-02 resolved):** `panel_default` and `panel_parchment`
+> are now `StyleBoxTexture` 9-patch (a painterly parchment PNG: `assets/art/ui/ui_panel_parchment.png`,
+> `texture_margin_* = 14`), not `StyleBoxFlat`. The tokens below still hold — Slate Ink border + 6px
+> radius — but are **baked into the texture** (the ink frame is painted at 2px to retain edge
+> definition since `StyleBoxTexture` cannot render the vector **drop shadow** below). Read this section
+> with ADR-0023.
 
 Default parchment panel:
 - Background: Parchment Cream (`#EDE0C4`)
@@ -319,7 +326,7 @@ The parchment theme (`assets/ui/parchment_theme.tres`) is the canonical Theme re
 ## Open Questions
 
 - **OQ-DS-01**: Tabular-nums feature in Lora — verify Godot 4.6 supports OpenType feature toggles on FontFile resources via `font_features = {"tnum": 1}`. Pending engine-reference doc check before stat-table implementation.
-- **OQ-DS-02**: Parchment texture — is the panel background a solid color (`#EDE0C4`), a procedural noise overlay, or a static PNG texture? Art bible says "parchment texture" but specific implementation is Sprint 20+ shader/art question.
+- **OQ-DS-02**: ~~Parchment texture — is the panel background a solid color (`#EDE0C4`), a procedural noise overlay, or a static PNG texture?~~ **RESOLVED → static PNG 9-patch texture (ADR-0023).** Composed from a Gemini-painted parchment fill + a deterministic PIL-drawn Slate Ink frame, wired as `StyleBoxTexture` on `panel_default` + `panel_parchment`. See §"Panel style" note below.
 - **OQ-DS-03**: Reduce-motion idle-pulse disable — confirm via tests that the Lantern Gold idle pulse on interactive buttons respects `reduce_motion` flag. Likely a Sprint 20 implementation story.
 
 ---
