@@ -698,7 +698,19 @@ func compute_offline_batch(tick_budget: int) -> OfflineResult:
 		push_error("Economy.compute_offline_batch: _config is null — cannot compute drip. " +
 			"DataRegistry boot likely failed; this method requires resolved EconomyConfig.")
 		return result
-	_is_offline_replay = true
+	# CODE REVIEW 2026-06-16 (C2): be caller-aware about the offline-replay
+	# suppression window. The OfflineProgressionEngine drives this method ONCE PER
+	# CHUNK inside an externally-managed window — it sets _is_offline_replay = true
+	# around the whole loop and emits a SINGLE aggregate via flush_offline_signals
+	# afterward. When driven that way we must NOT (a) clear the flag here (clearing
+	# it mid-loop unsuppresses add_gold on later chunks AND lets a foreground
+	# _on_tick double-credit during the engine's inter-chunk `await process_frame`),
+	# nor (b) emit a per-chunk gold_changed (which double-announces the offline gold
+	# the aggregate already covers). Only self-manage the flag + emit when called
+	# STANDALONE (was_replay == false) — e.g. a direct unit test.
+	var was_replay: bool = _is_offline_replay
+	if not was_replay:
+		_is_offline_replay = true
 	var balance_before: int = _gold_balance
 	# Closed-form drip: single multiplication via the shared _drip_rate_per_tick helper.
 	# S28-G1: refactored from an inline formula to use _drip_rate_per_tick so the
@@ -725,11 +737,17 @@ func compute_offline_batch(tick_budget: int) -> OfflineResult:
 	result.total_gold = _gold_balance - balance_before
 	# Future stories populate floors_cleared from try_award_floor_clear during
 	# the batch (the call site appends to result.floors_cleared); empty for MVP.
-	_is_offline_replay = false
-	# Aggregate emit AFTER flag clears (so re-entrant subscribers see post-replay state).
-	# Skip the emit on a zero-delta no-op so consumers don't get a phantom update.
-	if result.total_gold != 0:
-		gold_changed.emit(_gold_balance, result.total_gold, OFFLINE_REPLAY_REASON)
+	if not was_replay:
+		# Standalone call (no engine-managed window): close the flag and announce
+		# this batch's net delta as the single aggregate, exactly as before.
+		# Emit AFTER the flag clears (re-entrant subscribers see post-replay state);
+		# skip a zero-delta no-op so consumers don't get a phantom update.
+		_is_offline_replay = false
+		if result.total_gold != 0:
+			gold_changed.emit(_gold_balance, result.total_gold, OFFLINE_REPLAY_REASON)
+	# When was_replay (engine-driven): leave _is_offline_replay set and the drip
+	# accumulated in _offline_pending_delta. The engine clears the flag after the
+	# loop and flush_offline_signals emits the ONE aggregate gold_changed.
 	return result
 
 

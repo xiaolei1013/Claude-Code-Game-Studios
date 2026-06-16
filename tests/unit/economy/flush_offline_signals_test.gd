@@ -11,6 +11,7 @@
 extends GdUnitTestSuite
 
 const EconomyScript = preload("res://src/core/economy/economy.gd")
+const EconomyConfigScript = preload("res://src/core/economy/economy_config.gd")
 
 
 func _make_fresh_economy() -> Node:
@@ -247,3 +248,73 @@ func test_flush_emits_gold_and_first_clears_in_order() -> void:
 func test_economy_flush_offline_signals_method_exists() -> void:
 	var e: Node = _make_fresh_economy()
 	assert_bool(e.has_method("flush_offline_signals")).is_true()
+
+
+# ===========================================================================
+# Group F — code review 2026-06-16 (C2): compute_offline_batch is caller-aware.
+# Inside an engine-managed window (_is_offline_replay already true) it must NOT
+# clear the flag mid-loop nor emit a per-chunk gold_changed — only
+# flush_offline_signals emits the ONE aggregate. Called standalone it self-manages
+# the flag and emits a single per-batch gold_changed, exactly as before.
+# ===========================================================================
+
+## Boots a fresh Economy WITH an injected EconomyConfig so compute_offline_batch
+## can run its closed-form drip (mirrors the determinism test's _make_economy).
+func _make_economy_with_config(base_drip: Array[int]) -> Node:
+	var e: Node = EconomyScript.new()
+	add_child(e)
+	auto_free(e)
+	var cfg: Resource = EconomyConfigScript.new()
+	cfg.BASE_DRIP = base_drip
+	cfg.MATCHUP_DRIP_BONUS = 1.0
+	e._config = cfg
+	e._gold_balance = 1000
+	e._lifetime_gold_earned = 1000
+	return e
+
+
+func test_compute_offline_batch_inside_engine_window_defers_to_single_aggregate() -> void:
+	# Simulate the OfflineProgressionEngine: it sets the window flag around the
+	# whole chunk loop, drives compute_offline_batch per chunk, then flushes once.
+	var e: Node = _make_economy_with_config([2, 4, 7, 12, 8])
+	e.set_offline_replay_inputs(1.0, 2)
+	e._is_offline_replay = true
+	_connect_spy(e)
+
+	# Chunk 1: the flag must STAY set (clearing it mid-loop is the C2 defect) and
+	# no per-chunk gold_changed may fire.
+	var c1: Object = e.compute_offline_batch(500)
+	assert_bool(e._is_offline_replay).is_true()
+	assert_int(_gold_changed_calls.size()).is_equal(0)
+
+	# Chunk 2: still suppressed; both chunks accumulate into the pending delta.
+	var c2: Object = e.compute_offline_batch(500)
+	assert_bool(e._is_offline_replay).is_true()
+	assert_int(_gold_changed_calls.size()).is_equal(0)
+
+	var expected_total: int = int(c1.total_gold) + int(c2.total_gold)
+	assert_int(expected_total).is_greater(0)  # guard: drip actually happened
+	assert_int(e._offline_pending_delta).is_equal(expected_total)
+
+	# Engine ends the window + flushes → exactly ONE aggregate carrying the sum.
+	e.flush_offline_signals()
+	assert_int(_gold_changed_calls.size()).is_equal(1)
+	assert_int(_gold_changed_calls[0].delta).is_equal(expected_total)
+	assert_str(_gold_changed_calls[0].reason).is_equal("offline_replay_aggregate")
+
+
+func test_compute_offline_batch_standalone_emits_one_offline_replay_signal() -> void:
+	# No engine window (flag starts false): the method self-manages the flag and
+	# emits a single per-batch gold_changed, preserving the pre-fix standalone path.
+	var e: Node = _make_economy_with_config([2, 4, 7, 12, 8])
+	e.set_offline_replay_inputs(1.0, 2)
+	assert_bool(e._is_offline_replay).is_false()
+	_connect_spy(e)
+
+	var r: Object = e.compute_offline_batch(500)
+
+	assert_bool(e._is_offline_replay).is_false()
+	assert_int(int(r.total_gold)).is_greater(0)
+	assert_int(_gold_changed_calls.size()).is_equal(1)
+	assert_int(_gold_changed_calls[0].delta).is_equal(int(r.total_gold))
+	assert_str(_gold_changed_calls[0].reason).is_equal("offline_replay")
