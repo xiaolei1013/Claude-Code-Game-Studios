@@ -1371,13 +1371,26 @@ func load_save_data(d: Dictionary) -> void:
 	_resize_formation_slots()
 	_next_instance_id = 1
 
-	# Hydrate heroes — each entry is a 5-key dict per HeroInstance.to_dict().
+	# Hydrate heroes — each entry is a 6-key dict per HeroInstance.to_dict()
+	# (instance_id, class_id, display_name, current_level, xp, injured_until).
 	# TR-025: duplicate instance_id in save → last-write-wins via Dictionary
 	# assignment semantics; push_error logged so the upstream save corruption
 	# is visible. No crash; no skip — the second write overwrites the first.
 	var heroes_arr: Array = d.get("heroes", []) as Array
 	var seen_ids: Dictionary = {}
-	for hero_dict: Dictionary in heroes_arr:
+	for hero_raw: Variant in heroes_arr:
+		# CODE REVIEW 2026-06-16 (I4): per-element type guard. HMAC guarantees the
+		# bytes are SIGNED, not that the structure is well-formed — a buggy build or
+		# migration stub could leave a non-Dictionary element here, and a typed
+		# `for x: Dictionary in ...` loop runtime-faults the whole load on it. Degrade
+		# (warn + skip) instead of crashing, mirroring the prestige-records loop below.
+		if not (hero_raw is Dictionary):
+			push_warning(
+				"[HeroRoster] load_save_data: non-Dictionary element in 'heroes' array "
+				+ "(got %s); skipping it." % type_string(typeof(hero_raw))
+			)
+			continue
+		var hero_dict: Dictionary = hero_raw as Dictionary
 		var instance: RefCounted = HeroInstanceScript.new()
 		instance.from_dict(hero_dict)
 		if seen_ids.has(instance.instance_id):
@@ -1477,17 +1490,7 @@ func _validate_after_load() -> void:
 	for id: int in to_remove:
 		_heroes.erase(id)
 
-	# Step 2: clear stale formation slots referencing dropped/orphan ids.
-	for i: int in range(_formation_slots.size()):
-		var slot_id: int = _formation_slots[i]
-		if slot_id != 0 and not _heroes.has(slot_id):
-			push_warning(
-				"[HeroRoster] _validate_after_load: clearing formation slot %d (orphan id=%d)"
-				% [i, slot_id]
-			)
-			_formation_slots[i] = 0
-
-	# Step 3: trim over-cap (preserve lowest ids).
+	# Step 2: trim over-cap (preserve lowest ids).
 	var cap: int = max_roster_size()
 	if _heroes.size() > cap:
 		var sorted_ids: Array = _heroes.keys()
@@ -1500,6 +1503,21 @@ func _validate_after_load() -> void:
 				% [id_to_drop, cap]
 			)
 			_heroes.erase(id_to_drop)
+
+	# Step 3: clear stale formation slots referencing any dropped id.
+	# CODE REVIEW 2026-06-16 (I5): this sweep MUST run after BOTH the orphan-drop
+	# (Step 1) AND the over-cap trim (Step 2). It previously ran before the trim, so
+	# a trimmed high-id hero that was sitting in a formation slot survived the sweep
+	# and was then erased — leaving the slot pointing at a deleted hero, violating
+	# this function's post-condition that every non-empty slot resolves to a hero.
+	for i: int in range(_formation_slots.size()):
+		var slot_id: int = _formation_slots[i]
+		if slot_id != 0 and not _heroes.has(slot_id):
+			push_warning(
+				"[HeroRoster] _validate_after_load: clearing formation slot %d (dangling id=%d)"
+				% [i, slot_id]
+			)
+			_formation_slots[i] = 0
 
 	# Step 4: repair _next_instance_id to be strictly greater than any present id.
 	# Preserves TR-011 monotonic invariant even after trim/orphan drops.

@@ -474,3 +474,72 @@ func test_orphan_heroes_notice_fires_after_suppress_signals_lifted() -> void:
 	# Assert — _suppress_signals is now false (load completed); notice fired.
 	assert_bool(hr._suppress_signals).is_false()
 	assert_int(_spy_orphan_count).is_equal(1)
+
+
+# ===========================================================================
+# Group H — code review 2026-06-16: load hardening (I4 malformed element guard,
+# I5 trim-vs-slot ordering)
+# ===========================================================================
+
+func test_load_save_data_skips_non_dictionary_hero_elements_without_crashing() -> void:
+	# I4: HMAC signs BYTES, not structure — a buggy build / migration stub could
+	# leave a non-Dictionary element in "heroes". A typed `for x: Dictionary in`
+	# loop would runtime-fault the whole load on it; the guard must skip the junk
+	# and load the rest.
+	if not _data_registry_can_resolve_warrior():
+		push_warning("Skipped")
+		return
+	var hr: Node = _make_fresh_roster()
+	var heroes_arr: Array = [
+		_make_hero_dict(1, WARRIOR_ID),
+		42,            # non-Dictionary (int)
+		null,          # non-Dictionary (null)
+		"not_a_hero",  # non-Dictionary (String)
+		_make_hero_dict(2, WARRIOR_ID),
+	]
+	var save_dict: Dictionary = {
+		"heroes": heroes_arr,
+		"formation_slots": [],
+		"next_instance_id": 3,
+	}
+
+	# Act — must NOT crash; the 3 junk elements are skipped.
+	hr.load_save_data(save_dict)
+
+	# Assert — only the 2 valid heroes loaded.
+	assert_int(hr._heroes.size()).is_equal(2)
+	assert_bool(hr._heroes.has(1)).is_true()
+	assert_bool(hr._heroes.has(2)).is_true()
+
+
+func test_over_cap_trim_clears_formation_slot_pointing_at_trimmed_hero() -> void:
+	# I5: a formation slot referencing a high-id hero that gets trimmed for being
+	# over-cap must be CLEARED, not left dangling. The slot-clear sweep must run
+	# AFTER the over-cap trim. Pre-fix, the slot-clear ran first, so hero 35 (still
+	# present then) survived the sweep and was trimmed afterward → slot 0 dangled.
+	if not _data_registry_can_resolve_warrior():
+		push_warning("Skipped")
+		return
+	var hr: Node = _make_fresh_roster()
+	var heroes_arr: Array = []
+	for i: int in range(1, 36):  # 35 heroes; cap 30 → ids 31..35 trimmed
+		heroes_arr.append(_make_hero_dict(i, WARRIOR_ID))
+	var save_dict: Dictionary = {
+		"heroes": heroes_arr,
+		"formation_slots": [35, 1, 0],  # slot 0 → hero 35 (will be trimmed)
+		"next_instance_id": 36,
+	}
+
+	# Act
+	hr.load_save_data(save_dict)
+
+	# Assert — hero 35 trimmed, and slot 0 (which referenced it) cleared to 0;
+	# slot 1 (surviving hero 1) preserved.
+	assert_bool(hr._heroes.has(35)).is_false()
+	assert_int(hr._formation_slots[0]).is_equal(0)
+	assert_int(hr._formation_slots[1]).is_equal(1)
+	# Post-condition: every non-empty slot resolves to a present hero.
+	for i: int in range(hr._formation_slots.size()):
+		var sid: int = hr._formation_slots[i]
+		if sid != 0:
+			assert_bool(hr._heroes.has(sid)).is_true()
