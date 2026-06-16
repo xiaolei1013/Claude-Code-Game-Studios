@@ -208,35 +208,60 @@ func test_prestige_payload_includes_class_and_count_when_opt_in() -> void:
 # Group E — run state-change handler dispatches both events
 # ===========================================================================
 
-func test_state_changed_dispatching_emits_run_dispatched() -> void:
-	# When the handler enters DISPATCHING, the run_dispatched event fires.
-	# The orchestrator's run_snapshot may be null at this point (test env),
-	# in which case the handler short-circuits inside _emit_run_dispatched.
-	# Either way, count is 0 or 1, NOT > 1.
+func test_state_changed_active_foreground_emits_run_dispatched() -> void:
+	# I14: run_dispatched fires on ACTIVE_FOREGROUND (2) — reached only AFTER the
+	# orchestrator rebuilds run_snapshot and validations pass. run_snapshot may be
+	# null in a pure unit env → _emit_run_dispatched short-circuits, so 0 or 1.
 	var sink: Node = _get_sink()
 	sink.set_opt_in(true)
-	sink._on_run_state_changed(1, 0)  # 1 = DISPATCHING
-	# The state-change handler dispatched correctly even if the snapshot
-	# was null. Count is 0 in pure unit-test env (no live snapshot); the
-	# integration test exercises the snapshot-present path.
+	sink._on_run_state_changed(2, 1)  # DISPATCHING(1) → ACTIVE_FOREGROUND(2)
 	assert_int(_count_events("run_dispatched")).is_less_equal(1)
 	assert_int(_count_events("run_completed")).is_equal(0)
 
 
-func test_state_changed_run_ended_emits_run_completed() -> void:
+func test_state_changed_dispatching_does_not_emit_run_dispatched() -> void:
+	# I14 regression: DISPATCHING (1) must NOT emit run_dispatched. At DISPATCHING the
+	# orchestrator's run_snapshot is still the PRIOR run's (it is rebuilt on the way to
+	# ACTIVE_FOREGROUND), so emitting here logged a stale, off-by-one snapshot.
 	var sink: Node = _get_sink()
 	sink.set_opt_in(true)
-	sink._on_run_state_changed(4, 2)  # 4 = RUN_ENDED
+	sink._on_run_state_changed(1, 0)  # 1 = DISPATCHING
+	assert_int(_count_events("run_dispatched")).is_equal(0)
+
+
+func test_state_changed_run_ended_from_active_emits_run_completed() -> void:
+	# A real foreground run ending: ACTIVE_FOREGROUND(2) → RUN_ENDED(4).
+	var sink: Node = _get_sink()
+	sink.set_opt_in(true)
+	sink._on_run_state_changed(4, 2)  # old_state = ACTIVE_FOREGROUND
 	assert_int(_count_events("run_completed")).is_less_equal(1)
 	assert_int(_count_events("run_dispatched")).is_equal(0)
 
 
-func test_state_changed_other_state_does_not_emit() -> void:
-	# State 2 = ACTIVE_FOREGROUND, state 0 = NO_RUN — neither maps to an event.
+func test_state_changed_run_ended_from_dispatching_does_not_emit_run_completed() -> void:
+	# I14 regression: a FAILED-validation dispatch traverses DISPATCHING(1) →
+	# RUN_ENDED(4) WITHOUT reaching ACTIVE_FOREGROUND. run_completed must NOT fire —
+	# it would log a phantom completion with a garbage gold delta vs a stale baseline.
 	var sink: Node = _get_sink()
 	sink.set_opt_in(true)
-	sink._on_run_state_changed(2, 1)
-	sink._on_run_state_changed(0, 4)
+	sink._on_run_state_changed(4, 1)  # old_state = DISPATCHING
+	assert_int(_count_events("run_completed")).is_equal(0)
+
+
+func test_state_changed_offline_replay_end_does_not_emit_run_completed() -> void:
+	# Offline-replay end (ACTIVE_OFFLINE_REPLAY(3) → RUN_ENDED(4)) has its own
+	# summary and must NOT log a foreground run_completed.
+	var sink: Node = _get_sink()
+	sink.set_opt_in(true)
+	sink._on_run_state_changed(4, 3)  # old_state = ACTIVE_OFFLINE_REPLAY
+	assert_int(_count_events("run_completed")).is_equal(0)
+
+
+func test_state_changed_no_run_entry_does_not_emit() -> void:
+	# NO_RUN(0) on entry maps to no event.
+	var sink: Node = _get_sink()
+	sink.set_opt_in(true)
+	sink._on_run_state_changed(0, 4)  # → NO_RUN
 	assert_int(_count_events("run_dispatched")).is_equal(0)
 	assert_int(_count_events("run_completed")).is_equal(0)
 
