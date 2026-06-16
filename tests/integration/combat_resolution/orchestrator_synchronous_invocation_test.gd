@@ -151,3 +151,57 @@ func test_combat_resolver_instance_is_not_in_tick_system_connections() -> void:
 		var callable: Callable = conn.get("callable") as Callable
 		var target: Object = callable.get_object()
 		assert_object(target).is_not_equal(combat)
+
+
+# ===========================================================================
+# Group C: code review 2026-06-16 (C1) — dispatch anchors lazily to the FIRST
+# observed tick, not a hardcoded 0. TickSystem.tick_fired carries a monotonic,
+# session-absolute counter; in production the first tick after a dispatch is
+# already in the hundreds. Pre-fix, dispatched_at_tick=0 made the first handler
+# call feed Combat the range (0, n] and resolve the ENTIRE run in one tick
+# (instant clear/defeat on every run after the first cold-launch dispatch).
+# ===========================================================================
+
+func test_first_observed_tick_anchors_window_to_n_minus_one() -> void:
+	# Simulate a session whose absolute tick counter is already high at dispatch:
+	# the first observed tick is 800. The anchor must bind to 799 so Combat sees
+	# only the (799, 800] window (one relative tick), NOT (0, 800].
+	if not _data_registry_can_resolve_classes():
+		push_warning("Skipped: DataRegistry cannot resolve classes")
+		return
+	var orch: Node = OrchestratorScript.new()
+	var combat_spy: CountingCombatResolverSpy = CountingCombatResolverSpy.new()
+	orch.set_combat_resolver(combat_spy)
+	orch.set_matchup_resolver(DefaultMatchupResolverScript.new())
+	add_child(orch)
+	auto_free(orch)
+	orch.dispatch([_make_hero("warrior", 1, 5)], 1, "forest_reach")
+
+	# Act — the FIRST observed tick is a large session-absolute value.
+	orch._on_tick_fired(800)
+
+	# Assert — exactly one Combat call, windowed to (799, 800], not (0, 800].
+	assert_int(combat_spy.call_log.size()).is_equal(1)
+	assert_int(int(combat_spy.call_log[0]["tick_lo"])).is_equal(799)
+	assert_int(int(combat_spy.call_log[0]["tick_hi"])).is_equal(800)
+
+
+func test_manual_tick_stream_from_one_still_anchors_to_zero() -> void:
+	# Drivers that fire ticks starting at n=1 (the common test pattern) must keep
+	# anchoring to 0 — the first window stays (0, 1] exactly as before the fix.
+	if not _data_registry_can_resolve_classes():
+		push_warning("Skipped: DataRegistry cannot resolve classes")
+		return
+	var orch: Node = OrchestratorScript.new()
+	var combat_spy: CountingCombatResolverSpy = CountingCombatResolverSpy.new()
+	orch.set_combat_resolver(combat_spy)
+	orch.set_matchup_resolver(DefaultMatchupResolverScript.new())
+	add_child(orch)
+	auto_free(orch)
+	orch.dispatch([_make_hero("warrior", 1, 5)], 1, "forest_reach")
+
+	orch._on_tick_fired(1)
+
+	assert_int(combat_spy.call_log.size()).is_equal(1)
+	assert_int(int(combat_spy.call_log[0]["tick_lo"])).is_equal(0)
+	assert_int(int(combat_spy.call_log[0]["tick_hi"])).is_equal(1)

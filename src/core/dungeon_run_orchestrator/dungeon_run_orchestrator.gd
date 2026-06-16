@@ -85,6 +85,13 @@ var _combat_snapshot: RefCounted = null
 var _run_won: bool = true
 var _run_defeat_tick: int = -1
 
+## CODE REVIEW 2026-06-16 (C1): true from dispatch until the first observed tick.
+## dispatch() defers the run's dispatched_at_tick anchor to the first
+## [method _on_tick_fired] so the run binds to the live, session-absolute tick
+## stream — (first_tick - 1) — instead of a hardcoded 0 that would resolve the
+## whole run on the first tick. Reset true on every dispatch.
+var _run_anchor_pending: bool = false
+
 
 # ---------------------------------------------------------------------------
 # Signals — TR-orchestrator-026, TR-orchestrator-027
@@ -925,6 +932,21 @@ func dispatch(formation: Array, floor_index: int, biome_id: String) -> void:
 	# stored cache, never re-resolve.
 	_combat_snapshot = _build_combat_snapshot(formation, floor_index, biome_id)
 	run_snapshot = _build_run_snapshot(formation, floor_index, biome_id, _combat_snapshot)
+	# CODE REVIEW 2026-06-16 (C1): defer the run's tick anchor to the FIRST observed
+	# tick. TickSystem.tick_fired carries a monotonic, session-absolute counter that
+	# is NEVER reset on dispatch. _build_*_snapshot seed dispatched_at_tick /
+	# current_tick / last_emitted_tick to 0; left at 0, the first post-dispatch
+	# _on_tick_fired(n) would feed emit_events_in_range the range (0, n] with n
+	# already in the hundreds, resolving the ENTIRE run in one tick (instant
+	# clear/defeat) and reading a garbage HP bar — only the first dispatch of a
+	# cold-launch session was ever safe. Rather than query the global counter here
+	# (which would couple every test driver to the live clock), bind the anchor
+	# lazily in _on_tick_fired to (first_tick - 1) — see that handler's anchor
+	# block. The verdict below is therefore computed with dispatched_at=0, so its
+	# defeat_tick is RELATIVE; the first-tick anchor shifts it to absolute. Mirrors
+	# the offline path's `_offline_combat_snapshot.dispatched_at_tick =
+	# _offline_replay_cursor`.
+	_run_anchor_pending = true
 	# Phase 1 (GDD #34 / ADR-0021): compute the run verdict ONCE here from the
 	# combat snapshot via the resolver's `compute_run_outcome` — the SINGLE source
 	# of truth also used by the offline batch, so foreground + offline agree by
@@ -1131,6 +1153,25 @@ func _on_tick_fired(n: int) -> void:
 		return  # Defensive: only the steady state should drive combat.
 	if run_snapshot == null:
 		return  # Snapshot not yet built (Story 004 of orchestrator epic).
+	# CODE REVIEW 2026-06-16 (C1): bind the run's tick anchor to the FIRST observed
+	# tick. dispatch() left dispatched_at/current/last_emitted at 0 and set
+	# _run_anchor_pending; anchor to (n - 1) so this first window is the half-open
+	# (n-1, n] (relative tick 1) regardless of how large the session-absolute n is.
+	# Doing it here (not at dispatch) keeps the orchestrator agnostic to the global
+	# clock value and preserves manual-tick test drivers that start at n=1 (→ anchor
+	# 0, identical to the pre-fix behavior those tests assert). compute_run_outcome
+	# ran at dispatch with dispatched_at=0, so _run_defeat_tick is RELATIVE — re-seed
+	# the snapshot's schedule anchor and shift the defeat-tick baseline by the same
+	# amount so the n >= _run_defeat_tick comparison below stays in absolute ticks.
+	if _run_anchor_pending:
+		var anchor_tick: int = n - 1
+		if _combat_snapshot != null:
+			_combat_snapshot.dispatched_at_tick = anchor_tick
+		run_snapshot.current_tick = anchor_tick
+		run_snapshot.last_emitted_tick = anchor_tick
+		if _run_defeat_tick >= 0:
+			_run_defeat_tick += anchor_tick
+		_run_anchor_pending = false
 	if n <= run_snapshot.last_emitted_tick:
 		if n < run_snapshot.last_emitted_tick:
 			push_warning(
