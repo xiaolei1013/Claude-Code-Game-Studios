@@ -68,6 +68,22 @@ var dispatched_at_tick: int = 0
 var loops_per_run: int = 0
 
 
+# --- Transient HP-curve memoization (code review 2026-06-16 / I12) ----------
+# party_hp_remaining_at is polled every 20 Hz UI tick by the dungeon-run-view.
+# The per-loop kill schedule + race arrays it needs are a pure function of this
+# (immutable) snapshot, so they are built ONCE and cached here on first use rather
+# than rebuilt (with their DataRegistry config resolves) every tick — honoring the
+# zero-alloc hot-path rule. Caching lives on the snapshot (data), NOT the resolver,
+# so the resolver stays stateless / hot-reloadable (TR-combat-001 / TR-027).
+# The arrays are RELATIVE-tick, hence invariant to dispatched_at_tick (which binds
+# lazily on tick 1, C1). Deliberately EXCLUDED from equals() — derived cache, not
+# run state.
+var hp_curve_built: bool = false
+var hp_curve_rel_death: Array[int] = []
+var hp_curve_dmg_rate: Array[float] = []
+var hp_curve_ticks_per_loop: int = 0
+
+
 ## Field-by-field equality with TR-016 dict_equals + TR-017 is_equal_approx.
 ##
 ## TR-combat-013 / TR-combat-016 / TR-combat-017 — ADR-0010

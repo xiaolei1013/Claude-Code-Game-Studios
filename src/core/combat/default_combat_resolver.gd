@@ -417,17 +417,29 @@ func party_hp_remaining_at(snapshot: CombatRunSnapshot, rel_tick: int) -> int:
 	var party_hp: int = snapshot.formation_total_hp
 	if rel_tick <= 0:
 		return party_hp
-	var schedule: Array[Dictionary] = _kill_schedule_for_loop(snapshot)
-	if schedule.is_empty():
+	# CODE REVIEW 2026-06-16 (I12): build the per-loop kill schedule + race arrays
+	# ONCE and memoize them ON THE SNAPSHOT. This method is polled every 20 Hz UI
+	# tick; rebuilding the schedule (+ its DataRegistry config resolves + transient
+	# arrays) per tick violated the zero-alloc hot-path rule. The cache lives on the
+	# immutable snapshot, NOT the resolver, so the resolver stays stateless. Only
+	# rel_tick varies between calls; the arrays are relative-tick (anchor-invariant).
+	if not snapshot.hp_curve_built:
+		var schedule: Array[Dictionary] = _kill_schedule_for_loop(snapshot)
+		var rel_death: Array[int] = []
+		var dmg_rate: Array[float] = []
+		if not schedule.is_empty():
+			_build_race_arrays(snapshot, schedule, rel_death, dmg_rate)
+		snapshot.hp_curve_rel_death = rel_death
+		snapshot.hp_curve_dmg_rate = dmg_rate
+		snapshot.hp_curve_ticks_per_loop = (rel_death[rel_death.size() - 1] if not rel_death.is_empty() else 0)
+		snapshot.hp_curve_built = true
+	if snapshot.hp_curve_rel_death.is_empty():
 		return party_hp  # No enemies → no damage → full HP.
-	var rel_death: Array[int] = []
-	var dmg_rate: Array[float] = []
-	_build_race_arrays(snapshot, schedule, rel_death, dmg_rate)
-	var ticks_per_loop: int = rel_death[rel_death.size() - 1]
+	var ticks_per_loop: int = snapshot.hp_curve_ticks_per_loop
 	if ticks_per_loop <= 0:
 		return party_hp  # Degenerate single-tick clear → no damage window.
 	var loop_tick: int = rel_tick % ticks_per_loop
-	var damage: float = _party_damage_by(loop_tick, rel_death, dmg_rate)
+	var damage: float = _party_damage_by(loop_tick, snapshot.hp_curve_rel_death, snapshot.hp_curve_dmg_rate)
 	return maxi(0, ceili(float(party_hp) - damage))
 
 

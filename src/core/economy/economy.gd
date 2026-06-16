@@ -212,6 +212,14 @@ var _fg_drip_strength_override: float = -1.0
 ## orchestrator autoload. Mirrors [member _fg_drip_floor_override]. Test-only.
 var _fg_drip_defeated_override: int = -1
 
+## CODE REVIEW 2026-06-16 (I13): cached autoload refs for the 20 Hz _on_tick hot
+## path. _on_tick did up to three /root tree queries per tick (DungeonRunOrchestrator
+## twice + HeroRoster once). Resolve lazily into these members, re-resolving only when
+## null so a late-available autoload still binds; the *_override test seams
+## short-circuit before these are ever read, so test isolation is unchanged.
+var _tick_orchestrator: Node = null
+var _tick_roster: Node = null
+
 ## Cumulative gold delta accumulated during the current offline replay window.
 ## Per ADR-0013 Amendment #1 (Sprint 11 S11-X6): when [member _is_offline_replay]
 ## is true, add_gold + try_spend + try_award_floor_clear's gold side-effects
@@ -386,7 +394,7 @@ func _on_tick(_n: int) -> void:
 	if _fg_drip_floor_override >= 0:
 		active_floor = _fg_drip_floor_override
 	elif is_inside_tree():
-		var orchestrator: Node = get_node_or_null("/root/DungeonRunOrchestrator")
+		var orchestrator: Node = _resolve_tick_orchestrator()
 		if orchestrator != null and orchestrator.has_method("get_active_floor_index"):
 			active_floor = int(orchestrator.get_active_floor_index())
 
@@ -409,7 +417,7 @@ func _on_tick(_n: int) -> void:
 	if _fg_drip_defeated_override >= 0:
 		run_is_defeated = _fg_drip_defeated_override == 1
 	elif is_inside_tree():
-		var def_orch: Node = get_node_or_null("/root/DungeonRunOrchestrator")
+		var def_orch: Node = _resolve_tick_orchestrator()
 		if def_orch != null and def_orch.has_method("is_active_run_defeated"):
 			run_is_defeated = bool(def_orch.is_active_run_defeated())
 	if run_is_defeated:
@@ -426,7 +434,7 @@ func _on_tick(_n: int) -> void:
 	if _fg_drip_strength_override >= 0.0:
 		formation_strength = _fg_drip_strength_override
 	elif is_inside_tree():
-		var roster: Node = get_node_or_null("/root/HeroRoster")
+		var roster: Node = _resolve_tick_roster()
 		if roster != null and roster.has_method("get_formation_strength"):
 			formation_strength = float(roster.get_formation_strength())
 
@@ -448,6 +456,25 @@ func _on_tick(_n: int) -> void:
 	if delta > 0:
 		add_gold(delta)
 		_fg_drip_credited = target
+
+
+## CODE REVIEW 2026-06-16 (I13): lazily resolve + cache the DungeonRunOrchestrator
+## autoload for the _on_tick hot path. Re-resolves only when the cache is null /
+## invalid, so a late-available autoload still binds and a freed node (test teardown)
+## doesn't return a stale ref.
+func _resolve_tick_orchestrator() -> Node:
+	if _tick_orchestrator == null or not is_instance_valid(_tick_orchestrator):
+		_tick_orchestrator = get_node_or_null("/root/DungeonRunOrchestrator")
+	return _tick_orchestrator
+
+
+## CODE REVIEW 2026-06-16 (I13): lazily resolve + cache the HeroRoster autoload for
+## the _on_tick hot path. Same re-resolve-when-invalid contract as
+## [method _resolve_tick_orchestrator].
+func _resolve_tick_roster() -> Node:
+	if _tick_roster == null or not is_instance_valid(_tick_roster):
+		_tick_roster = get_node_or_null("/root/HeroRoster")
+	return _tick_roster
 
 
 ## Test-only seam: inject the foreground drip inputs so [method _on_tick] can be

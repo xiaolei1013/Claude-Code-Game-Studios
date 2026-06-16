@@ -184,3 +184,30 @@ func test_refactor_preserves_compute_run_outcome_defeat() -> void:
 	var outcome: RefCounted = resolver.compute_run_outcome(_make_snapshot(50))
 	assert_bool(outcome.won).is_false()
 	assert_int(outcome.defeat_tick).is_equal(102)
+
+
+# ===========================================================================
+# Group H — code review 2026-06-16 (I12): HP-curve memoization correctness
+# ===========================================================================
+
+func test_hp_curve_cache_populates_on_first_call() -> void:
+	# I12: the per-loop schedule + race arrays are built + cached on the snapshot
+	# on first use, so the 20 Hz poll doesn't rebuild them every tick.
+	var resolver: RefCounted = DefaultCombatResolverScript.new()
+	var snap: RefCounted = _make_snapshot(100)
+	assert_bool(snap.hp_curve_built).is_false()
+	resolver.party_hp_remaining_at(snap, 1)
+	assert_bool(snap.hp_curve_built).is_true()
+	assert_bool(snap.hp_curve_rel_death.is_empty()).is_false()
+
+
+func test_hp_curve_cache_returns_identical_results_to_fresh_snapshot() -> void:
+	# The cache is a transparent memoization: a primed (cached) snapshot returns the
+	# SAME HP at every rel_tick as a fresh (uncached) snapshot — no behavior change.
+	var resolver: RefCounted = DefaultCombatResolverScript.new()
+	var cached: RefCounted = _make_snapshot(100)
+	resolver.party_hp_remaining_at(cached, 1)  # prime the cache
+	for rel_tick: int in [0, 1, 2, 3, 4, 5, 7]:
+		var fresh: RefCounted = _make_snapshot(100)
+		assert_int(resolver.party_hp_remaining_at(cached, rel_tick)) \
+			.is_equal(resolver.party_hp_remaining_at(fresh, rel_tick))
