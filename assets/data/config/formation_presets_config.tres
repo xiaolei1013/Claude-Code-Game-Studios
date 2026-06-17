@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="FormationPresetsConfig" format=3 uid="uid://cfmpresetscfg1"]
+
+[ext_resource type="Script" path="res://src/core/formation_assignment/formation_presets_config.gd" id="1_fpconf"]
+
+[resource]
+script = ExtResource("1_fpconf")
+id = "formation_presets_config"
+display_name = "Formation Presets Config"
+MAX_PRESETS_PER_PLAYER = 6
+PRESET_NAME_MAX_LENGTH = 32
+RECALL_MISSING_HERO_TOAST_CAP = 3
+DELETE_CONFIRMATION_DEFAULT_FOCUS = "cancel"

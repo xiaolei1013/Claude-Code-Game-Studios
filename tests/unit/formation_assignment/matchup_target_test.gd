@@ -132,14 +132,19 @@ func test_formation_assignment_get_target_returns_deep_copy() -> void:
 # ===========================================================================
 
 # Per the GDD design floor: _matchup_target is session-only; cold-launch
-# reads {} → formation_assignment falls back to hard-coded defaults.
+# reads no target → formation_assignment falls back to hard-coded defaults.
 func test_formation_assignment_get_save_data_does_not_persist_matchup_target() -> void:
 	var fa: Node = _make_fa()
 	fa.set_target("forest_reach", 5)
 	var save_data: Dictionary = fa.get_save_data()
-	# get_save_data returns empty per existing MVP contract; specifically,
-	# _matchup_target should NOT leak into the save namespace.
-	assert_dict(save_data).is_empty()
+	# As of Formation Presets V1.0 the namespace carries the preset envelope
+	# ("presets" + "next_preset_id"). The session-only _matchup_target must
+	# still NOT leak into it — assert each target field is absent rather than
+	# asserting the whole dict is empty.
+	assert_bool(save_data.has("biome_id")).is_false()
+	assert_bool(save_data.has("floor_index")).is_false()
+	assert_bool(save_data.has("matchup_target")).is_false()
+	assert_bool(save_data.has("target")).is_false()
 
 
 # load_save_data is a no-op per existing MVP contract; verify that calling

@@ -65,6 +65,35 @@ signal formation_reassignment_committed(new_formation: Array[HeroInstance])
 signal class_synergy_detected_signal(synergy_id: String)
 
 
+## Formation Presets V1.0 (formation-presets.md §C.5) — fired AFTER a new preset
+## is appended via [method save_preset]. UI subscribes to refresh the preset
+## dropdown. [param preset_id] is the new monotonic id (never reused);
+## [param preset_name] is the stored, post-truncation name.
+##
+## design/gdd/formation-presets.md §C.5 step 6 + AC-FP-02.
+@warning_ignore("unused_signal")
+signal preset_saved(preset_id: int, preset_name: String)
+
+## Formation Presets V1.0 (formation-presets.md §C.4) — fired AFTER a preset is
+## resolved into a positional formation via [method recall_preset]. Recall does
+## NOT mutate HeroRoster (AC-FP-04); this signal carries the resolved formation
+## for the screen's edit buffer. [param formation] is a positional Array of
+## length formation_size(); each entry is a HeroInstance or null (empty slot or
+## a hero removed since the preset was saved).
+##
+## design/gdd/formation-presets.md §C.4 + AC-FP-04 + §J Story 4.
+@warning_ignore("unused_signal")
+signal preset_recalled(preset_id: int, formation: Array)
+
+## Formation Presets V1.0 (formation-presets.md §C.6) — fired AFTER a preset is
+## removed via [method delete_preset]. UI subscribes to refresh the dropdown +
+## reset its selection to "(none)".
+##
+## design/gdd/formation-presets.md §C.6 step 3 + AC-FP-06.
+@warning_ignore("unused_signal")
+signal preset_deleted(preset_id: int)
+
+
 # ---------------------------------------------------------------------------
 # Public API — per formation-assignment-system.md §C.1
 # ---------------------------------------------------------------------------
@@ -142,28 +171,121 @@ func commit(new_formation: Array[HeroInstance]) -> void:
 
 
 # ---------------------------------------------------------------------------
-# Save/Load consumer surface — empty in MVP per Rule 10 deferral
+# Save/Load consumer surface — Formation Presets V1.0 (formation-presets.md)
 # ---------------------------------------------------------------------------
 
-## MVP: empty payload. Formation state is persisted by HeroRoster per its
-## §C Rule 10 (the formation slots are co-located with the hero list inside
-## Roster's save namespace). FormationAssignment's save namespace is reserved
-## for V1.0 features (named formation presets, formation-history undo).
+## Serializes named formation presets for the Save/Load envelope.
 ##
-## Returning {} satisfies the Save/Load consumer contract surface without
-## persisting any state.
+## Live formation SLOTS remain owned by HeroRoster (its §C Rule 10); this
+## namespace persists only the V1.0 preset list + the monotonic id counter.
+## The live current formation is NOT duplicated here.
 ##
-## formation-assignment-system.md §C.6 + §C.1 line 118.
+## Returns a JSON-safe dictionary:
+## [codeblock]
+## {
+##   "presets": [
+##     {"id": 1, "name": "Fire Team", "created_at_unix": 0, "slot_hero_ids": [12, 0, 7]},
+##     ...
+##   ],
+##   "next_preset_id": 4,
+## }
+## [/codeblock]
+##
+## Each preset is deep-copied so external mutation of the returned dict cannot
+## corrupt internal state. [code]slot_hero_ids[/code] entries are HeroInstance
+## ids or the 0 empty-slot sentinel.
+##
+## design/gdd/formation-presets.md §C.1 (schema) + §C.7 (persistence) + AC-FP-01.
 func get_save_data() -> Dictionary:
-	return {}
+	var presets_out: Array = []
+	for p: Dictionary in _presets:
+		presets_out.append({
+			"id": int(p.get("id", 0)),
+			"name": String(p.get("name", "")),
+			"created_at_unix": int(p.get("created_at_unix", 0)),
+			"slot_hero_ids": (p.get("slot_hero_ids", []) as Array).duplicate(),
+		})
+	return {
+		"presets": presets_out,
+		"next_preset_id": _next_preset_id,
+	}
 
 
-## MVP: no-op. No state to hydrate. V1.0 fills this in alongside named-preset
-## persistence.
+## Hydrates named formation presets from a Save/Load payload.
 ##
-## formation-assignment-system.md §C.6 + §C.1 line 122.
-func load_save_data(_d: Dictionary) -> void:
-	pass
+## Defensive against three real hazards:
+##   1. [b]Pre-V1.0 saves[/b] (AC-FP-09): missing keys → empty preset list +
+##      [code]next_preset_id = 1[/code]. No migration step required; the absent
+##      namespace simply hydrates to defaults.
+##   2. [b]JSON int→float round-trip[/b]: [JSON] returns every number as
+##      TYPE_FLOAT, so every id / slot id / timestamp is [code]int()[/code]-cast
+##      and reads accept both TYPE_INT and TYPE_FLOAT.
+##   3. [b]Slot-count drift[/b] (AC-FP-10): a preset whose [code]slot_hero_ids[/code]
+##      length != [code]formation_size()[/code] (e.g. saved when the formation was
+##      a different size) is discarded with a single push_warning — never loaded
+##      into a malformed state.
+##
+## [code]next_preset_id[/code] is restored to [code]max(persisted, highest loaded
+## id + 1)[/code] so the monotonic-never-reused invariant (AC-FP-08) survives even
+## a hand-edited or partially-corrupt save.
+##
+## design/gdd/formation-presets.md §C.7 + AC-FP-08 + AC-FP-09 + AC-FP-10.
+func load_save_data(d: Dictionary) -> void:
+	# Reset to pre-V1.0 defaults first; a missing/empty namespace stays here.
+	_presets = []
+	_next_preset_id = 1
+	if d == null or d.is_empty():
+		return
+
+	var size: int = _formation_size()
+	var highest_loaded_id: int = 0
+
+	var raw_presets_v: Variant = d.get("presets", [])
+	if raw_presets_v is Array:
+		for entry_v: Variant in (raw_presets_v as Array):
+			if not (entry_v is Dictionary):
+				continue
+			var entry: Dictionary = entry_v as Dictionary
+
+			# slot_hero_ids — int()-cast each element (JSON floats), guard non-Array.
+			var raw_slots_v: Variant = entry.get("slot_hero_ids", [])
+			if not (raw_slots_v is Array):
+				push_warning(
+					"[FormationAssignment] load_save_data: preset id %s has non-Array slot_hero_ids; discarded"
+					% str(entry.get("id", "?"))
+				)
+				continue
+			var slots: Array[int] = []
+			for s_v: Variant in (raw_slots_v as Array):
+				slots.append(int(s_v) if (s_v is int or s_v is float) else 0)
+
+			# AC-FP-10: discard presets whose slot count drifted from formation_size().
+			if slots.size() != size:
+				push_warning(
+					"[FormationAssignment] load_save_data: discarding preset '%s' (id %s): slot_hero_ids length %d != formation_size %d"
+					% [str(entry.get("name", "?")), str(entry.get("id", "?")), slots.size(), size]
+				)
+				continue
+
+			var pid: int = int(entry.get("id", 0)) if _is_number(entry.get("id", 0)) else 0
+			var name_v: Variant = entry.get("name", "")
+			var pname: String = String(name_v) if name_v is String else ""
+			var created_v: Variant = entry.get("created_at_unix", 0)
+			var created: int = int(created_v) if _is_number(created_v) else 0
+
+			_presets.append({
+				"id": pid,
+				"name": pname,
+				"created_at_unix": created,
+				"slot_hero_ids": slots,
+			})
+			if pid > highest_loaded_id:
+				highest_loaded_id = pid
+
+	# Restore the monotonic counter; never below highest loaded id + 1, never < 1.
+	var raw_next_v: Variant = d.get("next_preset_id", 0)
+	var next_from_save: int = int(raw_next_v) if _is_number(raw_next_v) else 0
+	_next_preset_id = maxi(maxi(next_from_save, highest_loaded_id + 1), 1)
 
 
 # ---------------------------------------------------------------------------
@@ -428,3 +550,312 @@ func notify_synergy_detected(synergy_id: String) -> void:
 	if synergy_id == "":
 		return
 	class_synergy_detected_signal.emit(synergy_id)
+
+
+# ===========================================================================
+# Formation Presets V1.0 (design/gdd/formation-presets.md, GDD #33)
+#
+# Lets the player save / name / recall up to MAX_PRESETS_PER_PLAYER 3-slot
+# formation lineups. This autoload owns the preset DATA + persistence; the
+# PresetsRow UI (separate story) drives it through the public API below.
+#
+# Encapsulation contract (AC-FP-12): _presets and _next_preset_id are private.
+# All access goes through save_preset / recall_preset / delete_preset /
+# get_presets — enforced by formation_presets_encapsulation_ci_grep_test.gd.
+# ===========================================================================
+
+## DataRegistry category + id for the tuning-knob resource (ADR-0006 boot-scan).
+const _CONFIG_CATEGORY: String = "config"
+const _CONFIG_ID: String = "formation_presets_config"
+
+## Safe defaults used when DataRegistry resolution fails (e.g. early-sprint
+## ERROR state, or the .tres is missing). MUST mirror
+## assets/data/config/formation_presets_config.tres so behaviour is identical
+## whether the config resolves or not. design/gdd/formation-presets.md §G.
+const _FALLBACK_MAX_PRESETS_PER_PLAYER: int = 6
+const _FALLBACK_PRESET_NAME_MAX_LENGTH: int = 32
+const _FALLBACK_RECALL_MISSING_HERO_TOAST_CAP: int = 3
+const _FALLBACK_DELETE_CONFIRMATION_DEFAULT_FOCUS: String = "cancel"
+
+## Last-resort formation size used only when HeroRoster is unreachable at
+## load time (mirrors HeroRoster._FALLBACK_FORMATION_SIZE). Drives the
+## AC-FP-10 slot-count validation.
+const _FALLBACK_FORMATION_SIZE: int = 3
+
+## Resolved FormationPresetsConfig (null until _load_config runs / on failure).
+var _presets_config: Resource = null
+
+## The saved presets, in insertion order. Each entry is a Dictionary of shape
+## {id:int, name:String, created_at_unix:int, slot_hero_ids:Array[int]}.
+## PRIVATE — see the encapsulation contract above.
+var _presets: Array[Dictionary] = []
+
+## Monotonic id counter. The id of the NEXT preset to be created; never reused,
+## never decremented on delete (AC-FP-08). Starts at 1.
+var _next_preset_id: int = 1
+
+## Test seam (dependency injection). When set, [method recall_preset] and the
+## load-time formation-size check resolve heroes / size through this node
+## instead of the live [code]/root/HeroRoster[/code] autoload, so preset tests
+## stay isolated from live roster + save state. Production leaves this null.
+var _roster_override: Node = null
+
+
+func _ready() -> void:
+	_load_config()
+
+
+## Resolves the FormationPresetsConfig from DataRegistry. On any failure the
+## autoload keeps its [code]_FALLBACK_*[/code] safe defaults (graceful
+## degradation per engine-code rules). design/gdd/formation-presets.md §G.
+func _load_config() -> void:
+	var registry: Node = get_node_or_null("/root/DataRegistry")
+	if registry == null or not registry.has_method("resolve"):
+		return  # No registry (e.g. isolated test) — keep fallback consts.
+	var resolved: Resource = registry.call("resolve", _CONFIG_CATEGORY, _CONFIG_ID)
+	_apply_resolved_config(resolved)
+
+
+## Validates and applies a resolved config resource. Returns true if applied,
+## false if rejected (and fallback consts are retained). Mirrors the
+## HeroRoster._apply_resolved_config 4-branch guard so behaviour is uniform
+## across config consumers. Public-ish so tests can drive the branches with a
+## stub resource without booting DataRegistry.
+func _apply_resolved_config(resolved: Resource) -> bool:
+	# Branch 1: null — DataRegistry miss (ERROR state / absent file). Keep defaults.
+	if resolved == null:
+		return false
+	# Branch 2: wrong schema — duck-type the required knobs before trusting it.
+	if not ("MAX_PRESETS_PER_PLAYER" in resolved and "PRESET_NAME_MAX_LENGTH" in resolved):
+		push_error(
+			"[FormationAssignment] resolved config lacks FormationPresetsConfig schema; using fallback defaults"
+		)
+		return false
+	# Branch 3: present but invalid — run the resource's own _validate().
+	if resolved.has_method("_validate"):
+		var errors: Array = resolved.call("_validate")
+		if not errors.is_empty():
+			push_error(
+				"[FormationAssignment] FormationPresetsConfig validation failed: %s; using fallback defaults"
+				% ", ".join(errors)
+			)
+			return false
+	# Branch 4: valid — adopt it.
+	_presets_config = resolved
+	return true
+
+
+# ---------------------------------------------------------------------------
+# Config accessors — resolve from _presets_config, fall back to consts.
+# ---------------------------------------------------------------------------
+
+## Hard cap on saved presets (formation-presets.md §C.2 + §G).
+func max_presets() -> int:
+	if _presets_config != null and "MAX_PRESETS_PER_PLAYER" in _presets_config:
+		return int(_presets_config.get("MAX_PRESETS_PER_PLAYER"))
+	return _FALLBACK_MAX_PRESETS_PER_PLAYER
+
+
+## Maximum preset-name length in characters (formation-presets.md §C.1 + §G).
+func preset_name_max_length() -> int:
+	if _presets_config != null and "PRESET_NAME_MAX_LENGTH" in _presets_config:
+		return int(_presets_config.get("PRESET_NAME_MAX_LENGTH"))
+	return _FALLBACK_PRESET_NAME_MAX_LENGTH
+
+
+## Cap on missing-hero toasts per recall (formation-presets.md §C.4 + §G).
+func recall_missing_hero_toast_cap() -> int:
+	if _presets_config != null and "RECALL_MISSING_HERO_TOAST_CAP" in _presets_config:
+		return int(_presets_config.get("RECALL_MISSING_HERO_TOAST_CAP"))
+	return _FALLBACK_RECALL_MISSING_HERO_TOAST_CAP
+
+
+## Default-focused button in the delete-confirm modal (formation-presets.md §C.6 + §G).
+func delete_confirmation_default_focus() -> String:
+	if _presets_config != null and "DELETE_CONFIRMATION_DEFAULT_FOCUS" in _presets_config:
+		return String(_presets_config.get("DELETE_CONFIRMATION_DEFAULT_FOCUS"))
+	return _FALLBACK_DELETE_CONFIRMATION_DEFAULT_FOCUS
+
+
+# ---------------------------------------------------------------------------
+# Public preset API
+# ---------------------------------------------------------------------------
+
+## Saves a new named preset from a formation snapshot.
+##
+## The caller supplies the snapshot (typically
+## [code]HeroRoster.get_formation_slot(i)[/code] for each slot) and an optional
+## informational [param created_at_unix] timestamp — keeping this method pure
+## and deterministic for tests (no wall-clock read inside).
+##
+## Validation (formation-presets.md §C.5):
+##   - [param preset_name] is stripped; an empty result is REJECTED → returns 0.
+##   - A name longer than [method preset_name_max_length] is TRUNCATED (not
+##     rejected) to that many characters, then saved.
+##   - If the preset count is already at [method max_presets], the save is
+##     REJECTED → returns 0 (no silent overwrite, no auto-rotation).
+##
+## On success: appends the preset, advances the monotonic id counter, emits
+## [signal preset_saved], and returns the new id (always > 0).
+##
+## [b]Example[/b]
+## [codeblock]
+## var slots: Array[int] = [roster.get_formation_slot(0), roster.get_formation_slot(1), roster.get_formation_slot(2)]
+## var id := fa.save_preset("Fire Team", slots)
+## if id == 0:
+##     show_toast("Couldn't save — name empty or preset list full")
+## [/codeblock]
+##
+## design/gdd/formation-presets.md §C.5 + AC-FP-02 + AC-FP-03 + AC-FP-08.
+func save_preset(preset_name: String, slot_hero_ids: Array[int], created_at_unix: int = 0) -> int:
+	# §C.5 step 1: validate name. Empty (after strip) → reject.
+	var clean_name: String = preset_name.strip_edges()
+	if clean_name == "":
+		push_warning("[FormationAssignment] save_preset: empty name rejected; no preset saved")
+		return 0
+	# Over max length → truncate (char-accurate; Godot String is UTF-32 internally).
+	var max_len: int = preset_name_max_length()
+	if clean_name.length() > max_len:
+		clean_name = clean_name.substr(0, max_len)
+
+	# §C.5 step 2: validate cap.
+	if _presets.size() >= max_presets():
+		push_warning(
+			"[FormationAssignment] save_preset: preset cap (%d) reached; '%s' not saved"
+			% [max_presets(), clean_name]
+		)
+		return 0
+
+	# §C.5 steps 3-4: copy the snapshot defensively into a typed array.
+	var slots_copy: Array[int] = []
+	for s: int in slot_hero_ids:
+		slots_copy.append(s)
+
+	# §C.5 step 5: construct + append, then advance the monotonic counter.
+	var new_id: int = _next_preset_id
+	_presets.append({
+		"id": new_id,
+		"name": clean_name,
+		"created_at_unix": created_at_unix,
+		"slot_hero_ids": slots_copy,
+	})
+	_next_preset_id += 1
+
+	# §C.5 step 6: emit.
+	preset_saved.emit(new_id, clean_name)
+	return new_id
+
+
+## Resolves a saved preset into a positional formation WITHOUT mutating the
+## roster (AC-FP-04). The UI takes the returned array into its edit buffer and
+## only writes through [method commit] when the player confirms.
+##
+## Returns a positional [Array] of length [method _formation_size]; each entry
+## is the live [HeroInstance] for that slot's saved id, or [code]null[/code]
+## when the slot was empty (the 0 sentinel) or the referenced hero no longer
+## exists (dismissed / prestiged since the preset was saved — §J Story 4).
+## The UI surfaces a missing-hero toast for the nulls, capped by
+## [method recall_missing_hero_toast_cap].
+##
+## An unknown [param preset_id] returns an empty [Array] (and warns) so the
+## caller can no-op gracefully.
+##
+## design/gdd/formation-presets.md §C.4 + AC-FP-04 + AC-FP-05.
+func recall_preset(preset_id: int) -> Array:
+	var preset: Dictionary = _find_preset(preset_id)
+	if preset.is_empty():
+		push_warning(
+			"[FormationAssignment] recall_preset: no preset with id %d; returning empty formation"
+			% preset_id
+		)
+		return []
+
+	var roster: Node = _roster()
+	var can_resolve: bool = roster != null and roster.has_method("get_hero_by_id")
+	var slots: Array = preset.get("slot_hero_ids", []) as Array
+	var formation: Array = []  # positional; HeroInstance or null per slot
+	for slot_id_v: Variant in slots:
+		var slot_id: int = int(slot_id_v)
+		if slot_id == 0 or not can_resolve:
+			formation.append(null)
+			continue
+		# get_hero_by_id returns the HeroInstance, or null if it no longer exists.
+		formation.append(roster.call("get_hero_by_id", slot_id))
+
+	# AC-FP-04: NO roster write here — recall only populates the edit buffer.
+	preset_recalled.emit(preset_id, formation)
+	return formation
+
+
+## Deletes the preset with [param preset_id]. Returns true if one was removed,
+## false if no preset had that id.
+##
+## Per §C.6 the monotonic [member _next_preset_id] is NOT decremented — ids are
+## never reused, so a later save still gets a fresh id (AC-FP-08). Emits
+## [signal preset_deleted] on success.
+##
+## design/gdd/formation-presets.md §C.6 + AC-FP-06 + AC-FP-08.
+func delete_preset(preset_id: int) -> bool:
+	for i: int in range(_presets.size()):
+		if int(_presets[i].get("id", 0)) == preset_id:
+			_presets.remove_at(i)
+			preset_deleted.emit(preset_id)
+			return true
+	push_warning("[FormationAssignment] delete_preset: no preset with id %d" % preset_id)
+	return false
+
+
+## Returns a deep copy of all presets in insertion order, so callers can read
+## (and freely mutate their copy) without touching internal state — the
+## encapsulation contract (AC-FP-12). Each entry mirrors the §C.1 schema.
+##
+## design/gdd/formation-presets.md §C.1 + AC-FP-12.
+func get_presets() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for p: Dictionary in _presets:
+		out.append({
+			"id": int(p.get("id", 0)),
+			"name": String(p.get("name", "")),
+			"created_at_unix": int(p.get("created_at_unix", 0)),
+			"slot_hero_ids": (p.get("slot_hero_ids", []) as Array).duplicate(),
+		})
+	return out
+
+
+# ---------------------------------------------------------------------------
+# Private helpers
+# ---------------------------------------------------------------------------
+
+## Returns the stored preset dict for [param preset_id], or an empty dict if
+## none matches. Returns the LIVE internal dict (not a copy) — callers within
+## this file must not leak it past their scope.
+func _find_preset(preset_id: int) -> Dictionary:
+	for p: Dictionary in _presets:
+		if int(p.get("id", 0)) == preset_id:
+			return p
+	return {}
+
+
+## Current formation size, resolved from HeroRoster (or the test seam), falling
+## back to [constant _FALLBACK_FORMATION_SIZE] when the roster is unreachable
+## (e.g. load_save_data running in an isolated test before a roster exists).
+func _formation_size() -> int:
+	var roster: Node = _roster()
+	if roster != null and roster.has_method("formation_size"):
+		return int(roster.call("formation_size"))
+	return _FALLBACK_FORMATION_SIZE
+
+
+## Resolves the HeroRoster node — the injected [member _roster_override] when
+## set (tests), else the live [code]/root/HeroRoster[/code] autoload.
+func _roster() -> Node:
+	if _roster_override != null:
+		return _roster_override
+	return get_node_or_null("/root/HeroRoster")
+
+
+## True when [param v] is a JSON-safe number (TYPE_INT or TYPE_FLOAT). Used to
+## guard [code]int()[/code] casts on untyped save-dict reads — a present-but-null
+## value would otherwise crash the cast (project memory: dict-get null passthrough).
+func _is_number(v: Variant) -> bool:
+	return v is int or v is float
