@@ -11,7 +11,7 @@
 #   D — commit() emits AFTER writes (signal-after-mutation invariant per §D)
 #   E — commit() length validation (mismatch → no write, no emit)
 #   F — empty/null formation handling
-#   G — Save/Load consumer surface (empty payload + no-op load)
+#   G — Save/Load consumer surface (preset envelope shape + default hydration)
 #   H — autoload presence check (live /root/FormationAssignment present)
 extends GdUnitTestSuite
 
@@ -106,29 +106,41 @@ func test_browse_is_idempotent_two_calls_emit_twice() -> void:
 
 
 # ===========================================================================
-# Group G — Save/Load consumer surface
+# Group G — Save/Load consumer surface (Formation Presets V1.0)
+#
+# As of formation-presets.md the namespace persists the named-preset list +
+# the monotonic id counter. A FRESH instance serializes to the empty-but-shaped
+# default payload; detailed preset persistence is covered in
+# formation_presets_test.gd. These tests lock the envelope SHAPE + defaults.
 # ===========================================================================
 
-func test_get_save_data_returns_empty_dict_per_mvp_rule_10_deferral() -> void:
-	# Per §C.6: MVP empty payload. Formation state lives in HeroRoster's
-	# save namespace; FormationAssignment's namespace is reserved for V1.0
-	# named-preset features.
+func test_get_save_data_returns_default_preset_envelope() -> void:
+	# §C.7: fresh instance → empty preset list + initial monotonic id.
 	var fa: Node = _make_fa()
 	var data: Dictionary = fa.get_save_data()
-	assert_int(data.size()).is_equal(0)
+	assert_bool(data.has("presets")).is_true()
+	assert_bool(data.has("next_preset_id")).is_true()
+	assert_array(data["presets"]).is_empty()
+	assert_int(data["next_preset_id"]).is_equal(1)
 
 
-func test_load_save_data_with_empty_dict_is_noop() -> void:
+func test_load_save_data_with_empty_dict_hydrates_defaults() -> void:
+	# Empty payload (pre-V1.0 save) → defaults, no crash, no push_error.
 	var fa: Node = _make_fa()
-	# Should not crash; should not push_error.
 	fa.load_save_data({})
+	var data: Dictionary = fa.get_save_data()
+	assert_array(data["presets"]).is_empty()
+	assert_int(data["next_preset_id"]).is_equal(1)
 
 
-func test_load_save_data_with_non_empty_dict_is_noop_per_v1_0_reservation() -> void:
-	# Future-V1.0 saves with named-preset data are loaded by future
-	# FormationAssignment versions; current MVP code ignores the payload.
+func test_load_save_data_ignores_unknown_keys_and_keeps_defaults() -> void:
+	# A payload lacking the "presets"/"next_preset_id" keys (e.g. a pre-V1.0
+	# save, or an unrelated namespace) hydrates to defaults per AC-FP-09.
 	var fa: Node = _make_fa()
-	fa.load_save_data({"v1_0_named_presets": [{"name": "Tank", "slots": [1, 2, 3]}]})
+	fa.load_save_data({"v0_legacy_key": [{"name": "Tank", "slots": [1, 2, 3]}]})
+	var data: Dictionary = fa.get_save_data()
+	assert_array(data["presets"]).is_empty()
+	assert_int(data["next_preset_id"]).is_equal(1)
 
 
 # ===========================================================================
