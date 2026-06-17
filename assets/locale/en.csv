@@ -90,3 +90,11 @@ synergy_tier_gold,Gold
 synergy_tier_platinum,Platinum
 synergy_preview_tiered_format,Synergy: %s (%s)
 synergy_preview_tiered_format_with_effect,Synergy: %s (%s) — %s
+formation_presets_none_option,(none)
+formation_presets_saved_toast,Formation saved.
+formation_presets_truncated_toast,Name shortened to fit.
+formation_presets_at_cap_toast,You've saved the most formations you can. Delete one to make room.
+formation_presets_name_empty_toast,Enter a name for this formation.
+formation_presets_missing_toast,%d saved hero(es) are no longer in your guild — those slots are empty.
+formation_presets_recall_unknown_toast,That formation is no longer available.
+formation_presets_deleted_toast,Formation deleted.

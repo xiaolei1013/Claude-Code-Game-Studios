@@ -117,6 +117,23 @@ var _synergy_badge_tween: Tween = null
 @onready var _floor_picker_cancel_button: Button = $FloorPickerOverlay/PickerPanel/PickerContent/PickerHeader/PickerCancelButton
 @onready var _floor_picker_select_button: Button = $FloorPickerOverlay/PickerPanel/PickerContent/PickerSelectButton
 
+# Formation Presets (GDD #33, PR #2) — PresetsRow + the two confirm modals.
+# Wire to the merged FormationAssignment public API only (save_preset /
+# recall_preset / delete_preset / get_presets + config accessors); NEVER touch
+# the private _presets/_next_preset_id (AC-FP-12 CI grep would fail).
+@onready var _presets_panel: PanelContainer = $PresetsPanel
+@onready var _preset_dropdown: OptionButton = $PresetsPanel/PresetsVBox/PresetsRow/PresetDropdown
+@onready var _preset_recall_button: Button = $PresetsPanel/PresetsVBox/PresetsRow/PresetRecallButton
+@onready var _preset_save_button: Button = $PresetsPanel/PresetsVBox/PresetsRow/PresetSaveButton
+@onready var _preset_delete_button: Button = $PresetsPanel/PresetsVBox/PresetsRow/PresetDeleteButton
+@onready var _preset_save_modal: Control = $PresetSaveModal
+@onready var _preset_name_line_edit: LineEdit = $PresetSaveModal/SavePanel/SaveContent/PresetNameLineEdit
+@onready var _preset_save_confirm_button: Button = $PresetSaveModal/SavePanel/SaveContent/SaveButtonRow/SaveConfirmButton
+@onready var _preset_save_cancel_button: Button = $PresetSaveModal/SavePanel/SaveContent/SaveButtonRow/SaveCancelButton
+@onready var _preset_delete_modal: Control = $PresetDeleteModal
+@onready var _preset_delete_confirm_button: Button = $PresetDeleteModal/DeletePanel/DeleteContent/DeleteButtonRow/DeleteConfirmButton
+@onready var _preset_delete_cancel_button: Button = $PresetDeleteModal/DeletePanel/DeleteContent/DeleteButtonRow/DeleteCancelButton
+
 # Floor Picker cached state — built in _show_floor_picker from DataRegistry.
 var _fp_biomes: Array[Resource] = []
 var _fp_floors_by_biome: Dictionary = {}  # biome_id (String) → Array[Resource] sorted by floor_index
@@ -165,6 +182,18 @@ const MID_RUN_REASSIGN_WARNING_ENABLED: bool = true
 ## consumes them; _on_reassign_cancel_pressed clears them.
 var _pending_reassign_hero_id: int = 0
 var _pending_reassign_slot_index: int = -1
+
+## GDD #33 (Formation Presets, PR #2): the dropdown's currently-selected preset
+## id. 0 == the "(none)" placeholder. Drives Recall/Delete button visibility and
+## is the preset Recall/Delete act upon.
+var _selected_preset_id: int = 0
+
+## When a Recall is deferred for mid-run confirmation (§C.7 / AC-FP-11), the
+## resolved positional formation (length == formation_size(), HeroInstance-or-null
+## per slot) is stashed here. A NON-EMPTY array means a recall is pending — the
+## reassign confirm/cancel handlers branch on this BEFORE the single-hero
+## _pending_reassign_* path. The two pending states are never both set.
+var _pending_recall_formation: Array[HeroInstance] = []
 
 # ---------------------------------------------------------------------------
 # Built-in lifecycle (_ready — tap-target enforcement)
@@ -229,6 +258,19 @@ func _ready() -> void:
 	UIFrameworkScript.wire_touch_feedback(_floor_button)
 	UIFrameworkScript.wire_touch_feedback(_back_button)
 
+	# GDD #33 (Formation Presets, PR #2): parchment framing on the presets panel +
+	# touch-feedback pulses on the seven static preset/modal buttons. Wired once in
+	# _ready (these are .tscn-defined, not refresh-rebuilt); wire_touch_feedback is
+	# idempotent via its meta sentinel. The name LineEdit deliberately gets no pulse.
+	UIFrameworkScript.apply_parchment_panel($PresetsPanel)
+	UIFrameworkScript.wire_touch_feedback(_preset_recall_button)
+	UIFrameworkScript.wire_touch_feedback(_preset_save_button)
+	UIFrameworkScript.wire_touch_feedback(_preset_delete_button)
+	UIFrameworkScript.wire_touch_feedback(_preset_save_confirm_button)
+	UIFrameworkScript.wire_touch_feedback(_preset_save_cancel_button)
+	UIFrameworkScript.wire_touch_feedback(_preset_delete_confirm_button)
+	UIFrameworkScript.wire_touch_feedback(_preset_delete_cancel_button)
+
 
 # ---------------------------------------------------------------------------
 # Screen lifecycle hooks (ADR-0007 — all four MUST be declared)
@@ -286,9 +328,37 @@ func on_enter() -> void:
 	if FloorUnlock.has_signal("biome_unlocked") and not FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked):
 		FloorUnlock.biome_unlocked.connect(_on_biome_unlocked)
 
+	# GDD #33 (Formation Presets, PR #2): subscribe to the preset lifecycle signals
+	# + wire the PresetsRow / modal buttons + the dropdown selection. preset_saved
+	# and preset_deleted emit SYNCHRONOUSLY from save_preset()/delete_preset(), so
+	# the dropdown rebuilds during those calls (carrying the new/cleared selection).
+	# There is no preset_recalled subscription — the recall handler owns the mid-run
+	# gate flow and refreshes panels itself. All guards idempotent; mirrored in on_exit.
+	if not FormationAssignment.preset_saved.is_connected(_on_preset_saved):
+		FormationAssignment.preset_saved.connect(_on_preset_saved)
+	if not FormationAssignment.preset_deleted.is_connected(_on_preset_deleted):
+		FormationAssignment.preset_deleted.connect(_on_preset_deleted)
+	if not _preset_dropdown.item_selected.is_connected(_on_preset_selected):
+		_preset_dropdown.item_selected.connect(_on_preset_selected)
+	if not _preset_recall_button.pressed.is_connected(_on_preset_recall_button_pressed):
+		_preset_recall_button.pressed.connect(_on_preset_recall_button_pressed)
+	if not _preset_save_button.pressed.is_connected(_on_preset_save_button_pressed):
+		_preset_save_button.pressed.connect(_on_preset_save_button_pressed)
+	if not _preset_delete_button.pressed.is_connected(_on_preset_delete_button_pressed):
+		_preset_delete_button.pressed.connect(_on_preset_delete_button_pressed)
+	if not _preset_save_confirm_button.pressed.is_connected(_on_preset_save_confirm_pressed):
+		_preset_save_confirm_button.pressed.connect(_on_preset_save_confirm_pressed)
+	if not _preset_save_cancel_button.pressed.is_connected(_on_preset_save_cancel_pressed):
+		_preset_save_cancel_button.pressed.connect(_on_preset_save_cancel_pressed)
+	if not _preset_delete_confirm_button.pressed.is_connected(_on_preset_delete_confirm_pressed):
+		_preset_delete_confirm_button.pressed.connect(_on_preset_delete_confirm_pressed)
+	if not _preset_delete_cancel_button.pressed.is_connected(_on_preset_delete_cancel_pressed):
+		_preset_delete_cancel_button.pressed.connect(_on_preset_delete_cancel_pressed)
+
 	# Initial render from current game state.
 	_refresh_roster_panel()
 	_refresh_formation_panel()
+	_rebuild_preset_dropdown()
 
 	# S15-M1 (AC-FA-12): fire the read-intent informational signal so any
 	# subscribers (currently UI consumers only — DungeonRunOrchestrator
@@ -351,6 +421,28 @@ func on_exit() -> void:
 		FloorUnlock.floor_unlocked.disconnect(_on_floor_unlocked)
 	if FloorUnlock.has_signal("biome_unlocked") and FloorUnlock.biome_unlocked.is_connected(_on_biome_unlocked):
 		FloorUnlock.biome_unlocked.disconnect(_on_biome_unlocked)
+
+	# GDD #33 (Formation Presets, PR #2): mirror the preset signal/button wiring.
+	if FormationAssignment.preset_saved.is_connected(_on_preset_saved):
+		FormationAssignment.preset_saved.disconnect(_on_preset_saved)
+	if FormationAssignment.preset_deleted.is_connected(_on_preset_deleted):
+		FormationAssignment.preset_deleted.disconnect(_on_preset_deleted)
+	if _preset_dropdown != null and _preset_dropdown.item_selected.is_connected(_on_preset_selected):
+		_preset_dropdown.item_selected.disconnect(_on_preset_selected)
+	if _preset_recall_button != null and _preset_recall_button.pressed.is_connected(_on_preset_recall_button_pressed):
+		_preset_recall_button.pressed.disconnect(_on_preset_recall_button_pressed)
+	if _preset_save_button != null and _preset_save_button.pressed.is_connected(_on_preset_save_button_pressed):
+		_preset_save_button.pressed.disconnect(_on_preset_save_button_pressed)
+	if _preset_delete_button != null and _preset_delete_button.pressed.is_connected(_on_preset_delete_button_pressed):
+		_preset_delete_button.pressed.disconnect(_on_preset_delete_button_pressed)
+	if _preset_save_confirm_button != null and _preset_save_confirm_button.pressed.is_connected(_on_preset_save_confirm_pressed):
+		_preset_save_confirm_button.pressed.disconnect(_on_preset_save_confirm_pressed)
+	if _preset_save_cancel_button != null and _preset_save_cancel_button.pressed.is_connected(_on_preset_save_cancel_pressed):
+		_preset_save_cancel_button.pressed.disconnect(_on_preset_save_cancel_pressed)
+	if _preset_delete_confirm_button != null and _preset_delete_confirm_button.pressed.is_connected(_on_preset_delete_confirm_pressed):
+		_preset_delete_confirm_button.pressed.disconnect(_on_preset_delete_confirm_pressed)
+	if _preset_delete_cancel_button != null and _preset_delete_cancel_button.pressed.is_connected(_on_preset_delete_cancel_pressed):
+		_preset_delete_cancel_button.pressed.disconnect(_on_preset_delete_cancel_pressed)
 
 	# Kill any in-flight toast tween to avoid modulating a freed node.
 	if _toast_tween != null and _toast_tween.is_valid():
@@ -640,25 +732,265 @@ func _apply_hero_commit(hero_id: int, slot_index: int) -> void:
 	UIFrameworkScript.suppress_keyboard_focus(self)
 
 
-## Confirm button on the mid-run reassignment dialog. Consumes the pending
-## tap, runs the commit (which triggers run-end + restart per ADR-0001),
-## hides the dialog.
+## Confirm button on the mid-run reassignment dialog. Two pending paths share
+## this dialog (never both set at once):
+##   1. Preset recall (GDD #33 / AC-FP-11): a NON-EMPTY _pending_recall_formation
+##      is applied via _apply_recall_commit and takes priority.
+##   2. Single-hero tap (S15-M2): consumes _pending_reassign_* and commits.
+## Either commit triggers run-end + restart per ADR-0001. Hides the dialog.
 func _on_reassign_confirm_pressed() -> void:
+	_reassign_confirm_root.visible = false
+	if not _pending_recall_formation.is_empty():
+		var formation: Array[HeroInstance] = _pending_recall_formation
+		_pending_recall_formation = []
+		_apply_recall_commit(formation)
+		return
 	var hero_id: int = _pending_reassign_hero_id
 	var slot_index: int = _pending_reassign_slot_index
 	_pending_reassign_hero_id = 0
 	_pending_reassign_slot_index = -1
-	_reassign_confirm_root.visible = false
 	if hero_id != 0 and slot_index >= 0:
 		_apply_hero_commit(hero_id, slot_index)
 
 
-## Cancel button on the mid-run reassignment dialog. Discards the pending
-## tap; no signal emit; the run continues unaffected.
+## Cancel button on the mid-run reassignment dialog. Discards BOTH pending
+## paths (single-hero tap and preset recall); no signal emit; the run continues
+## unaffected.
 func _on_reassign_cancel_pressed() -> void:
 	_pending_reassign_hero_id = 0
 	_pending_reassign_slot_index = -1
+	_pending_recall_formation = []
 	_reassign_confirm_root.visible = false
+
+
+# ---------------------------------------------------------------------------
+# Formation Presets (GDD #33, PR #2) — dropdown, Save/Recall/Delete + modals
+# ---------------------------------------------------------------------------
+
+## Rebuilds the preset dropdown from FormationAssignment.get_presets(). Item 0
+## is always the "(none)" placeholder (preset id 0); each saved preset is added
+## with its real id as the OptionButton item id. [param keep_selected_id] re-selects
+## that preset if it still exists (used after a save to land on the new preset);
+## 0 resets to "(none)" (used after a delete). OptionButton.select() does NOT emit
+## item_selected, so this never re-enters _on_preset_selected.
+func _rebuild_preset_dropdown(keep_selected_id: int = 0) -> void:
+	if _preset_dropdown == null:
+		return
+	_preset_dropdown.clear()
+	_preset_dropdown.add_item(tr("formation_presets_none_option"), 0)
+	var presets: Array[Dictionary] = FormationAssignment.get_presets()
+	var select_index: int = 0
+	for preset: Dictionary in presets:
+		var pid: int = int(preset.get("id", 0))
+		_preset_dropdown.add_item(String(preset.get("name", "")), pid)
+		if pid == keep_selected_id and keep_selected_id != 0:
+			select_index = _preset_dropdown.get_item_count() - 1
+	_preset_dropdown.select(select_index)
+	_selected_preset_id = _preset_dropdown.get_item_id(select_index)
+	_update_preset_button_visibility()
+
+
+## Recall + Delete only make sense once a real preset (id != 0) is selected.
+func _update_preset_button_visibility() -> void:
+	var has_selection: bool = _selected_preset_id != 0
+	if _preset_recall_button != null:
+		_preset_recall_button.visible = has_selection
+	if _preset_delete_button != null:
+		_preset_delete_button.visible = has_selection
+
+
+## Player picked a dropdown row. Tracks the selection + toggles button visibility.
+func _on_preset_selected(index: int) -> void:
+	if _preset_dropdown == null:
+		return
+	_selected_preset_id = _preset_dropdown.get_item_id(index)
+	_update_preset_button_visibility()
+
+
+## preset_saved fires synchronously from save_preset(); land the dropdown on the
+## new preset.
+func _on_preset_saved(preset_id: int, _preset_name: String) -> void:
+	_rebuild_preset_dropdown(preset_id)
+
+
+## preset_deleted fires synchronously from delete_preset(); reset to "(none)".
+func _on_preset_deleted(_preset_id: int) -> void:
+	_rebuild_preset_dropdown(0)
+
+
+## Save button: cap-guard first (a friendly toast beats a silent no-op), then
+## open the name modal.
+func _on_preset_save_button_pressed() -> void:
+	if FormationAssignment.get_presets().size() >= FormationAssignment.max_presets():
+		_show_toast(tr("formation_presets_at_cap_toast"))
+		return
+	_show_preset_save_modal()
+
+
+func _show_preset_save_modal() -> void:
+	if _preset_save_modal == null:
+		return
+	if _preset_name_line_edit != null:
+		_preset_name_line_edit.text = ""
+	_preset_save_modal.visible = true
+	# LineEdit keeps FOCUS_ALL (suppress_keyboard_focus only neutralizes
+	# BaseButtons), so grab_focus raises the virtual keyboard on touch/Steam Deck.
+	if _preset_name_line_edit != null:
+		_preset_name_line_edit.grab_focus()
+
+
+func _hide_preset_save_modal() -> void:
+	if _preset_save_modal != null:
+		_preset_save_modal.visible = false
+
+
+func _on_preset_save_cancel_pressed() -> void:
+	_hide_preset_save_modal()
+
+
+## Snapshots the CURRENT formation slot ids and saves them under the typed name.
+## Empty name → toast + keep the modal open. The autoload truncates names over
+## preset_name_max_length(); we surface that with a "shortened" toast. Dropdown
+## refresh happens via the preset_saved signal (fires inside save_preset()).
+func _on_preset_save_confirm_pressed() -> void:
+	var raw_name: String = ""
+	if _preset_name_line_edit != null:
+		raw_name = _preset_name_line_edit.text
+	var trimmed: String = raw_name.strip_edges()
+	if trimmed.is_empty():
+		_show_toast(tr("formation_presets_name_empty_toast"))
+		return
+	var was_truncated: bool = trimmed.length() > FormationAssignment.preset_name_max_length()
+	var slot_ids: Array[int] = []
+	var fsize: int = HeroRoster.formation_size()
+	slot_ids.resize(fsize)
+	for i: int in range(fsize):
+		slot_ids[i] = HeroRoster.get_formation_slot(i)
+	var new_id: int = FormationAssignment.save_preset(trimmed, slot_ids)
+	_hide_preset_save_modal()
+	if new_id == 0:
+		_show_toast(tr("formation_presets_at_cap_toast"))
+		return
+	if was_truncated:
+		_show_toast(tr("formation_presets_truncated_toast"))
+	else:
+		_show_toast(tr("formation_presets_saved_toast"))
+
+
+## Recall (K.1 Option 1): resolve the preset to a positional formation, surface
+## any missing heroes as ONE composed (capped) toast, then commit immediately —
+## routing through the mid-run gate when a run is active (AC-FP-11).
+func _on_preset_recall_button_pressed() -> void:
+	if _selected_preset_id == 0:
+		return
+	var resolved: Array = FormationAssignment.recall_preset(_selected_preset_id)
+	if resolved.is_empty():
+		# Preset vanished (e.g. deleted in another flow). Recover gracefully.
+		_show_toast(tr("formation_presets_recall_unknown_toast"))
+		_rebuild_preset_dropdown(0)
+		return
+	var fsize: int = HeroRoster.formation_size()
+	var formation: Array[HeroInstance] = []
+	formation.resize(fsize)
+	var stored_ids: Array = _stored_slot_ids_for(_selected_preset_id)
+	var missing_count: int = 0
+	for i: int in range(fsize):
+		var hero: HeroInstance = resolved[i] as HeroInstance if i < resolved.size() else null
+		formation[i] = hero
+		# A slot stored a real hero id (!= 0) but it no longer resolves → that
+		# hero left the guild. Empty slots (stored id 0) are NOT "missing".
+		var stored_id: int = int(stored_ids[i]) if i < stored_ids.size() else 0
+		if stored_id != 0 and hero == null:
+			missing_count += 1
+	if missing_count > 0:
+		var shown: int = mini(missing_count, FormationAssignment.recall_missing_hero_toast_cap())
+		# Guard the %d substitution: if the locale string is unresolved — tr()
+		# returns the bare key, which has no placeholder — then `key % shown` is
+		# a FATAL format error in GDScript ("not all arguments converted").
+		# Only substitute when the placeholder is actually present, so a missing
+		# or late-loading LocaleLoader can never crash the recall path.
+		var template: String = tr("formation_presets_missing_toast")
+		var message: String = template
+		if template.find("%d") != -1:
+			message = template % shown
+		_show_toast(message)
+	# Mid-run gate: a recall commits, so defer behind the confirm dialog when a
+	# run is in flight (mirrors the single-hero tap path).
+	if MID_RUN_REASSIGN_WARNING_ENABLED and _is_orchestrator_active():
+		_pending_recall_formation = formation
+		_reassign_confirm_root.visible = true
+		return
+	_apply_recall_commit(formation)
+
+
+## Reads the stored slot_hero_ids for a preset (for missing-hero detection).
+## Returns [] if the preset is gone. JSON round-trips ints as floats, so callers
+## int()-cast each element.
+func _stored_slot_ids_for(preset_id: int) -> Array:
+	var result: Array = []
+	for preset: Dictionary in FormationAssignment.get_presets():
+		if int(preset.get("id", 0)) == preset_id:
+			var raw: Variant = preset.get("slot_hero_ids", [])
+			if raw is Array:
+				result = raw
+			break
+	return result
+
+
+## Applies a recalled formation through the single commit write-point, then
+## refreshes. Mirrors _apply_hero_commit's post-commit refresh; resets the active
+## slot to 0 since recall replaces the whole lineup.
+func _apply_recall_commit(formation: Array[HeroInstance]) -> void:
+	FormationAssignment.commit(formation)
+	_active_slot_index = 0
+	_refresh_roster_panel()
+	_refresh_formation_panel()
+	UIFrameworkScript.suppress_keyboard_focus(self)
+
+
+func _on_preset_delete_button_pressed() -> void:
+	if _selected_preset_id == 0:
+		return
+	_show_preset_delete_modal()
+
+
+func _show_preset_delete_modal() -> void:
+	if _preset_delete_modal == null:
+		return
+	_preset_delete_modal.visible = true
+	_grab_delete_default_focus()
+
+
+## Default focus on the delete-confirm modal is Cancel (the safe choice) per
+## FormationAssignment.delete_confirmation_default_focus(). suppress_keyboard_focus
+## neutralized this button, so re-enable focus_mode before grabbing.
+func _grab_delete_default_focus() -> void:
+	var which: String = FormationAssignment.delete_confirmation_default_focus()
+	var target: Button = _preset_delete_cancel_button
+	if which == "confirm":
+		target = _preset_delete_confirm_button
+	if target != null:
+		target.focus_mode = Control.FOCUS_ALL
+		target.grab_focus()
+
+
+func _hide_preset_delete_modal() -> void:
+	if _preset_delete_modal != null:
+		_preset_delete_modal.visible = false
+
+
+## Confirm delete: delete_preset emits preset_deleted synchronously → the
+## dropdown rebuilds to "(none)". Then a confirmation toast.
+func _on_preset_delete_confirm_pressed() -> void:
+	var pid: int = _selected_preset_id
+	_hide_preset_delete_modal()
+	if pid != 0:
+		FormationAssignment.delete_preset(pid)
+		_show_toast(tr("formation_presets_deleted_toast"))
+
+
+func _on_preset_delete_cancel_pressed() -> void:
+	_hide_preset_delete_modal()
 
 
 ## Shows the Floor Picker overlay (S22-M2 fold of the retired
@@ -1483,6 +1815,10 @@ const _CONTENT_TOP: float = 58.0  # y-offset below top bar where panels start
 const _FORMATION_H: float = 180.0 # height of the formation panel
 const _FLOOR_H: float = 80.0    # height of the floor-selector panel
 const _FOOTER_H: float = 60.0   # height of the dispatch CTA footer strip
+# GDD #33 (Formation Presets, PR #2): the PresetsPanel stacks below the floor
+# selector in the right column. _PRESETS_TOP == 338 (58+180+10+80+10).
+const _PRESETS_TOP: float = _CONTENT_TOP + _FORMATION_H + _ROW_GAP + _FLOOR_H + _ROW_GAP
+const _PRESETS_H: float = 120.0 # height of the presets panel (title + row + breathing room)
 
 var _wire_built: bool = false
 var _wire_float_layer: Control = null
@@ -1514,6 +1850,7 @@ func _build_wireframe_once() -> void:
 	_build_roster_section()
 	_build_formation_section()
 	_build_floor_section()
+	_build_presets_section()
 	_build_dispatch_footer()
 	_style_picker_panel()
 	_build_float_layer_fa()
@@ -1615,6 +1952,25 @@ func _reposition_existing_nodes_fa() -> void:
 	if _floor_picker_root != null:
 		_floor_picker_root.z_index = 7
 
+	# PresetsPanel: right column, below the floor selector (GDD #33, PR #2).
+	# Same anchor pattern (0,0,1,0) + absolute top/bottom offsets as the formation
+	# and floor panels above it.
+	if _presets_panel != null:
+		_presets_panel.grow_horizontal = Control.GROW_DIRECTION_END
+		_presets_panel.grow_vertical = Control.GROW_DIRECTION_END
+		_place_fa(_presets_panel, 0, 0, 1, 0,
+			_COL_GAP + _LEFT_W + _ROW_GAP, _PRESETS_TOP,
+			-_COL_GAP, _PRESETS_TOP + _PRESETS_H)
+		_presets_panel.z_index = _WIRE_Z
+
+	# Preset Save / Delete modals: full-rect overlays raised above the floor
+	# picker (z=7). Tree order (declared last in the .tscn) gives their STOP
+	# backdrops input priority; z just controls draw order.
+	if _preset_save_modal != null:
+		_preset_save_modal.z_index = 8
+	if _preset_delete_modal != null:
+		_preset_delete_modal.z_index = 8
+
 
 ## Decorative top-bar strip. The real HeaderLabel, BackButton, and GoldCounter
 ## are repositioned above it (z=3) so real text reads over the strip.
@@ -1683,6 +2039,24 @@ func _build_floor_section() -> void:
 	var body: VBoxContainer = WireframeKitScript.body_of(panel)
 	body.add_child(WireframeKitScript.caption(
 		"Tap to choose biome + floor.", WireframeKitScript.MUTED, 11))
+
+
+## Right column, below the floor selector: Presets section label (GDD #33).
+## The real PresetsPanel is repositioned over this; this greybox wrapper sits at
+## z=1 with MOUSE_FILTER_IGNORE so it never steals taps from the real controls
+## (per the z_index-does-not-affect-input-picking lesson).
+func _build_presets_section() -> void:
+	var panel: PanelContainer = WireframeKitScript.section_panel("Formations")
+	panel.name = "WirePresetsSection"
+	panel.z_index = 1   # behind the real PresetsPanel (z=2)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(panel)
+	_place_fa(panel, 0, 0, 1, 0,
+		_COL_GAP + _LEFT_W + _ROW_GAP, _PRESETS_TOP,
+		-_COL_GAP, _PRESETS_TOP + _PRESETS_H)
+	var body: VBoxContainer = WireframeKitScript.body_of(panel)
+	body.add_child(WireframeKitScript.caption(
+		"Save, recall, or delete a saved lineup.", WireframeKitScript.MUTED, 11))
 
 
 ## Full-width footer accent strip behind the real DispatchButton.
