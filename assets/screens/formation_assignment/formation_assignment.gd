@@ -23,6 +23,20 @@ extends Screen
 
 const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
 const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/dungeon_run_state.gd")
+# S28-S1 display icons (authored PR #226). The matchup resolver is the SAME one
+# DungeonRunOrchestrator uses to award the 1.5×/0.7× per-kill gold multiplier,
+# so the floor-hint icon can never diverge from the throughput the player earns.
+const DefaultMatchupResolverScript = preload("res://src/core/matchup_resolver/default_matchup_resolver.gd")
+# Role icons — only warrior/mage/rogue are authored (DESIGN.md "Required MVP
+# icon set"); the other four classes degrade to no icon (see _class_icon_for).
+const ICON_CLASS_WARRIOR: Texture2D = preload("res://assets/art/ui/icons/class_warrior.png")
+const ICON_CLASS_MAGE: Texture2D = preload("res://assets/art/ui/icons/class_mage.png")
+const ICON_CLASS_ROGUE: Texture2D = preload("res://assets/art/ui/icons/class_rogue.png")
+# Matchup-state icons keyed off MatchupResult.effectiveness_label
+# ("Strong" → advantage, "Even" → neutral, "Weak" → disadvantage).
+const ICON_MATCHUP_ADVANTAGE: Texture2D = preload("res://assets/art/ui/icons/matchup_advantage.png")
+const ICON_MATCHUP_NEUTRAL: Texture2D = preload("res://assets/art/ui/icons/matchup_neutral.png")
+const ICON_MATCHUP_DISADVANTAGE: Texture2D = preload("res://assets/art/ui/icons/matchup_disadvantage.png")
 
 # ---------------------------------------------------------------------------
 # Private screen state
@@ -117,6 +131,14 @@ var _fp_selected_floor_index: int = 0
 # picker has been opened for the first time. Visible = false when no
 # recommendation is available for the selected floor.
 var _floor_recommendation_label: Label = null
+
+# S28-S1 — decorative 3-state matchup icon pinned to the right edge of
+# FloorRecommendationLabel. Additive CHILD of the label (never reparents the
+# label into a new container — that would break the FloorRecommendationLabel
+# hard-path the tests/layout bind to per the screen-node-hard-path rule).
+# MOUSE_FILTER_IGNORE so it can never steal a tap from the Select button
+# beneath it. Null until the picker is opened for the first time.
+var _floor_matchup_icon: TextureRect = null
 
 # ---------------------------------------------------------------------------
 # AC-FA-13 (S15-M2) — Mid-run reassignment confirm dialog gating
@@ -416,6 +438,14 @@ func _refresh_roster_panel() -> void:
 		# Guild-Ledger-Entry). Same register as Guild Hall HeroCards so the
 		# player reads roster lines consistently across screens.
 		btn.theme_type_variation = &"LedgerRow"
+		# S28-S1: role icon inline on the card. Button.icon is the idiomatic slot
+		# (renders left of the text); the 24×24 art needs no expand_icon. NEAREST
+		# keeps the pixel edges crisp. Iconless classes leave btn.icon null so the
+		# card stays text-only (graceful degradation, not a placeholder glyph).
+		var class_icon: Texture2D = _class_icon_for(String(hero.class_id))
+		if class_icon != null:
+			btn.icon = class_icon
+			btn.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		# Bind the hero's instance_id so the closure captures the correct value.
 		btn.pressed.connect(_on_hero_button_pressed.bind(hero.instance_id))
 		_roster_list.add_child(btn)
@@ -428,6 +458,23 @@ func _refresh_roster_panel() -> void:
 		var injured_until: int = int(hero.get("injured_until"))
 		if injured_until > now_ms:
 			UIFrameworkScript.mark_injured(btn, (injured_until - now_ms) / 1000)
+
+
+## Returns the role icon for [param class_id], or null when the class has no
+## authored art. Only warrior/mage/rogue ship icons in the MVP set (DESIGN.md
+## "Required MVP icon set"); cleric/archer/berserker/paladin and any unknown id
+## return null so the card renders text-only rather than a broken/placeholder
+## glyph. Generating the remaining four class icons is a flagged follow-up.
+func _class_icon_for(class_id: String) -> Texture2D:
+	match class_id:
+		"warrior":
+			return ICON_CLASS_WARRIOR
+		"mage":
+			return ICON_CLASS_MAGE
+		"rogue":
+			return ICON_CLASS_ROGUE
+		_:
+			return null
 
 
 ## Rebuilds the formation slot buttons from the live HeroRoster state.
@@ -701,6 +748,28 @@ func _show_floor_picker() -> void:
 			picker_content.add_child(rec_label)
 			picker_content.move_child(rec_label, select_idx)
 			_floor_recommendation_label = rec_label
+			# S28-S1: additive matchup icon pinned to the label's right edge. It is
+			# a CHILD of the label (not a reparent of the label into a new HBox —
+			# that would break the FloorRecommendationLabel hard-path). Decorative:
+			# MOUSE_FILTER_IGNORE so a tap falls through to the Select button. As a
+			# child of the label it also inherits the label's visibility, so it can
+			# never linger when the recommendation is hidden.
+			var matchup_icon: TextureRect = TextureRect.new()
+			matchup_icon.name = "FloorMatchupIcon"
+			matchup_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			matchup_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			matchup_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			matchup_icon.custom_minimum_size = Vector2(16, 16)
+			matchup_icon.visible = false
+			# Right-edge, vertically centred 16×16 box (label is not a container,
+			# so position via explicit anchored offsets rather than layout).
+			matchup_icon.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+			matchup_icon.offset_left = -20.0
+			matchup_icon.offset_right = -4.0
+			matchup_icon.offset_top = -8.0
+			matchup_icon.offset_bottom = 8.0
+			rec_label.add_child(matchup_icon)
+			_floor_matchup_icon = matchup_icon
 
 	# Step 2: render biome tabs.
 	_render_floor_picker_biome_tabs()
@@ -923,14 +992,103 @@ func _update_floor_recommendation_label(biome_id: String, floor_index: int) -> v
 			break
 	if floor_data == null:
 		_floor_recommendation_label.visible = false
+		_set_matchup_icon_visible(false)
 		return
 	var archetype_to_class: Dictionary[String, String] = _build_archetype_to_class_map()
 	var recommended: String = _recommended_class_for_floor(floor_data, archetype_to_class)
 	if recommended == "":
 		_floor_recommendation_label.visible = false
+		_set_matchup_icon_visible(false)
 	else:
 		_floor_recommendation_label.text = tr("matchup_floor_recommended_format") % recommended
 		_floor_recommendation_label.visible = true
+		# S28-S1: the 3-state icon reports how the player's CURRENT lineup fares
+		# on THIS floor (Strong/Even/Weak from the combat resolver), distinct from
+		# the prescriptive "Recommended: <class>" text. Hidden when there is no
+		# formation yet or the floor has no resolvable archetypes.
+		_update_floor_matchup_icon(floor_data)
+
+
+## Returns the distinct enemy archetypes present on a floor, in first-seen order.
+##
+## Mirrors the enemy_list extraction in [method _recommended_class_for_floor]
+## (same defensive typed reads — present-but-null enemy_id would otherwise abort
+## a bare String() cast), but yields the FULL archetype set rather than only the
+## dominant one: the resolver scores the lineup against every archetype present,
+## not just the most common.
+func _floor_archetypes(floor_data: Floor) -> Array[String]:
+	var archetypes: Array[String] = []
+	var seen: Dictionary[String, bool] = {}
+	for entry: Dictionary in floor_data.enemy_list:
+		var raw_id: Variant = entry.get("enemy_id")
+		if typeof(raw_id) != TYPE_STRING or String(raw_id) == "":
+			continue
+		var enemy_data: EnemyData = EnemyDatabase.get_by_id(String(raw_id))
+		if enemy_data == null:
+			continue
+		var arch: String = String(enemy_data.archetype)
+		if arch == "" or seen.has(arch):
+			continue
+		seen[arch] = true
+		archetypes.append(arch)
+	return archetypes
+
+
+## Returns the live formation's matchup verdict against [param floor_data] as a
+## [MatchupResult] effectiveness_label ∈ {"Strong","Even","Weak"}, or "" when
+## there is nothing to score (empty formation, or a floor with no resolvable
+## archetypes). "" is distinct from "Even": it means "no verdict to show" and
+## the caller hides the icon entirely rather than displaying a neutral state.
+##
+## Reuses [DefaultMatchupResolver.resolve_floor_matchup] — the exact resolver
+## [DungeonRunOrchestrator] uses to award the 1.5×/0.7× per-kill gold multiplier
+## — so the hint reflects the throughput the player will actually experience.
+func _formation_matchup_label_for_floor(floor_data: Floor) -> String:
+	var formation: Array = HeroRoster.get_formation_heroes()
+	if formation.is_empty():
+		return ""
+	var archetypes: Array[String] = _floor_archetypes(floor_data)
+	if archetypes.is_empty():
+		return ""
+	var resolver := DefaultMatchupResolverScript.new()
+	var result: MatchupResult = resolver.resolve_floor_matchup(formation, archetypes)
+	return String(result.effectiveness_label)
+
+
+## Maps a [MatchupResult] effectiveness_label to its 3-state icon, or null for an
+## unrecognised/empty label (caller hides the icon). "Weak" → disadvantage is
+## truthful, not invented: a Weak floor means the lineup counters nothing on it,
+## so every kill lands at the 0.7× penalty.
+func _matchup_icon_for_label(label: String) -> Texture2D:
+	match label:
+		"Strong":
+			return ICON_MATCHUP_ADVANTAGE
+		"Even":
+			return ICON_MATCHUP_NEUTRAL
+		"Weak":
+			return ICON_MATCHUP_DISADVANTAGE
+		_:
+			return null
+
+
+## Sets the matchup icon for [param floor_data] against the live formation, or
+## hides it when there is no verdict (no formation / no resolvable archetypes).
+func _update_floor_matchup_icon(floor_data: Floor) -> void:
+	if _floor_matchup_icon == null:
+		return
+	var icon: Texture2D = _matchup_icon_for_label(_formation_matchup_label_for_floor(floor_data))
+	if icon == null:
+		_floor_matchup_icon.visible = false
+	else:
+		_floor_matchup_icon.texture = icon
+		_floor_matchup_icon.visible = true
+
+
+## Null-safe visibility toggle for the matchup icon (it may not exist yet if the
+## picker has never been opened).
+func _set_matchup_icon_visible(is_visible: bool) -> void:
+	if _floor_matchup_icon != null:
+		_floor_matchup_icon.visible = is_visible
 
 
 func _on_floor_picker_floor_pressed(biome_id: String, floor_index: int) -> void:
