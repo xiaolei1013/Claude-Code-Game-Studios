@@ -6,9 +6,9 @@
 
 ## A. Overview
 
-**Formation Presets** is a V1.0 affordance that lets the player save named formation configurations and recall them with one tap. The MVP shipped formation as a 3-slot hero arrangement persisted in HeroRoster's `_formation_slots`; players who experiment with different rosters (warrior-heavy for boss floors, mage-heavy for spell-resistant biomes) currently rebuild from scratch each time. Named presets remove that friction while keeping the cozy register: presets are **player-curated** (no auto-save), **named** (player chooses the label), and **non-destructive** (recalling a preset shows it, doesn't commit until confirmed).
+**Formation Presets** is a V1.0 affordance that lets the player save named formation configurations and recall them with one tap. The MVP shipped formation as a 3-slot hero arrangement persisted in HeroRoster's `_formation_slots`; players who experiment with different rosters (warrior-heavy for boss floors, mage-heavy for spell-resistant biomes) currently rebuild from scratch each time. Named presets remove that friction while keeping the cozy register: presets are **player-curated** (no auto-save), **named** (player chooses the label), and **preset-immutable** (recalling never edits the saved preset — it only applies it).
 
-The system layers on top of FormationAssignment's commit() contract (per ADR-0001 + AC-FA-12) without changing the underlying single-write-point invariant. A preset recall **populates the screen's edit buffer**; the player still presses commit to write to HeroRoster — preserving the mid-run reassignment confirmation gate (AC-FA-13) for in-flight runs.
+The system layers on top of FormationAssignment's commit() contract (per ADR-0001 + AC-FA-12) without changing the underlying single-write-point invariant. **Recall resolves the preset's stored ids to a positional formation and commits it immediately via the existing `commit()` path (§K.1 Option 1 — RESOLVED).** Because recall commits, it routes through the same mid-run reassignment confirmation gate (AC-FA-13) as a manual slot edit: if a run is in flight, the player is asked to confirm before the formation changes (and the run ends per ADR-0001).
 
 ---
 
@@ -46,21 +46,27 @@ Reaching the cap surfaces a defensive toast on Save attempt: "Preset limit reach
 
 ### C.3 — UI affordances (per `design/gdd/formation-assignment-system.md` §C.5 extension)
 
-On the FormationAssignment screen, add a **PresetsRow** between the FormationPanel and the existing ActionRow. The row contains:
+On the FormationAssignment screen, add a **PresetsRow** in the right column **below the Destination (FloorSelectorPanel) zone** — the screen has no "ActionRow" node (K.2 RESOLVED). Concretely (implementation, PR #2): a `PresetsPanel` (PanelContainer, parchment-framed like the sibling panels) holding a title label + the row, repositioned by the screen's runtime wireframe into the right-column gap beneath the Floor selector (above the bottom Dispatch footer). The row contains:
 
-- **PresetDropdown** (OptionButton) — lists saved presets by `name`, sorted by `created_at_unix` ascending (oldest first; preserves player's mental model of "1st, 2nd, 3rd preset"). Default item is "(none)".
-- **RecallButton** — visible only when a preset is selected in the dropdown. Tap → populate the screen's edit buffer with the preset's `slot_hero_ids` (resolved via `HeroRoster.get_hero_by_id` per S15-M1). Does NOT write to HeroRoster — the player still presses commit (or the auto-commit per S15-M2's mid-run-aware flow).
-- **SaveButton** — opens a small modal: "Save current formation as new preset?" with a name TextEdit (placeholder "My formation") and Save/Cancel buttons. Player types, taps Save → preset committed.
-- **DeleteButton** — visible only when a preset is selected. Opens a confirmation modal: "Delete '<name>'?" with Confirm/Cancel. Cancel default-focused (cozy register: destructive default is the safe one).
+- **PresetDropdown** (OptionButton) — lists saved presets by `name`, sorted by `created_at_unix` ascending (oldest first; preserves player's mental model of "1st, 2nd, 3rd preset"). Default item is "(none)" (preset_id 0); each preset is added with its `id` as the OptionButton item id so selection resolves by id, not list index.
+- **RecallButton** — visible only when a preset is selected in the dropdown. Tap → resolve the preset to a positional formation and **commit it immediately** (§C.4, Option 1). Routes through the mid-run gate if a run is active.
+- **SaveButton** — always available; opens a small modal: "Name this formation" with a name LineEdit (placeholder "My formation") and Save/Cancel buttons. Player types, taps Save → snapshot of the current formation is saved under that name. Cap-guarded up front (toast if already at `max_presets()`).
+- **DeleteButton** — visible only when a preset is selected. Opens a confirmation modal: "Delete this formation?" with Delete/Cancel. Cancel default-focused (cozy register: destructive default is the safe one) per `delete_confirmation_default_focus()`.
 
-### C.4 — Recall semantics
+### C.4 — Recall semantics (§K.1 Option 1 — RESOLVED)
 
-`RecallButton.pressed` populates the **screen's edit buffer**, not HeroRoster. The screen's existing per-slot rendering reads from the edit buffer; the existing commit flow (S15-M1's `FormationAssignment.commit()` route) handles the write-on-confirm.
+There is no screen-side edit buffer (see §K.1). `RecallButton.pressed` **commits the recalled formation immediately** through the existing single-write-point — the same `FormationAssignment.commit(new_formation)` path a manual slot edit uses (S15-M1).
 
-When recalling a preset:
-1. Iterate `preset.slot_hero_ids` positionally.
-2. For each id: if `HeroRoster.get_hero_by_id(id) == null` (hero removed since preset was saved), the slot is rendered as empty AND a toast surfaces (one toast per missing hero, dedup'd by display_name).
-3. The recalled buffer is the screen's working state until the player commits or navigates away.
+Two layers, with a clean split of responsibility:
+
+- **Autoload** — `recall_preset(id)` is a **pure resolver**: it returns a positional `Array` of length `formation_size()` where each entry is the `HeroInstance` for that slot's stored id, or `null` (empty-slot sentinel 0, OR a stored id that no longer resolves). It does **NOT** mutate HeroRoster (AC-FP-04) and emits `preset_recalled(id, formation)` (informational). Unknown id → returns `[]`.
+- **Screen** — takes that array and commits it:
+  1. Build the typed `Array[HeroInstance]` from the resolved array.
+  2. **Missing-hero detection**: cross-reference the preset's stored `slot_hero_ids` against the resolved array — a slot where `slot_hero_ids[i] != 0` but the resolved entry is `null` means that hero was removed since the preset was saved. Those slots commit as empty. (The schema stores only ids, so the toast is count-based, not name-based — see §C.4 note below.)
+  3. Surface **one composed toast** capped at `recall_missing_hero_toast_cap()` (the screen's toast has no queue — N separate toasts would collapse to the last one).
+  4. **Commit** via `commit(new_formation)`, routed through the mid-run gate (§C.7).
+
+> **Toast wording note**: under Option 1 the preset stores ids only (no saved display_name per slot), so a missing-hero toast names a count ("2 saved heroes are no longer in your guild — those slots are empty"), not specific hero names. Naming would require widening the schema to store display_name snapshots — deferred (cozy register doesn't need it).
 
 ### C.5 — Save semantics
 
@@ -83,9 +89,11 @@ When recalling a preset:
 
 `_next_preset_id` is NOT decremented (monotonic invariant per HeroInstance pattern — IDs are never reused even after deletion).
 
-### C.7 — Mid-run gate (AC-FA-13 inheritance)
+### C.7 — Mid-run gate (AC-FA-13 inheritance) — §K.1 Option 1
 
-Recall does NOT trigger the mid-run reassignment dialog (it doesn't commit). Save and Delete also do not commit. The dialog fires only on the player's explicit commit action AFTER a recall, exactly as it does today for any manual edit. **No new code path is needed in the dialog gate logic** — `_on_hero_button_pressed` is unchanged.
+Under Option 1, Recall **commits**, so it DOES route through the mid-run reassignment dialog when a run is in flight (ACTIVE_FOREGROUND / DISPATCHING / OFFLINE_REPLAY). Save and Delete still never commit a formation, so they never trigger the dialog.
+
+The existing gate (`_on_hero_button_pressed` → `_is_orchestrator_active()` → show `MidRunReassignConfirmation`) defers a **single-hero** tap via `_pending_reassign_hero_id` + `_pending_reassign_slot_index`. Recall replaces the **whole** formation, so the screen adds an **additive** parallel deferral: a `_pending_recall_formation: Array[HeroInstance]` field plus an `_apply_recall_commit()` helper. The shared confirm/cancel handlers gain a **recall-first branch** — a non-empty `_pending_recall_formation` is consumed first, otherwise the existing single-hero path runs unchanged. This preserves the tested single-hero behavior (the two pending-states are never both set: each entry point sets one and shows the dialog).
 
 ---
 
@@ -153,8 +161,8 @@ All knobs live in `assets/data/config/formation_presets_config.tres` (new file a
 **AC-FP-03** — Save enforces cap
 > With 6 presets already saved, `save_preset("seventh", ...)` → returns false, surfaces toast per §C.2. `_presets.size()` remains 6.
 
-**AC-FP-04** — Recall populates edit buffer, NOT HeroRoster
-> `recall_preset(id)` writes to the screen's local edit-buffer state. `HeroRoster.get_formation_slot(i)` is unchanged. The player must press commit (existing flow) to write.
+**AC-FP-04** — `recall_preset` is a pure resolver (autoload does NOT mutate HeroRoster)
+> `recall_preset(id)` returns a positional `Array` of length `formation_size()` (HeroInstance-or-null per slot) and does NOT call any HeroRoster mutator — `HeroRoster.get_formation_slot(i)` is unchanged by the call itself. (Verified at the autoload layer; PR #1.) The **screen** then commits that array via `commit()` (§C.4, Option 1) — so end-to-end, recall DOES change the live formation; the invariant is specifically that the resolver method has no side effects.
 
 **AC-FP-05** — Recall surfaces toast per missing hero
 > A preset referencing a removed hero (`get_hero_by_id` returns null) renders the slot empty AND fires a toast. Toast count capped per §G `RECALL_MISSING_HERO_TOAST_CAP`.
@@ -174,8 +182,8 @@ All knobs live in `assets/data/config/formation_presets_config.tres` (new file a
 **AC-FP-10** — `formation_size()` mismatch on load is defensive
 > A save file with a preset whose `slot_hero_ids.size() != formation_size()` (e.g., from a future 4-slot variant) is discarded on load with a single push_warning per affected preset. Other presets in the same save load normally.
 
-**AC-FP-11** — Mid-run reassignment dialog inheritance
-> Recalling a preset during ACTIVE_FOREGROUND state does NOT fire the dialog (recall doesn't commit). Pressing commit AFTER recall DOES fire the dialog per AC-FA-13.
+**AC-FP-11** — Mid-run reassignment dialog inheritance (§K.1 Option 1)
+> Recalling a preset during an active-run state (e.g. ACTIVE_FOREGROUND) **fires the dialog** (recall commits — §C.4/§C.7). Confirming applies the recalled formation via `commit()` (run ends + restarts per ADR-0001); cancelling discards the pending recall and leaves the live formation + run untouched. Recalling while NO run is active commits immediately with no dialog. Verified by the screen integration test (`formation_presets_screen_test.gd`).
 
 **AC-FP-12** — CI grep: forbidden patterns
 > No code outside `src/core/formation_assignment/` reads or writes `_presets` directly. The autoload exposes `save_preset(name, formation)`, `recall_preset(id)`, `delete_preset(id)`, `get_presets()` as the public API.
@@ -257,6 +265,8 @@ The GDD §C.4 describes Recall as populating "the screen's edit buffer". But the
 3. **Hybrid**: Recall = immediate commit (Option 1) for V1.0; refactor to buffered editing (Option 2) in V1.5+ if playtest signals need.
 
 I lean toward Option 1 for V1.0 — preserves cozy register simplicity (no "did I confirm or not?" cognitive load) and matches deployed code. Flag for designer call.
+
+> **RESOLVED 2026-06-17 (PR #2 UI implementation): Option 1.** Recall resolves the preset to a positional formation and commits it immediately via the existing `commit()` single-write-point; no screen-side edit buffer is introduced. Consequences reconciled across this GDD: §A (recall commits, "preset-immutable" replaces "non-destructive"), §C.4 (autoload resolver + screen commits, split responsibilities), §C.7 (recall routes through the mid-run gate via an additive `_pending_recall_formation` branch — the single-hero path is untouched), AC-FP-04 (the no-side-effect invariant scoped to the resolver method), AC-FP-11 (recall during an active run fires the dialog). K.3's "captures HeroRoster state not buffer state" concern dissolves under Option 1 (there is no buffer; Save snapshots `HeroRoster.get_formation_slot(i)` directly, which is exactly the player's committed intent).
 
 ### K.2 — CONCERN: spec assumes node names that don't exist
 

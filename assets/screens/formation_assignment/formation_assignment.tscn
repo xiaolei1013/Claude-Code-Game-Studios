@@ -206,6 +206,69 @@ horizontal_alignment = 1
 autowrap_mode = 3
 theme_type_variation = &"class_synergy_badge_active"
 
+; Formation Presets (GDD #33) — PresetsPanel sits in the right-column gap below
+; the Destination (FloorSelectorPanel) zone. The runtime wireframe
+; (_reposition_existing_nodes_fa) re-anchors this to (0,0,1,0) at
+; offset (left=362, top=_PRESETS_TOP=338, right=-12, bottom=458), z=2; the
+; anchors/offsets here are a sensible fallback for the no-wireframe case.
+; PanelContainer → parchment-framed like the sibling panels (apply_parchment_panel
+; in _ready). All children Control-derived so the theme cascade is intact.
+[node name="PresetsPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchor_top = 0.42
+anchor_right = 1.0
+anchor_bottom = 0.58
+offset_left = 480.0
+offset_right = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="PresetsVBox" type="VBoxContainer" parent="PresetsPanel"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="PresetsTitleLabel" type="Label" parent="PresetsPanel/PresetsVBox"]
+layout_mode = 2
+mouse_filter = 2
+text = "Saved Formations"
+horizontal_alignment = 1
+
+[node name="PresetsRow" type="HBoxContainer" parent="PresetsPanel/PresetsVBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="PresetDropdown" type="OptionButton" parent="PresetsPanel/PresetsVBox/PresetsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(96, 44)
+focus_mode = 0
+mouse_filter = 0
+
+[node name="PresetRecallButton" type="Button" parent="PresetsPanel/PresetsVBox/PresetsRow"]
+visible = false
+layout_mode = 2
+custom_minimum_size = Vector2(96, 44)
+focus_mode = 0
+mouse_filter = 0
+text = "Recall"
+
+[node name="PresetSaveButton" type="Button" parent="PresetsPanel/PresetsVBox/PresetsRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(84, 44)
+focus_mode = 0
+mouse_filter = 0
+text = "Save"
+
+[node name="PresetDeleteButton" type="Button" parent="PresetsPanel/PresetsVBox/PresetsRow"]
+visible = false
+layout_mode = 2
+custom_minimum_size = Vector2(84, 44)
+focus_mode = 0
+mouse_filter = 0
+text = "Delete"
+theme_type_variation = &"DestructiveButton"
+
 [node name="MidRunReassignConfirmation" type="Control" parent="."]
 visible = false
 layout_mode = 1
@@ -346,3 +409,143 @@ custom_minimum_size = Vector2(0, 60)
 focus_mode = 0
 mouse_filter = 0
 text = "Select"
+
+; Formation Presets — name-input modal. Clones the MidRunReassignConfirmation
+; pattern: full-rect Control (hidden) + dim ColorRect backdrop (STOP) + centered
+; PanelContainer. The wireframe raises z to 8. The LineEdit keeps default
+; FOCUS_ALL (suppress_keyboard_focus only touches BaseButtons) so the player can
+; type (virtual keyboard on touch/Steam Deck).
+[node name="PresetSaveModal" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="SaveDimBackdrop" type="ColorRect" parent="PresetSaveModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.75)
+mouse_filter = 0
+
+[node name="SavePanel" type="PanelContainer" parent="PresetSaveModal"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -240.0
+offset_top = -110.0
+offset_right = 240.0
+offset_bottom = 110.0
+grow_horizontal = 2
+grow_vertical = 2
+custom_minimum_size = Vector2(480, 220)
+
+[node name="SaveContent" type="VBoxContainer" parent="PresetSaveModal/SavePanel"]
+layout_mode = 2
+
+[node name="SaveTitleLabel" type="Label" parent="PresetSaveModal/SavePanel/SaveContent"]
+layout_mode = 2
+text = "Name this formation"
+horizontal_alignment = 1
+
+[node name="PresetNameLineEdit" type="LineEdit" parent="PresetSaveModal/SavePanel/SaveContent"]
+layout_mode = 2
+custom_minimum_size = Vector2(0, 44)
+placeholder_text = "My formation"
+
+[node name="SaveButtonRow" type="HBoxContainer" parent="PresetSaveModal/SavePanel/SaveContent"]
+layout_mode = 2
+alignment = 1
+
+[node name="SaveCancelButton" type="Button" parent="PresetSaveModal/SavePanel/SaveContent/SaveButtonRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(140, 44)
+focus_mode = 0
+mouse_filter = 0
+text = "Cancel"
+
+[node name="SaveConfirmButton" type="Button" parent="PresetSaveModal/SavePanel/SaveContent/SaveButtonRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(200, 44)
+focus_mode = 0
+mouse_filter = 0
+text = "Save"
+
+; Formation Presets — delete-confirm modal. Cancel is the wider/primary button
+; and is default-focused per delete_confirmation_default_focus() (AC-FP-07 cozy
+; register: the destructive default is the SAFE one). Delete uses the
+; DestructiveButton variation (Ember Rust). Wireframe raises z to 8.
+[node name="PresetDeleteModal" type="Control" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="DeleteDimBackdrop" type="ColorRect" parent="PresetDeleteModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.75)
+mouse_filter = 0
+
+[node name="DeletePanel" type="PanelContainer" parent="PresetDeleteModal"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -240.0
+offset_top = -110.0
+offset_right = 240.0
+offset_bottom = 110.0
+grow_horizontal = 2
+grow_vertical = 2
+custom_minimum_size = Vector2(480, 220)
+
+[node name="DeleteContent" type="VBoxContainer" parent="PresetDeleteModal/DeletePanel"]
+layout_mode = 2
+
+[node name="DeleteBodyLabel" type="Label" parent="PresetDeleteModal/DeletePanel/DeleteContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+autowrap_mode = 3
+horizontal_alignment = 1
+text = "Delete this formation? This can't be undone."
+
+[node name="DeleteButtonRow" type="HBoxContainer" parent="PresetDeleteModal/DeletePanel/DeleteContent"]
+layout_mode = 2
+alignment = 1
+
+[node name="DeleteCancelButton" type="Button" parent="PresetDeleteModal/DeletePanel/DeleteContent/DeleteButtonRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(200, 44)
+focus_mode = 0
+mouse_filter = 0
+text = "Cancel"
+
+[node name="DeleteConfirmButton" type="Button" parent="PresetDeleteModal/DeletePanel/DeleteContent/DeleteButtonRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(140, 44)
+focus_mode = 0
+mouse_filter = 0
+text = "Delete"
+theme_type_variation = &"DestructiveButton"

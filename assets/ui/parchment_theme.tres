@@ -383,3 +383,16 @@ SelectedSlotButton/font_sizes/font_size = 16
 SelectedSlotButton/colors/font_color = Color(0.9490, 0.7216, 0.2314, 1)
 SelectedSlotButton/colors/font_outline_color = Color(0.1725, 0.1569, 0.2196, 1)
 SelectedSlotButton/constants/outline_size = 2
+
+; DestructiveButton — destructive-action button (Delete a saved formation).
+; Ember Rust font over the inherited parchment Button styleboxes per DESIGN.md
+; ("Ember Rust = destructive / delete affordance"). base_type Button so all four
+; styleboxes + sizes + the pressed/disabled states inherit unchanged; only the
+; resting + hover + pressed font colors shift to Ember Rust (#A84C2F / a brighter
+; hover) so the button reads as the "careful" action WITHOUT a code-side Color()
+; literal (ADR-0008). Applied via theme_type_variation = &"DestructiveButton"
+; (Formation Presets, GDD #33 §C.6 Delete affordance + delete-confirm modal).
+DestructiveButton/base_type = &"Button"
+DestructiveButton/colors/font_color = Color(0.6588, 0.2980, 0.1843, 1)
+DestructiveButton/colors/font_hover_color = Color(0.7882, 0.3569, 0.2196, 1)
+DestructiveButton/colors/font_pressed_color = Color(0.7882, 0.3569, 0.2196, 1)
