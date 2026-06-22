@@ -82,7 +82,7 @@ signals — **never** added to the tick handler.
 
 | # | Story | Phase | Type | Status | ADRs |
 |---|-------|-------|------|--------|------|
-| 001 | GDD: `hero-combat-animation.md` — which beats animate, 3-heroes→1-aggregate-DPS mapping, cozy/read-only pillar preservation, reduce-motion behavior | P0 Design | Design (GDD) | In Progress | — (authors TRs) |
+| 001 | GDD: `hero-combat-animation.md` — which beats animate, formation→aggregate-DPS mapping, cozy/read-only pillar preservation, reduce-motion behavior | P0 Design | Design (GDD) | **Done** (GDD #35, 8 sections + I/J; systems-index row #35; #24 §F reverse-dep) | — |
 | 002 | Art-bible: hero dungeon-presence section + per-class action-pose spec (attack/hit/victory), honoring §8.1 "no hero reuses another's motion" | P0 Design | Design (Art) | Ready | ADR-0024 |
 | 003 | UX spec: `design/ux/dungeon-run-view.md` hero placement, sizes, per-hero vs aggregate HP, layering, read-only (no new input) | P0 Design | Design (UX) | Ready | ADR-0008, 0019 |
 | 004 | ADR-0025: animation ↔ kill-schedule sync model + 20 Hz zero-alloc hot-path rule + reduce-motion | P0 Arch | Architecture | Ready | ADR-0025, 0010 |
@@ -107,4 +107,4 @@ signals — **never** added to the tick handler.
 
 ## Next Step
 
-Phase 0, Story 001 — author `design/gdd/hero-combat-animation.md` (8 required sections, written incrementally). Then Story 004 (ADR-0025) locks the sync model that Phases 1–3 build against. Phases 1–2 ship the full player-visible win with no new art; Phase 3's art + Phase 4's playtest are the external-dependency gates surfaced to the user.
+**Story 001 done** (GDD #35 authored — `design/gdd/hero-combat-animation.md`, 8 sections + I/J; systems-index #35; #24 §F reverse-dep). Remaining Phase 0: Story 002 (art-bible hero-presence section), Story 003 (UX spec `design/ux/dungeon-run-view.md`), Story 004 (**ADR-0025** — locks the §C.3 sync model + §C.9 hot-path rule that Phases 1–3 build against; must reach **Accepted** before Phase 1 code). Then Phases 1–2 ship the full player-visible win with no new art; Phase 3's per-class art (Story 011) + Phase 4's human playtest (Story 016) are the external-dependency gates surfaced to the user.

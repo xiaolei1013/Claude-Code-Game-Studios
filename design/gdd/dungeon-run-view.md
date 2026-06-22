@@ -200,6 +200,7 @@ If `_on_tick_fired` adds an allocation (e.g., a new format string or a tr() call
 - `formation_assignment` screen — predecessor screen that triggers FADE_TO_BLACK into this screen via dispatch
 - `main_menu` screen — successor screen via the RUN_ENDED → CROSS_FADE route
 - `AudioRouter` (#28) — subscribes to `hero_leveled` independently (parallel to this screen's toast subscription) per audio-system.md §C.5
+- **Hero Combat Presence & Animation (#35)** — adds the dispatched formation's hero sprites + reaction beats to this screen (idle loop + `enemy_killed`/`boss_killed`/`floor_cleared_first_time`/`run_defeated` beats). It **must not** violate this screen's two invariants: the read-only spectator contract (§B — hero subtrees are `MOUSE_FILTER_IGNORE`) and the zero-alloc hot path (§C.2 — animation never enters `_on_tick_fired`). Its victory beat is the intended resolution of **OQ-24-6** (run-end overlay animation).
 
 ---
 
