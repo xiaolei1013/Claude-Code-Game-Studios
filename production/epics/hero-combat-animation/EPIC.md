@@ -83,7 +83,7 @@ signals — **never** added to the tick handler.
 | # | Story | Phase | Type | Status | ADRs |
 |---|-------|-------|------|--------|------|
 | 001 | GDD: `hero-combat-animation.md` — which beats animate, formation→aggregate-DPS mapping, cozy/read-only pillar preservation, reduce-motion behavior | P0 Design | Design (GDD) | **Done** (GDD #35, 8 sections + I/J; systems-index row #35; #24 §F reverse-dep) | — |
-| 002 | Art-bible: hero dungeon-presence section + per-class action-pose spec (attack/hit/victory), honoring §8.1 "no hero reuses another's motion" | P0 Design | Design (Art) | Ready | ADR-0024 |
+| 002 | Art-bible: hero dungeon-presence section + per-class action-pose spec (attack/hit/victory) | P0 Design | Design (Art) | **Done** (art-bible §5: "Dungeon Combat Presence" + "Per-Class Action Poses" — 4-beat pose table for all 6 classes; no-reuse rule extended to actions; defeat=dignified slump per ADR-0021; 4-frame strip convention for pipeline reuse) | ADR-0024 |
 | 003 | UX spec: `design/ux/dungeon-run-view.md` hero placement, sizes, per-hero vs aggregate HP, layering, read-only (no new input) | P0 Design | Design (UX) | Ready | ADR-0008, 0019 |
 | 004 | ADR-0025: animation ↔ kill-schedule sync model + 20 Hz zero-alloc hot-path rule + reduce-motion | P0 Arch | Architecture | Ready | ADR-0025, 0010 |
 | 005 | Render the 3 party heroes as sprites on `dungeon_run_view` (ClassSpriteFactory art), positioned per UX spec, layered with biome/VFX/enemies | P1 On-Screen | UI / Visual | Backlog | ADR-0008, 0019 |
@@ -107,4 +107,4 @@ signals — **never** added to the tick handler.
 
 ## Next Step
 
-**Story 001 done** (GDD #35 authored — `design/gdd/hero-combat-animation.md`, 8 sections + I/J; systems-index #35; #24 §F reverse-dep). Remaining Phase 0: Story 002 (art-bible hero-presence section), Story 003 (UX spec `design/ux/dungeon-run-view.md`), Story 004 (**ADR-0025** — locks the §C.3 sync model + §C.9 hot-path rule that Phases 1–3 build against; must reach **Accepted** before Phase 1 code). Then Phases 1–2 ship the full player-visible win with no new art; Phase 3's per-class art (Story 011) + Phase 4's human playtest (Story 016) are the external-dependency gates surfaced to the user.
+**Stories 001–002 done** (GDD #35 — `design/gdd/hero-combat-animation.md`, 8 sections + I/J; systems-index #35; #24 §F reverse-dep · art-bible §5 — "Dungeon Combat Presence" + "Per-Class Action Poses" 4-beat table). Remaining Phase 0: Story 003 (UX spec `design/ux/dungeon-run-view.md` — hero placement, sizes, per-hero vs aggregate HP, layering, read-only), Story 004 (**ADR-0025** — locks the §C.3 sync model + §C.9 hot-path rule that Phases 1–3 build against; must reach **Accepted** before Phase 1 code). Then Phases 1–2 ship the full player-visible win with no new art; Phase 3's per-class art (Story 011) + Phase 4's human playtest (Story 016) are the external-dependency gates surfaced to the user.
