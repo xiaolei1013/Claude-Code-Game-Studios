@@ -53,6 +53,17 @@
         "note": "Switched from a 4-frame strip to a single 256x256 still: EnemySpriteFactory.get_sprite loads the sprite as ONE Texture2D with NO frame slicing (src/ui/enemy_sprite_factory.gd), so a strip renders squashed in-game. Animation needs hframes slicing added to the factory first (follow-up). The isolated/chroma-key path gives a usable still now. A strip-mode (size like 1024x256 + frames N) would need _postprocess_image to scale-with-pad instead of square-scale — also a follow-up."
       }
     ],
+    "class_action_sprites": [
+      {
+        "id": "warrior_attack",
+        "out": "assets/art/classes/warrior/attack.png",
+        "size": "768x432",
+        "aspect_ratio": "16:9",
+        "isolated": true,
+        "prompt": "OVERRIDE the single-object framing above: this asset is a 4-FRAME ACTION SPRITE SHEET, NOT one centred object and NOT an idle strip. Render FOUR figures and NO MORE — count them: 1, 2, 3, 4 — EXACTLY four full-body figures of the SAME cozy-fantasy Warrior, evenly spaced left-to-right in a single horizontal row of four equal cells, the SAME outfit, colours, scale, side-on facing and ground line throughout; ONLY the body pose advances across the cells as ONE short shield-led attack that settles back toward the neutral idle: (1) weight gathers, the round shield drawn slightly back; (2) the peak — weight drops onto the front foot and the shield leads forward in a bulwark shoulder-check, mass over flourish; (3) the shove follows through, the sword arm trailing; (4) settles back to the broad grounded stance. Controlled power, never a wild swing. The Warrior: weathered iron pauldrons, a round shield on the left arm, a warm scarf, a kind tired face, broad grounded build. Guild Amber and Slate Ink armour with a Lantern Gold rim light. Every figure is a SOLID, fully-painted body — no motion-blur, no dissolving into particles, sparks, smoke, dust or scattered dots. Clear silhouette readable at small size. Flat uniform backdrop between and around all four figures, no grid lines, no panel borders, no numbers, no arrows, no motion lines. NOT a single large figure, NOT four different characters, NEVER five or six figures.",
+        "note": "PILOT COST-TEST for the Story-011 class_action_sprites bank (28 entries in full.json). This is the RISKIEST asset type: a 4-frame ACTION PROGRESSION (one motion that settles to rest), not an idle-breath strip. Prompt is byte-identical to full.json warrior_attack so the cost/quality read transfers directly. Generate this ONE first (python generate.py --manifest pilot.json --only class_action_sprites), eyeball-QA it for (a) exactly 4 figures, (b) a readable wind-up→peak→follow-through→settle progression that loops, (c) no stipple/particle dissolution, (d) palette + cozy register — THEN decide whether to scale to the full 28. Format mirrors class_sprites idle (768x432, 16:9, isolated) so ClassSpriteFactory.slice_sheet ingests it unchanged. assets/art/classes/ is gitignored demo-IP — review-only, do not commit the PNG."
+      }
+    ],
     "vfx": [
       {
         "id": "gold_sparkle",
