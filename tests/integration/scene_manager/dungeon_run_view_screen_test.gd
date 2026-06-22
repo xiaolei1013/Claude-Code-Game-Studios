@@ -45,6 +45,9 @@ const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/d
 const RunSnapshotScript = preload("res://src/core/dungeon_run_orchestrator/run_snapshot.gd")
 const CombatRunSnapshotScript = preload("res://src/core/combat/combat_run_snapshot.gd")
 const HeroRosterFixture = preload("res://tests/helpers/hero_roster_test_fixture.gd")
+# Story 012: source of the POSE_* ids + the action-frame override key shape, so the
+# injected-art tests never hardcode the "<class>/<pose>" string or the pose names.
+const ClassSpriteFactoryScript = preload("res://src/ui/class_sprite_factory.gd")
 
 # ---------------------------------------------------------------------------
 # Per-test state snapshots for isolation
@@ -1357,6 +1360,9 @@ func test_on_tick_fired_adds_no_hero_animation_work() -> void:
 		"_party_diorama",       # no diorama node access
 		"_make_hero_slot",      # no slot building
 		"get_idle_frames",      # no frame slicing
+		"get_action_frames",    # Story 012 — no action-frame slicing on the tick
+		"play_oneshot",         # Story 012 — no action one-shot kicked from the tick
+		"_route_action_or_collect",  # Story 012 — the frames-vs-tween router is beat-only
 		"get_formation_heroes", # no per-hero roster walk
 		"_IdleAnimator",        # no animator lookup
 	]
@@ -2340,6 +2346,283 @@ func test_idle_animates_when_motion_enabled_gate_is_conditional() -> void:
 		assert_bool(animator.is_processing()).override_failure_message(
 			"with reduce_motion OFF the idle gate must NOT fire — animators stay live"
 		).is_true()
+
+	# Cleanup
+	sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+# ===========================================================================
+# Story 012 — frames-vs-tween state machine (GDD #35 Phase 3 / ADR-0025).
+#
+# A reaction beat now PREFERS real action frames when the class has art for the
+# beat's pose, falling back to the Phase-2 cosmetic tween where art is absent. No
+# action PNGs are on disk yet, so production runs every slot through the tween
+# (the 60 existing beat tests prove that path stays byte-identical). These tests
+# inject synthetic frames via the [member _action_frames_override] seam — the SAME
+# pattern as [member _beat_clock_override_ms] — to exercise the FRAMES branch
+# without committing art, pinning:
+#   • all-art beat → NO tween, every slot plays its action one-shot (attack/victory/defeat)
+#   • mixed party  → art slot plays frames AND art-less slot still tweens, one beat
+#   • defeat       → routes with hold_last (the slump frame holds, §D.4)
+#   • reduce_motion defeat → art slot HOLDS the final frame statically (no scale/dim
+#     double-up), the §C.8 terminal-state-without-animation contract
+# All driven through the real human-frequency beat handlers, never the tick.
+# ===========================================================================
+
+## Builds [count] DISTINCT synthetic frame textures (per-frame fill) so a slot's
+## displayed texture can be identity-compared against a specific action frame.
+func _make_action_frames(count: int) -> Array:
+	var frames: Array = []
+	for i: int in range(count):
+		var img: Image = Image.create(8, 8, false, Image.FORMAT_RGBA8)
+		img.fill(Color(0.0, float(i + 1) / 10.0, 0.0, 1.0))
+		frames.append(ImageTexture.create_from_image(img))
+	return frames
+
+
+## Returns the live front-line slot whose stashed class_id matches [class_id], or null.
+func _slot_for_class(screen: Control, class_id: String) -> Control:
+	var row: Node = screen.get_node_or_null("PartyDioramaLayer/PartyFrontLine")
+	if row == null:
+		return null
+	for node: Node in row.get_children():
+		var slot: Control = node as Control
+		if slot != null and String(slot.get_meta(&"hero_class_id", "")) == class_id:
+			return slot
+	return null
+
+
+func test_strike_beat_plays_action_frames_when_art_exists_and_starts_no_tween() -> void:
+	# A kill beat with attack art present: every slot plays its attack one-shot on the
+	# &"_IdleAnimator", so NO cosmetic tween is started (the frames REPLACE the tween).
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 1000
+
+	# Inject synthetic attack frames for the warrior class (the art-exists branch).
+	var attack: Array = _make_action_frames(3)
+	screen._action_frames_override["warrior/" + ClassSpriteFactoryScript.POSE_ATTACK] = attack
+
+	# Act — a normal kill arrives via the real handler.
+	screen._on_enemy_killed_beat(1, "goblin", false)
+
+	# Assert — frames replaced the tween: no beat tween, and every warrior slot's
+	# animator is playing the action one-shot showing the first attack frame.
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"with attack art present, the strike beat must play frames and start NO tween"
+	).is_null()
+	for slot: Node in screen._party_hero_slots():
+		var c: Control = slot as Control
+		var animator: SpriteSheetAnimator = c.get_node_or_null("_IdleAnimator") as SpriteSheetAnimator
+		assert_object(animator).is_not_null()
+		assert_bool(animator._oneshot).override_failure_message(
+			"the slot's animator must be playing a one-shot action (not the idle loop)"
+		).is_true()
+		assert_object(c.texture).override_failure_message(
+			"the slot must display the injected attack frame 0"
+		).is_same(attack[0])
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_strike_beat_mixed_party_art_slot_plays_frames_and_artless_slot_tweens() -> void:
+	# The per-slot routing proof: a warrior WITH injected attack art plays frames while a
+	# mage WITHOUT art falls back to the cosmetic tween — both in the SAME beat. So a tween
+	# IS started (for the mage) AND the warrior is on its action one-shot.
+	HeroRosterFixture.reset_hero_roster()
+	var party: Array[String] = ["warrior", "mage"]
+	HeroRosterFixture.seed_heroes(party)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 1000
+
+	# Inject attack art for the WARRIOR only — the mage has no attack frames (disk or override).
+	var attack: Array = _make_action_frames(3)
+	screen._action_frames_override["warrior/" + ClassSpriteFactoryScript.POSE_ATTACK] = attack
+
+	# Act
+	screen._on_enemy_killed_beat(1, "goblin", false)
+
+	# Assert — a tween WAS started (the art-less mage needs it)...
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"the art-less mage slot must still get a cosmetic strike tween"
+	).is_not_null()
+	assert_bool(screen._active_beat_tween.is_valid()).is_true()
+
+	# ...the warrior plays its action one-shot (frames path)...
+	var warrior_slot: Control = _slot_for_class(screen, "warrior")
+	assert_object(warrior_slot).is_not_null()
+	var warrior_anim: SpriteSheetAnimator = warrior_slot.get_node_or_null("_IdleAnimator") as SpriteSheetAnimator
+	assert_object(warrior_anim).is_not_null()
+	assert_bool(warrior_anim._oneshot).override_failure_message(
+		"the warrior (art present) must play its action one-shot"
+	).is_true()
+	assert_object(warrior_slot.texture).is_same(attack[0])
+
+	# ...and the mage is NOT on a one-shot (it took the tween branch, idle untouched by frames).
+	var mage_slot: Control = _slot_for_class(screen, "mage")
+	assert_object(mage_slot).is_not_null()
+	var mage_anim: SpriteSheetAnimator = mage_slot.get_node_or_null("_IdleAnimator") as SpriteSheetAnimator
+	assert_object(mage_anim).is_not_null()
+	assert_bool(mage_anim._oneshot).override_failure_message(
+		"the art-less mage must NOT be on an action one-shot (it took the tween branch)"
+	).is_false()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_victory_beat_plays_action_frames_when_art_exists_and_starts_no_tween() -> void:
+	# A first-time floor clear with victory art: every slot plays its victory one-shot;
+	# NO tween, the terminal latch still sets (this run's terminal motion has played).
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+
+	var victory: Array = _make_action_frames(3)
+	screen._action_frames_override["warrior/" + ClassSpriteFactoryScript.POSE_VICTORY] = victory
+
+	# Act — a first-time floor clear (winning run).
+	screen._on_floor_cleared_beat(2, "forest_reach", false)
+
+	# Assert — frames replaced the tween, latch set, slots on the victory one-shot.
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"with victory art present, the cheer must play frames and start NO tween"
+	).is_null()
+	assert_bool(screen._terminal_beat_played).is_true()
+	for slot: Node in screen._party_hero_slots():
+		var c: Control = slot as Control
+		var animator: SpriteSheetAnimator = c.get_node_or_null("_IdleAnimator") as SpriteSheetAnimator
+		assert_object(animator).is_not_null()
+		assert_bool(animator._oneshot).is_true()
+		assert_object(c.texture).is_same(victory[0])
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_defeat_slump_plays_action_frames_with_hold_last_when_art_exists() -> void:
+	# run_defeated with defeat art (motion ON): every slot plays its defeat one-shot routed
+	# with hold_last = TRUE (the slump frame holds under the run-end overlay); NO tween.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+
+	var defeat: Array = _make_action_frames(3)
+	screen._action_frames_override["warrior/" + ClassSpriteFactoryScript.POSE_DEFEAT] = defeat
+
+	# Act — the run is lost (motion enabled).
+	screen._on_run_defeated_beat(4, "crypt_depths")
+
+	# Assert — no tween, latch set, and each slot plays a HOLD-LAST defeat one-shot.
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"with defeat art present, the slump must play frames and start NO tween"
+	).is_null()
+	assert_bool(screen._terminal_beat_played).is_true()
+	for slot: Node in screen._party_hero_slots():
+		var c: Control = slot as Control
+		var animator: SpriteSheetAnimator = c.get_node_or_null("_IdleAnimator") as SpriteSheetAnimator
+		assert_object(animator).is_not_null()
+		assert_bool(animator._oneshot).is_true()
+		assert_bool(animator._oneshot_hold_last).override_failure_message(
+			"the defeat one-shot must hold its final (slump) frame — hold_last = true"
+		).is_true()
+		assert_object(c.texture).is_same(defeat[0])
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_defeat_static_reduce_motion_holds_final_frame_when_art_exists() -> void:
+	# §C.8 with art: under reduce_motion the defeat slump is shown INSTANTLY as the held
+	# FINAL defeat frame — the art IS the slump pose, so the scale/dim cosmetic slump is
+	# NOT applied on top (no double-up). NO tween; the party stays visible (alpha 1.0).
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	assert_object(sm).is_not_null()
+	var prior_rm: bool = bool(sm.get("reduce_motion"))
+	sm.set("reduce_motion", true)
+
+	# Pull the cosmetic-slump constants — we assert the art slot does NOT get them.
+	var consts: Dictionary = screen.get_script().get_script_constant_map()
+	var slump_x: float = float(consts["DEFEAT_SLUMP_SCALE_X"])
+	var dim: float = float(consts["DEFEAT_SLUMP_DIM"])
+
+	var defeat: Array = _make_action_frames(3)
+	screen._action_frames_override["warrior/" + ClassSpriteFactoryScript.POSE_DEFEAT] = defeat
+
+	# Act — the run is lost under reduce_motion.
+	screen._on_run_defeated_beat(4, "crypt_depths")
+
+	# Assert — static path (no tween), latch set, and each art slot shows the HELD FINAL
+	# defeat frame WITHOUT the scale/dim slump (the art is the pose) and stays visible.
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"reduce_motion must not animate — the defeat slump frame is shown statically"
+	).is_null()
+	assert_bool(screen._terminal_beat_played).is_true()
+	for slot: Node in screen._party_hero_slots():
+		var c: Control = slot as Control
+		assert_object(c.texture).override_failure_message(
+			"the art slot must hold the FINAL defeat frame statically (§C.8)"
+		).is_same(defeat[defeat.size() - 1])
+		assert_float(c.scale.x).override_failure_message(
+			"the art slot must NOT also apply the cosmetic slump scale (no double-up)"
+		).is_not_equal(slump_x)
+		assert_float(c.scale.x).is_equal_approx(1.0, 0.001)
+		assert_float(c.modulate.r).override_failure_message(
+			"the art slot must NOT also apply the cosmetic dim (the art carries the mood)"
+		).is_not_equal(dim)
+		assert_float(c.modulate.a).override_failure_message(
+			"the slumped party must stay visible (alpha 1.0) — never a fade (§C.8)"
+		).is_equal(1.0)
 
 	# Cleanup
 	sm.set("reduce_motion", prior_rm)

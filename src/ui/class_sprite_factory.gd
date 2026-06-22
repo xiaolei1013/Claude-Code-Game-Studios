@@ -23,6 +23,24 @@ const FRAME_COUNT: int = 4
 ## cozy register, not a frenetic loop.
 const IDLE_FPS: float = 6.0
 
+## Default ACTION playback rate (attack / victory / defeat one-shots). Faster than
+## the breathing idle so a reaction pose reads as a deliberate beat, not idle drift.
+## Story 014 may make this per-class / per-pose data-driven; one rate is enough for
+## the Story 012 frames-vs-tween machinery (the action art does not exist yet).
+const ACTION_FPS: float = 12.0
+
+## Canonical action-pose ids. Each names a per-class action sprite sheet authored by
+## the asset pipeline (manifest images.class_action_sprites in full.json), shipped at
+## [code]assets/art/classes/<class_id>/<pose>.png[/code] beside the idle sprite.png.
+## Single source of truth for "which action poses exist"; the beat→pose mapping lives
+## in the consumer (dungeon_run_view's reaction beats). NOTE: combat is party-AGGREGATE
+## and emits no per-hero "hit" signal — [constant POSE_HIT] art is authored-ahead
+## (GDD #35 §5 / art-bible) but has no firing beat in this epic.
+const POSE_ATTACK: String = "attack"
+const POSE_HIT: String = "hit"
+const POSE_VICTORY: String = "victory"
+const POSE_DEFEAT: String = "defeat"
+
 ## Name of the animator child node attached to a driven TextureRect. Stable so
 ## [method animate] can find-and-reuse it across re-renders instead of stacking
 ## duplicate animators on a reused card. Public + the single source of truth:
@@ -52,6 +70,29 @@ static func get_idle_frames(class_id: String) -> Array:
 			var sheet: Texture2D = load(path) as Texture2D
 			frames = slice_sheet(sheet, FRAME_COUNT)
 	_frames_cache[class_id] = frames
+	return frames
+
+
+## Returns the ordered ACTION frames for [param class_id]'s [param pose] (one of the
+## [code]POSE_*[/code] ids), or an empty array when the class/pose is empty or its sheet
+## is absent — the art-not-yet-authored path, where the caller falls back to its cosmetic
+## tween (Story 012's "real frames where art exists" contract). Cached per (class_id, pose)
+## under a composite key, so it never collides with [method get_idle_frames]'s bare
+## class_id key. Mirrors the idle loader exactly: same [member ResourceLoader] existence
+## guard (resolves real art in EXPORTED builds, where the source .png is stripped), same
+## [constant FRAME_COUNT] equal-column slice over a single shared sheet.
+static func get_action_frames(class_id: String, pose: String) -> Array:
+	if class_id.is_empty() or pose.is_empty():
+		return []
+	var cache_key: String = "%s/%s" % [class_id, pose]
+	if _frames_cache.has(cache_key):
+		return _frames_cache[cache_key]
+	var frames: Array = []
+	var path: String = "res://assets/art/classes/%s/%s.png" % [class_id, pose]
+	if ResourceLoader.exists(path):
+		var sheet: Texture2D = load(path) as Texture2D
+		frames = slice_sheet(sheet, FRAME_COUNT)
+	_frames_cache[cache_key] = frames
 	return frames
 
 

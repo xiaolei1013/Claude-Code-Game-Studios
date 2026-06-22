@@ -181,3 +181,56 @@ func test_real_art_class_loads_and_windows_quarter_width_columns() -> void:
 		assert_float(atlas.region.position.x).is_equal_approx(expected_w * float(i), 0.5)
 		assert_float(atlas.region.size.x).is_equal_approx(expected_w, 0.5)
 		assert_float(atlas.region.size.y).is_equal_approx(float(_STRIP_HEIGHT), 0.5)
+
+
+# ===========================================================================
+# Group F — get_action_frames asset-absent behavior (Story 012 — action loader)
+#
+# Mirrors get_idle_frames' disk-first / empty-fallback contract for the action
+# poses (attack / hit / victory / defeat). Action art is authored-ahead in the
+# manifest (Story 011) but not yet rendered to disk, so EVERY real lookup is the
+# empty "caller-falls-back-to-its-cosmetic-tween" path — Story 012's "real frames
+# where art exists, tween where it doesn't" contract. The loader is still fully
+# exercised (empty-arg guards, missing-sheet path, cache, cache-key isolation).
+# ===========================================================================
+
+func test_get_action_frames_empty_class_returns_empty() -> void:
+	assert_int(ClassSpriteFactoryScript.get_action_frames(
+		"", ClassSpriteFactoryScript.POSE_ATTACK).size()).is_equal(0)
+
+
+func test_get_action_frames_empty_pose_returns_empty() -> void:
+	# A real class id but no pose → empty (the (class, pose) pair is incomplete).
+	assert_int(ClassSpriteFactoryScript.get_action_frames(
+		_REAL_ART_CLASS_ID, "").size()).is_equal(0)
+
+
+func test_get_action_frames_missing_sheet_returns_empty() -> void:
+	# No attack.png on disk for a bogus class → graceful empty (caller keeps its
+	# cosmetic tween). The production / art-not-yet-authored path.
+	assert_int(ClassSpriteFactoryScript.get_action_frames(
+		"not_a_real_class_xyz", ClassSpriteFactoryScript.POSE_ATTACK).size()).is_equal(0)
+
+
+func test_get_action_frames_caches_result_for_repeat_calls() -> void:
+	# Same Array instance returned on the second call (cache hit under the
+	# composite "<class>/<pose>" key).
+	var first: Array = ClassSpriteFactoryScript.get_action_frames(
+		_REAL_ART_CLASS_ID, ClassSpriteFactoryScript.POSE_ATTACK)
+	var second: Array = ClassSpriteFactoryScript.get_action_frames(
+		_REAL_ART_CLASS_ID, ClassSpriteFactoryScript.POSE_ATTACK)
+	assert_bool(first == second).is_true()
+
+
+func test_get_action_frames_does_not_collide_with_idle_cache() -> void:
+	# The real-art class has a committed idle sprite.png (FRAME_COUNT frames) but NO
+	# action sheets yet. The composite "<class>/<pose>" action key must NOT return the
+	# idle frames cached under the bare "<class>" key — action stays empty while idle
+	# is populated. Regression net for a cache-key collision between the two loaders.
+	# NOTE: when Story 011's action art is rendered + committed, this flips — update it
+	# to assert the real attack frames load (mirroring the idle real-art test above).
+	var idle: Array = ClassSpriteFactoryScript.get_idle_frames(_REAL_ART_CLASS_ID)
+	var action: Array = ClassSpriteFactoryScript.get_action_frames(
+		_REAL_ART_CLASS_ID, ClassSpriteFactoryScript.POSE_ATTACK)
+	assert_int(idle.size()).is_equal(ClassSpriteFactoryScript.FRAME_COUNT)
+	assert_int(action.size()).is_equal(0)

@@ -292,6 +292,13 @@ var _last_beat_ms: int = -BEAT_THROTTLE_MS
 ## fixed value to drive the coalescing window deterministically.
 var _beat_clock_override_ms: int = -1
 
+## Test seam for action-frame lookup (Story 012; mirrors [member _beat_clock_override_ms]).
+## Maps [code]"<class_id>/<pose>"[/code] → Array of frame textures, letting a test inject
+## synthetic action art so the frames-vs-tween split is exercised WITHOUT committing PNGs.
+## Empty (the default) → the real disk lookup via [method ClassSpriteFactory.get_action_frames].
+## See [method _action_frames_for].
+var _action_frames_override: Dictionary = {}
+
 ## One-shot latch for the terminal reaction beat (Story 009 · GDD #35 §C.4 / §E.9).
 ## Set the first time a victory cheer or defeat slump plays; thereafter every
 ## kill/boss strike is suppressed ([method _try_party_strike_beat]) so no late
@@ -1368,6 +1375,11 @@ func _try_party_strike_beat(scale_punch: float, duration_ms: int) -> bool:
 func _start_strike_tween(slots: Array, scale_punch: float, duration_ms: int) -> void:
 	if _active_beat_tween != null and _active_beat_tween.is_valid():
 		_active_beat_tween.kill()
+	# Story 012: slots WITH attack art play the one-shot; the rest get the cosmetic tween.
+	var tween_slots: Array = _route_action_or_collect(slots, ClassSpriteFactoryScript.POSE_ATTACK, false)
+	if tween_slots.is_empty():
+		_active_beat_tween = null  # all slots played frames — no tween needed this beat
+		return
 	var total_s: float = float(duration_ms) / 1000.0
 	var out_s: float = total_s * BEAT_OUT_PHASE_RATIO
 	var back_s: float = total_s - out_s
@@ -1380,7 +1392,7 @@ func _start_strike_tween(slots: Array, scale_punch: float, duration_ms: int) -> 
 	flash.g = BEAT_BRIGHTNESS_FLASH
 	flash.b = BEAT_BRIGHTNESS_FLASH
 	var tween: Tween = create_tween().set_parallel(true)
-	for node: Node in slots:
+	for node: Node in tween_slots:
 		var slot: Control = node as Control
 		if slot == null:
 			continue
@@ -1388,7 +1400,7 @@ func _start_strike_tween(slots: Array, scale_punch: float, duration_ms: int) -> 
 		tween.tween_property(slot, "scale", punch, out_s).from(Vector2.ONE).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		tween.tween_property(slot, "modulate", flash, out_s).from(Color.WHITE)
 	tween.chain()
-	for node2: Node in slots:
+	for node2: Node in tween_slots:
 		var slot2: Control = node2 as Control
 		if slot2 == null:
 			continue
@@ -1405,6 +1417,73 @@ func _start_strike_tween(slots: Array, scale_punch: float, duration_ms: int) -> 
 ## [code]>= 0[/code] test and the [code]-BEAT_THROTTLE_MS[/code] init of [member _last_beat_ms].
 func _beat_now_ms() -> int:
 	return _beat_clock_override_ms if _beat_clock_override_ms >= 0 else Time.get_ticks_msec()
+
+
+# ---------------------------------------------------------------------------
+# Story 012 — frames-vs-tween routing (the "real frames where art exists" seam,
+# GDD #35 Phase 3 / ADR-0025). Each reaction-beat builder first routes its slots
+# through here: a slot WHOSE class has action art for the beat's pose plays the
+# action one-shot frames on its &"_IdleAnimator"; a slot WITHOUT art is RETURNED
+# for the caller's Phase-2 cosmetic tween. With NO action PNGs on disk yet,
+# get_action_frames returns [] for every class, so EVERY slot falls through to the
+# tween — behaviour identical to pre-Story-012 — until the per-class sheets land.
+# All on HUMAN-frequency beats, never _on_tick_fired (ADR-0025 §C.9 / Story 007 guard).
+# ---------------------------------------------------------------------------
+
+## Resolves a slot's action frames for [param pose]: the injected override when present
+## (test seam [member _action_frames_override]), else the real factory disk lookup. An
+## empty [param class_id] or absent art → [] (the caller falls back to its cosmetic tween).
+func _action_frames_for(class_id: String, pose: String) -> Array:
+	if class_id.is_empty():
+		return []
+	var key: String = "%s/%s" % [class_id, pose]
+	if _action_frames_override.has(key):
+		return _action_frames_override[key]
+	return ClassSpriteFactoryScript.get_action_frames(class_id, pose)
+
+
+## Splits [param slots] for [param pose]: a slot WITH action art (and an animator) plays
+## the action one-shot on its idle animator ([param hold_last] passed through — true holds
+## the final frame, e.g. the defeat slump); every other slot is appended to (and returned
+## in) the tween list for the caller's cosmetic fallback. The single Story 012 routing seam,
+## shared by the strike + terminal builders.
+func _route_action_or_collect(slots: Array, pose: String, hold_last: bool) -> Array:
+	var tween_slots: Array = []
+	for node: Variant in slots:
+		var slot: Control = node as Control
+		if slot == null:
+			continue
+		var class_id: String = String(slot.get_meta(_HERO_SLOT_CLASS_META, ""))
+		var frames: Array = _action_frames_for(class_id, pose)
+		if frames.is_empty() or not _play_slot_action(slot, frames, hold_last):
+			tween_slots.append(slot)
+	return tween_slots
+
+
+## Plays the action [param frames] as a one-shot on [param slot]'s idle animator (the
+## &"_IdleAnimator" child attached by [method ClassSpriteFactory.animate]), reverting to the
+## idle loop on finish unless [param hold_last]. Returns [code]false[/code] (→ caller uses the
+## tween) when the slot has no animator — an art-less idle never gets one, so a real party
+## slot with action art always has it; the guard just keeps a partial-art edge graceful.
+func _play_slot_action(slot: Control, frames: Array, hold_last: bool) -> bool:
+	var animator: SpriteSheetAnimator = slot.get_node_or_null(
+		NodePath(String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME))) as SpriteSheetAnimator
+	if animator == null:
+		return false
+	animator.play_oneshot(frames, ClassSpriteFactoryScript.ACTION_FPS, hold_last)
+	return true
+
+
+## Shows [param frame] statically on [param slot]'s idle animator (the reduce_motion defeat
+## HELD pose for a class with action art). Returns [code]false[/code] when the slot has no
+## animator, so [method _apply_defeat_slump_static] falls back to the scale/dim static slump.
+func _hold_slot_static_frame(slot: Control, frame: Texture2D) -> bool:
+	var animator: SpriteSheetAnimator = slot.get_node_or_null(
+		NodePath(String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME))) as SpriteSheetAnimator
+	if animator == null:
+		return false
+	animator.show_static_frame(frame)
+	return true
 
 
 # ---------------------------------------------------------------------------
@@ -1483,6 +1562,11 @@ func _play_terminal_beat(victorious: bool) -> bool:
 func _start_victory_tween(slots: Array) -> void:
 	if _active_beat_tween != null and _active_beat_tween.is_valid():
 		_active_beat_tween.kill()
+	# Story 012: slots WITH victory art play the one-shot; the rest get the cosmetic tween.
+	var tween_slots: Array = _route_action_or_collect(slots, ClassSpriteFactoryScript.POSE_VICTORY, false)
+	if tween_slots.is_empty():
+		_active_beat_tween = null  # all slots played frames — no tween needed this beat
+		return
 	var total_s: float = float(VICTORY_BEAT_MS) / 1000.0
 	var out_s: float = total_s * BEAT_OUT_PHASE_RATIO
 	var back_s: float = total_s - out_s
@@ -1494,7 +1578,7 @@ func _start_victory_tween(slots: Array) -> void:
 	bloom.g = VICTORY_BRIGHTNESS_BLOOM
 	bloom.b = VICTORY_BRIGHTNESS_BLOOM
 	var tween: Tween = create_tween().set_parallel(true)
-	for node: Node in slots:
+	for node: Node in tween_slots:
 		var slot: Control = node as Control
 		if slot == null:
 			continue
@@ -1502,7 +1586,7 @@ func _start_victory_tween(slots: Array) -> void:
 		tween.tween_property(slot, "scale", punch, out_s).from(Vector2.ONE).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		tween.tween_property(slot, "modulate", bloom, out_s).from(Color.WHITE)
 	tween.chain()
-	for node2: Node in slots:
+	for node2: Node in tween_slots:
 		var slot2: Control = node2 as Control
 		if slot2 == null:
 			continue
@@ -1519,6 +1603,12 @@ func _start_victory_tween(slots: Array) -> void:
 func _start_defeat_slump_tween(slots: Array) -> void:
 	if _active_beat_tween != null and _active_beat_tween.is_valid():
 		_active_beat_tween.kill()
+	# Story 012: slots WITH defeat art play the one-shot and HOLD its final (slump) frame;
+	# the rest get the cosmetic scale/dim slump tween.
+	var tween_slots: Array = _route_action_or_collect(slots, ClassSpriteFactoryScript.POSE_DEFEAT, true)
+	if tween_slots.is_empty():
+		_active_beat_tween = null  # all slots played frames — no tween needed this beat
+		return
 	var slump_s: float = float(DEFEAT_SLUMP_MS) / 1000.0
 	var slump_scale: Vector2 = Vector2(DEFEAT_SLUMP_SCALE_X, DEFEAT_SLUMP_SCALE_Y)
 	var dim: Color = Color.WHITE
@@ -1526,7 +1616,7 @@ func _start_defeat_slump_tween(slots: Array) -> void:
 	dim.g = DEFEAT_SLUMP_DIM
 	dim.b = DEFEAT_SLUMP_DIM
 	var tween: Tween = create_tween().set_parallel(true)
-	for node: Node in slots:
+	for node: Node in tween_slots:
 		var slot: Control = node as Control
 		if slot == null:
 			continue
@@ -1548,6 +1638,15 @@ func _apply_defeat_slump_static(slots: Array) -> void:
 	for node: Node in slots:
 		var slot: Control = node as Control
 		if slot == null:
+			continue
+		# Story 012: a class WITH defeat art shows its held (final) defeat frame
+		# instantly — the art IS the slump pose, so we do NOT also scale/dim (which
+		# would double up the read). reduce_motion shows the terminal STATE without
+		# animating into it (GDD #35 §C.8). Falls through to the cosmetic scale/dim
+		# static slump when there is no art (or no animator on the slot).
+		var class_id: String = String(slot.get_meta(_HERO_SLOT_CLASS_META, ""))
+		var frames: Array = _action_frames_for(class_id, ClassSpriteFactoryScript.POSE_DEFEAT)
+		if not frames.is_empty() and _hold_slot_static_frame(slot, frames[frames.size() - 1]):
 			continue
 		slot.pivot_offset = Vector2(slot.size.x * 0.5, slot.size.y)
 		slot.scale = slump_scale
