@@ -1082,14 +1082,21 @@ func _build_party_diorama() -> void:
 		row.add_child(_make_hero_slot(cls, row.get_child_count()))
 
 
-## Builds one hero sprite slot: a TextureRect showing the class's STATIC idle
-## frame 0 (Story 006 attaches the animator to loop it). Square
-## [const _HERO_SPRITE_DISPLAY_PX] box, aspect-preserved + nearest-neighbour for
-## the cozy pixel-art register, read-only (MOUSE_FILTER_IGNORE). When the class
-## art is absent get_idle_frames returns [] and the texture stays null — the slot
-## still reserves its layout space (ClassSpriteFactory's null-fallback contract,
-## mirrored from the enemy lineup's greybox path). The class_id is stashed via
-## set_meta so Story 006 can attach the idle animator without re-reading the roster.
+## Builds one hero sprite slot: a TextureRect playing the class's looping idle
+## animation (the calm "breathing" idle). Square [const _HERO_SPRITE_DISPLAY_PX]
+## box, aspect-preserved + nearest-neighbour for the cozy pixel-art register,
+## read-only (MOUSE_FILTER_IGNORE). The class_id is stashed via set_meta so the
+## animator wiring (and later reaction beats) need not re-read the roster.
+##
+## Story 006: [method ClassSpriteFactory.animate] attaches a [SpriteSheetAnimator]
+## child (&"_IdleAnimator") that cycles the idle frames from its OWN _process —
+## NEVER the 20 Hz tick hot path (ADR-0025 §C.9 — animation is _process-driven on
+## a separate node, the tick handler gains nothing). animate() also sets the
+## static frame 0, and is a no-op when the class art is absent (get_idle_frames
+## returns [], the texture stays null) — the slot still reserves its layout box
+## (the factory's null-fallback contract, mirrored from the enemy-lineup greybox
+## path). The animator disables its own _process for ≤1-frame sheets, so an
+## art-less class costs nothing per frame.
 func _make_hero_slot(class_id: String, index: int) -> TextureRect:
 	var slot: TextureRect = TextureRect.new()
 	slot.name = "HeroSprite_%d" % index
@@ -1099,9 +1106,7 @@ func _make_hero_slot(class_id: String, index: int) -> TextureRect:
 	slot.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	slot.set_meta(_HERO_SLOT_CLASS_META, class_id)
-	var frames: Array = ClassSpriteFactoryScript.get_idle_frames(class_id)
-	if not frames.is_empty():
-		slot.texture = frames[0]
+	ClassSpriteFactoryScript.animate(slot, class_id)
 	return slot
 
 

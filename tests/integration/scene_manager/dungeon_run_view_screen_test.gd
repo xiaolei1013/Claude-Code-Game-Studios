@@ -1202,3 +1202,91 @@ func test_party_diorama_slot_stashes_class_id_and_loads_idle_frame() -> void:
 	screen.on_exit()
 	screen.queue_free()
 	await get_tree().process_frame
+
+
+# ===========================================================================
+# Hero idle animation — looping breathing idle (GDD #35, Story 006, ADR-0025).
+#
+# Each occupied slot gets a SpriteSheetAnimator child (&"_IdleAnimator", attached
+# by ClassSpriteFactory.animate) that cycles the class idle frames from its OWN
+# _process. This is the "two clocks, never the tick" rule made concrete: the idle
+# loop is a free-running _process on a SEPARATE node, structurally decoupled from
+# the 20 Hz `_on_tick_fired` hot path (ADR-0025 §C.9 zero-alloc gate). reduce_motion
+# gating is deferred to Story 010.
+# ===========================================================================
+
+func test_party_diorama_hero_slot_runs_idle_animation() -> void:
+	# Arrange — a warrior (its committed 4-frame idle strip > 1 frame → the
+	# animator should be live).
+	HeroRosterFixture.reset_hero_roster()
+	var classes: Array[String] = ["warrior"]
+	HeroRosterFixture.seed_heroes(classes)
+
+	# Act
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var row: HBoxContainer = screen.get_node_or_null(
+		"PartyDioramaLayer/PartyFrontLine") as HBoxContainer
+	assert_object(row).is_not_null()
+	assert_int(row.get_child_count()).is_equal(1)
+	var slot: TextureRect = row.get_child(0) as TextureRect
+	assert_object(slot).is_not_null()
+
+	# Assert — Story 006 attached a SpriteSheetAnimator (&"_IdleAnimator") AS A
+	# CHILD OF THE SLOT (not the tick path), and it is driving its OWN _process
+	# (4 idle frames > 1 → setup() called set_process(true)). The animator being a
+	# processing node under the slot IS the "two clocks, never the tick" guarantee.
+	var animator: Node = slot.get_node_or_null("_IdleAnimator")
+	assert_object(animator).override_failure_message(
+		"Story 006 must attach a SpriteSheetAnimator (_IdleAnimator) to each hero slot"
+	).is_not_null()
+	assert_bool(animator is SpriteSheetAnimator).override_failure_message(
+		"the idle animator child must be a SpriteSheetAnimator"
+	).is_true()
+	assert_bool(animator.is_processing()).override_failure_message(
+		"the idle animator should drive its own _process loop (a multi-frame idle)"
+	).is_true()
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_party_diorama_idle_animation_advances_the_frame() -> void:
+	# Arrange — a warrior slot with its idle animator.
+	HeroRosterFixture.reset_hero_roster()
+	var classes: Array[String] = ["warrior"]
+	HeroRosterFixture.seed_heroes(classes)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var row: HBoxContainer = screen.get_node_or_null(
+		"PartyDioramaLayer/PartyFrontLine") as HBoxContainer
+	assert_object(row).is_not_null()
+	var slot: TextureRect = row.get_child(0) as TextureRect
+	assert_object(slot).is_not_null()
+	var animator: Node = slot.get_node_or_null("_IdleAnimator")
+	assert_object(animator).is_not_null()
+
+	# Pre-assert — the slot currently shows an idle frame.
+	var frame_before: Texture2D = slot.texture
+	assert_object(frame_before).is_not_null()
+
+	# Act — drive the animator one frame-step deterministically. At IDLE_FPS = 6
+	# a frame lasts ~0.167 s; a single 0.2 s step advances exactly one frame
+	# (0.2 < 2 × 0.167). We call _process directly so the assertion is timing-
+	# independent — no real-frame await race against the engine's own _process.
+	animator._process(0.2)
+
+	# Assert — the displayed texture advanced to a DIFFERENT idle frame, proving
+	# the loop is live (not a one-shot frame-0 stamp). With a 4-frame strip one
+	# step always changes the index ((i+1) % 4 != i), so this holds wherever the
+	# free-running loop happened to be when we captured frame_before.
+	assert_bool(slot.texture != frame_before).override_failure_message(
+		"the idle animator should advance the slot texture past the captured frame"
+	).is_true()
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
