@@ -158,6 +158,46 @@ const _MILESTONE_TOAST_FONT_SIZE: int = 20
 @onready var _biome_background: ColorRect = $BiomeBackground
 
 # ---------------------------------------------------------------------------
+# Reaction-beat tuning (Hero Combat Presence epic, Story 008 · ADR-0025 §C.4 /
+# GDD #35 §D.2/§D.3/§D.5). Presentation + coalescing values, NOT gameplay —
+# named constants, never inline magic numbers, per the coding standard. The
+# feel knobs are Story-014 / playtest tunable; the throttle is a binding
+# accessibility safeguard (no animation faster than ~8 Hz).
+# ---------------------------------------------------------------------------
+
+## Strike-pulse total duration (ms) for a normal enemy kill — the out-and-back
+## scale punch + brightness flash (GDD #35 §D.2). Short enough to keep up with a
+## fast kill cadence (§D.5), long enough to register.
+const KILL_BEAT_MS: int = 180
+
+## Boss-strike duration (ms) — 2× the kill beat; a boss death is the run's
+## punctuation, so it reads bigger and slightly longer (GDD #35 §D.2).
+const BOSS_BEAT_MS: int = 360
+
+## Peak scale of the kill strike punch (1.0 → this → 1.0). Subtle by design — the
+## cozy register forbids a jarring strobe (GDD #35 §D.3).
+const KILL_BEAT_SCALE_PUNCH: float = 1.08
+
+## Peak scale of the boss strike punch — a touch larger than the kill punch
+## (GDD #35 §D.3).
+const BOSS_BEAT_SCALE_PUNCH: float = 1.14
+
+## Peak brightness multiplier of the strike flash (modulate 1.0 → this → 1.0)
+## over the same interval as the scale punch (GDD #35 §D.3).
+const BEAT_BRIGHTNESS_FLASH: float = 1.25
+
+## Fraction of a beat spent on the "out" (punch-up) phase; the remainder is the
+## "back" (settle) phase. A snappy punch + slightly longer settle reads as a
+## strike — a feel-default; Story 014 may tune it against live 1280×800.
+const BEAT_OUT_PHASE_RATIO: float = 0.4
+
+## Beat-coalescing window (ms) — the anti-strobe safeguard (GDD #35 §D.5, the
+## load-bearing formula). A new kill/boss beat is suppressed (its kill absorbed
+## into the in-flight beat) if the previous VISIBLE beat began < this long ago,
+## capping visible beats at ~8.3/s. Parallels the audio gold-chime throttle.
+const BEAT_THROTTLE_MS: int = 120
+
+# ---------------------------------------------------------------------------
 # Private state
 # ---------------------------------------------------------------------------
 
@@ -195,6 +235,25 @@ var _enemies_remaining_label: Label = null
 ## attaches the idle SpriteSheetAnimator to each slot; Stories 008–009 fire the
 ## reaction beats. See [method _build_party_diorama].
 var _party_diorama_layer: Control = null
+
+## Active party reaction-beat tween (Story 008 · ADR-0025 §C.4 / GDD #35 §D.3).
+## A SINGLE party-aggregate tween that pulses every hero slot together (out-and-
+## back scale punch + brightness flash) on a human-frequency kill/boss signal —
+## NEVER the 20 Hz tick. Killed-and-replaced on each new beat (so a rapid cascade
+## never stacks fighting tweens) and killed in [method on_exit] (ADR-0025 §C.7
+## lifecycle). Null while idle.
+var _active_beat_tween: Tween = null
+
+## Timestamp (ms, from [method _beat_now_ms]) at which the last VISIBLE beat began
+## — the coalescing clock (GDD #35 §D.5). Initialized to the −window sentinel (NOT
+## 0) so the very first beat is never wrongly suppressed at low engine uptime (the
+## prestige-audio-throttle lesson: a 0-sentinel + engine-uptime clock mis-fires).
+var _last_beat_ms: int = -BEAT_THROTTLE_MS
+
+## Test seam for the beat-throttle clock (mirrors AudioRouter._throttle_now_ms).
+## −1 → use real engine uptime ([method Time.get_ticks_msec]); a test assigns a
+## fixed value to drive the coalescing window deterministically.
+var _beat_clock_override_ms: int = -1
 
 
 # ---------------------------------------------------------------------------
@@ -302,6 +361,17 @@ func on_enter() -> void:
 	if not DungeonRunOrchestrator.floor_cleared_first_time.is_connected(_on_floor_cleared_vfx):
 		DungeonRunOrchestrator.floor_cleared_first_time.connect(_on_floor_cleared_vfx)
 
+	# Hero reaction beats (Hero Combat Presence epic, Story 008 · ADR-0025 §C.4):
+	# a kill / boss death pulses the WHOLE party (aggregate attribution, GDD #35
+	# §C.5 — combat emits no per-hero events). DISTINCT from the gold-burst VFX
+	# above (that is screen feedback; these animate the hero SPRITES). Triggered by
+	# human-frequency signals ONLY — never the 20 Hz tick (ADR-0025 §C.9; the
+	# per-tick source guard enforces it). Both disconnected in on_exit.
+	if not DungeonRunOrchestrator.enemy_killed.is_connected(_on_enemy_killed_beat):
+		DungeonRunOrchestrator.enemy_killed.connect(_on_enemy_killed_beat)
+	if not DungeonRunOrchestrator.boss_killed.is_connected(_on_boss_killed_beat):
+		DungeonRunOrchestrator.boss_killed.connect(_on_boss_killed_beat)
+
 	# Initial render — snap labels to the current snapshot (covers the case
 	# where this screen is shown after DISPATCHING has already begun and ticks
 	# have already advanced the snapshot before on_enter fires).
@@ -360,6 +430,20 @@ func on_exit() -> void:
 		DungeonRunOrchestrator.enemy_killed.disconnect(_on_enemy_killed_vfx)
 	if DungeonRunOrchestrator.floor_cleared_first_time.is_connected(_on_floor_cleared_vfx):
 		DungeonRunOrchestrator.floor_cleared_first_time.disconnect(_on_floor_cleared_vfx)
+
+	# Hero reaction beats (Story 008): mirror the on_enter subscriptions and kill
+	# any in-flight beat tween so no tween or _process outlives the run (ADR-0025
+	# §C.7 lifecycle). create_tween() binds to this node and is auto-killed on free,
+	# but the explicit kill is the ADR-mandated discipline.
+	if DungeonRunOrchestrator.enemy_killed.is_connected(_on_enemy_killed_beat):
+		DungeonRunOrchestrator.enemy_killed.disconnect(_on_enemy_killed_beat)
+	if DungeonRunOrchestrator.boss_killed.is_connected(_on_boss_killed_beat):
+		DungeonRunOrchestrator.boss_killed.disconnect(_on_boss_killed_beat)
+	if _active_beat_tween != null:
+		if _active_beat_tween.is_valid():
+			_active_beat_tween.kill()
+		_active_beat_tween = null
+
 	if _vfx_layer != null:
 		_vfx_layer.queue_free()
 		_vfx_layer = null
@@ -1119,6 +1203,20 @@ func _make_hero_slot(class_id: String, index: int) -> TextureRect:
 	return slot
 
 
+## Returns the live front-line hero slot nodes ([TextureRect]s built by
+## [method _make_hero_slot]), or an empty array before the diorama exists.
+## Single source of truth for "which nodes are the party" — both the idle-toggle
+## ([method _set_party_idle_animating]) and the reaction beats ([method _try_party_strike_beat])
+## walk these. Fully defensive: empty array when the diorama or its row is absent.
+func _party_hero_slots() -> Array:
+	if _party_diorama_layer == null:
+		return []
+	var row: Node = _party_diorama_layer.get_node_or_null("PartyFrontLine")
+	if row == null:
+		return []
+	return row.get_children()
+
+
 ## Reflects a COARSE run-state change onto the party diorama by pausing or resuming
 ## every hero's looping idle (GDD #35 §C.4 "baseline transition", ADR-0025 §C.9).
 ## Called ONLY from human-frequency signal handlers (e.g. [method _on_state_changed]
@@ -1128,16 +1226,102 @@ func _make_hero_slot(class_id: String, index: int) -> TextureRect:
 ## itself honours the static-card invariant (≤1-frame / art-less slots never animate).
 ## Fully defensive: a no-op before the diorama is built or when the party is empty.
 func _set_party_idle_animating(enabled: bool) -> void:
-	if _party_diorama_layer == null:
-		return
-	var row: Node = _party_diorama_layer.get_node_or_null("PartyFrontLine")
-	if row == null:
-		return
-	for slot: Node in row.get_children():
+	for slot: Node in _party_hero_slots():
 		var animator: SpriteSheetAnimator = slot.get_node_or_null(
 			NodePath(String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME))) as SpriteSheetAnimator
 		if animator != null:
 			animator.set_animating(enabled)
+
+
+## Reaction beat for a normal kill (GDD #35 §C.4 "Strike pulse"). Wired to
+## [signal DungeonRunOrchestrator.enemy_killed] — a HUMAN-FREQUENCY signal, NEVER the
+## 20 Hz tick (ADR-0025 "two clocks, never the tick"; the Story 007 source guard enforces
+## that [method _on_tick_fired] gains no hero-animation work). The party reacts as a whole
+## (GDD §C.5 / OQ-35-1 — combat emits no per-hero attribution). Args ignored: the beat is
+## the same regardless of tier / archetype / advantage; those drive the gold-burst VFX
+## ([method _on_enemy_killed_vfx]), a distinct concern on the same signal.
+func _on_enemy_killed_beat(_tier: int, _archetype: String, _advantaged: bool) -> void:
+	_try_party_strike_beat(KILL_BEAT_SCALE_PUNCH, KILL_BEAT_MS)
+
+
+## Reaction beat for a boss kill (GDD #35 §C.4 — "larger / longer" than a normal kill).
+## Wired to [signal DungeonRunOrchestrator.boss_killed] (human-frequency). Same party-aggregate
+## pulse as [method _on_enemy_killed_beat] but with the boss scale-punch / duration constants.
+func _on_boss_killed_beat(_enemy_id: String) -> void:
+	_try_party_strike_beat(BOSS_BEAT_SCALE_PUNCH, BOSS_BEAT_MS)
+
+
+## Gated entry point for every reaction beat. Returns [code]true[/code] iff a tween was
+## actually started; [code]false[/code] when suppressed. Gate order (all per GDD #35 / ADR-0025):
+## [br]1. [b]reduce_motion[/b] — read AT BEAT TIME, never cached (GDD §C.8 / §E.6, precedent
+##    prestige_fade_animation_test AC-PR-18); when on, NO beat and the throttle clock is left
+##    untouched (a suppressed beat must not "use up" the throttle window).
+## [br]2. [b]coalescing[/b] — suppress if the previous VISIBLE beat began < [constant BEAT_THROTTLE_MS]
+##    ago (GDD §D.5 anti-strobe), measured via the injectable [method _beat_now_ms] clock seam.
+## [br]3. [b]empty party[/b] — nothing to animate before the diorama is built / when no heroes.
+## Only after all three pass do we stamp [member _last_beat_ms] and start the tween.
+func _try_party_strike_beat(scale_punch: float, duration_ms: int) -> bool:
+	if _reduce_motion():
+		return false
+	var now_ms: int = _beat_now_ms()
+	if now_ms - _last_beat_ms < BEAT_THROTTLE_MS:
+		return false
+	var slots: Array = _party_hero_slots()
+	if slots.is_empty():
+		return false
+	_last_beat_ms = now_ms
+	_start_strike_tween(slots, scale_punch, duration_ms)
+	return true
+
+
+## Builds + runs the party-aggregate strike tween: a fast scale-punch + brightness flash
+## (out phase) chained into a softer settle back to rest (GDD #35 §D.2 / §D.3). One shared
+## tween for the whole party, killed-and-replaced per beat (via [member _active_beat_tween])
+## so a kill cascade never stacks competing tweens fighting over the same transforms. The
+## out / back split is [constant BEAT_OUT_PHASE_RATIO]; [code].from(...)[/code] pins a clean
+## rest start so a mid-settle re-trigger still snaps to a coherent pose. Pivot is centred so
+## the punch scales about each slot's middle. Purely cosmetic — the phase shape is advisory
+## (not test-pinned); tests target the GATING logic and lifecycle, not tween internals.
+func _start_strike_tween(slots: Array, scale_punch: float, duration_ms: int) -> void:
+	if _active_beat_tween != null and _active_beat_tween.is_valid():
+		_active_beat_tween.kill()
+	var total_s: float = float(duration_ms) / 1000.0
+	var out_s: float = total_s * BEAT_OUT_PHASE_RATIO
+	var back_s: float = total_s - out_s
+	var punch: Vector2 = Vector2(scale_punch, scale_punch)
+	# Brightness flash: lift the white point above 1.0 for an additive-looking pop on
+	# modulate (NOT a palette color — built by component to keep the no-hardcoded-Color
+	# manifest guard strict; alpha stays 1.0 from Color.WHITE).
+	var flash: Color = Color.WHITE
+	flash.r = BEAT_BRIGHTNESS_FLASH
+	flash.g = BEAT_BRIGHTNESS_FLASH
+	flash.b = BEAT_BRIGHTNESS_FLASH
+	var tween: Tween = create_tween().set_parallel(true)
+	for node: Node in slots:
+		var slot: Control = node as Control
+		if slot == null:
+			continue
+		slot.pivot_offset = slot.size * 0.5
+		tween.tween_property(slot, "scale", punch, out_s).from(Vector2.ONE).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(slot, "modulate", flash, out_s).from(Color.WHITE)
+	tween.chain()
+	for node2: Node in slots:
+		var slot2: Control = node2 as Control
+		if slot2 == null:
+			continue
+		tween.tween_property(slot2, "scale", Vector2.ONE, back_s).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		tween.tween_property(slot2, "modulate", Color.WHITE, back_s)
+	_active_beat_tween = tween
+
+
+## Beat-clock seam (mirrors [code]AudioRouter._throttle_now_ms[/code]). Returns the injected
+## override when [member _beat_clock_override_ms] is >= 0, else real engine uptime. The
+## [code]-1[/code] sentinel = "use the real clock"; tests set a concrete ms value to drive the
+## coalescing window deterministically. Lesson (prestige-audio throttle): a 0-sentinel + raw
+## [method Time.get_ticks_msec] wrongly suppresses the first beat at low uptime — hence the
+## [code]>= 0[/code] test and the [code]-BEAT_THROTTLE_MS[/code] init of [member _last_beat_ms].
+func _beat_now_ms() -> int:
+	return _beat_clock_override_ms if _beat_clock_override_ms >= 0 else Time.get_ticks_msec()
 
 
 ## Top-right: run stats backing panel + Return-to-Hall. The real StatsPanel

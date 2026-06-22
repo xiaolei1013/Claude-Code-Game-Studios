@@ -1412,3 +1412,311 @@ func test_run_ended_freezes_party_idle_animation() -> void:
 	screen.on_exit()
 	screen.queue_free()
 	await get_tree().process_frame
+
+
+# ===========================================================================
+# Story 008 — kill / boss reaction beats (GDD #35 §C.4 / §D.5, ADR-0025).
+#
+# A normal kill (enemy_killed) and a boss kill (boss_killed) — BOTH human-frequency
+# orchestrator signals, NEVER the 20 Hz tick — punch + brightness-flash the whole
+# party diorama via a create_tween() beat (party-aggregate; GDD §C.5 / OQ-35-1).
+# The Story 007 source guard (test_on_tick_fired_adds_no_hero_animation_work) already
+# proves no beat work leaks onto the tick; these tests pin the BEAT path itself:
+#   • wiring hygiene — connected on_enter, disconnected on_exit
+#   • plays when motion is enabled (kill + boss)
+#   • suppressed by reduce_motion, read AT BEAT TIME (ADR-0025 §C.8; precedent AC-PR-18)
+#   • coalesced within BEAT_THROTTLE_MS (anti-strobe, §D.5) via the injectable clock seam
+#   • suppressed for an empty party (no slots to animate)
+#   • end-to-end: emitting enemy_killed routes through the connection to a real beat
+#   • lifecycle: on_exit kills the active beat tween (no tween outlives the screen)
+#
+# The tween's internal phase shape (out-punch → settle) is cosmetic/advisory and is
+# NOT pinned here — these target the GATING logic + lifecycle (ADR-0025 validation).
+# ===========================================================================
+
+## Drives one normal-kill beat through the gated entry point and returns whether a
+## tween was actually started. Pulls the real KILL_BEAT_* constants from the screen
+## script (get_script_constant_map) so the test never hardcodes the punch/duration —
+## only the CLOCK + reduce_motion gates are under test here, not the tween's shape.
+func _kill_beat_gate(screen: Control) -> bool:
+	var consts: Dictionary = screen.get_script().get_script_constant_map()
+	return screen._try_party_strike_beat(
+		float(consts["KILL_BEAT_SCALE_PUNCH"]), int(consts["KILL_BEAT_MS"]))
+
+
+func test_kill_and_boss_beats_connected_on_enter_disconnected_on_exit() -> void:
+	# Arrange — navigate (on_enter connects both reaction-beat handlers).
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	# Pre-assert: both beats are wired while the screen is active. enemy_killed has
+	# TWO distinct consumers (the existing gold-burst VFX + this new hero beat); we
+	# guard the BEAT connection specifically (the scaffolded-but-unwired net).
+	assert_bool(
+		DungeonRunOrchestrator.enemy_killed.is_connected(screen._on_enemy_killed_beat)
+	).override_failure_message(
+		"enemy_killed must drive the hero strike beat while dungeon_run_view is active"
+	).is_true()
+	assert_bool(
+		DungeonRunOrchestrator.boss_killed.is_connected(screen._on_boss_killed_beat)
+	).override_failure_message(
+		"boss_killed must drive the hero strike beat while dungeon_run_view is active"
+	).is_true()
+
+	# Act
+	screen.on_exit()
+
+	# Assert — both subscriptions disconnected (no orphaned connection / leak).
+	assert_bool(
+		DungeonRunOrchestrator.enemy_killed.is_connected(screen._on_enemy_killed_beat)
+	).is_false()
+	assert_bool(
+		DungeonRunOrchestrator.boss_killed.is_connected(screen._on_boss_killed_beat)
+	).is_false()
+
+	# Cleanup
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_enemy_kill_beat_starts_strike_tween_when_motion_enabled() -> void:
+	# Arrange — a two-warrior party so the diorama has slots to animate.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	# reduce_motion OFF so the beat is allowed; deterministic clock so the throttle
+	# never interferes (first beat always clears the -BEAT_THROTTLE_MS init).
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 1000
+
+	# Pre-assert: no beat tween yet.
+	assert_object(screen._active_beat_tween).is_null()
+
+	# Act — a normal kill arrives via the real handler.
+	screen._on_enemy_killed_beat(1, "goblin", false)
+
+	# Assert — a live beat tween was created for the party (cosmetic shape unchecked).
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"a normal kill should start a party strike-beat tween when motion is enabled"
+	).is_not_null()
+	assert_bool(screen._active_beat_tween.is_valid()).is_true()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_boss_kill_beat_starts_strike_tween_when_motion_enabled() -> void:
+	# Arrange — a two-warrior party.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 1000
+
+	# Act — a boss kill arrives via the real handler.
+	screen._on_boss_killed_beat("forest_warden")
+
+	# Assert — a live beat tween was created (the boss beat shares the gated path).
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"a boss kill should start a party strike-beat tween when motion is enabled"
+	).is_not_null()
+	assert_bool(screen._active_beat_tween.is_valid()).is_true()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_strike_beat_suppressed_when_reduce_motion_enabled() -> void:
+	# Arrange — a party present (so the empty-party gate is NOT what suppresses).
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	screen._beat_clock_override_ms = 1000
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	assert_object(sm).is_not_null()
+	var prior_rm: bool = bool(sm.get("reduce_motion"))
+
+	# Act + Assert (suppressed) — reduce_motion ON: the gate returns false, reads the
+	# flag AT BEAT TIME (ADR-0025 §C.8), and starts NO tween. A suppressed beat must
+	# also leave the throttle clock untouched so it never "uses up" the window.
+	sm.set("reduce_motion", true)
+	assert_bool(_kill_beat_gate(screen)).override_failure_message(
+		"reduce_motion must suppress the strike beat (no tween)"
+	).is_false()
+	assert_object(screen._active_beat_tween).is_null()
+
+	# Act + Assert (allowed) — flip reduce_motion OFF at the SAME clock: the beat now
+	# fires, proving reduce_motion (not the clock / slots) was the gate. The suppressed
+	# call above did not stamp _last_beat_ms, so the init window still clears here.
+	sm.set("reduce_motion", false)
+	assert_bool(_kill_beat_gate(screen)).override_failure_message(
+		"clearing reduce_motion must let the strike beat fire at the same clock"
+	).is_true()
+	assert_object(screen._active_beat_tween).is_not_null()
+
+	# Cleanup
+	sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_strike_beats_coalesce_within_throttle_window() -> void:
+	# Anti-strobe coalescing (GDD #35 §D.5): a new beat is suppressed if the previous
+	# VISIBLE beat began < BEAT_THROTTLE_MS ago, measured on the injectable clock seam.
+	# Arrange — party present, reduce_motion OFF (isolate the CLOCK gate).
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+
+	# Sanity pin: the 1119/1120 boundary below is derived from a 120 ms window. If the
+	# throttle is ever retuned, this pin flags that the boundary values need updating.
+	var consts: Dictionary = screen.get_script().get_script_constant_map()
+	assert_int(int(consts["BEAT_THROTTLE_MS"])).is_equal(120)
+
+	# Act + Assert — t=1000: first beat fires (clears the -120 init window).
+	screen._beat_clock_override_ms = 1000
+	assert_bool(_kill_beat_gate(screen)).override_failure_message(
+		"the first beat must fire (no prior visible beat within the window)"
+	).is_true()
+
+	# t=1119: 119 ms later (< 120) — coalesced away (anti-strobe).
+	screen._beat_clock_override_ms = 1119
+	assert_bool(_kill_beat_gate(screen)).override_failure_message(
+		"a beat 119 ms after the last must be suppressed (within the 120 ms window)"
+	).is_false()
+
+	# t=1120: exactly 120 ms after the FIRST visible beat (the suppressed one did not
+	# move the clock) — the window has elapsed, so this beat fires again.
+	screen._beat_clock_override_ms = 1120
+	assert_bool(_kill_beat_gate(screen)).override_failure_message(
+		"a beat exactly 120 ms after the last visible beat must fire again"
+	).is_true()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_strike_beat_suppressed_for_empty_party() -> void:
+	# Arrange — an EMPTY roster: the diorama row builds but holds zero hero slots.
+	HeroRosterFixture.reset_hero_roster()
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	# Motion ON + a clear clock so neither reduce_motion nor the throttle is the gate.
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 1000
+
+	# Act + Assert — with no slots to animate, the beat is a no-op (false, no tween).
+	assert_bool(_kill_beat_gate(screen)).override_failure_message(
+		"an empty party must not start a beat tween (nothing to animate)"
+	).is_false()
+	assert_object(screen._active_beat_tween).is_null()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_enemy_killed_signal_emission_triggers_beat_end_to_end() -> void:
+	# End-to-end: the on_enter CONNECTION must actually route a live enemy_killed
+	# emission to a real beat (not just be wired in isolation).
+	# Arrange — party present, motion ON, deterministic clock.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 1000
+
+	# Act — emit the orchestrator signal exactly as combat does (tier, archetype,
+	# advantaged). The screen's connected handler must turn this into a beat.
+	DungeonRunOrchestrator.enemy_killed.emit(1, "goblin", false)
+	await get_tree().process_frame
+
+	# Assert — a live beat tween exists, proving the signal → handler → tween path.
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"emitting enemy_killed should route through the connection to a real beat"
+	).is_not_null()
+	assert_bool(screen._active_beat_tween.is_valid()).is_true()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_on_exit_kills_active_beat_tween() -> void:
+	# Lifecycle hygiene (ADR-0025): no beat tween may outlive the screen.
+	# Arrange — a party + a started beat.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 1000
+	screen._on_enemy_killed_beat(1, "goblin", false)
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"precondition: a beat tween should be active before on_exit"
+	).is_not_null()
+
+	# Act — leave the screen.
+	screen.on_exit()
+
+	# Assert — the active beat tween was killed AND the handle cleared (no dangling
+	# tween fighting the next screen's transforms / no leak on a freed screen).
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"on_exit must kill and clear the active beat tween"
+	).is_null()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.queue_free()
+	await get_tree().process_frame
