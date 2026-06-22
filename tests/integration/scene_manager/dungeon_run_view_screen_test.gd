@@ -1720,3 +1720,464 @@ func test_on_exit_kills_active_beat_tween() -> void:
 		sm.set("reduce_motion", prior_rm)
 	screen.queue_free()
 	await get_tree().process_frame
+
+
+# ===========================================================================
+# Story 009 — terminal reaction beats: victory cheer / defeat slump
+# (GDD #35 §C.4 / §D.2 / §D.4 / §E.5 / §E.7 / §E.9 / §E.11 / §H, ADR-0025 / ADR-0021).
+#
+# The run's two punctuation moments, each on a HUMAN-FREQUENCY orchestrator signal
+# (NEVER the 20 Hz tick — the Story 007 source guard already proves the tick stays
+# clean):
+#   • floor_cleared_first_time (losing_run == false) → VICTORY cheer (out-and-back)
+#   • run_defeated                                   → DEFEAT slump (one-way, held)
+# Both animate the hero SPRITES only and NEVER route — the route + idle-freeze stay
+# with _on_state_changed(RUN_ENDED) (§E.5: the slump is "not a second independent
+# route decision"). These tests pin: wiring hygiene; the beat plays / is suppressed
+# under the documented gates; the precedence latch (victory>boss>kill, §E.9); the
+# duration cap (< RUN_END_DWELL_MS so the beat completes under the overlay, AC-35-04);
+# reduce_motion read AT BEAT TIME with the defeat slump shown as an INSTANT static
+# pose (heroes visible + dimmed, §C.8); and the empty-party no-op (§E.7). Tween
+# internal shape is cosmetic/advisory and is NOT pinned (Story 008 precedent).
+# ===========================================================================
+
+func test_terminal_beats_connected_on_enter_disconnected_on_exit() -> void:
+	# Wiring hygiene (the scaffolded-but-unwired net). Arrange — navigate (on_enter
+	# connects both terminal-beat handlers).
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	# Pre-assert: both terminal beats are wired. Each signal has TWO consumers now
+	# (floor_cleared_first_time → glow VFX + this victory beat; run_defeated → the
+	# defeat overlay + this slump beat); guard the BEAT connections specifically.
+	assert_bool(
+		DungeonRunOrchestrator.floor_cleared_first_time.is_connected(screen._on_floor_cleared_beat)
+	).override_failure_message(
+		"floor_cleared_first_time must drive the hero victory beat while dungeon_run_view is active"
+	).is_true()
+	assert_bool(
+		DungeonRunOrchestrator.run_defeated.is_connected(screen._on_run_defeated_beat)
+	).override_failure_message(
+		"run_defeated must drive the hero defeat slump while dungeon_run_view is active"
+	).is_true()
+
+	# Act
+	screen.on_exit()
+
+	# Assert — both subscriptions disconnected (no orphaned connection / leak).
+	assert_bool(
+		DungeonRunOrchestrator.floor_cleared_first_time.is_connected(screen._on_floor_cleared_beat)
+	).is_false()
+	assert_bool(
+		DungeonRunOrchestrator.run_defeated.is_connected(screen._on_run_defeated_beat)
+	).is_false()
+
+	# Cleanup
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_victory_beat_plays_on_floor_cleared_and_does_not_route() -> void:
+	# AC-35-04 [BLOCKING]: a first-time floor clear plays the victory cheer. The beat
+	# animates the heroes ONLY — it must NOT show the run-end overlay or route (those stay
+	# with _on_state_changed, §E.5). Arrange — a two-warrior party, motion ON.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+
+	# Pre-assert: clean slate — no beat, not routed, no overlay, latch clear.
+	assert_object(screen._active_beat_tween).is_null()
+	assert_bool(screen._routed).is_false()
+	assert_bool(screen._overlay_shown).is_false()
+	assert_bool(screen._terminal_beat_played).is_false()
+
+	# Act — a first-time floor clear arrives via the real handler (winning run).
+	screen._on_floor_cleared_beat(2, "forest_reach", false)
+
+	# Assert — a live victory tween was started (cosmetic shape unchecked)...
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"a first-time floor clear should start a victory cheer tween when motion is enabled"
+	).is_not_null()
+	assert_bool(screen._active_beat_tween.is_valid()).is_true()
+	# ...the latch is set (this run's terminal motion has played)...
+	assert_bool(screen._terminal_beat_played).is_true()
+	# ...but the beat is NOT a route decision: no overlay shown, not routed (§E.5).
+	assert_bool(screen._routed).override_failure_message(
+		"the victory beat must NOT route — that stays with _on_state_changed(RUN_ENDED)"
+	).is_false()
+	assert_bool(screen._overlay_shown).override_failure_message(
+		"the victory beat must NOT show the run-end overlay — that stays with _on_state_changed"
+	).is_false()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_terminal_beat_durations_complete_within_run_end_dwell() -> void:
+	# AC-35-04 / AC-35-05: both terminal beats must complete UNDER the run-end overlay,
+	# before the auto-route fires — i.e. each duration < RUN_END_DWELL_MS (the dwell the
+	# route awaits). A pure constant-relationship pin (no scene needed); flags a retune that
+	# would let a beat outlive the dwell and get cut off by the screen change.
+	var script: GDScript = load(DUNGEON_RUN_VIEW_GD_PATH) as GDScript
+	assert_object(script).is_not_null()
+	var consts: Dictionary = script.get_script_constant_map()
+	var victory_ms: int = int(consts["VICTORY_BEAT_MS"])
+	var slump_ms: int = int(consts["DEFEAT_SLUMP_MS"])
+	var dwell_ms: int = int(consts["RUN_END_DWELL_MS"])
+
+	assert_int(dwell_ms).override_failure_message(
+		"RUN_END_DWELL_MS (%d) must exceed VICTORY_BEAT_MS (%d) so the cheer completes under the overlay" % [dwell_ms, victory_ms]
+	).is_greater(victory_ms)
+	assert_int(dwell_ms).override_failure_message(
+		"RUN_END_DWELL_MS (%d) must exceed DEFEAT_SLUMP_MS (%d) so the slump completes under the overlay" % [dwell_ms, slump_ms]
+	).is_greater(slump_ms)
+
+
+func test_losing_run_floor_clear_plays_no_victory_and_does_not_latch() -> void:
+	# A floor cleared on a LOSING run earns no celebration (it stays the retry target),
+	# mirroring the lantern-glow VFX gate — AND must NOT latch, so the run_defeated slump
+	# that follows still plays (bug guard: a losing clear silently eating the slump).
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+
+	# Act 1 — a first-time floor clear on a LOSING run.
+	screen._on_floor_cleared_beat(2, "forest_reach", true)
+
+	# Assert — no victory tween, and the latch is still clear.
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"a losing-run floor clear must not play a victory cheer"
+	).is_null()
+	assert_bool(screen._terminal_beat_played).override_failure_message(
+		"a losing-run floor clear must NOT latch — the run_defeated slump must still be able to play"
+	).is_false()
+
+	# Act 2 — the run is then lost: the slump must play (the latch was left clear).
+	screen._on_run_defeated_beat(2, "forest_reach")
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"after a losing-run floor clear, run_defeated must still play the defeat slump"
+	).is_not_null()
+	assert_bool(screen._active_beat_tween.is_valid()).is_true()
+	assert_bool(screen._terminal_beat_played).is_true()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_defeat_slump_plays_on_run_defeated_coordinated_with_overlay_no_route() -> void:
+	# AC-35-05 [BLOCKING]: run_defeated plays the defeat slump, coordinated WITH the defeat
+	# overlay (both consume run_defeated), and the slump is NOT a route decision (§E.5) — the
+	# route stays with _on_state_changed(RUN_ENDED). End-to-end: emit the REAL signal so BOTH
+	# connected consumers fire (overlay + slump), proving the on_enter connection routes it.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+
+	# Pre-assert: clean slate.
+	assert_object(screen._active_beat_tween).is_null()
+	assert_bool(screen._overlay_shown).is_false()
+	assert_bool(screen._routed).is_false()
+
+	# Act — the run is lost (emit exactly as the orchestrator does, just before RUN_ENDED).
+	DungeonRunOrchestrator.run_defeated.emit(4, "crypt_depths")
+	await get_tree().process_frame
+
+	# Assert — the slump tween plays (signal → _on_run_defeated_beat → tween)...
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"run_defeated should route through the connection to a real defeat slump tween"
+	).is_not_null()
+	assert_bool(screen._active_beat_tween.is_valid()).is_true()
+	# ...coordinated WITH the defeat overlay (the other run_defeated consumer fired)...
+	assert_bool(screen._overlay_shown).override_failure_message(
+		"the defeat slump must be coordinated with the defeat overlay (both consume run_defeated)"
+	).is_true()
+	# ...and the slump is NOT a route decision (§E.5): _on_state_changed owns the route.
+	assert_bool(screen._routed).override_failure_message(
+		"the defeat slump must NOT route — that is _on_state_changed(RUN_ENDED)'s job (no double-route)"
+	).is_false()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_victory_supersedes_boss_strike_then_latch_blocks_late_kill() -> void:
+	# AC-35-13 [BLOCKING]: a boss strike then a first-time floor clear → the victory cheer
+	# SUPERSEDES the in-flight boss beat (only ONE terminal motion, §E.9 victory>boss>kill);
+	# a kill arriving AFTER is then suppressed by the terminal latch (no late strike overrides
+	# the terminal motion). Arrange — party present, motion ON, deterministic clock.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 1000
+
+	# Act 1 — a boss kill starts a strike beat.
+	screen._on_boss_killed_beat("forest_warden")
+	var boss_tween: Tween = screen._active_beat_tween
+	assert_object(boss_tween).override_failure_message(
+		"precondition: the boss kill should start a strike beat"
+	).is_not_null()
+	assert_bool(boss_tween.is_valid()).is_true()
+
+	# Act 2 — a first-time floor clear: the victory cheer supersedes the boss strike.
+	screen._on_floor_cleared_beat(3, "forest_reach", false)
+
+	# Assert — the boss tween was KILLED and a DIFFERENT (victory) tween is now active.
+	assert_bool(boss_tween.is_valid()).override_failure_message(
+		"the victory cheer must supersede (kill) the in-flight boss strike (§E.9)"
+	).is_false()
+	assert_object(screen._active_beat_tween).is_not_null()
+	assert_bool(screen._active_beat_tween.is_valid()).is_true()
+	assert_bool(screen._active_beat_tween != boss_tween).override_failure_message(
+		"the active tween after victory must be the new cheer, not the killed boss beat"
+	).is_true()
+	var victory_tween: Tween = screen._active_beat_tween
+
+	# Act 3 — a late normal kill arrives AFTER the terminal beat. Advance the clock well past
+	# the throttle so coalescing can NOT be the gate — isolating the latch as the suppressor.
+	screen._beat_clock_override_ms = 5000
+	screen._on_enemy_killed_beat(1, "goblin", false)
+
+	# Assert — the late kill did nothing: the victory tween is untouched (still the active one).
+	assert_bool(screen._active_beat_tween == victory_tween).override_failure_message(
+		"a kill after the terminal beat must be suppressed by the latch — the victory tween stays active"
+	).is_true()
+	assert_bool(screen._active_beat_tween.is_valid()).is_true()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_victory_beat_suppressed_by_reduce_motion_heroes_stay_visible() -> void:
+	# AC-35-07/08: reduce_motion suppresses the victory cheer (no tween); the heroes stay
+	# visible (a victory's terminal state IS rest — nothing to apply). reduce_motion is set
+	# AFTER on_enter, so the beat reading it true also proves the read-at-beat-time (suppress
+	# direction). Arrange — party present so the empty-party gate is NOT what suppresses.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	assert_object(sm).is_not_null()
+	var prior_rm: bool = bool(sm.get("reduce_motion"))
+	sm.set("reduce_motion", true)
+
+	# Act — a first-time floor clear under reduce_motion.
+	screen._on_floor_cleared_beat(2, "forest_reach", false)
+
+	# Assert — NO tween (suppressed), latch still set (the terminal moment happened), and
+	# every hero stays fully visible at rest (alpha 1.0).
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"reduce_motion must suppress the victory tween (no animation)"
+	).is_null()
+	assert_bool(screen._terminal_beat_played).is_true()
+	var row: HBoxContainer = screen.get_node_or_null(
+		"PartyDioramaLayer/PartyFrontLine") as HBoxContainer
+	assert_object(row).is_not_null()
+	for slot: Node in row.get_children():
+		var c: Control = slot as Control
+		assert_float(c.modulate.a).override_failure_message(
+			"heroes must stay fully visible under reduce_motion (no fade)"
+		).is_equal(1.0)
+
+	# Cleanup
+	sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_defeat_slump_static_under_reduce_motion_visible_and_dimmed() -> void:
+	# §C.8 / AC-35-07/08: under reduce_motion the defeat slump is shown as an INSTANT static
+	# pose — NO tween, but the terminal STATE is applied (heroes sit slumped + dimmed) and
+	# they stay VISIBLE (alpha 1.0; never a fade-to-nothing). Arrange — party present.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	assert_object(sm).is_not_null()
+	var prior_rm: bool = bool(sm.get("reduce_motion"))
+	sm.set("reduce_motion", true)
+
+	# Pull the slump constants so the test never hardcodes the pose values.
+	var consts: Dictionary = screen.get_script().get_script_constant_map()
+	var slump_x: float = float(consts["DEFEAT_SLUMP_SCALE_X"])
+	var slump_y: float = float(consts["DEFEAT_SLUMP_SCALE_Y"])
+	var dim: float = float(consts["DEFEAT_SLUMP_DIM"])
+
+	# Act — the run is lost under reduce_motion.
+	screen._on_run_defeated_beat(4, "crypt_depths")
+
+	# Assert — NO tween (static path), but the slump pose IS applied + heroes stay visible.
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"reduce_motion must NOT animate the slump (no tween) — it applies a static pose (§C.8)"
+	).is_null()
+	assert_bool(screen._terminal_beat_played).is_true()
+	var row: HBoxContainer = screen.get_node_or_null(
+		"PartyDioramaLayer/PartyFrontLine") as HBoxContainer
+	assert_object(row).is_not_null()
+	for slot: Node in row.get_children():
+		var c: Control = slot as Control
+		assert_float(c.scale.x).override_failure_message(
+			"the static slump must apply the slump X-scale instantly"
+		).is_equal_approx(slump_x, 0.001)
+		assert_float(c.scale.y).override_failure_message(
+			"the static slump must apply the slump Y-scale instantly"
+		).is_equal_approx(slump_y, 0.001)
+		assert_float(c.modulate.r).override_failure_message(
+			"the static slump must dim the heroes (modulate < 1.0)"
+		).is_equal_approx(dim, 0.001)
+		assert_float(c.modulate.a).override_failure_message(
+			"the slumped party must stay visible (alpha 1.0) — never a fade (§C.8)"
+		).is_equal(1.0)
+
+	# Cleanup
+	sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_terminal_beat_reads_reduce_motion_at_beat_time_not_on_enter() -> void:
+	# ADR-0025 §C.8 / AC-35-08 (allow direction): the flag is read AT BEAT TIME, never cached
+	# at on_enter. Navigate with reduce_motion ON, then CLEAR it: the victory cheer must
+	# ANIMATE — proving the beat read the LIVE (false) value, not the on_enter (true) value
+	# (which would have suppressed it).
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+
+	var sm: Node = get_node_or_null("/root/SceneManager")
+	assert_object(sm).is_not_null()
+	var prior_rm: bool = bool(sm.get("reduce_motion"))
+	sm.set("reduce_motion", true)  # ON for the whole of on_enter
+
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	# Flip OFF after on_enter, then fire the beat.
+	sm.set("reduce_motion", false)
+	screen._on_floor_cleared_beat(2, "forest_reach", false)
+
+	# Assert — the beat ANIMATED (read reduce_motion=false at beat time, not the cached true).
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"the terminal beat must read reduce_motion AT BEAT TIME — clearing it after on_enter must let the cheer animate"
+	).is_not_null()
+	assert_bool(screen._active_beat_tween.is_valid()).is_true()
+
+	# Cleanup
+	sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_terminal_beats_no_op_for_empty_party() -> void:
+	# §E.7: a terminal beat on an EMPTY party is a no-op (no tween, no crash) — the diorama
+	# row exists but holds zero hero slots. Covers BOTH victory and defeat.
+	HeroRosterFixture.reset_hero_roster()
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+
+	# Act + Assert — victory on an empty party: no tween.
+	screen._on_floor_cleared_beat(2, "forest_reach", false)
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"an empty party must not start a victory tween (nothing to animate)"
+	).is_null()
+
+	# Reset the latch so the defeat path is reachable in the same test (a run cannot both
+	# win and lose; we reset only to exercise the empty-party gate on BOTH terminal paths).
+	screen._terminal_beat_played = false
+
+	# Act + Assert — defeat on an empty party: no tween, no crash.
+	screen._on_run_defeated_beat(2, "forest_reach")
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"an empty party must not start a defeat slump tween (nothing to animate)"
+	).is_null()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_on_exit_kills_active_terminal_beat_tween() -> void:
+	# Lifecycle hygiene (ADR-0025 §C.7): a terminal beat shares the _active_beat_tween handle,
+	# so on_exit must kill + clear it too (no victory/slump tween outlives the screen).
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+
+	# Arrange — a started victory tween.
+	screen._on_floor_cleared_beat(2, "forest_reach", false)
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"precondition: a victory tween should be active before on_exit"
+	).is_not_null()
+
+	# Act — leave the screen.
+	screen.on_exit()
+
+	# Assert — the active terminal tween was killed AND the handle cleared.
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"on_exit must kill and clear the active terminal beat tween"
+	).is_null()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.queue_free()
+	await get_tree().process_frame

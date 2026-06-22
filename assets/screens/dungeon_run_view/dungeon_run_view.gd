@@ -197,6 +197,43 @@ const BEAT_OUT_PHASE_RATIO: float = 0.4
 ## capping visible beats at ~8.3/s. Parallels the audio gold-chime throttle.
 const BEAT_THROTTLE_MS: int = 120
 
+# --- Terminal reaction beats (Story 009 · GDD #35 §C.4 / §D.2 / §D.4 / §G) ----
+# The run's two punctuation moments: a VICTORY cheer (floor_cleared_first_time)
+# and a DEFEAT slump (run_defeated). One-shot, NOT coalesced (a terminal beat
+# must play even if the final kill's strike fired < BEAT_THROTTLE_MS ago), and
+# they supersede any in-flight kill/boss strike (precedence victory>boss>kill,
+# §E.9). Durations are capped < RUN_END_DWELL_MS (1500) so the beat completes
+# under the run-end overlay before the auto-route (AC-35-04). Feel knobs are
+# Story-014 / playtest tunable within the §G safe ranges noted below.
+
+## Victory cheer total duration (ms) — out-and-back, like the strike but bigger /
+## longer (GDD §D.2). §G safe range 200–1400; MUST stay < RUN_END_DWELL_MS.
+const VICTORY_BEAT_MS: int = 600
+
+## Defeat slump duration (ms) — the slowest beat; a held one-way sag (GDD §D.2).
+## §G safe range 300–1400; MUST stay < RUN_END_DWELL_MS.
+const DEFEAT_SLUMP_MS: int = 700
+
+## Peak scale of the victory cheer (1.0 → this → 1.0), about a BOTTOM-CENTRE pivot
+## so the party reads as rising on their feet (GDD §D.4 — the upward HOP_PX hop,
+## approximated by bottom-pivot scale under the HBoxContainer position constraint).
+const VICTORY_SCALE_PUNCH: float = 1.10
+
+## Peak brightness multiplier of the victory bloom (modulate 1.0 → this → 1.0) —
+## a touch warmer than the kill flash; the run's celebratory high (GDD §D.4).
+const VICTORY_BRIGHTNESS_BLOOM: float = 1.30
+
+## Held horizontal / vertical scale of the defeat slump about the BOTTOM-CENTRE
+## pivot — a slight sag at the feet (GDD §D.4 SLUMP_OFFSET_PX, §G 2–16 px,
+## approximated by scale). Y compresses more than X so the party "sinks", never
+## reads as a fall / ragdoll / gore (ADR-0021 / §E.11). NOT a death pose.
+const DEFEAT_SLUMP_SCALE_X: float = 0.97
+const DEFEAT_SLUMP_SCALE_Y: float = 0.90
+
+## Held brightness multiplier of the defeat slump (modulate dim) — lanterns dim
+## but the party stays VISIBLE (alpha 1.0), per GDD §D.4 / §C.8.
+const DEFEAT_SLUMP_DIM: float = 0.80
+
 # ---------------------------------------------------------------------------
 # Private state
 # ---------------------------------------------------------------------------
@@ -255,6 +292,14 @@ var _last_beat_ms: int = -BEAT_THROTTLE_MS
 ## fixed value to drive the coalescing window deterministically.
 var _beat_clock_override_ms: int = -1
 
+## One-shot latch for the terminal reaction beat (Story 009 · GDD #35 §C.4 / §E.9).
+## Set the first time a victory cheer or defeat slump plays; thereafter every
+## kill/boss strike is suppressed ([method _try_party_strike_beat]) so no late
+## strike overrides the run's terminal motion (precedence victory>boss>kill), and
+## a second terminal beat is a no-op (at most one terminal motion per run). Reset
+## in [method on_enter] so a re-entered screen / next run plays its beat afresh.
+var _terminal_beat_played: bool = false
+
 
 # ---------------------------------------------------------------------------
 # Built-in lifecycle (_ready — tap-target + label localisation)
@@ -296,6 +341,9 @@ func on_enter() -> void:
 	# Reset both idempotency guards for this screen visit (Story 012 + Story 013).
 	_overlay_shown = false
 	_routed = false
+	# Reset the terminal-beat latch (Story 009) so this visit's run can play its
+	# victory cheer / defeat slump even if a prior visit already played one.
+	_terminal_beat_played = false
 	_run_end_overlay.visible = false
 
 	# Sprint 19 S19-M3 — set the biome background to match the active dispatch.
@@ -372,6 +420,18 @@ func on_enter() -> void:
 	if not DungeonRunOrchestrator.boss_killed.is_connected(_on_boss_killed_beat):
 		DungeonRunOrchestrator.boss_killed.connect(_on_boss_killed_beat)
 
+	# Terminal reaction beats (Story 009 · ADR-0025 §C.4): the run's punctuation —
+	# a VICTORY cheer on first-time floor clear and a DEFEAT slump on run_defeated.
+	# DISTINCT, additive consumers on signals that already drive screen feedback
+	# (floor_cleared_first_time → lantern-glow VFX above; run_defeated → the defeat
+	# OVERLAY below): these animate the hero SPRITES and never route. The route +
+	# idle-freeze stay with _on_state_changed(RUN_ENDED) — the slump is NOT a second
+	# route decision (GDD §E.5). Both disconnected in on_exit.
+	if not DungeonRunOrchestrator.floor_cleared_first_time.is_connected(_on_floor_cleared_beat):
+		DungeonRunOrchestrator.floor_cleared_first_time.connect(_on_floor_cleared_beat)
+	if not DungeonRunOrchestrator.run_defeated.is_connected(_on_run_defeated_beat):
+		DungeonRunOrchestrator.run_defeated.connect(_on_run_defeated_beat)
+
 	# Initial render — snap labels to the current snapshot (covers the case
 	# where this screen is shown after DISPATCHING has already begun and ticks
 	# have already advanced the snapshot before on_enter fires).
@@ -439,6 +499,12 @@ func on_exit() -> void:
 		DungeonRunOrchestrator.enemy_killed.disconnect(_on_enemy_killed_beat)
 	if DungeonRunOrchestrator.boss_killed.is_connected(_on_boss_killed_beat):
 		DungeonRunOrchestrator.boss_killed.disconnect(_on_boss_killed_beat)
+	# Terminal beats (Story 009): mirror the on_enter subscriptions. A victory /
+	# slump tween shares the _active_beat_tween handle, so the kill below covers it.
+	if DungeonRunOrchestrator.floor_cleared_first_time.is_connected(_on_floor_cleared_beat):
+		DungeonRunOrchestrator.floor_cleared_first_time.disconnect(_on_floor_cleared_beat)
+	if DungeonRunOrchestrator.run_defeated.is_connected(_on_run_defeated_beat):
+		DungeonRunOrchestrator.run_defeated.disconnect(_on_run_defeated_beat)
 	if _active_beat_tween != null:
 		if _active_beat_tween.is_valid():
 			_active_beat_tween.kill()
@@ -1253,6 +1319,9 @@ func _on_boss_killed_beat(_enemy_id: String) -> void:
 
 ## Gated entry point for every reaction beat. Returns [code]true[/code] iff a tween was
 ## actually started; [code]false[/code] when suppressed. Gate order (all per GDD #35 / ADR-0025):
+## [br]0. [b]terminal latch[/b] — once a victory/slump terminal beat has played
+##    ([member _terminal_beat_played]), every kill/boss strike is suppressed so no late
+##    strike overrides the run's terminal motion (precedence victory>boss>kill, §E.9).
 ## [br]1. [b]reduce_motion[/b] — read AT BEAT TIME, never cached (GDD §C.8 / §E.6, precedent
 ##    prestige_fade_animation_test AC-PR-18); when on, NO beat and the throttle clock is left
 ##    untouched (a suppressed beat must not "use up" the throttle window).
@@ -1261,6 +1330,8 @@ func _on_boss_killed_beat(_enemy_id: String) -> void:
 ## [br]3. [b]empty party[/b] — nothing to animate before the diorama is built / when no heroes.
 ## Only after all three pass do we stamp [member _last_beat_ms] and start the tween.
 func _try_party_strike_beat(scale_punch: float, duration_ms: int) -> bool:
+	if _terminal_beat_played:
+		return false  # §E.9 — a terminal beat (victory/slump) has played; no late strike
 	if _reduce_motion():
 		return false
 	var now_ms: int = _beat_now_ms()
@@ -1322,6 +1393,153 @@ func _start_strike_tween(slots: Array, scale_punch: float, duration_ms: int) -> 
 ## [code]>= 0[/code] test and the [code]-BEAT_THROTTLE_MS[/code] init of [member _last_beat_ms].
 func _beat_now_ms() -> int:
 	return _beat_clock_override_ms if _beat_clock_override_ms >= 0 else Time.get_ticks_msec()
+
+
+# ---------------------------------------------------------------------------
+# Terminal reaction beats — victory cheer / defeat slump (Story 009 ·
+# GDD #35 §C.4 / §D.2 / §D.4 / §E.5 / §E.9 / §E.11, ADR-0025 §C.4 / ADR-0021).
+# ---------------------------------------------------------------------------
+
+## Victory cheer — wired to [signal DungeonRunOrchestrator.floor_cleared_first_time]
+## (human-frequency, never the tick). Mirrors the lantern-glow VFX gate: a LOSING-run
+## floor clear earns no celebration (the floor stays the retry target) — and crucially
+## must NOT latch, so the subsequent [signal DungeonRunOrchestrator.run_defeated] can
+## still play the slump. Addresses GDD #24 OQ-24-6 (the run-end overlay's hero beat).
+func _on_floor_cleared_beat(_floor_index: int, _biome_id: String, losing_run: bool) -> void:
+	if losing_run:
+		return
+	_play_terminal_beat(true)
+
+
+## Defeat slump — wired to [signal DungeonRunOrchestrator.run_defeated] (human-frequency).
+## A SECOND, additive consumer alongside [method _on_run_defeated] (which shows the defeat
+## overlay): this animates the hero sprites only. It does NOT route — the slump is "not a
+## second independent route decision" (GDD §E.5); the route stays with [method _on_state_changed].
+func _on_run_defeated_beat(_floor_index: int, _biome_id: String) -> void:
+	_play_terminal_beat(false)
+
+
+## Plays the run's ONE terminal beat — a victory cheer ([param victorious] true) or a defeat
+## slump (false). Returns [code]true[/code] iff an animated tween was started. Contract
+## (GDD #35 §C.4 / §E.9 / §C.8, ADR-0025):
+## [br]• [b]one-shot[/b] — [member _terminal_beat_played] latches on the first call; a second
+##   terminal beat is a no-op (at most one terminal motion per run).
+## [br]• [b]supersedes strikes[/b] — kills any in-flight kill/boss beat tween (precedence
+##   victory>boss>kill); the latch then blocks any later strike in [method _try_party_strike_beat].
+## [br]• [b]NOT coalesced[/b] — unlike a strike, a terminal beat ignores [constant BEAT_THROTTLE_MS]
+##   and never stamps [member _last_beat_ms]; it must play even if the final kill's strike just fired.
+## [br]• [b]reduce_motion[/b] (read AT BEAT TIME, §C.8) — no tween: a victory's terminal state IS
+##   rest (nothing to show), a defeat's terminal state is the slump pose, applied INSTANTLY
+##   ([method _apply_defeat_slump_static]) so the party stays visibly slumped, never animated.
+## [br]• [b]empty party[/b] (§E.7) — no-op when the diorama holds no hero slots.
+func _play_terminal_beat(victorious: bool) -> bool:
+	if _terminal_beat_played:
+		return false
+	_terminal_beat_played = true
+
+	var slots: Array = _party_hero_slots()
+	if slots.is_empty():
+		return false
+
+	# Terminal state supersedes any in-flight kill/boss strike (§E.9). Kill it first so the
+	# reduce_motion static path is not left fighting a strike tween, and so the animated path
+	# starts from a clean handle.
+	if _active_beat_tween != null and _active_beat_tween.is_valid():
+		_active_beat_tween.kill()
+	_active_beat_tween = null
+
+	if _reduce_motion():
+		# §C.8 — show the terminal STATE instantly, no animation. Victory resolves back to
+		# rest (no-op: the frozen idle pose already reads as "standing"); defeat holds a slump.
+		if not victorious:
+			_apply_defeat_slump_static(slots)
+		return false
+
+	if victorious:
+		_start_victory_tween(slots)
+	else:
+		_start_defeat_slump_tween(slots)
+	return true
+
+
+## Builds + runs the victory cheer: an out-and-back scale punch + brightness bloom about a
+## BOTTOM-CENTRE pivot (the party rises on their feet — GDD §D.4's upward hop, approximated
+## by bottom-pivot scale since the HBoxContainer owns each slot's position; same constraint
+## the Story 008 strike tween works within). Bigger / longer / warmer than a kill flash. The
+## out/back split reuses [constant BEAT_OUT_PHASE_RATIO]; [code].from(...)[/code] pins a clean
+## rest start so a mid-strike victory still snaps to a coherent pose. Cosmetic — shape advisory.
+func _start_victory_tween(slots: Array) -> void:
+	if _active_beat_tween != null and _active_beat_tween.is_valid():
+		_active_beat_tween.kill()
+	var total_s: float = float(VICTORY_BEAT_MS) / 1000.0
+	var out_s: float = total_s * BEAT_OUT_PHASE_RATIO
+	var back_s: float = total_s - out_s
+	var punch: Vector2 = Vector2(VICTORY_SCALE_PUNCH, VICTORY_SCALE_PUNCH)
+	# Brightness bloom built by component from Color.WHITE (no hardcoded-Color literal — keeps
+	# the manifest grep strict; alpha stays 1.0 so the party never fades).
+	var bloom: Color = Color.WHITE
+	bloom.r = VICTORY_BRIGHTNESS_BLOOM
+	bloom.g = VICTORY_BRIGHTNESS_BLOOM
+	bloom.b = VICTORY_BRIGHTNESS_BLOOM
+	var tween: Tween = create_tween().set_parallel(true)
+	for node: Node in slots:
+		var slot: Control = node as Control
+		if slot == null:
+			continue
+		slot.pivot_offset = Vector2(slot.size.x * 0.5, slot.size.y)  # bottom-centre → "rise"
+		tween.tween_property(slot, "scale", punch, out_s).from(Vector2.ONE).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(slot, "modulate", bloom, out_s).from(Color.WHITE)
+	tween.chain()
+	for node2: Node in slots:
+		var slot2: Control = node2 as Control
+		if slot2 == null:
+			continue
+		tween.tween_property(slot2, "scale", Vector2.ONE, back_s).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		tween.tween_property(slot2, "modulate", Color.WHITE, back_s)
+	_active_beat_tween = tween
+
+
+## Builds + runs the defeat slump: a ONE-WAY, HELD sag — scale to (X,Y) + modulate dim about
+## the BOTTOM-CENTRE pivot, so the party sinks at the feet and the lanterns dim, then HOLDS
+## (no settle-back) under the defeat overlay until the screen routes to guild_hall. Slow
+## EASE_IN_OUT, alpha 1.0 throughout (the party stays visible) — must read as a weary sag,
+## never a fall / ragdoll / gore (ADR-0021 / §E.11). Cosmetic — shape advisory, not test-pinned.
+func _start_defeat_slump_tween(slots: Array) -> void:
+	if _active_beat_tween != null and _active_beat_tween.is_valid():
+		_active_beat_tween.kill()
+	var slump_s: float = float(DEFEAT_SLUMP_MS) / 1000.0
+	var slump_scale: Vector2 = Vector2(DEFEAT_SLUMP_SCALE_X, DEFEAT_SLUMP_SCALE_Y)
+	var dim: Color = Color.WHITE
+	dim.r = DEFEAT_SLUMP_DIM
+	dim.g = DEFEAT_SLUMP_DIM
+	dim.b = DEFEAT_SLUMP_DIM
+	var tween: Tween = create_tween().set_parallel(true)
+	for node: Node in slots:
+		var slot: Control = node as Control
+		if slot == null:
+			continue
+		slot.pivot_offset = Vector2(slot.size.x * 0.5, slot.size.y)  # bottom-centre → "sag at the feet"
+		tween.tween_property(slot, "scale", slump_scale, slump_s).from(Vector2.ONE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tween.tween_property(slot, "modulate", dim, slump_s).from(Color.WHITE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_active_beat_tween = tween
+
+
+## reduce_motion defeat path (§C.8): applies the slump pose INSTANTLY — no tween, no animation.
+## Sets the same bottom-centre pivot + held scale + dim modulate the animated slump settles to,
+## so the party reads as slumped the instant the run ends. Alpha stays 1.0 (party visible).
+func _apply_defeat_slump_static(slots: Array) -> void:
+	var slump_scale: Vector2 = Vector2(DEFEAT_SLUMP_SCALE_X, DEFEAT_SLUMP_SCALE_Y)
+	var dim: Color = Color.WHITE
+	dim.r = DEFEAT_SLUMP_DIM
+	dim.g = DEFEAT_SLUMP_DIM
+	dim.b = DEFEAT_SLUMP_DIM
+	for node: Node in slots:
+		var slot: Control = node as Control
+		if slot == null:
+			continue
+		slot.pivot_offset = Vector2(slot.size.x * 0.5, slot.size.y)
+		slot.scale = slump_scale
+		slot.modulate = dim
 
 
 ## Top-right: run stats backing panel + Return-to-Hall. The real StatsPanel
