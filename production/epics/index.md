@@ -106,7 +106,15 @@ Planned epics (from systems-index §Feature Layer):
 
 ## Presentation Layer
 
-_Not yet processed. Run `/create-epics layer: presentation` when Feature layer nears completion._
+> First Presentation-layer epic defined **2026-06-22**: **hero-combat-animation** —
+> puts the party's heroes on the dungeon screen and animates them in reaction to
+> combat (heroes are currently absent from the one screen the player watches during
+> the core loop). The remaining Presentation systems below are still scaffold-only —
+> run `/create-epics layer: presentation` when picking them up.
+
+| Epic | System | GDD | Governing ADRs | Risk | Stories | Status |
+|---|---|---|---|---|---|---|
+| [hero-combat-animation](hero-combat-animation/EPIC.md) | Hero Combat Presence & Animation | [hero-combat-animation.md](../../design/gdd/hero-combat-animation.md) | ADR-0025, 0010, 0021, 0008, 0019, 0024 | MEDIUM | 16 (Phase 0 in progress) | In Progress |
 
 Planned epics (from systems-index §Presentation Layer):
 - guild-hall-screen, offline-rewards-screen, recruit-screen, roster-screen,
