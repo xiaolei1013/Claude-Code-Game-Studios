@@ -1240,6 +1240,18 @@ func _build_party_diorama() -> void:
 			cls = String(h.class_id)
 		row.add_child(_make_hero_slot(cls, row.get_child_count()))
 
+	# Story 010 — §C.8 / AC-35-07: reduce_motion suppresses the IDLE loop at build time.
+	# Heroes stay fully present (all K slots built above, modulate untouched at alpha 1.0)
+	# but hold a single static frame — frame 0, which setup() already assigned — with the
+	# animator's _process disabled. Read at build, which IS the idle's "state evaluation"
+	# point per §E.6: set_reduce_motion() emits no signal, and a fresh on_enter rebuilds
+	# the diorama, so toggling the flag freezes/resumes the idle on the next re-enter
+	# (AC-35-08's idle direction). The reaction beats (strike/terminal) read reduce_motion
+	# INDEPENDENTLY at beat time. set_animating(false) → set_process(false), so no frame
+	# ever advances; this is the sole idle-animation surface, hence the sole build gate.
+	if _reduce_motion():
+		_set_party_idle_animating(false)
+
 
 ## Builds one hero sprite slot: a TextureRect playing the class's looping idle
 ## animation (the calm "breathing" idle). Square [const _HERO_SPRITE_DISPLAY_PX]

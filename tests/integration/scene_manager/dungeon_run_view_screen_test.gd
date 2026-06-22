@@ -1211,8 +1211,11 @@ func test_party_diorama_slot_stashes_class_id_and_loads_idle_frame() -> void:
 # by ClassSpriteFactory.animate) that cycles the class idle frames from its OWN
 # _process. This is the "two clocks, never the tick" rule made concrete: the idle
 # loop is a free-running _process on a SEPARATE node, structurally decoupled from
-# the 20 Hz `_on_tick_fired` hot path (ADR-0025 §C.9 zero-alloc gate). reduce_motion
-# gating is deferred to Story 010.
+# the 20 Hz `_on_tick_fired` hot path (ADR-0025 §C.9 zero-alloc gate). Story 010
+# adds the reduce_motion build-time suppression (§C.8 / AC-35-07): with the flag on,
+# _build_party_diorama freezes the idle (set_animating(false)) so each slot holds a
+# static frame 0 — heroes stay fully visible, no frame advances. See the
+# "reduce_motion suppression sweep" section below for that coverage.
 # ===========================================================================
 
 func test_party_diorama_hero_slot_runs_idle_animation() -> void:
@@ -2179,5 +2182,167 @@ func test_on_exit_kills_active_terminal_beat_tween() -> void:
 	# Cleanup
 	if sm != null:
 		sm.set("reduce_motion", prior_rm)
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+# ===========================================================================
+# reduce_motion suppression sweep — Story 010 (GDD #35 §C.8 / AC-35-07, AC-35-08).
+#
+# The single, consolidated guarantee: when reduce_motion is ON, NO hero-animation
+# surface moves. Every surface is covered by an individual gate already (the idle at
+# build time, the strike/boss/terminal beats at beat time); this section asserts the
+# WHOLE set together so no future surface can be added without a reduce_motion gate.
+#
+# Invariants under reduce_motion:
+#   • Idle loop frozen — each _IdleAnimator has _process disabled and holds frame 0.
+#   • Strike + boss beats suppressed — _try_party_strike_beat returns false, no tween.
+#   • Terminal beats suppressed — victory/defeat apply INSTANT state, never a tween.
+#   • Heroes stay FULLY PRESENT and VISIBLE (all K slots, modulate.a == 1.0) — the
+#     accessibility contract removes motion, NEVER the party (§C.8).
+# ===========================================================================
+
+func test_reduce_motion_idle_suppressed_static_and_heroes_visible() -> void:
+	# AC-35-07 (idle core): reduce_motion ON at build → every hero holds a single static
+	# frame (frame 0, _process disabled) yet stays fully present and visible. A 3-warrior
+	# party so we also prove the data-driven count (all K=3 slots) survives suppression.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(3)
+
+	var sm: Node = get_node_or_null("/root/SceneManager")
+	assert_object(sm).is_not_null()
+	var prior_rm: bool = bool(sm.get("reduce_motion"))
+	sm.set("reduce_motion", true)  # ON before on_enter builds the diorama
+
+	# Act — navigate (on_enter → _build_party_diorama reads reduce_motion at build time).
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var row: HBoxContainer = screen.get_node_or_null(
+		"PartyDioramaLayer/PartyFrontLine") as HBoxContainer
+	assert_object(row).is_not_null()
+
+	# Assert — all K slots present, each frozen on a static frame 0, fully visible.
+	assert_int(row.get_child_count()).override_failure_message(
+		"reduce_motion must NOT drop heroes — all 3 occupied slots stay present (§C.8)"
+	).is_equal(3)
+	for slot: Node in row.get_children():
+		var animator: SpriteSheetAnimator = slot.get_node_or_null(
+			"_IdleAnimator") as SpriteSheetAnimator
+		assert_object(animator).override_failure_message(
+			"a committed-art warrior must still get its idle animator (just frozen)"
+		).is_not_null()
+		assert_bool(animator.is_processing()).override_failure_message(
+			"reduce_motion must disable the idle animator's _process (no looping idle)"
+		).is_false()
+		assert_int(animator._idx).override_failure_message(
+			"a frozen idle must hold the single static frame 0 (no frame ever advanced)"
+		).is_equal(0)
+		var c: Control = slot as Control
+		assert_float(c.modulate.a).override_failure_message(
+			"heroes must remain fully visible under reduce_motion (alpha 1.0, never faded)"
+		).is_equal(1.0)
+
+	# Cleanup
+	sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_reduce_motion_full_sweep_no_surface_animates_heroes_visible() -> void:
+	# AC-35-07 (anchor): the consolidated guarantee — under reduce_motion NO surface moves.
+	# Exercise idle + strike + boss + victory in one run and assert each is inert (frozen /
+	# no tween), then assert every hero is still fully visible. Strike + boss fire BEFORE the
+	# terminal beat so the terminal latch is clear and reduce_motion (gate 1) is provably the
+	# suppressor — not the latch (gate 0).
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+
+	var sm: Node = get_node_or_null("/root/SceneManager")
+	assert_object(sm).is_not_null()
+	var prior_rm: bool = bool(sm.get("reduce_motion"))
+	sm.set("reduce_motion", true)
+
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	screen._beat_clock_override_ms = 1000  # deterministic clock; RM, not the throttle, is the gate
+
+	# (1) Idle frozen at build.
+	for slot: Node in screen._party_hero_slots():
+		var animator: SpriteSheetAnimator = slot.get_node_or_null(
+			"_IdleAnimator") as SpriteSheetAnimator
+		assert_object(animator).is_not_null()
+		assert_bool(animator.is_processing()).override_failure_message(
+			"reduce_motion must freeze the idle loop (sweep: idle surface)"
+		).is_false()
+
+	# (2) Normal-kill strike beat suppressed (latch clear → RM is the gate).
+	assert_bool(_kill_beat_gate(screen)).override_failure_message(
+		"reduce_motion must suppress the strike beat (sweep: enemy_killed surface)"
+	).is_false()
+	assert_object(screen._active_beat_tween).is_null()
+
+	# (3) Boss-kill strike beat suppressed.
+	screen._on_boss_killed_beat("forest_warden")
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"reduce_motion must suppress the boss strike beat (sweep: boss_killed surface)"
+	).is_null()
+
+	# (4) Victory terminal beat suppressed — instant, no tween (latch now sets).
+	screen._on_floor_cleared_beat(2, "forest_reach", false)
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"reduce_motion must suppress the victory cheer (sweep: terminal surface)"
+	).is_null()
+	assert_bool(screen._terminal_beat_played).is_true()
+
+	# (5) After the full sweep, every hero is still fully present and visible.
+	var row: HBoxContainer = screen.get_node_or_null(
+		"PartyDioramaLayer/PartyFrontLine") as HBoxContainer
+	assert_object(row).is_not_null()
+	assert_int(row.get_child_count()).is_equal(2)
+	for slot: Node in row.get_children():
+		assert_float((slot as Control).modulate.a).override_failure_message(
+			"no suppressed surface may fade the heroes — alpha stays 1.0 (§C.8)"
+		).is_equal(1.0)
+
+	# Cleanup
+	sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_idle_animates_when_motion_enabled_gate_is_conditional() -> void:
+	# Negative control for the Story 010 build gate: with reduce_motion explicitly OFF, the
+	# idle MUST animate (every animator processing). Pairs with the suppression test above to
+	# prove the gate is CONDITIONAL on reduce_motion — a guard against anyone inverting or
+	# unconditionally applying the freeze (which would silently kill the idle for everyone).
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(3)
+
+	var sm: Node = get_node_or_null("/root/SceneManager")
+	assert_object(sm).is_not_null()
+	var prior_rm: bool = bool(sm.get("reduce_motion"))
+	sm.set("reduce_motion", false)  # explicitly OFF — the gate must NOT fire
+
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var row: HBoxContainer = screen.get_node_or_null(
+		"PartyDioramaLayer/PartyFrontLine") as HBoxContainer
+	assert_object(row).is_not_null()
+	assert_int(row.get_child_count()).is_equal(3)
+
+	# Assert — motion enabled → every idle animator is live (the gate did NOT freeze them).
+	for slot: Node in row.get_children():
+		var animator: SpriteSheetAnimator = slot.get_node_or_null(
+			"_IdleAnimator") as SpriteSheetAnimator
+		assert_object(animator).is_not_null()
+		assert_bool(animator.is_processing()).override_failure_message(
+			"with reduce_motion OFF the idle gate must NOT fire — animators stay live"
+		).is_true()
+
+	# Cleanup
+	sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
 	screen.queue_free()
 	await get_tree().process_frame
