@@ -44,6 +44,7 @@ const DUNGEON_RUN_VIEW_GD_PATH: String = "res://assets/screens/dungeon_run_view/
 const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/dungeon_run_state.gd")
 const RunSnapshotScript = preload("res://src/core/dungeon_run_orchestrator/run_snapshot.gd")
 const CombatRunSnapshotScript = preload("res://src/core/combat/combat_run_snapshot.gd")
+const HeroRosterFixture = preload("res://tests/helpers/hero_roster_test_fixture.gd")
 
 # ---------------------------------------------------------------------------
 # Per-test state snapshots for isolation
@@ -64,6 +65,10 @@ var _orch_run_won_snapshot: bool = true
 ## so a lineup test's mutation never leaks into another test.
 var _orch_dispatched_biome_snapshot: String = ""
 var _orch_dispatched_floor_snapshot: int = 0
+## Snapshot of HeroRoster state — the party-diorama tests (Story 005) seed a
+## known formation; snapshot+restore so the seeding never leaks into the
+## orchestrator/lineup tests (feedback_test_isolation_live_autoload memory).
+var _hero_roster_snapshot: Dictionary = {}
 
 ## Snapshots of SceneManager state modified by tests.
 ## Story 013 adds _on_state_changed → request_screen("main_menu") on RUN_ENDED.
@@ -113,6 +118,10 @@ func before_test() -> void:
 	_sm_queued_request_snapshot = SceneManager._queued_request.duplicate()
 	_sm_current_screen_id_snapshot = SceneManager.current_screen_id
 
+	# Snapshot HeroRoster so the party-diorama tests' formation seeding (Story 005)
+	# never leaks into other tests. Restored in after_test.
+	_hero_roster_snapshot = HeroRosterFixture.snapshot_via_save_data()
+
 
 func after_test() -> void:
 	# Restore SceneManager state.
@@ -128,6 +137,9 @@ func after_test() -> void:
 	DungeonRunOrchestrator._dispatched_floor_index = _orch_dispatched_floor_snapshot
 	DungeonRunOrchestrator._combat_snapshot = _orch_combat_snapshot_snapshot
 	DungeonRunOrchestrator._run_won = _orch_run_won_snapshot
+
+	# Restore HeroRoster (party-diorama test isolation, Story 005).
+	HeroRosterFixture.restore_via_load_save_data(_hero_roster_snapshot)
 
 
 # ---------------------------------------------------------------------------
@@ -1041,5 +1053,152 @@ func test_on_exit_disconnects_run_defeated_subscription() -> void:
 	).is_false()
 
 	# Cleanup
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+# ===========================================================================
+# Hero Combat Presence — party diorama (GDD #35, Story 005, ADR-0025).
+#
+# The screen renders one idle-frame-0 sprite per OCCUPIED formation slot in an
+# additive, input-transparent PartyDioramaLayer (sibling on the root — NOT a
+# reparent of WirePartyHud). The slot COUNT is DATA-DRIVEN from
+# HeroRoster.get_formation_heroes() — never hardcoded to 3 (the dominant
+# "scaffolded-but-unwired / magic-constant" bug class this epic must avoid).
+# Aggregate HP stays the sole HP readout; these sprites are presence only.
+#
+# Each test reset+seeds a known formation BEFORE navigating (the diorama builds
+# in on_enter → _build_wireframe_once, reading the roster at build time). The
+# shared before_test/after_test snapshot+restore the live HeroRoster autoload.
+# ===========================================================================
+
+func test_party_diorama_layer_present_and_input_transparent() -> void:
+	# Arrange — clean roster with one hero so the diorama has something to build.
+	HeroRosterFixture.reset_hero_roster()
+	var classes: Array[String] = ["warrior"]
+	HeroRosterFixture.seed_heroes(classes)
+
+	# Act
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	# Assert — the additive layer exists, is input-transparent (read-only
+	# spectator view — z_index does NOT gate input picking, so the WHOLE subtree
+	# must be MOUSE_FILTER_IGNORE), and sits on the sharp z=1 plane (in front of
+	# the tilt-shift DoF at z=-1, behind stats/header z=2 + run-end overlay z=5).
+	var layer: Control = screen.get_node_or_null("PartyDioramaLayer") as Control
+	assert_object(layer).override_failure_message(
+		"Story 005 must add a PartyDioramaLayer sibling on the screen root"
+	).is_not_null()
+	assert_int(layer.mouse_filter).is_equal(Control.MOUSE_FILTER_IGNORE)
+	assert_int(layer.z_index).is_equal(1)
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_party_diorama_renders_one_sprite_per_occupied_slot_data_driven() -> void:
+	# Arrange — a known 3-hero formation (the fixture seeds slots 0..2).
+	HeroRosterFixture.reset_hero_roster()
+	var classes: Array[String] = ["warrior", "mage", "rogue"]
+	HeroRosterFixture.seed_heroes(classes)
+
+	# Act
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var row: HBoxContainer = screen.get_node_or_null(
+		"PartyDioramaLayer/PartyFrontLine") as HBoxContainer
+
+	# Assert — exactly one slot per occupied formation hero. The expected count is
+	# READ FROM the roster (get_formation_heroes().size()), proving the render is
+	# data-driven rather than a literal — with a sanity pin that the seed made 3.
+	assert_object(row).is_not_null()
+	var expected: int = HeroRoster.get_formation_heroes().size()
+	assert_int(expected).is_equal(3)
+	assert_int(row.get_child_count()).override_failure_message(
+		"party diorama must render one sprite per occupied formation slot"
+	).is_equal(expected)
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_party_diorama_slot_count_tracks_formation_not_hardcoded() -> void:
+	# Arrange — a TWO-hero formation. A hardcoded-3 implementation fails here.
+	HeroRosterFixture.reset_hero_roster()
+	var classes: Array[String] = ["warrior", "mage"]
+	HeroRosterFixture.seed_heroes(classes)
+
+	# Act
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var row: HBoxContainer = screen.get_node_or_null(
+		"PartyDioramaLayer/PartyFrontLine") as HBoxContainer
+
+	# Assert — two slots, proving the count follows the formation, not a constant.
+	assert_object(row).is_not_null()
+	assert_int(row.get_child_count()).override_failure_message(
+		"diorama slot count must follow the formation size, not a hardcoded 3"
+	).is_equal(2)
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_party_diorama_empty_formation_renders_no_slots() -> void:
+	# Arrange — empty roster: no heroes recruited, no formation slots filled.
+	HeroRosterFixture.reset_hero_roster()
+
+	# Act — must not crash; the layer + row still build but render zero sprites.
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var row: HBoxContainer = screen.get_node_or_null(
+		"PartyDioramaLayer/PartyFrontLine") as HBoxContainer
+
+	# Assert — the row exists (the diorama scaffolding is always built) with zero
+	# hero slots (an empty formation renders nothing — UX spec).
+	assert_object(row).is_not_null()
+	assert_int(row.get_child_count()).is_equal(0)
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_party_diorama_slot_stashes_class_id_and_loads_idle_frame() -> void:
+	# Arrange — a single warrior so we can assert the slot's class binding + art.
+	HeroRosterFixture.reset_hero_roster()
+	var classes: Array[String] = ["warrior"]
+	HeroRosterFixture.seed_heroes(classes)
+
+	# Act
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var row: HBoxContainer = screen.get_node_or_null(
+		"PartyDioramaLayer/PartyFrontLine") as HBoxContainer
+	assert_object(row).is_not_null()
+	assert_int(row.get_child_count()).is_equal(1)
+	var slot: TextureRect = row.get_child(0) as TextureRect
+
+	# Assert — the slot is a TextureRect, input-transparent, stashes its class_id
+	# (so Story 006 can attach the idle animator without re-reading the roster),
+	# and shows the warrior idle frame 0 (the committed class sprite.png loads via
+	# ResourceLoader — the .ctex is regenerated in CI from the committed PNG).
+	assert_object(slot).is_not_null()
+	assert_int(slot.mouse_filter).is_equal(Control.MOUSE_FILTER_IGNORE)
+	assert_str(String(slot.get_meta(&"hero_class_id", ""))).is_equal("warrior")
+	assert_object(slot.texture).override_failure_message(
+		"warrior idle frame 0 should load from assets/art/classes/warrior/sprite.png"
+	).is_not_null()
+
+	# Cleanup
+	screen.on_exit()
 	screen.queue_free()
 	await get_tree().process_frame

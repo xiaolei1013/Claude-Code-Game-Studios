@@ -74,6 +74,11 @@ const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/d
 const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
 # Demo enemy sprites for the "Enemies ahead" lineup (no-op without demo assets).
 const EnemySpriteFactoryScript = preload("res://src/ui/enemy_sprite_factory.gd")
+# Hero class sprites for the party diorama (Hero Combat Presence epic, GDD #35).
+# Preloaded (not called via the global class_name) so the static get_idle_frames
+# call never races the cold-load class registry — same pattern as the enemy
+# factory above and the _biome_background typed-as-ColorRect note.
+const ClassSpriteFactoryScript = preload("res://src/ui/class_sprite_factory.gd")
 const VfxKitScript = preload("res://src/ui/vfx_kit.gd")
 
 ## VFX particle textures (committed product art). All loaded best-effort in
@@ -182,6 +187,14 @@ var _float_layer: Control = null
 var _party_hp_bar: ProgressBar = null
 var _party_hp_label: Label = null
 var _enemies_remaining_label: Label = null
+
+## Party diorama layer (Hero Combat Presence epic, GDD #35 · Story 005 · ADR-0025).
+## A dedicated, additive Control holding one hero sprite per OCCUPIED formation
+## slot — the party the player dispatched, rendered center-stage below the enemy
+## lineup. Built once in [method _build_wireframe_once]; null until then. Story 006
+## attaches the idle SpriteSheetAnimator to each slot; Stories 008–009 fire the
+## reaction beats. See [method _build_party_diorama].
+var _party_diorama_layer: Control = null
 
 
 # ---------------------------------------------------------------------------
@@ -774,6 +787,7 @@ func _build_wireframe_once() -> void:
 	_reposition_existing_nodes_drv()
 	_build_party_hud()
 	_build_enemy_lineup_drv()
+	_build_party_diorama()
 	_build_run_stats_hud()
 	_build_progress_panel()
 	_build_activity_feed_drv()
@@ -980,6 +994,115 @@ func _enemy_display_name(enemy_id: String) -> String:
 		if ed != null and ("display_name" in ed) and String(ed.display_name) != "":
 			return String(ed.display_name)
 	return enemy_id.capitalize()
+
+
+# ===========================================================================
+# Party diorama — the front line of heroes the player dispatched
+# (Hero Combat Presence epic, GDD #35 · Story 005 · ADR-0025)
+#
+# Renders one sprite per OCCUPIED formation slot — the count is data-driven from
+# HeroRoster.get_formation_heroes() and is NEVER assumed to be 3 — as a centered
+# HBox of TextureRects on a dedicated, additive PartyDioramaLayer Control. The
+# layer is a SIBLING of the wireframe HUD panels (add_child on root), NOT a
+# reparent of WirePartyHud: the screen's node structure stays hard-path-stable
+# (the screen test binds nodes by path; restructure additively, never reparent).
+#
+# Read-only spectacle (GDD #35 §B.2): every node in the subtree is
+# MOUSE_FILTER_IGNORE so it can never steal a tap — z_index does NOT gate Godot
+# input picking, so the read-only contract is enforced by mouse_filter, not z.
+# The plane sits at z = _PARTY_DIORAMA_Z: in front of the tilt-shift DoF (z = -1)
+# and the biome (z = 0), behind the stats/header (z = 2) and the run-end overlay
+# (z = 5). Theme cascade (ADR-0008) is preserved — every node is a Control, so no
+# type="Node" intermediate silently breaks inheritance.
+#
+# Story 005 renders the STATIC idle frame 0 (or nothing when the class art is
+# absent — ClassSpriteFactory's null-fallback contract; the slot still reserves
+# its layout space). Story 006 attaches the SpriteSheetAnimator to each slot to
+# drive the _process idle loop — NOT in _on_tick_fired (the 20 Hz zero-alloc hot
+# path, ADR-0025 §C.9). Each slot stashes its class_id via set_meta so that
+# wiring needs no roster re-fetch.
+# ===========================================================================
+
+## On-screen display size (px) of each hero sprite — the square bounding box the
+## idle frame is fit into (KEEP_ASPECT_CENTERED). UX spec default 72 (range 48–96).
+const _HERO_SPRITE_DISPLAY_PX: int = 72
+
+## Horizontal gap (px) between adjacent hero sprites in the front-line row.
+const _HERO_SLOT_SEPARATION_PX: int = 24
+
+## Canvas z of the party diorama plane — the sharp focal subjects. In front of
+## the tilt-shift DoF (z = -1) + biome (z = 0); behind stats/header (z = 2) and
+## the run-end overlay (z = 5). Matches the enemy lineup's _WIRE_Z plane.
+const _PARTY_DIORAMA_Z: int = 1
+
+## Metadata key under which each hero slot stashes its class_id, so Story 006's
+## idle-animation wiring drives the right sheet without re-reading the roster.
+const _HERO_SLOT_CLASS_META: StringName = &"hero_class_id"
+
+
+## Center-stage: the party's heroes — one sprite per OCCUPIED formation slot,
+## rendered as a centered front-line row placed just below the enemy lineup, on a
+## dedicated additive PartyDioramaLayer. Count is data-driven from
+## HeroRoster.get_formation_heroes() (empty slots render nothing). Idempotent
+## within a screen instance via [member _party_diorama_layer] (the parent
+## [method _build_wireframe_once] is itself guarded by _wire_built).
+func _build_party_diorama() -> void:
+	if _party_diorama_layer != null:
+		return
+	var layer: Control = Control.new()
+	layer.name = "PartyDioramaLayer"
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.z_index = _PARTY_DIORAMA_Z
+	add_child(layer)
+	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_party_diorama_layer = layer
+
+	# Centered front-line row, placed just below the enemy lineup (which occupies
+	# y≈188–384 at the same 0.5-anchored 560 px-wide band). Offsets per the UX
+	# spec "Hero Combat Presence (GDD #35)" section; Story 014 polish may refine
+	# the ground-line against live 1280×800.
+	var row: HBoxContainer = HBoxContainer.new()
+	row.name = "PartyFrontLine"
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", _HERO_SLOT_SEPARATION_PX)
+	layer.add_child(row)
+	_place(row, 0.5, 0, 0.5, 0, -280.0, 408.0, 280.0, 540.0)
+
+	# One sprite per OCCUPIED formation slot — count is data-driven (never 3).
+	if HeroRoster == null:
+		return
+	var party: Array = HeroRoster.get_formation_heroes()
+	for h: Variant in party:
+		if h == null:
+			continue  # empty formation slot → renders nothing (UX spec)
+		var cls: String = ""
+		if "class_id" in h:
+			cls = String(h.class_id)
+		row.add_child(_make_hero_slot(cls, row.get_child_count()))
+
+
+## Builds one hero sprite slot: a TextureRect showing the class's STATIC idle
+## frame 0 (Story 006 attaches the animator to loop it). Square
+## [const _HERO_SPRITE_DISPLAY_PX] box, aspect-preserved + nearest-neighbour for
+## the cozy pixel-art register, read-only (MOUSE_FILTER_IGNORE). When the class
+## art is absent get_idle_frames returns [] and the texture stays null — the slot
+## still reserves its layout space (ClassSpriteFactory's null-fallback contract,
+## mirrored from the enemy lineup's greybox path). The class_id is stashed via
+## set_meta so Story 006 can attach the idle animator without re-reading the roster.
+func _make_hero_slot(class_id: String, index: int) -> TextureRect:
+	var slot: TextureRect = TextureRect.new()
+	slot.name = "HeroSprite_%d" % index
+	slot.custom_minimum_size = Vector2(_HERO_SPRITE_DISPLAY_PX, _HERO_SPRITE_DISPLAY_PX)
+	slot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	slot.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	slot.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.set_meta(_HERO_SLOT_CLASS_META, class_id)
+	var frames: Array = ClassSpriteFactoryScript.get_idle_frames(class_id)
+	if not frames.is_empty():
+		slot.texture = frames[0]
+	return slot
 
 
 ## Top-right: run stats backing panel + Return-to-Hall. The real StatsPanel
