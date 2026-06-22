@@ -4,7 +4,7 @@
 > **GDD**: `design/gdd/hero-combat-animation.md` (authored in Phase 0, Story 001)
 > **Architecture Module**: `dungeon_run_view` screen + `HeroCombatAnimator` presentation nodes (NO autoload, NO new gameplay state) — governed by ADR-0025
 > **Control Manifest Version**: 2026-04-24
-> **Status**: In Progress (Phase 0 — Design & Architecture)
+> **Status**: In Progress (Phase 1 — Heroes On-Screen; Phase 0 Design & Architecture complete)
 > **Stories**: 16 defined across 5 phases
 
 ## Overview
@@ -44,7 +44,7 @@ signals — **never** added to the tick handler.
 
 | ADR | Decision Summary | Engine Risk |
 |-----|-----------------|-------------|
-| ADR-0025: Hero Animation ↔ Kill-Schedule Sync (NEW — Story 004) | How animation timing is driven absent per-hero attack events (cosmetic-react vs poll-schedule vs synthetic-events); enshrines the 20 Hz zero-alloc hot-path rule and reduce-motion suppression | MEDIUM |
+| ADR-0025: Hero Animation ↔ Kill-Schedule Sync (**Accepted** — Story 004) | How animation timing is driven absent per-hero attack events (cosmetic-react vs poll-schedule vs synthetic-events); enshrines the 20 Hz zero-alloc hot-path rule and reduce-motion suppression | MEDIUM |
 | ADR-0010: Combat Resolver Snapshot + Parity | Combat stays aggregate-DPS + discrete kill events; the kill schedule is the only deterministic timing source available to Story 013 | MEDIUM |
 | ADR-0021: Defeat-State Pivot | Defeat presentation contract the run_defeated slump beat (Story 009) must honor | LOW |
 | ADR-0008: Theme Skin / UI Framework | Hero sprites layer into a Control tree; theme cascades only through Control ancestors — sprite/animator nodes must not break sibling theme inheritance | MEDIUM |
@@ -85,7 +85,7 @@ signals — **never** added to the tick handler.
 | 001 | GDD: `hero-combat-animation.md` — which beats animate, formation→aggregate-DPS mapping, cozy/read-only pillar preservation, reduce-motion behavior | P0 Design | Design (GDD) | **Done** (GDD #35, 8 sections + I/J; systems-index row #35; #24 §F reverse-dep) | — |
 | 002 | Art-bible: hero dungeon-presence section + per-class action-pose spec (attack/hit/victory) | P0 Design | Design (Art) | **Done** (art-bible §5: "Dungeon Combat Presence" + "Per-Class Action Poses" — 4-beat pose table for all 6 classes; no-reuse rule extended to actions; defeat=dignified slump per ADR-0021; 4-frame strip convention for pipeline reuse) | ADR-0024 |
 | 003 | UX spec: `design/ux/dungeon-run-view.md` hero placement, sizes, per-hero vs aggregate HP, layering, read-only (no new input) | P0 Design | Design (UX) | **Done** ("Hero Combat Presence (GDD #35)" section in the existing UX spec: center-stage front-line placement, ~72px in-scene sprites, **AGGREGATE HP** decisive, z=1 sharp-plane layering, full MOUSE_FILTER_IGNORE read-only, additive `PartyDioramaLayer`; 10 ACs UX-DRV-HERO-01..10 + 3 OQs) | ADR-0008, 0019 |
-| 004 | ADR-0025: animation ↔ kill-schedule sync model + 20 Hz zero-alloc hot-path rule + reduce-motion | P0 Arch | Architecture | Ready | ADR-0025, 0010 |
+| 004 | ADR-0025: animation ↔ kill-schedule sync model + 20 Hz zero-alloc hot-path rule + reduce-motion | P0 Arch | Architecture | **Done** (ADR-0025 **Accepted** 2026-06-22 — "two clocks, never the tick": free-running `_process` idle + signal-triggered reaction beats; 3 rejected alts [poll-schedule-per-tick, resolver-emits-per-hero, ~~synthetic-events~~ → deferred to Story 013]; enshrines the 20 Hz zero-alloc hot-path rule + reduce-motion-read-at-beat-time; aggregate-react resolves OQ-35-1; GDD↔ADR bidirectional) | ADR-0025, 0010 |
 | 005 | Render the 3 party heroes as sprites on `dungeon_run_view` (ClassSpriteFactory art), positioned per UX spec, layered with biome/VFX/enemies | P1 On-Screen | UI / Visual | Backlog | ADR-0008, 0019 |
 | 006 | Wire existing idle animation to the on-screen hero sprites (`SpriteSheetAnimator`, `_process`-driven, NOT in the tick handler) | P1 On-Screen | UI / Visual | Backlog | ADR-0025 |
 | 007 | Low-frequency hero-state reflection + extend the Story-012 per-tick budget test (prove 20 Hz hot path stays zero-alloc) | P1 On-Screen | Logic (Performance) | Backlog | ADR-0025, 0010 |
@@ -107,4 +107,6 @@ signals — **never** added to the tick handler.
 
 ## Next Step
 
-**Stories 001–003 done** (GDD #35 — `design/gdd/hero-combat-animation.md`, 8 sections + I/J; systems-index #35; #24 §F reverse-dep · art-bible §5 — "Dungeon Combat Presence" + "Per-Class Action Poses" 4-beat table · UX spec — "Hero Combat Presence (GDD #35)" section: center-stage placement, AGGREGATE HP decisive, z=1 sharp-plane layering, read-only, additive `PartyDioramaLayer`). Remaining Phase 0: Story 004 (**ADR-0025** — locks the §C.3 sync model + §C.9 hot-path rule that Phases 1–3 build against; must reach **Accepted** before Phase 1 code). Then Phases 1–2 ship the full player-visible win with no new art; Phase 3's per-class art (Story 011) + Phase 4's human playtest (Story 016) are the external-dependency gates surfaced to the user.
+**Phase 0 (Design & Architecture) COMPLETE** — Stories 001–004 done: GDD #35 (`design/gdd/hero-combat-animation.md`, 8 sections + I/J; systems-index #35; #24 §F reverse-dep) · art-bible §5 ("Dungeon Combat Presence" + "Per-Class Action Poses" 4-beat table) · UX spec ("Hero Combat Presence (GDD #35)": center-stage placement, AGGREGATE HP decisive, z=1 sharp-plane layering, read-only, additive `PartyDioramaLayer`) · **ADR-0025 Accepted** (locks the §C.3 "two clocks, never the tick" sync model + §C.9 zero-alloc hot-path rule + reduce-motion suppression that Phases 1–3 build against).
+
+**Now: Phase 1 — Heroes On-Screen (first visible win). Story 005** — render the party heroes as `TextureRect` sprites (count data-driven from `HeroRoster.get_formation_heroes()`, NEVER hardcode 3) in a NEW additive `PartyDioramaLayer` Control on `dungeon_run_view` (sibling `add_child` on root, NOT reparenting `WirePartyHud`; whole subtree `MOUSE_FILTER_IGNORE`; z=1 sharp plane in front of the tilt-shift DoF), using `ClassSpriteFactory.get_idle_frames()` art, positioned/sized per the UX spec (~72px, centered HBox below the enemy lineup). Then Story 006 (wire `SpriteSheetAnimator` idle, `_process`-driven — NOT in `_on_tick_fired`) + Story 007 (extend the Story-012 per-tick zero-alloc budget test). Phase 3's per-class art (Story 011) + Phase 4's human playtest (Story 016) remain the external-dependency gates surfaced to the user.
