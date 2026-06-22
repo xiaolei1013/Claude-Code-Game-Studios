@@ -25,8 +25,10 @@ const IDLE_FPS: float = 6.0
 
 ## Name of the animator child node attached to a driven TextureRect. Stable so
 ## [method animate] can find-and-reuse it across re-renders instead of stacking
-## duplicate animators on a reused card.
-const _ANIMATOR_NODE_NAME: StringName = &"_IdleAnimator"
+## duplicate animators on a reused card. Public + the single source of truth:
+## external consumers (e.g. dungeon_run_view's run-state idle freeze, Story 007)
+## look the animator up by this exact name instead of re-declaring the literal.
+const ANIMATOR_NODE_NAME: StringName = &"_IdleAnimator"
 
 const SpriteSheetAnimatorScript = preload("res://src/ui/sprite_sheet_animator.gd")
 
@@ -82,10 +84,10 @@ static func animate(target: TextureRect, class_id: String, fps: float = IDLE_FPS
 	var frames: Array = get_idle_frames(class_id)
 	if frames.is_empty():
 		return
-	var anim: Node = target.get_node_or_null(NodePath(String(_ANIMATOR_NODE_NAME)))
+	var anim: Node = target.get_node_or_null(NodePath(String(ANIMATOR_NODE_NAME)))
 	if anim == null:
 		anim = SpriteSheetAnimatorScript.new()
-		anim.name = _ANIMATOR_NODE_NAME
+		anim.name = ANIMATOR_NODE_NAME
 		target.add_child(anim)
 	anim.setup(target, frames, fps)
 

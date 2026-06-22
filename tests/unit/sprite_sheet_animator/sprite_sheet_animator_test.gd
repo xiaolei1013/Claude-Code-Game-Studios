@@ -125,3 +125,73 @@ func test_process_accumulates_across_calls() -> void:
 	anim._process(1.0 / 12.0)
 
 	assert_object(target.texture).is_same(frames[1])
+
+
+# ===========================================================================
+# Group C — set_animating() pause/resume (Story 007 run-state reflection)
+#
+# set_animating reflects a COARSE run-state change (e.g. the dungeon run ending
+# freezes hero idles) on a human-frequency signal — it toggles _process WITHOUT
+# re-running setup or losing the frame index. It respects the static-card
+# invariant: a ≤1-frame animator stays unprocessed even when resumed.
+# ===========================================================================
+
+func test_set_animating_false_stops_processing() -> void:
+	# Arrange — a live multi-frame animator (processing).
+	var target: TextureRect = _make_target()
+	var anim: Node = _make_animator()
+	anim.setup(target, _make_frames(4), 6.0)
+	assert_bool(anim.is_processing()).is_true()
+
+	# Act — pause the idle loop.
+	anim.set_animating(false)
+
+	# Assert — _process is off (the frozen pose costs nothing per frame).
+	assert_bool(anim.is_processing()).is_false()
+
+
+func test_set_animating_true_resumes_processing() -> void:
+	# Arrange — a paused multi-frame animator.
+	var target: TextureRect = _make_target()
+	var anim: Node = _make_animator()
+	anim.setup(target, _make_frames(4), 6.0)
+	anim.set_animating(false)
+	assert_bool(anim.is_processing()).is_false()
+
+	# Act — resume.
+	anim.set_animating(true)
+
+	# Assert — _process is back on.
+	assert_bool(anim.is_processing()).is_true()
+
+
+func test_set_animating_true_keeps_single_frame_static() -> void:
+	# A 1-frame (or art-less) slot has nothing to animate — resuming must NOT turn
+	# on _process (the static-card invariant; art-less heroes cost 0 per frame).
+	var target: TextureRect = _make_target()
+	var anim: Node = _make_animator()
+	anim.setup(target, _make_frames(1), 6.0)
+	assert_bool(anim.is_processing()).is_false()
+
+	anim.set_animating(true)
+
+	assert_bool(anim.is_processing()).is_false()
+
+
+func test_set_animating_resume_continues_from_paused_frame() -> void:
+	# Pause/resume must PRESERVE the frame index (it is not a setup() restart).
+	# Arrange — advance to frame 1, then pause.
+	var target: TextureRect = _make_target()
+	var frames: Array = _make_frames(4)
+	var anim: Node = _make_animator()
+	anim.setup(target, frames, 6.0)
+	anim._process(1.0 / 6.0)               # → frame 1
+	assert_object(target.texture).is_same(frames[1])
+	anim.set_animating(false)
+
+	# Act — resume and advance one more interval.
+	anim.set_animating(true)
+	anim._process(1.0 / 6.0)               # → frame 2 (continues; does NOT restart at 0)
+
+	# Assert — advanced to frame 2, proving the index survived the pause.
+	assert_object(target.texture).is_same(frames[2])

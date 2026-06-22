@@ -1290,3 +1290,125 @@ func test_party_diorama_idle_animation_advances_the_frame() -> void:
 	screen.on_exit()
 	screen.queue_free()
 	await get_tree().process_frame
+
+
+# ===========================================================================
+# Story 007 — 20 Hz hot-path zero-(hero-)alloc guard + coarse run-state reflection
+# (GDD #35 §C.9 / AC-35-06 [BLOCKING] / ADR-0025).
+#
+# AC-35-06 [BLOCKING]: as Stories 005/006/007 put heroes + animators on screen,
+# `_on_tick_fired` must add NO hero-animation work (no tween, node creation,
+# factory idle-attach, diorama walk, or per-hero roster read). The idle loop is a
+# free-running _process on each SpriteSheetAnimator; coarse run-state changes (e.g.
+# RUN_ENDED freezing the idle) ride human-frequency signals — never the tick.
+#
+# tests/perf/ is NOT in CI, and a timing test cannot prove the ABSENCE of allocation
+# on a UI screen. So the CI-blocking form of the "Story-012 per-tick budget test" is
+# this SOURCE-level guard: assert the hot-path function body contains none of the
+# hero/alloc tokens — proving the decoupling structurally + deterministically.
+# Mirrors the existing manifest greps (no change_scene / no Color literal above).
+# ===========================================================================
+
+## Extracts the source lines of [param func_name]'s body from [param gd_path],
+## stripping inline comments so comment prose cannot trip a token check. The body
+## runs from the line after the `func` signature up to the next column-0 `func` or
+## `#` (section separator / next doc block) — every in-body statement is indented,
+## so a column-0 hash reliably marks the end of the body in this file's style.
+func _extract_function_body(gd_path: String, func_name: String) -> String:
+	var fa: FileAccess = FileAccess.open(gd_path, FileAccess.READ)
+	if fa == null:
+		return ""
+	var signature: String = "func %s(" % func_name
+	var body: String = ""
+	var inside: bool = false
+	while not fa.eof_reached():
+		var line: String = fa.get_line()
+		if inside:
+			# A column-0 `func`/`#` ends the body (every body statement is indented).
+			if line.begins_with("func ") or line.begins_with("#"):
+				break
+			body += line.split("#")[0] + "\n"
+		elif line.begins_with(signature):
+			inside = true
+	fa.close()
+	return body
+
+
+func test_on_tick_fired_adds_no_hero_animation_work() -> void:
+	# AC-35-06 [BLOCKING]: the 20 Hz hot path must gain NO hero/animation work.
+	# Arrange — extract the live `_on_tick_fired` body from the screen source.
+	var body: String = _extract_function_body(DUNGEON_RUN_VIEW_GD_PATH, "_on_tick_fired")
+	assert_bool(body.is_empty()).override_failure_message(
+		"could not locate _on_tick_fired in %s" % DUNGEON_RUN_VIEW_GD_PATH
+	).is_false()
+
+	# Hot-path ops that animating the heroes must NEVER introduce into the tick.
+	# Each would mean per-hero / animation work leaked onto the 20 Hz tick (§C.9).
+	var forbidden: Array[String] = [
+		"create_tween",         # no tween allocation on the tick
+		".new(",                # no object / node construction
+		"add_child",            # no node creation
+		"animate(",             # no ClassSpriteFactory idle-attach
+		"set_animating",        # the run-state reflection is human-frequency, not the tick
+		"_set_party_idle",      # ditto — the diorama-walk helper
+		"_party_diorama",       # no diorama node access
+		"_make_hero_slot",      # no slot building
+		"get_idle_frames",      # no frame slicing
+		"get_formation_heroes", # no per-hero roster walk
+		"_IdleAnimator",        # no animator lookup
+	]
+
+	# Assert — none of the forbidden hero/alloc tokens appear in the tick body.
+	var violations: Array[String] = []
+	for token: String in forbidden:
+		if body.contains(token):
+			violations.append(token)
+	assert_int(violations.size()).override_failure_message(
+		"_on_tick_fired (20 Hz hot path) must add no hero-animation work " +
+		"(ADR-0025 §C.9 / AC-35-06) — found forbidden token(s): %s" % str(violations)
+	).is_equal(0)
+
+
+func test_run_ended_freezes_party_idle_animation() -> void:
+	# Coarse run-state reflection (GDD #35 §C.4): entering RUN_ENDED freezes every
+	# hero's idle loop — on a human-frequency signal, not the tick.
+	# Arrange — a two-warrior party (committed 4-frame art → live animators).
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	var row: HBoxContainer = screen.get_node_or_null(
+		"PartyDioramaLayer/PartyFrontLine") as HBoxContainer
+	assert_object(row).is_not_null()
+	assert_int(row.get_child_count()).is_equal(2)
+
+	# Precondition — both idle animators are running after on_enter (Story 006).
+	for slot: Node in row.get_children():
+		var anim_pre: Node = slot.get_node_or_null("_IdleAnimator")
+		assert_object(anim_pre).is_not_null()
+		assert_bool(anim_pre.is_processing()).override_failure_message(
+			"the idle animator should be live before the run ends"
+		).is_true()
+
+	# Act — drive the RUN_ENDED transition through the REAL handler. Pre-set _routed
+	# so the handler runs the §C.4 freeze then short-circuits before the overlay /
+	# dwell-await / route — isolating the reflection (and proving the freeze is NOT
+	# gated by the idempotency guard: it must fire even on a replayed RUN_ENDED).
+	screen._routed = true
+	screen._on_state_changed(
+		DungeonRunStateScript.State.RUN_ENDED,
+		DungeonRunStateScript.State.ACTIVE_FOREGROUND)
+
+	# Assert — every hero idle is now frozen (the held pose for the run-end overlay).
+	for slot: Node in row.get_children():
+		var anim_post: Node = slot.get_node_or_null("_IdleAnimator")
+		assert_object(anim_post).is_not_null()
+		assert_bool(anim_post.is_processing()).override_failure_message(
+			"RUN_ENDED must freeze every hero idle loop (GDD #35 §C.4 baseline transition)"
+		).is_false()
+
+	# Cleanup
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame

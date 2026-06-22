@@ -459,6 +459,15 @@ func _on_tick_fired(_tick_number: int) -> void:
 func _on_state_changed(new_state: int, _old_state: int) -> void:
 	if new_state != DungeonRunStateScript.State.RUN_ENDED:
 		return
+
+	# Baseline transition (GDD #35 §C.4 / ADR-0025): the run is over — freeze every
+	# hero's looping idle so the party holds its pose under the run-end overlay. This
+	# is the coarse, HUMAN-frequency hero-state reflection (NOT the 20 Hz tick); the
+	# terminal victory/slump beat that plays over the frozen pose is Story 009. Placed
+	# BEFORE the _routed idempotency guard so the freeze fires on every RUN_ENDED entry
+	# (incl. a transition-replayed duplicate) — set_animating(false) is idempotent.
+	_set_party_idle_animating(false)
+
 	if _routed:
 		return  # AC-5 idempotency — route already requested; ignore duplicate.
 	_routed = true
@@ -1108,6 +1117,27 @@ func _make_hero_slot(class_id: String, index: int) -> TextureRect:
 	slot.set_meta(_HERO_SLOT_CLASS_META, class_id)
 	ClassSpriteFactoryScript.animate(slot, class_id)
 	return slot
+
+
+## Reflects a COARSE run-state change onto the party diorama by pausing or resuming
+## every hero's looping idle (GDD #35 §C.4 "baseline transition", ADR-0025 §C.9).
+## Called ONLY from human-frequency signal handlers (e.g. [method _on_state_changed]
+## on RUN_ENDED) — NEVER from [method _on_tick_fired]; the 20 Hz hot path must stay
+## free of any per-hero work. Walks the front-line slots and toggles each slot's
+## [SpriteSheetAnimator] child via [method SpriteSheetAnimator.set_animating], which
+## itself honours the static-card invariant (≤1-frame / art-less slots never animate).
+## Fully defensive: a no-op before the diorama is built or when the party is empty.
+func _set_party_idle_animating(enabled: bool) -> void:
+	if _party_diorama_layer == null:
+		return
+	var row: Node = _party_diorama_layer.get_node_or_null("PartyFrontLine")
+	if row == null:
+		return
+	for slot: Node in row.get_children():
+		var animator: SpriteSheetAnimator = slot.get_node_or_null(
+			NodePath(String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME))) as SpriteSheetAnimator
+		if animator != null:
+			animator.set_animating(enabled)
 
 
 ## Top-right: run stats backing panel + Return-to-Hall. The real StatsPanel

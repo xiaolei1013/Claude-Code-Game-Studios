@@ -49,6 +49,18 @@ func setup(target: TextureRect, frames: Array, fps: float = 6.0) -> void:
 	set_process(_target != null and _frames.size() > 1)
 
 
+## Pauses ([param enabled] = false) or resumes the looping idle WITHOUT re-running
+## [method setup] or losing the current frame index — resuming continues from the
+## frame it paused on. Reflects a COARSE run-state change (e.g. the dungeon run
+## ending freezes every hero's idle on the pose it holds under the run-end overlay),
+## driven by a HUMAN-frequency orchestrator signal, NEVER the 20 Hz combat tick
+## (ADR-0025 §C.9). Respects the static-card invariant: a ≤1-frame (or art-less)
+## animator stays unprocessed even when [param enabled] is true, so it never burns
+## a per-frame _process for a slot with nothing to animate.
+func set_animating(enabled: bool) -> void:
+	set_process(enabled and _target != null and _frames.size() > 1)
+
+
 ## Advances the animation. Uses a while-loop drain so a long frame (or a paused
 ## tab resuming) catches up rather than skipping the wrap math, and only writes
 ## the texture when the frame index actually changes.
