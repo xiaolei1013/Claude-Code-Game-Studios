@@ -184,14 +184,15 @@ func test_real_art_class_loads_and_windows_quarter_width_columns() -> void:
 
 
 # ===========================================================================
-# Group F — get_action_frames asset-absent behavior (Story 012 — action loader)
+# Group F — get_action_frames disk-first loader (Story 011 art · Story 012 loader)
 #
 # Mirrors get_idle_frames' disk-first / empty-fallback contract for the action
-# poses (attack / hit / victory / defeat). Action art is authored-ahead in the
-# manifest (Story 011) but not yet rendered to disk, so EVERY real lookup is the
-# empty "caller-falls-back-to-its-cosmetic-tween" path — Story 012's "real frames
-# where art exists, tween where it doesn't" contract. The loader is still fully
-# exercised (empty-arg guards, missing-sheet path, cache, cache-key isolation).
+# poses (attack / hit / victory / defeat). Story 011's per-class action art is now
+# rendered + committed, so a real (class, pose) lookup loads + slices FRAME_COUNT
+# frames from disk (see the all-classes windowing test + the does-not-collide test).
+# The empty "caller-falls-back-to-its-cosmetic-tween" fallback — Story 012's "real
+# frames where art exists, tween where it doesn't" contract — is still fully exercised
+# via the empty-arg guards and the missing-sheet (bogus class) path.
 # ===========================================================================
 
 func test_get_action_frames_empty_class_returns_empty() -> void:
@@ -223,17 +224,60 @@ func test_get_action_frames_caches_result_for_repeat_calls() -> void:
 
 
 func test_get_action_frames_does_not_collide_with_idle_cache() -> void:
-	# The real-art class has a committed idle sprite.png (FRAME_COUNT frames) but NO
-	# action sheets yet. The composite "<class>/<pose>" action key must NOT return the
-	# idle frames cached under the bare "<class>" key — action stays empty while idle
-	# is populated. Regression net for a cache-key collision between the two loaders.
-	# NOTE: when Story 011's action art is rendered + committed, this flips — update it
-	# to assert the real attack frames load (mirroring the idle real-art test above).
+	# The real-art class now has BOTH a committed idle sprite.png AND committed action
+	# sheets (Story 011). The composite "<class>/<pose>" action key must load the action
+	# sheet's OWN frames — never the idle frames cached under the bare "<class>" key. Both
+	# caches populated AND distinct is a stronger isolation net than the original empty-
+	# action case: a cache-key collision would make get_action_frames hand back the SAME
+	# array the idle loader cached, which the inequality assert below catches.
 	var idle: Array = ClassSpriteFactoryScript.get_idle_frames(_REAL_ART_CLASS_ID)
 	var action: Array = ClassSpriteFactoryScript.get_action_frames(
 		_REAL_ART_CLASS_ID, ClassSpriteFactoryScript.POSE_ATTACK)
 	assert_int(idle.size()).is_equal(ClassSpriteFactoryScript.FRAME_COUNT)
-	assert_int(action.size()).is_equal(0)
+	assert_int(action.size()).is_equal(ClassSpriteFactoryScript.FRAME_COUNT)
+	# No cache-key collision: the action key returns its own distinct frames (sliced from
+	# attack.png), not the idle array (sliced from sprite.png) cached under the bare key.
+	assert_bool(idle == action).is_false()
+
+
+# Canonical roster class ids with committed real art (Sprint 28 idle + Story 011 action
+# sheets) under assets/art/classes/<id>/. Mirrors the asset-pipeline manifest roster
+# (images.class_sprites / class_action_sprites in full.json). The exact set IS the point:
+# this list is the asset-presence contract — a missing or renamed sheet must fail loudly.
+const _ALL_ART_CLASS_IDS: Array[String] = [
+	"warrior", "mage", "rogue", "cleric", "archer", "berserker", "paladin",
+]
+
+
+func test_real_art_action_sheets_load_for_every_class_and_pose() -> void:
+	# The Story 011 wiring net (the dominant "scaffolded-but-unwired" bug class): EVERY
+	# class × EVERY action pose must resolve a committed sheet on disk and slice into
+	# FRAME_COUNT equal columns. A missing / misnamed sheet, an unimported PNG, or an
+	# import-dims drift off the manifest-pinned 768×432 fails here — proving all 28 action
+	# sheets (7 classes × 4 poses) are present, named, and window correctly, so a reaction
+	# beat plays real frames instead of silently falling back to the cosmetic tween.
+	var expected_w: float = float(_STRIP_WIDTH) / float(ClassSpriteFactoryScript.FRAME_COUNT)
+	var poses: Array[String] = [
+		ClassSpriteFactoryScript.POSE_ATTACK,
+		ClassSpriteFactoryScript.POSE_HIT,
+		ClassSpriteFactoryScript.POSE_VICTORY,
+		ClassSpriteFactoryScript.POSE_DEFEAT,
+	]
+	for class_id: String in _ALL_ART_CLASS_IDS:
+		for pose: String in poses:
+			var frames: Array = ClassSpriteFactoryScript.get_action_frames(class_id, pose)
+			assert_int(frames.size()).override_failure_message(
+				"%s/%s.png must load + slice into FRAME_COUNT frames (missing / unimported sheet?)" % [class_id, pose]
+			).is_equal(ClassSpriteFactoryScript.FRAME_COUNT)
+			for i: int in range(frames.size()):
+				var atlas: AtlasTexture = frames[i] as AtlasTexture
+				assert_object(atlas).override_failure_message(
+					"%s/%s frame %d must be an AtlasTexture window" % [class_id, pose, i]
+				).is_not_null()
+				assert_float(atlas.region.size.x).override_failure_message(
+					"%s/%s frame %d width must be STRIP_WIDTH / FRAME_COUNT (import-dims drift?)" % [class_id, pose, i]
+				).is_equal_approx(expected_w, 0.5)
+				assert_float(atlas.region.size.y).is_equal_approx(float(_STRIP_HEIGHT), 0.5)
 
 
 # ===========================================================================

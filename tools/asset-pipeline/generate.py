@@ -512,8 +512,17 @@ def dry_run(manifest: dict, only: str | None) -> None:
         C.log("")
 
     C.log(f"Total: {total} asset(s) would be generated.")
-    C.log("NOTE: assets/art/classes/ and assets/art/enemies/ are gitignored as demo")
-    C.log("      placeholders — committing real art there needs the .gitignore lines removed.")
+    # The ship-art NOTE only applies when image sections are in scope — an
+    # audio-only run (--only audio/sfx/music) writes nothing under assets/art/,
+    # so naming those paths there would be misleading.
+    images_in_scope = any(
+        parent == "images" and _wanted(section, parent, only)
+        for section, parent, *_ in _SECTIONS
+    )
+    if images_in_scope:
+        C.log("NOTE: assets/art/classes/ and assets/art/enemies/ are tracked ship-art paths — a "
+              "generated sheet is review-only until artistic sign-off, then committed with its "
+              ".import sidecar (no .gitignore change needed).")
 
 
 def run(manifest: dict, only: str | None, keys: dict, skip_existing: bool = False) -> int:
@@ -566,7 +575,11 @@ def run(manifest: dict, only: str | None, keys: dict, skip_existing: bool = Fals
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description="Lantern Guild asset generation")
     ap.add_argument("--manifest", default=str(Path(__file__).parent / "manifests" / "pilot.json"))
-    ap.add_argument("--only", choices=["audio", "images", "sfx", "music", "backgrounds", "portraits", "enemy_sprites", "class_sprites", "vfx", "ui"])
+    # Choices mirror exactly what _wanted() accepts: every credentialed parent
+    # (_PARENT_KEY keys) plus every section name (_SECTIONS). A new section is
+    # auto-reachable; a new parent becomes reachable once it has a _PARENT_KEY
+    # entry (which the run path requires anyway). No hardcoded list to drift.
+    ap.add_argument("--only", choices=[*_PARENT_KEY, *(s[0] for s in _SECTIONS)])
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--author-tres", action="store_true", help="Only author AudioCue .tres wrappers (run after audio is imported).")
     ap.add_argument("--skip-existing", action="store_true", help="Skip assets whose output file already exists (protects approved assets; makes a large batch resumable).")
