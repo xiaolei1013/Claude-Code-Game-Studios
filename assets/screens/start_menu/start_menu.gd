@@ -18,13 +18,14 @@
 extends Screen
 
 const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+const ParchmentKitScript = preload("res://src/ui/parchment_kit.gd")
+const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
 const ClassSpriteFactoryScript = preload("res://src/ui/class_sprite_factory.gd")
 const ClassPortraitFactoryScript = preload("res://src/ui/class_portrait_factory.gd")
 
-## Parchment-cream ground (DESIGN.md token — Parchment Cream #EDE0C4).
-## Keeps the start menu in the light-register theme rather than committing
-## to a dark variant before the skin decision is made (see active.md REMAINING).
-const _GROUND: Color = Color(0.929, 0.878, 0.769)
+## Parchment-cream ground (DESIGN.md token, never raw hex — the light shipping
+## register). WireframeKit is retained only for the ambient lit-lantern disc.
+const _GROUND: Color = UIFrameworkScript.PARCHMENT_CREAM
 
 ## Hero classes cycled in the demo portrait row beneath the logo.
 const _DEMO_CLASSES: PackedStringArray = [
@@ -74,10 +75,14 @@ func _build() -> void:
 	col.add_theme_constant_override("separation", 12)
 	cc.add_child(col)
 
-	# Lantern mark placeholder.
+	# Brand mark — the lit lantern disc (the Hall's ambient-lantern motif): warm
+	# Guild Amber on a lantern-lit fill, input-transparent. Replaces the greybox
+	# placeholder box — the lantern IS the Lantern Guild logo.
 	var mark_row: HBoxContainer = HBoxContainer.new()
 	mark_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	mark_row.add_child(WireframeKitScript.placeholder_box("lantern", Vector2(80, 80)))
+	var mark: Panel = WireframeKitScript.lantern_display()
+	mark.custom_minimum_size = Vector2(80, 80)
+	mark_row.add_child(mark)
 	col.add_child(mark_row)
 
 	# Game title wordmark.
@@ -90,8 +95,8 @@ func _build() -> void:
 	col.add_child(title_label)
 
 	# Tagline.
-	var tagline: Label = WireframeKitScript.caption(
-		"The dungeon is dark. Send a light.", WireframeKitScript.MUTED, 16)
+	var tagline: Label = ParchmentKitScript.caption(
+		"The dungeon is dark. Send a light.", ParchmentKitScript.MUTED, 16)
 	tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(tagline)
 
@@ -114,7 +119,7 @@ func _build() -> void:
 	col.add_child(quit_btn)
 
 	# Build-meta footer.
-	var footer: Label = WireframeKitScript.eyebrow(_footer_text())
+	var footer: Label = ParchmentKitScript.eyebrow(_footer_text())
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(footer)
 	footer.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
@@ -155,6 +160,9 @@ func _nav_button(text: String, cb: Callable) -> Button:
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = _BTN_MIN_SIZE
 	b.pressed.connect(cb)
+	# Tap feedback: sfx_ui_tap chime + an 80ms press pulse (ADR-0008 §Touch
+	# feedback). The boot menu buttons were silent before the parchment pass.
+	UIFrameworkScript.wire_touch_feedback(b)
 	return b
 
 
