@@ -69,6 +69,11 @@ var _toast_tween: Tween = null
 # "mock wireframe" section at the bottom of this file.
 # ---------------------------------------------------------------------------
 const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+## Parchment shipping-skin kit (Sprint 29 S29-1). Mirrors WireframeKit's factory
+## signatures, so the greybox→parchment swap below is a prefix change, not a
+## layout rewrite. WireframeKit is retained only for the ambient lantern block
+## (S28-G2), which intentionally stays greybox.
+const ParchmentKitScript = preload("res://src/ui/parchment_kit.gd")
 const CodexModalScript = preload("res://assets/screens/codex/codex_modal.gd")
 const _WIRE_Z: int = 2          # draw above WarmLanternOverlay (z=1): greybox stays neutral
 const _TOPBAR_H: float = 52.0
@@ -349,9 +354,17 @@ func _set_gold_text(balance: int) -> void:
 		_gold_counter.text = formatted
 
 
-func _on_gold_changed(new_balance: int, _delta: int, _reason: String) -> void:
-	if _gold_counter != null:
-		_set_gold_text(new_balance)
+## Live gold-counter update + earn/spend feedback. The value always snaps to the
+## new balance; the counter additionally pulses (color → Guild Amber and back,
+## VFX GDD #27 §F) only on discrete player-initiated spends, gated centrally by
+## [method UIFramework.is_gold_pulse_reason] — never the idle drip ("add_gold"),
+## which fires every tick and would strobe the HUD. Reduce-motion snaps with no
+## pulse (the pulse helper guards this).
+func _on_gold_changed(new_balance: int, _delta: int, reason: String) -> void:
+	if _gold_counter == null:
+		return
+	_set_gold_text(new_balance)
+	UIFrameworkScript.pulse_gold_on_reason(_gold_counter, reason, SceneManager.reduce_motion)
 
 
 # ---------------------------------------------------------------------------
@@ -790,8 +803,18 @@ func _build_top_bar() -> void:
 	bar.name = "WireTopBar"
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar.z_index = _WIRE_Z
-	bar.add_theme_stylebox_override("panel", WireframeKitScript.stylebox(
-		WireframeKitScript.HEADER_FILL, WireframeKitScript.LINE, 1, 0, 0))
+	# Parchment chrome band: a warm Parchment-Cream strip with a soft Slate-Ink
+	# bottom hairline (the same rule color as ParchmentKit.divider). Zero content
+	# margin keeps the inner row edge-to-edge, exactly as the prior greybox band.
+	var band: StyleBoxFlat = StyleBoxFlat.new()
+	band.bg_color = UIFrameworkScript.PARCHMENT_CREAM
+	band.border_color = ParchmentKitScript.LINE_SOFT
+	band.border_width_bottom = 1
+	band.content_margin_left = 0
+	band.content_margin_right = 0
+	band.content_margin_top = 0
+	band.content_margin_bottom = 0
+	bar.add_theme_stylebox_override("panel", band)
 	add_child(bar)
 	_place(bar, 0, 0, 1, 0, 0.0, 0.0, 0.0, _TOPBAR_H)
 
@@ -808,8 +831,8 @@ func _build_top_bar() -> void:
 
 	for tab_text: String in ["The Hall", "Codex", "Lantern Shards · 0"]:
 		var is_active: bool = tab_text == "The Hall"
-		var tab: Label = WireframeKitScript.eyebrow(tab_text,
-			WireframeKitScript.ACCENT if is_active else WireframeKitScript.MUTED)
+		var tab: Label = ParchmentKitScript.eyebrow(tab_text,
+			ParchmentKitScript.ACCENT if is_active else ParchmentKitScript.MUTED)
 		tab.add_theme_font_size_override("font_size", 12)
 		# The Codex tab is the live entry point for the read-only catalogue modal.
 		if tab_text == "Codex":
@@ -825,7 +848,7 @@ func _build_top_bar() -> void:
 	row.add_child(grow)
 
 	for chip_text: String in ["Gems —", "Keys —"]:
-		var chip: Label = WireframeKitScript.eyebrow(chip_text)
+		var chip: Label = ParchmentKitScript.eyebrow(chip_text)
 		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(chip)
 
@@ -848,7 +871,7 @@ func _on_codex_tab_input(event: InputEvent) -> void:
 ## Center-column top panel: "Expeditions in progress". Our orchestrator is a
 ## single-run engine, so this honestly shows 0 or 1 run.
 func _build_runs_panel() -> void:
-	var panel: PanelContainer = WireframeKitScript.section_panel("Expeditions in progress")
+	var panel: PanelContainer = ParchmentKitScript.section_panel("Expeditions in progress")
 	panel.name = "WireRunsPanel"
 	panel.z_index = _WIRE_Z
 	add_child(panel)
@@ -857,7 +880,7 @@ func _build_runs_panel() -> void:
 	var dyn: VBoxContainer = VBoxContainer.new()
 	dyn.name = "Dyn"
 	dyn.add_theme_constant_override("separation", 6)
-	WireframeKitScript.body_of(panel).add_child(dyn)
+	ParchmentKitScript.body_of(panel).add_child(dyn)
 	_runs_body = dyn
 
 
@@ -868,36 +891,36 @@ func _refresh_runs_panel() -> void:
 		c.queue_free()
 	var snap: Variant = DungeonRunOrchestrator.run_snapshot if DungeonRunOrchestrator != null else null
 	if snap == null:
-		_runs_body.add_child(WireframeKitScript.caption(
-			"The lantern is lit. No one has answered yet.", WireframeKitScript.MUTED))
+		_runs_body.add_child(ParchmentKitScript.caption(
+			"The lantern is lit. No one has answered yet.", ParchmentKitScript.MUTED))
 		return
 	var biome_id: String = DungeonRunOrchestrator.get_dispatched_biome_id()
 	var floor_i: int = DungeonRunOrchestrator.get_dispatched_floor_index()
 	var biome_label: String = biome_id.capitalize()
 	if BiomeDungeonDatabase != null:
 		biome_label = _biome_display(BiomeDungeonDatabase.get_biome_by_id(biome_id), biome_id)
-	_runs_body.add_child(WireframeKitScript.list_tile(
+	_runs_body.add_child(ParchmentKitScript.list_tile(
 		biome_label, "Floor %d · in progress" % floor_i, "WATCH"))
 
 
 ## Center-column middle panel: the event/activity feed (static flavour lines —
 ## the live combat log is wired on the Expedition screen).
 func _build_activity_feed() -> void:
-	var panel: PanelContainer = WireframeKitScript.section_panel("Event log")
+	var panel: PanelContainer = ParchmentKitScript.section_panel("Event log")
 	panel.name = "WireActivityFeed"
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.z_index = _WIRE_Z
 	add_child(panel)
 	_place(panel, 0, 0, 1, 1,
 		_center_col_left(), _CONTENT_TOP + 208.0, _center_col_right(), -216.0)
-	var body: VBoxContainer = WireframeKitScript.body_of(panel)
+	var body: VBoxContainer = ParchmentKitScript.body_of(panel)
 	for line: String in [
 		"The lantern needs trimming.",
 		"A draft. Somewhere a door closes.",
 		"The party rests four breaths.",
 		"A loose stone settles in the wall.",
 	]:
-		var l: Label = WireframeKitScript.caption("· " + line, WireframeKitScript.MUTED, 12)
+		var l: Label = ParchmentKitScript.caption("· " + line, ParchmentKitScript.MUTED, 12)
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		body.add_child(l)
 
@@ -933,7 +956,7 @@ func _biome_display(biome: Variant, fallback_id: String) -> String:
 ## Right column: "The Map" — list of playable biomes (real data) with their
 ## clear progress. Floor/party selection happens in Dispatch (Send Party CTA).
 func _build_map_panel() -> void:
-	var panel: PanelContainer = WireframeKitScript.section_panel("The Map")
+	var panel: PanelContainer = ParchmentKitScript.section_panel("The Map")
 	panel.name = "WireMapPanel"
 	panel.z_index = _WIRE_Z
 	add_child(panel)
@@ -942,7 +965,7 @@ func _build_map_panel() -> void:
 	var scroll: ScrollContainer = ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	WireframeKitScript.body_of(panel).add_child(scroll)
+	ParchmentKitScript.body_of(panel).add_child(scroll)
 	var dyn: VBoxContainer = VBoxContainer.new()
 	dyn.name = "Dyn"
 	dyn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -960,8 +983,8 @@ func _refresh_map_panel() -> void:
 	if BiomeDungeonDatabase != null:
 		biomes = BiomeDungeonDatabase.get_playable_biomes()
 	if biomes.is_empty():
-		_map_body.add_child(WireframeKitScript.caption(
-			"No dungeons available yet.", WireframeKitScript.MUTED))
+		_map_body.add_child(ParchmentKitScript.caption(
+			"No dungeons available yet.", ParchmentKitScript.MUTED))
 	else:
 		var shown: int = 0
 		for b: Variant in biomes:
@@ -972,9 +995,9 @@ func _refresh_map_panel() -> void:
 			var sub: String = "Sealed"
 			if FloorUnlock != null and FloorUnlock.is_biome_available(bid):
 				sub = "Cleared to floor %d" % FloorUnlock.get_highest_cleared(bid)
-			_map_body.add_child(WireframeKitScript.list_tile(bname, sub, ""))
+			_map_body.add_child(ParchmentKitScript.list_tile(bname, sub, ""))
 			shown += 1
 			if shown >= 6:
 				break
-	_map_body.add_child(WireframeKitScript.caption(
-		"Choose a party and floor in Dispatch ->", WireframeKitScript.MUTED, 11))
+	_map_body.add_child(ParchmentKitScript.caption(
+		"Choose a party and floor in Dispatch ->", ParchmentKitScript.MUTED, 11))
