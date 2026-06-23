@@ -48,6 +48,37 @@ const TOUCH_PULSE_RETURN_SEC: float = 0.016
 ## simplest idempotency guard.
 const _TOUCH_FEEDBACK_META: StringName = &"ui_framework_touch_feedback_wired"
 
+# ---------------------------------------------------------------------------
+# Parchment palette (DESIGN.md §Color — Art Bible §4, locked by ADR-0008)
+# ---------------------------------------------------------------------------
+# The canonical Color constants the DESIGN.md "Godot Theme implementation"
+# translation guide refers to. Hex strings match DESIGN.md §Color exactly
+# (Color() parses "#RRGGBB" as sRGB). Usage rules: Slate Ink replaces pure black
+# everywhere (rule #1); no pure-saturated literals (rule #2). Themed widgets
+# that build colors in code (e.g. ParchmentKit) reference these, never raw hex.
+
+## Player-controlled territory / primary interactive state. #C8872A
+const GUILD_AMBER: Color = Color("#C8872A")
+## Reward + progression highlight — the game's highest-attention color. #F2B83B
+const LANTERN_GOLD: Color = Color("#F2B83B")
+## UI ground / panel backgrounds. #EDE0C4
+const PARCHMENT_CREAM: Color = Color("#EDE0C4")
+## Enemy territory / dungeon ambient / locked content. #5B4A72
+const DUSK_PURPLE: Color = Color("#5B4A72")
+## Forest biome / environmental nature accent. #7A8C5E
+const MOSS_SAGE: Color = Color("#7A8C5E")
+## Danger indicator / enemy power tier / warning register. #A84C2F
+const EMBER_RUST: Color = Color("#A84C2F")
+## Typography, sprite outlines, deep shadow — never pure black. #2C2838
+const SLATE_INK: Color = Color("#2C2838")
+
+## Gold-counter pulse rise duration (color → Guild Amber). Recruit GDD §C.3: 100 ms.
+const GOLD_PULSE_RISE_SEC: float = 0.10
+## Gold-counter pulse settle duration (Guild Amber → resting). Recruit GDD §C.3: 200 ms.
+const GOLD_PULSE_FALL_SEC: float = 0.20
+## Meta sentinel holding a gold counter's in-flight pulse Tween (kill-on-restart).
+const _GOLD_PULSE_TWEEN_META: StringName = &"ui_framework_gold_pulse_tween"
+
 ## ParchmentPanel application pattern.
 ## - [code]STANDARD[/code]: panel intercepts taps (mouse_filter unchanged from
 ##   the panel's own setting; defaults to STOP for PanelContainer).
@@ -249,6 +280,126 @@ static func _fire_ui_tap_chime() -> void:
 	if router == null or not router.has_method("play_sfx"):
 		return
 	router.play_sfx(&"sfx_ui_tap")
+
+
+# ---------------------------------------------------------------------------
+# Gold-counter pulse
+# ---------------------------------------------------------------------------
+
+## Pulses [param label]'s font color toward Guild Amber and back — the "gold
+## changed" feedback shared by the Guild Hall, Recruit, and Dungeon Run gold
+## counters (the three counters VFX GDD #27 §F enumerates), so the timing and
+## color stay in lockstep across screens.
+##
+## A COLOR pulse, deliberately not a scale pulse: the gold counter is a centered
+## Label, and a scale tween would reflow neighbouring layout / fight the touch
+## pulse's transform. Recruit GDD §C.3 specifies the motion — font color shifts
+## to Guild Amber over ~100 ms, then settles back over ~200 ms (≤300 ms total).
+##
+## WHICH gold_changed reasons pulse (recruit / level_up / floor_clear / kill —
+## never the idle drip) is the caller's decision; this helper only renders.
+##
+## Reduce-motion (ADR-0007): when [param reduce_motion] is true the pulse is
+## suppressed entirely. The caller has already snapped the counter text, so the
+## value change is still conveyed — just without animation.
+##
+## Self-contained tween lifecycle: a meta sentinel holds the in-flight Tween so a
+## rapid burst of triggers (e.g. a quick double-tap recruit) kills-and-restarts
+## rather than stacking overlapping color tweens. The font_color override is
+## removed on completion so the label falls back to its themed resting color.
+##
+## This is the low-level primitive — it pulses unconditionally. Screens reacting
+## to [signal Economy.gold_changed] should call [method pulse_gold_on_reason] so
+## the "which gold changes pulse" policy stays centralized.
+##
+## ADR-0008 §Touch feedback (sibling pulse effect) + VFX GDD #27.
+static func pulse_gold_counter(label: Label, reduce_motion: bool = false) -> void:
+	if label == null:
+		push_error("[UIFramework] pulse_gold_counter called with null label.")
+		return
+	# Kill any in-flight pulse so a burst of gold_changed signals restarts
+	# cleanly instead of stacking overlapping color tweens on the same label.
+	if label.has_meta(_GOLD_PULSE_TWEEN_META):
+		var prior: Tween = label.get_meta(_GOLD_PULSE_TWEEN_META) as Tween
+		if prior != null and prior.is_valid():
+			prior.kill()
+		label.remove_meta(_GOLD_PULSE_TWEEN_META)
+	# Drop any leftover font_color override so the captured resting color is the
+	# label's themed color, never a mid-pulse tint. Our gold counters derive
+	# their resting color from the IdentityHeader theme variation (Lantern Gold),
+	# not a local override — see guild_hall.tscn $GoldCounter — so clearing the
+	# override here both restores the true base and keeps rapid bursts drift-free.
+	if label.has_theme_color_override("font_color"):
+		label.remove_theme_color_override("font_color")
+	# Reduce-motion (ADR-0007): no animation; the caller has already snapped text.
+	if reduce_motion:
+		return
+	var base: Color = label.get_theme_color("font_color")
+	var tw: Tween = label.create_tween()
+	tw.tween_method(
+		_apply_label_font_color.bind(label), base, GUILD_AMBER, GOLD_PULSE_RISE_SEC
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_method(
+		_apply_label_font_color.bind(label), GUILD_AMBER, base, GOLD_PULSE_FALL_SEC
+	).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.finished.connect(_clear_gold_pulse.bind(label), CONNECT_ONE_SHOT)
+	label.set_meta(_GOLD_PULSE_TWEEN_META, tw)
+
+
+## Internal — tween_method target for [method pulse_gold_counter]. Applies the
+## interpolated [param c] as a font_color override. [code]Callable.bind(label)[/code]
+## appends the label AFTER the interpolated value, so the signature is
+## [code](c, label)[/code], not [code](label, c)[/code].
+static func _apply_label_font_color(c: Color, label: Label) -> void:
+	if label != null:
+		label.add_theme_color_override("font_color", c)
+
+
+## Internal — gold-pulse completion: drop the override (fall back to the themed
+## resting color) and clear the in-flight-tween sentinel.
+static func _clear_gold_pulse(label: Label) -> void:
+	if label == null:
+		return
+	label.remove_theme_color_override("font_color")
+	if label.has_meta(_GOLD_PULSE_TWEEN_META):
+		label.remove_meta(_GOLD_PULSE_TWEEN_META)
+
+
+## True when an [signal Economy.gold_changed] [param reason] denotes a discrete,
+## player-initiated transaction worth a gold-counter pulse.
+##
+## Matches ONLY the spend reasons Economy actually emits (verified against
+## economy.gd, recruitment.gd, hero_detail_modal.gd — 2026-06-23):
+##   - [code]"level_up"[/code]            — hero level-up spend (hero_detail_modal.gd)
+##   - [code]"recruit_<class_id>"[/code]  — hero recruit spend; class-suffixed, so
+##                                          matched by the [code]"recruit_"[/code] prefix
+##   - [code]"recruit_pool_refresh"[/code] — paid pool refresh (also "recruit_"-prefixed)
+##
+## Deliberately EXCLUDES the earn + system reasons — they are NOT discrete player
+## actions and pulsing on them would strobe or mislead:
+##   - [code]"add_gold"[/code]          — the foreground idle drip credits this EVERY
+##                                        tick (economy.gd [code]_on_tick[/code]) AND
+##                                        once per kill (dungeon_run_orchestrator), so
+##                                        pulsing would throb continuously through a run.
+##   - [code]"first_launch_seed"[/code] — one-time boot grant; a boot pulse is noise.
+##   - [code]"offline_replay"[/code] / [code]"offline_replay_aggregate"[/code] — the
+##                                        offline-return lump has its own return beat.
+##
+## NOTE: this supersedes VFX GDD #27 §F's literal {recruit, level_up, floor_clear,
+## kill} list — floor_clear/kill earns are emitted as the generic "add_gold" reason
+## and cannot be isolated here without an Economy-level reason change.
+static func is_gold_pulse_reason(reason: String) -> bool:
+	return reason == "level_up" or reason.begins_with("recruit_")
+
+
+## Reason-gated gold pulse: pulses [param label] via [method pulse_gold_counter]
+## only when [param reason] passes [method is_gold_pulse_reason]. Every screen
+## bound to [signal Economy.gold_changed] (Guild Hall, Recruitment, Hero Detail,
+## Expedition) calls this from its handler, so the trigger policy lives in one
+## place rather than being re-derived — and drifting — per screen.
+static func pulse_gold_on_reason(label: Label, reason: String, reduce_motion: bool = false) -> void:
+	if is_gold_pulse_reason(reason):
+		pulse_gold_counter(label, reduce_motion)
 
 
 ## Safe-format wrapper around [code]tr()[/code] localization keys with format
