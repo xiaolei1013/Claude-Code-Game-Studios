@@ -224,4 +224,21 @@ The epic's **sibling external gate** — **Story 011** (per-class action-sprite 
 beats are the permanent fallback, so the epic is fully playable and shippable without the
 action art.
 
-`[ ]` Pass · `[ ]` Fail · `[ ]` Not yet executed
+`[x]` **Pass — closed on owner sign-off 2026-06-23** · `[ ]` Fail · `[ ]` Not yet executed
+
+### Outcome — CLOSED 2026-06-23
+
+PR #240 was merged to `main` (@ `32c74c6`, 2026-06-23 04:14 UTC) and local `main` synced
+before play. The owner played the merged-`main` build and signed off verbatim:
+**"the core game logic holds. we can move on."** Story 016 is flipped to **Done** in
+`EPIC.md` and the epic is **complete** (15/16 Done; Story 011 action-art spend remains a
+deferred, ship-optional gate).
+
+**Honest scope of this closure** (per project practice that 100% green ≠ shipped): the gate
+is closed on **owner authority**, not on an itemized A–G walkthrough. The owner confirmed the
+build runs and the core logic holds against merged `main` and elected to move on; the per-row
+visual/feel checks (A–G, incl. the on-hardware 60 fps read G1) were **accepted on that
+sign-off, not individually recorded** in this session. The structural contracts those rows
+mirror remain locked by the **117-case automated surface** above (re-verified green on the
+merged commits). If any hero-presence visual issue surfaces in later play, reopen as a
+follow-up bug — the closure rests on the owner's sign-off, transparently scoped.
