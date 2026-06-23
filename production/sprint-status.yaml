@@ -18,7 +18,7 @@ goal: "Drain the compounded playtest backlog, lock the theme direction, and ship
 start: "2026-06-03"
 end: "2026-06-16"
 generated: "2026-06-03"
-updated: "2026-06-08"
+updated: "2026-06-23"
 
 stories:
   - id: "28-M1"
@@ -45,11 +45,11 @@ stories:
     name: "Theme skin ADR-0020: dark-mock vs light-parchment"
     file: "docs/architecture/ADR-0020-theme-skin-direction.md"
     priority: must-have
-    status: review
+    status: done
     owner: ""
     estimate_days: 0.5
-    blocker: "ADR-0020 WRITTEN 2026-06-08 — defensible default = ratify light-parchment (already locked in DESIGN.md; dark-mock rejected). Pending USER ratification at end-of-batch verification."
-    completed: ""
+    blocker: "RATIFIED by user 2026-06-23 — light-parchment confirmed as binding visual identity; dark-mock pivot declined. ADR-0020 accepted by user verification."
+    completed: "2026-06-23"
 
   - id: "28-S1"
     name: "Per-floor matchup hint on floor picker"
@@ -65,11 +65,11 @@ stories:
     name: "Prestige GDD #31 /design-review → APPROVED (or pivot)"
     file: "design/gdd/reviews/prestige-system-review-log.md"
     priority: should-have
-    status: review
+    status: done
     owner: "systems-designer"
     estimate_days: 0.5
-    blocker: "design-review DONE 2026-06-08 → APPROVED WITH CONDITIONS; RATIFY per-hero model (recommendation). 2 doc-fixes applied, 2 resolved by shipped reality (prestige is ALREADY built+tested). Pending USER ratification of RATIFY rec."
-    completed: ""
+    blocker: "RATIFIED by user 2026-06-23 — per-hero-retire → global-multiplier model accepted (already built + tested); pure-global ascension declined. GDD #31 is the binding prestige design."
+    completed: "2026-06-23"
 
   - id: "28-N1"
     name: "VFX: particle layer (aura/bubble/batwing) wired to gameplay signals"
@@ -107,8 +107,8 @@ stories:
     name: "Channel-light lantern: wire to a real mechanic OR formally cut"
     file: "src/ui/wireframe_kit.gd"
     priority: nice-to-have
-    status: blocked
+    status: done
     owner: ""
     estimate_days: 0.5
-    blocker: "USER DESIGN DECISION required — clicker-faucet vs cut vs keep-as-juice. Cozy-IDLE pillar risk if it becomes a cookie-clicker. Flagged for user; not unilaterally built."
-    completed: ""
+    blocker: "DECIDED by user 2026-06-23 — keep as ambient juice, no mechanic. Lantern made non-interactive (WireframeKit.lantern_display/lantern_block, MOUSE_FILTER_IGNORE) on Hall + Expedition so there is no false tap-target. Regression tests added (ui_framework input-transparency suite green)."
+    completed: "2026-06-23"
