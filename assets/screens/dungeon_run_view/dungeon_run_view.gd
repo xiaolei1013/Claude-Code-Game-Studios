@@ -1467,9 +1467,10 @@ func _beat_now_ms() -> int:
 # GDD #35 Phase 3 / ADR-0025). Each reaction-beat builder first routes its slots
 # through here: a slot WHOSE class has action art for the beat's pose plays the
 # action one-shot frames on its &"_IdleAnimator"; a slot WITHOUT art is RETURNED
-# for the caller's Phase-2 cosmetic tween. With NO action PNGs on disk yet,
-# get_action_frames returns [] for every class, so EVERY slot falls through to the
-# tween — behaviour identical to pre-Story-012 — until the per-class sheets land.
+# for the caller's Phase-2 cosmetic tween. Story 011 landed the per-class action sheets
+# (attack/hit/victory/defeat for every roster class), so get_action_frames now resolves
+# real frames and the live party plays them; the tween is the fallback for an art-less /
+# partial-art slot (or a pose with no sheet), not the default path.
 # All on HUMAN-frequency beats, never _on_tick_fired (ADR-0025 §C.9 / Story 007 guard).
 # ---------------------------------------------------------------------------
 

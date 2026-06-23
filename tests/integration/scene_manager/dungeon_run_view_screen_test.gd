@@ -1455,6 +1455,24 @@ func _kill_beat_gate(screen: Control) -> bool:
 		float(consts["KILL_BEAT_SCALE_PUNCH"]), int(consts["KILL_BEAT_MS"]))
 
 
+## Story 011 migration seam. Warrior now ships REAL action art (attack/hit/victory/defeat),
+## so an un-pinned reaction beat plays one-shot FRAMES and starts NO _active_beat_tween (the
+## frames REPLACE the tween). The gate / latch / route-suppression / lifecycle tests below
+## target the art-ORTHOGONAL contract, so they pin warrior's four poses to [] — the art-absent
+## branch of _action_frames_for — forcing the cosmetic-tween path back so _active_beat_tween is
+## the observable again. The real disk-frames path stays covered by the positive disk-art test
+## (test_real_disk_art_boss_beat_plays_warrior_action_frames_and_starts_no_tween) + the Story
+## 012/013 synthetic-override tests; this keeps the GATING proofs stable as the art lands.
+func _force_warrior_artless(screen: Control) -> void:
+	for pose: String in [
+		ClassSpriteFactoryScript.POSE_ATTACK,
+		ClassSpriteFactoryScript.POSE_HIT,
+		ClassSpriteFactoryScript.POSE_VICTORY,
+		ClassSpriteFactoryScript.POSE_DEFEAT,
+	]:
+		screen._action_frames_override["warrior/" + pose] = []
+
+
 func test_kill_and_boss_beats_connected_on_enter_disconnected_on_exit() -> void:
 	# Arrange — navigate (on_enter connects both reaction-beat handlers).
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
@@ -1496,6 +1514,7 @@ func test_enemy_kill_beat_starts_strike_tween_when_motion_enabled() -> void:
 	HeroRosterFixture.seed_warriors(2)
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
 	assert_object(screen).is_not_null()
+	_force_warrior_artless(screen)  # Story 011: keep _active_beat_tween observable (see helper)
 
 	# reduce_motion OFF so the beat is allowed; deterministic clock so the throttle
 	# never interferes (first beat always clears the -BEAT_THROTTLE_MS init).
@@ -1531,6 +1550,7 @@ func test_boss_kill_beat_starts_strike_tween_when_motion_enabled() -> void:
 	HeroRosterFixture.seed_warriors(2)
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
 	assert_object(screen).is_not_null()
+	_force_warrior_artless(screen)  # Story 011: keep _active_beat_tween observable (see helper)
 
 	var sm: Node = screen.get_node_or_null("/root/SceneManager")
 	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
@@ -1561,6 +1581,7 @@ func test_strike_beat_suppressed_when_reduce_motion_enabled() -> void:
 	HeroRosterFixture.seed_warriors(2)
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
 	assert_object(screen).is_not_null()
+	_force_warrior_artless(screen)  # Story 011: keep _active_beat_tween observable (see helper)
 	screen._beat_clock_override_ms = 1000
 
 	var sm: Node = screen.get_node_or_null("/root/SceneManager")
@@ -1673,6 +1694,7 @@ func test_enemy_killed_signal_emission_triggers_beat_end_to_end() -> void:
 	HeroRosterFixture.seed_warriors(2)
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
 	assert_object(screen).is_not_null()
+	_force_warrior_artless(screen)  # Story 011: keep _active_beat_tween observable (see helper)
 
 	var sm: Node = screen.get_node_or_null("/root/SceneManager")
 	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
@@ -1706,6 +1728,7 @@ func test_on_exit_kills_active_beat_tween() -> void:
 	HeroRosterFixture.seed_warriors(2)
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
 	assert_object(screen).is_not_null()
+	_force_warrior_artless(screen)  # Story 011: keep _active_beat_tween observable (see helper)
 
 	var sm: Node = screen.get_node_or_null("/root/SceneManager")
 	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
@@ -1796,6 +1819,7 @@ func test_victory_beat_plays_on_floor_cleared_and_does_not_route() -> void:
 	HeroRosterFixture.seed_warriors(2)
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
 	assert_object(screen).is_not_null()
+	_force_warrior_artless(screen)  # Story 011: keep _active_beat_tween observable (see helper)
 
 	var sm: Node = screen.get_node_or_null("/root/SceneManager")
 	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
@@ -1862,6 +1886,7 @@ func test_losing_run_floor_clear_plays_no_victory_and_does_not_latch() -> void:
 	HeroRosterFixture.seed_warriors(2)
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
 	assert_object(screen).is_not_null()
+	_force_warrior_artless(screen)  # Story 011: keep _active_beat_tween observable (see helper)
 
 	var sm: Node = screen.get_node_or_null("/root/SceneManager")
 	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
@@ -1904,6 +1929,7 @@ func test_defeat_slump_plays_on_run_defeated_coordinated_with_overlay_no_route()
 	HeroRosterFixture.seed_warriors(2)
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
 	assert_object(screen).is_not_null()
+	_force_warrior_artless(screen)  # Story 011: keep _active_beat_tween observable (see helper)
 
 	var sm: Node = screen.get_node_or_null("/root/SceneManager")
 	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
@@ -1950,6 +1976,7 @@ func test_victory_supersedes_boss_strike_then_latch_blocks_late_kill() -> void:
 	HeroRosterFixture.seed_warriors(2)
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
 	assert_object(screen).is_not_null()
+	_force_warrior_artless(screen)  # Story 011: keep _active_beat_tween observable (see helper)
 
 	var sm: Node = screen.get_node_or_null("/root/SceneManager")
 	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
@@ -2042,10 +2069,13 @@ func test_defeat_slump_static_under_reduce_motion_visible_and_dimmed() -> void:
 	# §C.8 / AC-35-07/08: under reduce_motion the defeat slump is shown as an INSTANT static
 	# pose — NO tween, but the terminal STATE is applied (heroes sit slumped + dimmed) and
 	# they stay VISIBLE (alpha 1.0; never a fade-to-nothing). Arrange — party present.
+	# (Pinned to the art-absent path so the slump is the SCALE/DIM static pose this test
+	# asserts; with real defeat art the slump is a HELD frame instead — see _apply_defeat_slump_static.)
 	HeroRosterFixture.reset_hero_roster()
 	HeroRosterFixture.seed_warriors(2)
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
 	assert_object(screen).is_not_null()
+	_force_warrior_artless(screen)  # Story 011: keep the scale/dim static slump observable (see helper)
 
 	var sm: Node = screen.get_node_or_null("/root/SceneManager")
 	assert_object(sm).is_not_null()
@@ -2106,6 +2136,7 @@ func test_terminal_beat_reads_reduce_motion_at_beat_time_not_on_enter() -> void:
 
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
 	assert_object(screen).is_not_null()
+	_force_warrior_artless(screen)  # Story 011: keep _active_beat_tween observable (see helper)
 
 	# Flip OFF after on_enter, then fire the beat.
 	sm.set("reduce_motion", false)
@@ -2167,6 +2198,7 @@ func test_on_exit_kills_active_terminal_beat_tween() -> void:
 	HeroRosterFixture.seed_warriors(2)
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
 	assert_object(screen).is_not_null()
+	_force_warrior_artless(screen)  # Story 011: keep _active_beat_tween observable (see helper)
 
 	var sm: Node = screen.get_node_or_null("/root/SceneManager")
 	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
@@ -2449,6 +2481,62 @@ func test_boss_beat_plays_action_frames_when_art_exists_and_starts_no_tween() ->
 	await get_tree().process_frame
 
 
+func test_real_disk_art_boss_beat_plays_warrior_action_frames_and_starts_no_tween() -> void:
+	# Story 011 end-to-end WIRING net (the dominant scaffolded-but-unwired bug class): with NO
+	# override injected, the screen must pull warrior's REAL committed attack sheet off disk via
+	# _action_frames_for → ClassSpriteFactory.get_action_frames, play it as a one-shot on every
+	# slot, and therefore start NO cosmetic tween. This is the ONLY test that drives the live
+	# disk-art path with zero synthetic frames — proving the art is actually reachable in-scene,
+	# not merely present on disk + unit-loadable (which the factory suite already proves). Boss
+	# beat = whole-party pulse (Story 013 routes a normal kill to a single round-robin hero), so
+	# it exercises ALL slots' frames path in one beat.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 1000
+
+	# NO _action_frames_override for warrior — the real disk sheet must resolve on its own.
+	# Same cached array the screen will read, so its frame 0 is identity-comparable below.
+	var expected: Array = ClassSpriteFactoryScript.get_action_frames(
+		"warrior", ClassSpriteFactoryScript.POSE_ATTACK)
+	assert_int(expected.size()).override_failure_message(
+		"precondition: warrior's real attack sheet must load from disk (Story 011 art)"
+	).is_equal(ClassSpriteFactoryScript.FRAME_COUNT)
+
+	# Act — a boss kill arrives via the real handler (whole-party beat).
+	screen._on_boss_killed_beat("forest_warden")
+
+	# Assert — the REAL frames replaced the tween: no beat tween, and every warrior slot's
+	# animator plays the action one-shot showing disk attack frame 0 (the same cached
+	# AtlasTexture the factory hands back — proving the slot shows the on-disk art, not a stand-in).
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"with warrior's real attack art on disk, the boss beat must play frames and start NO tween"
+	).is_null()
+	for slot: Node in screen._party_hero_slots():
+		var c: Control = slot as Control
+		var animator := _slot_animator(slot)
+		assert_object(animator).is_not_null()
+		assert_bool(animator._oneshot).override_failure_message(
+			"the slot's animator must be playing the disk action one-shot (not the idle loop)"
+		).is_true()
+		assert_object(c.texture).override_failure_message(
+			"the slot must display real disk attack frame 0 (the cached factory AtlasTexture)"
+		).is_same(expected[0])
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
 func test_boss_beat_mixed_party_art_slot_plays_frames_and_artless_slot_tweens() -> void:
 	# The per-slot routing proof: a warrior WITH injected attack art plays frames while a
 	# mage WITHOUT art falls back to the cosmetic tween — both in the SAME beat. So a tween
@@ -2467,9 +2555,13 @@ func test_boss_beat_mixed_party_art_slot_plays_frames_and_artless_slot_tweens() 
 		sm.set("reduce_motion", false)
 	screen._beat_clock_override_ms = 1000
 
-	# Inject attack art for the WARRIOR only — the mage has no attack frames (disk or override).
+	# Inject synthetic attack art for the WARRIOR (the frames path). Story 011 shipped a REAL
+	# mage/attack.png too, so to keep this a MIXED party we must now EXPLICITLY force the mage
+	# art-less — pin its attack pose to [] (the art-absent branch of _action_frames_for) so it
+	# still falls to the cosmetic tween. (Pre-Story-011 the mage was art-less by default.)
 	var attack: Array = _make_action_frames(3)
 	screen._action_frames_override["warrior/" + ClassSpriteFactoryScript.POSE_ATTACK] = attack
+	screen._action_frames_override["mage/" + ClassSpriteFactoryScript.POSE_ATTACK] = []
 
 	# Act — a boss kill (whole-party beat) routes BOTH slots at once.
 	screen._on_boss_killed_beat("forest_warden")

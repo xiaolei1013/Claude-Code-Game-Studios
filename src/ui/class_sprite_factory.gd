@@ -7,7 +7,7 @@
 ## pixel-art look, authored via tools/asset-pipeline). Each frame becomes an
 ## [AtlasTexture] window over the shared sheet, so all frames share a single GPU texture.
 ##
-## When the sheet is absent for a class (art not yet authored), [method get_idle_frames]
+## When the sheet is absent for a class (art absent), [method get_idle_frames]
 ## returns an empty array and [method animate] is a no-op, leaving whatever still
 ## texture the caller already set (a [ClassPortraitFactory] portrait or block).
 ## This mirrors ClassPortraitFactory's disk-first / null-fallback contract.
@@ -41,7 +41,7 @@ const PORTRAIT_IDLE_FPS: float = IDLE_FPS * PORTRAIT_IDLE_FPS_RATIO
 ## Default ACTION playback rate (attack / victory / defeat one-shots). Faster than
 ## the breathing idle so a reaction pose reads as a deliberate beat, not idle drift.
 ## Story 014 may make this per-class / per-pose data-driven; one rate is enough for
-## the Story 012 frames-vs-tween machinery (the action art does not exist yet).
+## the Story 012 frames-vs-tween machinery across all committed action sheets.
 const ACTION_FPS: float = 12.0
 
 ## Canonical action-pose ids. Each names a per-class action sprite sheet authored by
@@ -90,7 +90,7 @@ static func get_idle_frames(class_id: String) -> Array:
 
 ## Returns the ordered ACTION frames for [param class_id]'s [param pose] (one of the
 ## [code]POSE_*[/code] ids), or an empty array when the class/pose is empty or its sheet
-## is absent — the art-not-yet-authored path, where the caller falls back to its cosmetic
+## is absent — the art-absent fallback, where the caller falls back to its cosmetic
 ## tween (Story 012's "real frames where art exists" contract). Cached per (class_id, pose)
 ## under a composite key, so it never collides with [method get_idle_frames]'s bare
 ## class_id key. Mirrors the idle loader exactly: same [member ResourceLoader] existence
