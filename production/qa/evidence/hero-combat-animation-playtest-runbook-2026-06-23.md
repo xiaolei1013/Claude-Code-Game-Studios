@@ -190,13 +190,18 @@ Story 016's eyes confirm feel; the **contracts** are locked by these suites (all
 run individually on local `Godot_mono` 4.6 — the full multi-dir run SIGABRTs at shutdown
 locally, a known artifact, not a failure):
 
+> **Re-verified green on branch HEAD `8f08824` (2026-06-23):** all four suites re-run, each
+> in its own process — **117 cases total (71 + 28 + 2 + 16), 0 errors · 0 failures · 0 flaky ·
+> 0 skipped · 0 orphans.** This is the complete automated-coverage surface of the epic; the
+> build the playtester will run against merged `main` is sound.
+
 | Suite | Cases | What it locks |
 |---|---|---|
 | `tests/integration/scene_manager/dungeon_run_view_screen_test.gd` | 71 | The whole in-scene contract: diorama present + input-transparent (AC-35-10/14); **one sprite per occupied slot, count data-driven not hardcoded** (AC-35-11); idle loads + **advances** the frame (006); `_on_tick_fired` adds **no** hero work (AC-35-06); RUN_ENDED **freezes** idle (AC-35-15); kill/boss/victory/defeat beats connect→fire→disconnect end-to-end incl. **real signal emission**, coalescing (AC-35-09), precedence victory>boss>kill (AC-35-13), round-robin walk + boss whole-party, action-frame-vs-tween split, and the **full reduce-motion sweep** with heroes visible (AC-35-07/08). |
 | `tests/unit/class_sprite_factory/class_sprite_factory_test.gd` | 28 | Idle frame slicing; reduce-motion **freezes on static frame 0** (`_process` off) + motion-on control + 3-arg default-stays-on; **shared-atlas draw-call budget** (K heroes of a class ≈ 1 sheet texture). |
 | `tests/unit/class_sprite_factory/calm_surface_reduce_motion_wiring_test.gd` | 2 | Structural guard: **all four** calm portrait surfaces thread the reduce-motion flag **into** their `animate()` call + define the helper (the scaffolded-but-unwired regression net). |
 | `tests/integration/recruitment/recruit_screen_contract_test.gd` | 16 | Group G drives the **real** `_render_pool_entry` path: portrait idle freezes under reduce-motion, animates without it. |
-| `tests/unit/dungeon_run_orchestrator/*` (Story 007 hot-path guard) | — | `_on_tick_fired` source guard: **no** alloc / format string / `tr()` / tween / node creation at 20 Hz **with heroes on screen** (AC-35-06 BLOCKING). |
+| Story 007 hot-path guard — `test_on_tick_fired_adds_no_hero_animation_work` (a case **inside** the 71-case headline suite, L1343) | (in 71) | `_on_tick_fired` guard: **no** hero-animation work / alloc added at 20 Hz **with heroes on screen** (AC-35-06 BLOCKING). |
 
 ---
 
