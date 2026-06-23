@@ -59,8 +59,10 @@ var POOL_SIZE: int = RecruitmentScript.POOL_SIZE
 @warning_ignore("unused_private_class_variable")
 var _is_rendering: bool = false
 
-# Lantern Guild mock wireframe (feat/ui-wireframe-detail-recruit) — greybox state.
-const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+# Recruit pool draft styling. Sprint 29 theme-first re-skin: graduated from the
+# greybox WireframeKit to the parchment skin. ParchmentKit mirrors WireframeKit's
+# factory signatures, so this is a kit-reference swap, not a layout rewrite.
+const ParchmentKitScript = preload("res://src/ui/parchment_kit.gd")
 var _wire_built: bool = false
 
 
@@ -106,9 +108,8 @@ func on_enter() -> void:
 	if _biome_background != null:
 		_biome_background.set_biome("guild_hall_tavern")
 
-	# Lantern Guild mock wireframe (feat/ui-wireframe-detail-recruit): restyle
-	# the pool into the mock's side-by-side 3-card draft (the .tscn flips
-	# PoolVBox→HBox and each PoolEntry→VBox; this styles the cards).
+	# Parchment-skin the pool into the side-by-side 3-card draft (the .tscn lays
+	# PoolVBox out as an HBox and each PoolEntry as a VBox; this styles the cards).
 	_build_wireframe_once()
 
 
@@ -295,7 +296,11 @@ func _on_recruit_pressed(pool_index: int) -> void:
 			# Signals (HeroRoster.hero_recruited 1-arg + Recruitment.hero_recruited
 			# 3-arg + Economy.gold_changed) fire from try_recruit's atomic
 			# dispatch. Screen subscribers re-render automatically.
-			pass
+			# Sprint 29: warm "a hero joined the guild" chime. No dedicated recruit
+			# cue exists, so reuse the level-up reward register (the closest warm
+			# hero-progression ping). The button's own tap chime already acked the
+			# press; this marks the successful outcome.
+			_play_audio_cue(&"sfx_reward_level_up_chime")
 		RecruitmentScript.RecruitOutcome.INSUFFICIENT_GOLD:
 			_show_toast(tr("recruit_error_insufficient_gold"))
 		RecruitmentScript.RecruitOutcome.ROSTER_FULL:
@@ -310,9 +315,15 @@ func _on_recruit_pressed(pool_index: int) -> void:
 func _on_refresh_pressed() -> void:
 	# Per GDD §C.6: read cost via accessor pair; gate via affordability.
 	# refresh_pool_paid handles the try_spend internally.
-	if not Recruitment.refresh_pool_paid():
-		# Returned false — most likely insufficient gold race.
-		_show_toast(tr("recruit_error_insufficient_gold"))
+	if Recruitment.refresh_pool_paid():
+		# Sprint 29: soft parchment whoosh paired with the pool cross-fade
+		# (_on_pool_refreshed) — "the ledger turns a page." Reuses the panel-open
+		# cue. Fired here (not in _on_pool_refreshed) so only the player-paid path
+		# chimes, never the initial fill or daily reset.
+		_play_audio_cue(&"sfx_ui_panel_open")
+		return
+	# Returned false — most likely insufficient gold race.
+	_show_toast(tr("recruit_error_insufficient_gold"))
 
 
 func _on_back_pressed() -> void:
@@ -396,17 +407,29 @@ func _show_toast(message: String) -> void:
 	push_warning("[RecruitScreen] toast: %s" % message)
 
 
+## Fires a one-shot SFX cue through the AudioRouter autoload — the sanctioned
+## manual-cue trigger (escape hatch) per audio_router.gd. Routes THROUGH the
+## audio event system rather than a direct AudioStreamPlayer.play (per the UI
+## audio rule). Defensive no-op when the autoload is absent (test fixtures) or in
+## headless (play_sfx returns null with no device). Mirrors the defensive lookup
+## in ui_framework._fire_ui_tap_chime.
+func _play_audio_cue(cue: StringName) -> void:
+	var router: Node = get_node_or_null("/root/AudioRouter")
+	if router == null or not router.has_method("play_sfx"):
+		return
+	router.play_sfx(cue)
+
+
 # ===========================================================================
-# Lantern Guild mock wireframe — greybox 3-card recruit draft
-# (feat/ui-wireframe-detail-recruit)
+# Recruit pool draft — parchment-skinned side-by-side 3-card draft
+# ("three came to the door"). Sprint 29 theme-first re-skin.
 #
-# The mock's Recruit is a side-by-side 3-card draft ("three came to the door").
-# The .tscn flips PoolVBox VBox→HBox (cards side by side) and each PoolEntry
-# HBox→VBox (portrait on top, class / cost / owned, flavour, recruit button at
+# The .tscn lays PoolVBox out as an HBox (cards side by side) and each PoolEntry
+# as a VBox (portrait on top, class / cost / owned, flavour, recruit button at
 # the foot) — node paths preserved so the path-based tests stay green. This
-# styles the draft: a defined draft table, evenly-spaced fixed-width cards with
-# a header rule, centered content, and a flavour line. Colors route through
-# WireframeKit (no Color() literals here).
+# styles the draft: a warmer ParchmentPanel "table", evenly-spaced fixed-width
+# cards with an amber header rule, centered content, and a flavour line. Colors
+# route through ParchmentKit / the theme cascade (no Color() literals here).
 # ===========================================================================
 
 func _build_wireframe_once() -> void:
@@ -414,10 +437,11 @@ func _build_wireframe_once() -> void:
 		return
 	_wire_built = true
 
-	# The pool panel becomes the draft "table".
+	# The pool panel is the draft "table" — graduate it to the warmer
+	# ParchmentPanel register. (HeaderBar / FooterBar already inherit the default
+	# parchment panel from the global theme cascade, so only this one needs it.)
 	if _pool_panel != null:
-		_pool_panel.add_theme_stylebox_override("panel", WireframeKitScript.stylebox(
-			WireframeKitScript.FILL, WireframeKitScript.LINE, 1, 4, 20))
+		UIFrameworkScript.apply_parchment_panel(_pool_panel)
 
 	var pool_box: Control = get_node_or_null("PoolPanel/PoolVBox")  # now an HBoxContainer
 	if pool_box is BoxContainer:
@@ -443,7 +467,7 @@ func _style_draft_card(entry: Control) -> void:
 	if not entry.has_node("WireCardTop"):
 		var rule: ColorRect = ColorRect.new()
 		rule.name = "WireCardTop"
-		rule.color = WireframeKitScript.ACCENT
+		rule.color = ParchmentKitScript.ACCENT
 		rule.custom_minimum_size = Vector2(0, 2)
 		entry.add_child(rule)
 		entry.move_child(rule, 0)
@@ -463,8 +487,8 @@ func _style_draft_card(entry: Control) -> void:
 			if child is Label:
 				(child as Label).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		if not details.has_node("WireFlavor"):
-			var flavor: Label = WireframeKitScript.caption(
-				"“They came to the door.”", WireframeKitScript.MUTED, 11)
+			var flavor: Label = ParchmentKitScript.caption(
+				"“They came to the door.”", ParchmentKitScript.MUTED, 11)
 			flavor.name = "WireFlavor"
 			flavor.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			details.add_child(flavor)
