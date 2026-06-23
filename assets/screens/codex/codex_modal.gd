@@ -162,7 +162,11 @@ func _make_thumbnail(res: Variant, content_type: String) -> Control:
 		var slot: TextureRect = _thumb_rect()
 		slot.texture = ClassPortraitFactoryScript.get_portrait_texture(id)
 		# Calm PORTRAIT tier: half the in-scene rate (Story 014 / GDD #35 §D.7).
-		ClassSpriteFactoryScript.animate(slot, id, ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS)
+		# reduce_motion (Story 015 / §C.8): the idle holds a static frame under the
+		# accessibility flag — presence without motion.
+		ClassSpriteFactoryScript.animate(
+			slot, id, ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS,
+			_is_reduce_motion_enabled())
 		return slot
 	if content_type == "enemies" and id != "":
 		var tex: Texture2D = EnemySpriteFactoryScript.get_sprite(id)
@@ -213,6 +217,19 @@ func _field_str(res: Variant, field: String) -> String:
 	if res != null and field in res:
 		return String(res.get(field))
 	return ""
+
+
+## Reads the live accessibility motion preference off the SceneManager autoload
+## (Story 015 / §C.8). Returns false when the autoload or the flag is absent, so
+## the codex degrades to animated-idle — the safe, non-breaking default. Read on
+## every (re)render: a card built while reduce_motion is on holds a static frame.
+func _is_reduce_motion_enabled() -> bool:
+	var sm: Node = get_node_or_null("/root/SceneManager")
+	if sm == null:
+		return false
+	if not ("reduce_motion" in sm):
+		return false
+	return bool(sm.get("reduce_motion"))
 
 
 func _on_close_pressed() -> void:

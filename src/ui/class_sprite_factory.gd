@@ -140,7 +140,19 @@ static func slice_sheet(sheet: Texture2D, frame_count: int) -> Array:
 ## each class loads its OWN distinct strip via [method get_idle_frames] (keyed on
 ## class_id), so the art-bible §8.1 "no hero reuses another's idle motion" invariant
 ## holds at the code boundary; the secondary-motion CONTENT is authored into the art.
-static func animate(target: TextureRect, class_id: String, fps: float = IDLE_FPS) -> void:
+## [param reduce_motion]: when true the idle MOTION is suppressed (accessibility,
+## GDD #35 §C.8 + the binding ui-code rule "all animations respect motion prefs") —
+## the slot still receives its animator and holds STATIC frame 0 ([method setup]
+## already assigned it) with [code]_process[/code] disabled, so the hero stays present
+## but nothing moves and the slot costs nothing per frame. The flag is PASSED IN, not
+## read from an autoload, so the factory stays pure-utility / autoload-free (mirrors
+## [method VfxKit.spawn_burst]'s reduce_motion parameter); each caller re-evaluates it
+## on every (re)render, which is the surface's "state evaluation" point (§E.6). The
+## in-scene dungeon slot leaves this false and gates its idle externally (Story 010);
+## the calm portrait surfaces pass their own [code]reduce_motion[/code] read (Story 015).
+static func animate(
+		target: TextureRect, class_id: String, fps: float = IDLE_FPS,
+		reduce_motion: bool = false) -> void:
 	if target == null:
 		return
 	var frames: Array = get_idle_frames(class_id)
@@ -152,6 +164,10 @@ static func animate(target: TextureRect, class_id: String, fps: float = IDLE_FPS
 		anim.name = ANIMATOR_NODE_NAME
 		target.add_child(anim)
 	anim.setup(target, frames, fps)
+	if reduce_motion:
+		# Accessibility (§C.8): hold the static frame 0 setup() just assigned and stop
+		# the per-frame _process. Presence without motion — the hero is shown, not moving.
+		anim.set_animating(false)
 
 
 ## Clears the frame cache. Tests + editor reload only; not reachable from gameplay.

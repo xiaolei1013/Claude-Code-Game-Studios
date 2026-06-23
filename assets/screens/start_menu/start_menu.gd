@@ -140,7 +140,11 @@ func _build_sprite_row() -> Control:
 		slot.texture = ClassPortraitFactoryScript.get_portrait_texture(class_id)
 		row.add_child(slot)
 		# Calm PORTRAIT tier: half the in-scene rate (Story 014 / GDD #35 §D.7).
-		ClassSpriteFactoryScript.animate(slot, class_id, ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS)
+		# reduce_motion (Story 015 / §C.8): the idle holds a static frame under the
+		# accessibility flag — presence without motion.
+		ClassSpriteFactoryScript.animate(
+			slot, class_id, ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS,
+			_is_reduce_motion_enabled())
 
 	return row
 
@@ -165,3 +169,17 @@ func _on_start_pressed() -> void:
 
 func _on_quit_pressed() -> void:
 	get_tree().quit()
+
+
+## Reads the live accessibility motion preference off the SceneManager autoload
+## (Story 015 / §C.8). Returns false when the autoload or the flag is absent, so
+## the start-menu sprite row degrades to animated-idle — the safe, non-breaking
+## default. Read when the row is built; a row built under reduce_motion holds a
+## static frame instead of looping.
+func _is_reduce_motion_enabled() -> bool:
+	var sm: Node = get_node_or_null("/root/SceneManager")
+	if sm == null:
+		return false
+	if not ("reduce_motion" in sm):
+		return false
+	return bool(sm.get("reduce_motion"))

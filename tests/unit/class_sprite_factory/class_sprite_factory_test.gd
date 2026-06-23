@@ -331,3 +331,90 @@ func test_distinct_classes_load_distinct_idle_sheets() -> void:
 	var warrior_sheet: Texture2D = (warrior[0] as AtlasTexture).atlas
 	var mage_sheet: Texture2D = (mage[0] as AtlasTexture).atlas
 	assert_object(warrior_sheet).is_not_same(mage_sheet)
+
+
+# ===========================================================================
+# Group H — Story 015: reduce_motion suppression + shared-atlas perf budget
+#
+# GDD #35 §C.8 + the binding ui-code rule ("all animations respect motion
+# prefs"): animate(reduce_motion=true) must hold the hero PRESENT but STILL —
+# the animator attaches, displays frame 0, and disables its per-frame _process,
+# so a reduce_motion slot costs nothing per frame yet the hero is still shown
+# (AC-35-07: "motion suppressed, presence kept, all K visible"). The flag is
+# PASSED IN (the four calm portrait surfaces thread their own SceneManager read),
+# keeping the factory autoload-free — mirrors VfxKit.spawn_burst's reduce_motion.
+#
+# Perf budget (AC-35-06 / §F): K on-screen heroes of one class window ONE shared
+# sheet texture — the draw-call/VRAM cost scales with CLASS COUNT, not hero count.
+# ===========================================================================
+
+func test_animate_reduce_motion_freezes_idle_on_static_frame_zero() -> void:
+	# Arrange — a real-art class so an animator actually attaches.
+	var rect: TextureRect = TextureRect.new()
+	add_child(rect)
+	auto_free(rect)
+	var frames: Array = ClassSpriteFactoryScript.get_idle_frames(_REAL_ART_CLASS_ID)
+	assert_int(frames.size()).is_equal(ClassSpriteFactoryScript.FRAME_COUNT)
+
+	# Act — animate under reduce_motion.
+	ClassSpriteFactoryScript.animate(
+		rect, _REAL_ART_CLASS_ID, ClassSpriteFactoryScript.IDLE_FPS, true)
+
+	# Assert — animator present (hero is shown) but frozen: _process disabled and
+	# holding frame 0. Presence without motion.
+	var anim: SpriteSheetAnimator = rect.get_node_or_null(
+		String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME)) as SpriteSheetAnimator
+	assert_object(anim).is_not_null()
+	assert_bool(anim.is_processing()).is_false()
+	assert_object(rect.texture).is_same(frames[0])
+
+
+func test_animate_motion_enabled_runs_idle_conditional_control() -> void:
+	# Control for the freeze test above: the SAME call with reduce_motion=false
+	# leaves the idle running (per-frame _process enabled). Proves the freeze is
+	# caused by the flag, not by the slot being inert.
+	var rect: TextureRect = TextureRect.new()
+	add_child(rect)
+	auto_free(rect)
+
+	ClassSpriteFactoryScript.animate(
+		rect, _REAL_ART_CLASS_ID, ClassSpriteFactoryScript.IDLE_FPS, false)
+
+	var anim: SpriteSheetAnimator = rect.get_node_or_null(
+		String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME)) as SpriteSheetAnimator
+	assert_object(anim).is_not_null()
+	assert_bool(anim.is_processing()).is_true()
+
+
+func test_animate_reduce_motion_defaults_to_motion_enabled() -> void:
+	# The 4th param defaults false: the pre-Story-015 3-arg call sites (the dungeon
+	# in-scene slot, which gates its idle externally via Story 010) keep looping.
+	# Regression net against the default flipping and silently freezing everything.
+	var rect: TextureRect = TextureRect.new()
+	add_child(rect)
+	auto_free(rect)
+
+	ClassSpriteFactoryScript.animate(
+		rect, _REAL_ART_CLASS_ID, ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS)
+
+	var anim: SpriteSheetAnimator = rect.get_node_or_null(
+		String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME)) as SpriteSheetAnimator
+	assert_object(anim).is_not_null()
+	assert_bool(anim.is_processing()).is_true()
+
+
+func test_idle_frames_share_one_atlas_for_draw_call_budget() -> void:
+	# AC-35-06 / §F perf budget, made concrete: EVERY frame of a class windows the
+	# SAME underlying sheet texture. So K on-screen heroes of one class reference K
+	# AtlasTextures over ONE sheet — draw-call/VRAM cost scales with the number of
+	# distinct CLASSES on screen, not the hero count. Regression net for a slicing
+	# refactor that allocates a sheet per frame (which would multiply VRAM by
+	# FRAME_COUNT and break the min-spec budget this story validates).
+	var frames: Array = ClassSpriteFactoryScript.get_idle_frames(_REAL_ART_CLASS_ID)
+	assert_int(frames.size()).is_equal(ClassSpriteFactoryScript.FRAME_COUNT)
+	var sheet: Texture2D = (frames[0] as AtlasTexture).atlas
+	assert_object(sheet).is_not_null()
+	for frame: Variant in frames:
+		var atlas: AtlasTexture = frame as AtlasTexture
+		assert_object(atlas).is_not_null()
+		assert_object(atlas.atlas).is_same(sheet)

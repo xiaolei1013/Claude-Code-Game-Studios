@@ -19,6 +19,9 @@ extends GdUnitTestSuite
 const RecruitScreenScene = preload("res://assets/screens/recruitment/recruitment.tscn")
 const RecruitmentScript = preload("res://src/core/recruitment/recruitment.gd")
 const HeroInstanceScript = preload("res://src/core/hero_roster/hero_instance.gd")
+# Story 015 — Group G reads the animator node name (single source of truth) to
+# locate the idle animator the recruit render path attaches to ClassPortrait.
+const ClassSpriteFactoryScript = preload("res://src/ui/class_sprite_factory.gd")
 
 
 func _make_screen() -> Node:
@@ -32,6 +35,25 @@ func _make_screen() -> Node:
 # the live HeroRoster autoload (S10-S4 hygiene-barrier pattern per
 # tests/PATTERNS.md §3).
 var _injected_hero_ids: Array[int] = []
+
+# Test isolation for the live SceneManager.reduce_motion flag (Story 015). Group G
+# mutates the autoload's accessibility flag; snapshot-and-restore so a failing
+# assertion mid-test can't leak `reduce_motion = true` into sibling suites.
+var _sm: Node = null
+var _sm_reduce_motion_prior: bool = false
+var _sm_reduce_motion_touched: bool = false
+
+
+# Sets the live SceneManager.reduce_motion flag, recording the prior value on the
+# first touch so after_test can restore it. No-op when the autoload is absent.
+func _set_reduce_motion(value: bool) -> void:
+	_sm = get_node_or_null("/root/SceneManager")
+	if _sm == null:
+		return
+	if not _sm_reduce_motion_touched:
+		_sm_reduce_motion_prior = bool(_sm.get("reduce_motion"))
+		_sm_reduce_motion_touched = true
+	_sm.set("reduce_motion", value)
 
 
 func _inject_hero(id: int, class_id: String) -> RefCounted:
@@ -50,6 +72,11 @@ func after_test() -> void:
 	for id: int in _injected_hero_ids:
 		HeroRoster._heroes.erase(id)
 	_injected_hero_ids.clear()
+	# Restore the live reduce_motion flag if a test touched it (Story 015).
+	if _sm_reduce_motion_touched and _sm != null:
+		_sm.set("reduce_motion", _sm_reduce_motion_prior)
+	_sm_reduce_motion_touched = false
+	_sm = null
 
 
 # ===========================================================================
@@ -236,3 +263,43 @@ func test_recruit_screen_back_button_handler_wired_in_on_enter() -> void:
 	screen.on_exit()
 	# After on_exit, handler is disconnected.
 	assert_bool(screen._back_button.pressed.is_connected(screen._on_back_pressed)).is_false()
+
+
+# ===========================================================================
+# Group G — Story 015: reduce_motion end-to-end through the real render path
+#
+# The factory unit test proves animate(reduce_motion=true) freezes the animator;
+# THIS proves the recruit screen actually THREADS its live SceneManager read into
+# that call. Drives the real _render_pool_entry path (not the factory directly),
+# so it's the scaffolded-but-unwired regression net: if the call site dropped the
+# 4th arg, the portrait would loop under reduce_motion and this test would catch it.
+# "warrior" is the canonical committed-art class (see ClassSpriteFactory tests),
+# so the idle animator is guaranteed to attach.
+# ===========================================================================
+
+func test_recruit_pool_entry_freezes_portrait_idle_under_reduce_motion() -> void:
+	var screen: Node = _make_screen()
+	# Render a known committed-art class with reduce_motion ON.
+	_set_reduce_motion(true)
+	screen._render_pool_entry(screen._pool_entries[0], 0, "warrior")
+
+	var portrait: TextureRect = screen._pool_entries[0].get_node("ClassPortrait") as TextureRect
+	var anim: Node = portrait.get_node_or_null(
+		String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME))
+	# Committed warrior art ⇒ animator attached, but frozen (presence, no motion).
+	assert_object(anim).is_not_null()
+	assert_bool(anim.is_processing()).is_false()
+
+
+func test_recruit_pool_entry_animates_portrait_idle_without_reduce_motion() -> void:
+	# Control: the SAME render path with reduce_motion OFF leaves the idle looping,
+	# proving the freeze above is caused by the threaded flag, not an inert slot.
+	var screen: Node = _make_screen()
+	_set_reduce_motion(false)
+	screen._render_pool_entry(screen._pool_entries[0], 0, "warrior")
+
+	var portrait: TextureRect = screen._pool_entries[0].get_node("ClassPortrait") as TextureRect
+	var anim: Node = portrait.get_node_or_null(
+		String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME))
+	assert_object(anim).is_not_null()
+	assert_bool(anim.is_processing()).is_true()

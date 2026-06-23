@@ -195,6 +195,30 @@ The flag is **read at beat time**, not cached at `on_enter`, so a mid-run toggle
 effect immediately (§E.6). Precedent: `prestige_fade_animation_test` AC-PR-18; persistence
 per ADR-0007 OQ-7.
 
+**Implemented (Story 015 — full reduce-motion sweep across the calm portrait tier).**
+The in-scene dungeon idle + all reaction beats already honoured `reduce_motion` (Stories
+009/010). Story 015 closed the gap on the **four calm portrait surfaces** Story 014 had just
+added (recruit card, hero-detail modal, codex entry, start-menu row): `ClassSpriteFactory.animate()`
+gained a `reduce_motion: bool = false` 4th parameter. When `true` it still attaches the
+animator and shows **frame 0**, then calls `set_animating(false)` to disable `_process` —
+the hero is **present but still**, and the slot costs nothing per frame (AC-35-07). The flag
+is **passed in**, not read inside the factory, keeping it pure-utility / autoload-free (mirrors
+`VfxKit.spawn_burst(reduce_motion)`); each surface threads its own `_is_reduce_motion_enabled()`
+read off `SceneManager`, re-evaluated on every (re)render — its "beat time" (§E.6). The
+in-scene dungeon slot keeps the **default `false`** and gates its idle externally via Story
+010's `_set_party_idle_animating`, so it is unchanged. Guarded three ways: a factory unit test
+(freeze + motion-on control + default-stays-on), a recruit integration test driving the real
+`_render_pool_entry` path end-to-end, and a structural wiring guard asserting all four surfaces
+pass the flag *into* their `animate()` call (the scaffolded-but-unwired regression net).
+
+**Min-spec / Steam Deck perf validation (Story 015, Part A).** The 20 Hz hot path is already
+proven zero-alloc with heroes + animators on screen (Story 007, AC-35-06 — re-affirmed green
+this story). The remaining draw-call/VRAM concern is pinned by a factory test proving every
+frame of a class windows **one shared sheet texture** (an `AtlasTexture` over a single sheet),
+so K on-screen heroes of a class cost ~1 sheet texture — cost scales with **class count**, not
+hero count. The actual on-hardware **1280×800 @ 60fps** measurement is hardware-bound and is
+**not** faked headlessly; it folds into the **Story 016 human playtest** closure gate (AC-35-16).
+
 ### C.9 Hot-path rule (binding, cross-ref GDD #24 §C.2 / §E.10)
 
 `dungeon_run_view.gd._on_tick_fired` runs at **20 Hz** and MUST remain **zero-allocation**:
@@ -428,15 +452,23 @@ dignity is ADVISORY (Pillar 1 / ADR-0021).
 **AC-35-06 — Hot path stays zero-alloc [BLOCKING].** The Story-012-style per-tick
 performance test passes **with heroes + animators on screen** — `_on_tick_fired` adds no
 allocation, format string, `tr()`, tween, or node creation. (Story 007 extends the existing
-perf test.)
+perf test.) *Verified (Story 015 re-affirm): Story 007 source-guard test green; the
+shared-atlas draw-call budget is additionally pinned by
+`class_sprite_factory_test.test_idle_frames_share_one_atlas_for_draw_call_budget`.*
 
 **AC-35-07 — reduce_motion suppresses motion, keeps presence [BLOCKING].** With
 `SceneManager.reduce_motion = true`: idle shows a single static frame (animator `_process`
 disabled), all reaction beats are suppressed (no tween), and **all `K` hero sprites remain
-visible.**
+visible.** *Verified (Story 015): `class_sprite_factory_test.test_animate_reduce_motion_freezes_idle_on_static_frame_zero`
+(+ motion-on control) for the calm tier; `recruit_screen_contract_test` Group G drives the
+real render path end-to-end; `calm_surface_reduce_motion_wiring_test` guards all four surfaces.
+In-scene + beats covered by Stories 009/010.*
 
 **AC-35-08 — reduce_motion read at beat time [BLOCKING].** Toggle `reduce_motion` after
-`on_enter`; the next beat respects the new value (flag not cached at enter).
+`on_enter`; the next beat respects the new value (flag not cached at enter). *Verified
+(Story 015, calm tier): each surface's `_is_reduce_motion_enabled()` is read inside
+`_render_*`/`_make_*` on every (re)render — not cached at enter — so a re-render under a
+toggled flag freezes (or resumes) the portrait idle.*
 
 **AC-35-09 — Kill cascade coalesces, no strobe [BLOCKING].** Emit `N` `enemy_killed` within
 one `BEAT_THROTTLE_MS` window; visible kill beats ≤ `ceil(window / BEAT_THROTTLE_MS)`.
