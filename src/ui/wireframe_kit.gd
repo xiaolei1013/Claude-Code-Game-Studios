@@ -26,8 +26,7 @@ const LINE_SOFT: Color = Color(0.36, 0.34, 0.42, 0.45)
 const ACCENT: Color = Color(0.62, 0.49, 0.16)          # muted gold — interactive / CTA hint
 const TEXT: Color = Color(0.17, 0.16, 0.22)            # Slate Ink (default body text)
 const MUTED: Color = Color(0.32, 0.30, 0.39, 0.85)     # secondary annotation
-const LANTERN_HOVER: Color = Color(0.91, 0.88, 0.78)
-const LANTERN_PRESSED: Color = Color(0.86, 0.81, 0.66)
+const LANTERN_LIT: Color = Color(0.91, 0.88, 0.78)     # warm "lit" fill — ambient lantern glow (non-interactive)
 
 const PAD: int = 12
 
@@ -174,25 +173,48 @@ static func list_tile(title: String, subtitle: String = "", right: String = "") 
 	return p
 
 
-# ---- Lantern (idle-clicker click target) + floating numbers -----------------
+# ---- Lantern (ambient lit display) -----------------------------------------
 
-## The circular "LIGHT" lantern button. Connects [param on_pressed] if valid.
-## Idle-clicker hero element; shared by the Hall and Expedition wireframes.
-static func lantern_button(on_pressed: Callable = Callable()) -> Button:
-	var btn: Button = Button.new()
-	btn.name = "LanternButton"
-	btn.custom_minimum_size = Vector2(118, 118)
-	btn.focus_mode = Control.FOCUS_NONE
-	btn.text = "LIGHT"
-	btn.add_theme_font_size_override("font_size", 20)
-	btn.add_theme_color_override("font_color", TEXT)
-	btn.add_theme_stylebox_override("normal", stylebox(FILL_RAISED, ACCENT, 2, 60, 0))
-	btn.add_theme_stylebox_override("hover", stylebox(LANTERN_HOVER, ACCENT, 2, 60, 0))
-	btn.add_theme_stylebox_override("pressed", stylebox(LANTERN_PRESSED, ACCENT, 3, 60, 0))
-	if on_pressed.is_valid():
-		btn.pressed.connect(on_pressed)
-	return btn
+## A non-interactive, lit lantern disc — ambient cozy juice, NOT a click target.
+## Per Sprint 28 S28-G2 (user-ratified 2026-06-23): the channel-light lantern has
+## no economy mechanic, so the disc is input-transparent (MOUSE_FILTER_IGNORE — no
+## false tap-target) and carries no hover/pressed state. Shared by the Hall and
+## Expedition wireframes.
+static func lantern_display() -> Panel:
+	var disc: Panel = Panel.new()
+	disc.name = "LanternGlow"
+	disc.custom_minimum_size = Vector2(118, 118)
+	disc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	disc.add_theme_stylebox_override("panel", stylebox(LANTERN_LIT, ACCENT, 2, 60, 0))
+	return disc
 
+
+## The bottom-center "lantern is lit" block: an ambient eyebrow caption above the
+## non-interactive lit disc. Shared verbatim by the Guild Hall and Expedition
+## wireframes so the copy, spacing, and input-transparency stay in lockstep — the
+## whole subtree is MOUSE_FILTER_IGNORE (no false tap-target, per S28-G2). The
+## caller owns placement: set z_index, add it to the screen, then _place() it.
+static func lantern_block() -> VBoxContainer:
+	var wrap: VBoxContainer = VBoxContainer.new()
+	wrap.name = "WireLantern"
+	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.alignment = BoxContainer.ALIGNMENT_CENTER
+	wrap.add_theme_constant_override("separation", 8)
+
+	var cap_top: Label = eyebrow("The lantern is lit", ACCENT)
+	cap_top.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wrap.add_child(cap_top)
+
+	var center_row: HBoxContainer = HBoxContainer.new()
+	center_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	wrap.add_child(center_row)
+	center_row.add_child(lantern_display())
+
+	return wrap
+
+
+# ---- Floating-number layer (gameplay feedback host) ------------------------
 
 ## Full-rect, input-transparent layer to host floating numbers. The caller adds
 ## it to the screen and presets it to full rect.
@@ -202,28 +224,3 @@ static func float_layer() -> Control:
 	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.z_index = 4
 	return layer
-
-
-## Spawns a floating "+N"-style label at [param pos] on [param layer]. When
-## [param animate] is false (reduce-motion) it snap-holds then frees with no
-## travel. Self-frees via its own tween.
-static func spawn_float(layer: Control, text: String, pos: Vector2, animate: bool = true) -> void:
-	if layer == null:
-		return
-	var lbl: Label = Label.new()
-	lbl.text = text
-	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	lbl.add_theme_font_size_override("font_size", 22)
-	lbl.add_theme_color_override("font_color", ACCENT)
-	layer.add_child(lbl)
-	lbl.position = pos
-	if not animate:
-		var hold: Tween = lbl.create_tween()
-		hold.tween_interval(0.5)
-		hold.tween_callback(lbl.queue_free)
-		return
-	var tw: Tween = lbl.create_tween()
-	tw.set_parallel(true)
-	tw.tween_property(lbl, "position:y", pos.y - 64.0, 0.9).set_ease(Tween.EASE_OUT)
-	tw.tween_property(lbl, "modulate:a", 0.0, 0.9)
-	tw.chain().tween_callback(lbl.queue_free)

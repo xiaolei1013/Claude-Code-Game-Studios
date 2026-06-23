@@ -253,7 +253,6 @@ var _routed: bool = false
 
 ## Lantern Guild mock wireframe (feat/ui-wireframe-core-loop) — greybox HUD state.
 var _wire_built: bool = false
-var _float_layer: Control = null
 
 ## Watchable-battle read-model widgets (Defeat & Injury Phase 4, GDD #34 §I).
 ## Built additively inside the wireframe HUD; refreshed per tick from the
@@ -938,7 +937,7 @@ func _show_defeat_overlay(floor_index: int) -> void:
 # (feat/ui-wireframe-core-loop)
 #
 # Recreates the mock's Expedition layout (party HUD top-left, run stats +
-# Return-to-Hall top-right, expedition progress bottom-right, channel-light
+# Return-to-Hall top-right, expedition progress bottom-right, ambient lit
 # lantern bottom-center, event feed mid-left) at greybox fidelity, built
 # additively over the existing display-only nodes. The real tick/kill labels
 # are kept and repositioned into the run-stats HUD.
@@ -976,10 +975,6 @@ func _build_wireframe_once() -> void:
 	_build_progress_panel()
 	_build_activity_feed_drv()
 	_build_lantern_drv()
-	var layer: Control = WireframeKitScript.float_layer()
-	add_child(layer)
-	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_float_layer = layer
 
 	# Snap the watchable-battle widgets to the current run state now that they
 	# exist (on_enter's earlier _refresh_display ran before this build, so the
@@ -1755,46 +1750,17 @@ func _build_activity_feed_drv() -> void:
 		body.add_child(l)
 
 
-## Bottom-center: the channel-light lantern (idle-clicker target).
+## Bottom-center: the lantern — ambient lit warmth, NOT a click target.
+## S28-G2 (user-ratified 2026-06-23): no channel-light economy; the disc is
+## input-transparent (WireframeKit.lantern_display), so there is no false
+## tap-target promising a mechanic that does not exist.
 func _build_lantern_drv() -> void:
-	var wrap: VBoxContainer = VBoxContainer.new()
-	wrap.name = "WireLantern"
-	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	wrap.alignment = BoxContainer.ALIGNMENT_CENTER
-	wrap.add_theme_constant_override("separation", 8)
+	var wrap: VBoxContainer = WireframeKitScript.lantern_block()
+	# Lantern draws one plane above the other DRV wireframe nodes (this screen's
+	# _WIRE_Z is 1) so it reads as foreground warmth over the run panels.
 	wrap.z_index = 2
 	add_child(wrap)
 	_place(wrap, 0.5, 1, 0.5, 1, -150.0, -210.0, 150.0, -16.0)
-
-	var cap_top: Label = WireframeKitScript.eyebrow(
-		"Channel light · click the lantern", WireframeKitScript.ACCENT)
-	cap_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	cap_top.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	wrap.add_child(cap_top)
-
-	var center_row: HBoxContainer = HBoxContainer.new()
-	center_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	center_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	wrap.add_child(center_row)
-	center_row.add_child(WireframeKitScript.lantern_button(_on_lantern_pressed_drv))
-
-	var note: Label = WireframeKitScript.caption(
-		"Wireframe — click feedback only; channel-light economy TBD",
-		WireframeKitScript.MUTED, 10)
-	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	wrap.add_child(note)
-
-
-func _on_lantern_pressed_drv() -> void:
-	if _float_layer == null:
-		return
-	var vp: Vector2 = get_viewport_rect().size
-	var animate: bool = not (SceneManager != null and SceneManager.reduce_motion)
-	WireframeKitScript.spawn_float(
-		_float_layer, "+ light",
-		Vector2(vp.x * 0.5 - 28.0 + randf_range(-26.0, 26.0), vp.y - 210.0),
-		animate)
 
 
 func _on_wire_return_pressed() -> void:
