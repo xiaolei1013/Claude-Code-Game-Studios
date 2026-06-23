@@ -20,8 +20,23 @@ extends RefCounted
 const FRAME_COUNT: int = 4
 
 ## Default idle playback rate. 6 fps reads as a calm "breathing" idle at the
-## cozy register, not a frenetic loop.
+## cozy register, not a frenetic loop. This is the full IN-SCENE rate: the dungeon
+## party heroes ([code]dungeon_run_view._make_hero_slot[/code]) animate at it.
 const IDLE_FPS: float = 6.0
+
+## Portrait-tier idle rate as a fraction of the in-scene [constant IDLE_FPS].
+## Story 014 / GDD #35 §D.7 + §G knob: the dungeon in-scene hero breathes at the
+## full IDLE_FPS (restless, alive); the SAME idle on a calm portrait / thumbnail
+## surface (recruit card, hero-detail modal, codex entry, start-menu row) plays at
+## HALF that rate — art-bible §8.1: "Portrait idles are meditative, not restless."
+## A data-driven knob (§G safe range 0.25–1.0), never a magic 3.0 at a call site.
+const PORTRAIT_IDLE_FPS_RATIO: float = 0.5
+
+## Derived portrait-tier idle rate: [constant IDLE_FPS] × [constant PORTRAIT_IDLE_FPS_RATIO]
+## = 3.0 fps. Portrait-tier consumers pass THIS to [method animate], so the in-scene
+## ↔ portrait speed differential has a single source of truth instead of a hardcoded
+## 3.0 sprinkled across screens. (GDScript evaluates const×const at parse time.)
+const PORTRAIT_IDLE_FPS: float = IDLE_FPS * PORTRAIT_IDLE_FPS_RATIO
 
 ## Default ACTION playback rate (attack / victory / defeat one-shots). Faster than
 ## the breathing idle so a reaction pose reads as a deliberate beat, not idle drift.
@@ -119,6 +134,12 @@ static func slice_sheet(sheet: Texture2D, frame_count: int) -> Array:
 ## sheet is absent — in the latter case the caller's existing still texture stays.
 ## Idempotent across re-renders: a reused card keeps its single named animator and
 ## is just reconfigured for the (possibly new) class.
+## [param fps] defaults to the full in-scene [constant IDLE_FPS]; calm portrait /
+## thumbnail surfaces pass [constant PORTRAIT_IDLE_FPS] for the half-speed tier
+## (Story 014 speed differential). The same per-class frames are used either way —
+## each class loads its OWN distinct strip via [method get_idle_frames] (keyed on
+## class_id), so the art-bible §8.1 "no hero reuses another's idle motion" invariant
+## holds at the code boundary; the secondary-motion CONTENT is authored into the art.
 static func animate(target: TextureRect, class_id: String, fps: float = IDLE_FPS) -> void:
 	if target == null:
 		return

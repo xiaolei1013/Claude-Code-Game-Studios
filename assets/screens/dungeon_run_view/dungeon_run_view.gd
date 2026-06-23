@@ -1302,6 +1302,8 @@ func _make_hero_slot(class_id: String, index: int) -> TextureRect:
 	slot.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	slot.set_meta(_HERO_SLOT_CLASS_META, class_id)
+	# Full IN-SCENE rate (default IDLE_FPS) — the dungeon party animates livelier than
+	# the calm portrait/thumbnail tier (Story 014 speed differential; GDD #35 §D.7).
 	ClassSpriteFactoryScript.animate(slot, class_id)
 	return slot
 

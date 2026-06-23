@@ -234,3 +234,100 @@ func test_get_action_frames_does_not_collide_with_idle_cache() -> void:
 		_REAL_ART_CLASS_ID, ClassSpriteFactoryScript.POSE_ATTACK)
 	assert_int(idle.size()).is_equal(ClassSpriteFactoryScript.FRAME_COUNT)
 	assert_int(action.size()).is_equal(0)
+
+
+# ===========================================================================
+# Group G — Story 014: in-scene ↔ portrait speed differential + per-class non-reuse
+#
+# GDD #35 §D.7 + §G: the dungeon in-scene hero breathes at the full IDLE_FPS;
+# the SAME idle on a calm portrait/thumbnail surface (recruit / hero-detail /
+# codex / start-menu) plays at PORTRAIT_IDLE_FPS = IDLE_FPS × 0.5 = 3.0 fps
+# (art-bible §8.1 "meditative, not restless"). The differential is exercised
+# BEHAVIOURALLY through a real-art animator, not by reading the rate back —
+# proving the cadence the player actually sees. art-bible §8.1 also forbids one
+# class reusing another's idle motion; the code-boundary guarantee of that is
+# that each class loads its OWN distinct sheet (keyed on class_id).
+# ===========================================================================
+
+# A SECOND class with committed real art (alongside _REAL_ART_CLASS_ID) — used
+# to prove two classes window two DIFFERENT sheets (non-reuse invariant).
+const _REAL_ART_CLASS_ID_2: String = "mage"
+
+
+func test_portrait_idle_fps_ratio_is_half() -> void:
+	# §G knob: portrait tier animates at 0.5× the in-scene rate (safe range 0.25–1.0).
+	assert_float(ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS_RATIO).is_equal_approx(0.5, 0.0001)
+
+
+func test_portrait_idle_fps_is_idle_fps_times_ratio() -> void:
+	# Derived rate is a single source of truth: IDLE_FPS (6.0) × 0.5 = 3.0 fps,
+	# never a hardcoded 3.0 at a call site (§D.7).
+	assert_float(ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS).is_equal_approx(
+		ClassSpriteFactoryScript.IDLE_FPS * ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS_RATIO, 0.0001)
+	assert_float(ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS).is_equal_approx(3.0, 0.0001)
+
+
+func test_animate_portrait_tier_is_slower_than_in_scene() -> void:
+	# The differential made observable: a delta LARGER than one in-scene frame
+	# interval (1/6s ≈ 0.167) but SMALLER than one portrait interval (1/3s ≈ 0.333)
+	# advances the in-scene animator yet leaves the portrait animator on frame 0.
+	# Both load the SAME real warrior idle frames — only the fps arg differs.
+	var mid_delta: float = 0.25  # 0.167 < 0.25 < 0.333
+
+	var in_scene: TextureRect = TextureRect.new()
+	add_child(in_scene)
+	auto_free(in_scene)
+	ClassSpriteFactoryScript.animate(in_scene, _REAL_ART_CLASS_ID)  # default = full IDLE_FPS
+	var in_scene_frame0: Texture2D = in_scene.texture
+
+	var portrait: TextureRect = TextureRect.new()
+	add_child(portrait)
+	auto_free(portrait)
+	ClassSpriteFactoryScript.animate(portrait, _REAL_ART_CLASS_ID, ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS)
+	var portrait_frame0: Texture2D = portrait.texture
+
+	var in_scene_anim: SpriteSheetAnimator = in_scene.get_node_or_null(
+		String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME)) as SpriteSheetAnimator
+	var portrait_anim: SpriteSheetAnimator = portrait.get_node_or_null(
+		String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME)) as SpriteSheetAnimator
+	assert_object(in_scene_anim).is_not_null()
+	assert_object(portrait_anim).is_not_null()
+
+	in_scene_anim._process(mid_delta)
+	portrait_anim._process(mid_delta)
+
+	# In-scene advanced (full speed); portrait held frame 0 (half speed).
+	assert_object(in_scene.texture).is_not_same(in_scene_frame0)
+	assert_object(portrait.texture).is_same(portrait_frame0)
+
+
+func test_animate_portrait_tier_advances_after_a_full_portrait_interval() -> void:
+	# The portrait tier is SLOWER, not frozen: once a full portrait interval
+	# (1/PORTRAIT_IDLE_FPS ≈ 0.333s) elapses it advances one frame.
+	var portrait: TextureRect = TextureRect.new()
+	add_child(portrait)
+	auto_free(portrait)
+	ClassSpriteFactoryScript.animate(portrait, _REAL_ART_CLASS_ID, ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS)
+	var frame0: Texture2D = portrait.texture
+	var anim: SpriteSheetAnimator = portrait.get_node_or_null(
+		String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME)) as SpriteSheetAnimator
+	assert_object(anim).is_not_null()
+
+	anim._process(0.5)  # > 1/PORTRAIT_IDLE_FPS (0.333) → one frame advances
+	assert_object(portrait.texture).is_not_same(frame0)
+
+
+func test_distinct_classes_load_distinct_idle_sheets() -> void:
+	# art-bible §8.1: "No hero may reuse another hero's secondary idle motion."
+	# Code-boundary guarantee: each class loads its OWN sprite sheet, so two classes'
+	# idle frames window DIFFERENT source textures — no class can animate with
+	# another's frames. (The secondary-motion CONTENT is authored INTO each class's
+	# distinct strip; the loader's per-class keying enforces non-reuse.) Regression
+	# net for a cache-key collision or a shared-sheet refactor.
+	var warrior: Array = ClassSpriteFactoryScript.get_idle_frames(_REAL_ART_CLASS_ID)
+	var mage: Array = ClassSpriteFactoryScript.get_idle_frames(_REAL_ART_CLASS_ID_2)
+	assert_int(warrior.size()).is_equal(ClassSpriteFactoryScript.FRAME_COUNT)
+	assert_int(mage.size()).is_equal(ClassSpriteFactoryScript.FRAME_COUNT)
+	var warrior_sheet: Texture2D = (warrior[0] as AtlasTexture).atlas
+	var mage_sheet: Texture2D = (mage[0] as AtlasTexture).atlas
+	assert_object(warrior_sheet).is_not_same(mage_sheet)

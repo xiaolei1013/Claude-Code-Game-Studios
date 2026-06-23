@@ -124,7 +124,8 @@ func _build() -> void:
 
 ## Builds a centred row of 48×48 demo portrait/sprite slots — one per class.
 ## When the demo sprite sheet is imported, ClassSpriteFactory.animate() turns
-## the still portrait into a looping idle animation (6 fps).
+## the still portrait into a looping idle animation at the calm PORTRAIT tier
+## (3 fps — half the in-scene rate; Story 014 / GDD #35 §D.7).
 func _build_sprite_row() -> Control:
 	var row: HBoxContainer = HBoxContainer.new()
 	row.name = "DemoSpriteRow"
@@ -138,7 +139,8 @@ func _build_sprite_row() -> Control:
 		slot.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		slot.texture = ClassPortraitFactoryScript.get_portrait_texture(class_id)
 		row.add_child(slot)
-		ClassSpriteFactoryScript.animate(slot, class_id)
+		# Calm PORTRAIT tier: half the in-scene rate (Story 014 / GDD #35 §D.7).
+		ClassSpriteFactoryScript.animate(slot, class_id, ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS)
 
 	return row
 

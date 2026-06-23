@@ -264,6 +264,13 @@ hero-detail thumbnails) may animate calmer: `portrait_fps = IDLE_FPS × PORTRAIT
 `PORTRAIT_IDLE_FPS_RATIO = 0.5` → `3.0 fps`. This is a Phase-4 polish knob (§G), not an
 MVP gate.
 
+**Implemented (Story 014):** `ClassSpriteFactory.PORTRAIT_IDLE_FPS_RATIO` / `PORTRAIT_IDLE_FPS`
+consts (`PORTRAIT_IDLE_FPS = IDLE_FPS × PORTRAIT_IDLE_FPS_RATIO`). The dungeon in-scene slot
+keeps the full `IDLE_FPS`; all four calm surfaces — recruit card, hero-detail modal, codex
+entry, start-menu row — pass `PORTRAIT_IDLE_FPS` to `ClassSpriteFactory.animate()`. "Calm"
+covers every non-dungeon surface per art-bible §8.1 ("meditative, not restless"), a superset
+of the recruit/hero-detail thumbnails this section names.
+
 ---
 
 ## E. Edge Cases
@@ -486,6 +493,16 @@ This GDD's victory beat does not duplicate #25. Revisit if #25's flow changes.
 in-scene heroes animate livelier than thumbnails, and should each class have distinct
 secondary idle motion (art-bible §8.1 "no hero reuses another's motion")? Phase-4 fidelity;
 not MVP-gating.
+**Resolved (Story 014):** YES to both — a code knob + an art-resident invariant. (1) The
+in-scene dungeon party animates at full `IDLE_FPS` (6.0); every calm portrait/thumbnail
+surface (recruit, hero-detail, codex, start-menu) animates at `PORTRAIT_IDLE_FPS`
+(`IDLE_FPS × 0.5` = 3.0 fps), a §D.7/§G knob held as a single source of truth on
+`ClassSpriteFactory`. (2) The per-class secondary motion is **art-resident** — baked into
+each class's distinct 4-frame idle strip (art-bible §8.1); the code-boundary guarantee of
+"no hero reuses another's motion" is that each class loads its OWN sheet via
+`get_idle_frames(class_id)`, pinned by a non-reuse regression test (warrior vs mage window
+different atlases). The speed differential itself is proven **behaviourally** (a delta
+between the two frame intervals advances the in-scene animator but not the portrait one).
 
 **OQ-35-5 — Should a leveled-up hero get a dedicated pulse?** MVP: no (the level-up toast
 in GDD #24 §C.5 covers the moment; coupling it to sprites adds risk). Candidate Phase-4

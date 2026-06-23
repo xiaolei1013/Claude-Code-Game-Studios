@@ -161,7 +161,8 @@ func _make_thumbnail(res: Variant, content_type: String) -> Control:
 	if content_type == "classes" and id != "":
 		var slot: TextureRect = _thumb_rect()
 		slot.texture = ClassPortraitFactoryScript.get_portrait_texture(id)
-		ClassSpriteFactoryScript.animate(slot, id)
+		# Calm PORTRAIT tier: half the in-scene rate (Story 014 / GDD #35 §D.7).
+		ClassSpriteFactoryScript.animate(slot, id, ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS)
 		return slot
 	if content_type == "enemies" and id != "":
 		var tex: Texture2D = EnemySpriteFactoryScript.get_sprite(id)
