@@ -299,6 +299,21 @@ var _beat_clock_override_ms: int = -1
 ## See [method _action_frames_for].
 var _action_frames_override: Dictionary = {}
 
+## Round-robin cursor for the synthetic per-hero strike cadence (Story 013 · ADR-0025
+## Alternative 4 — the OPTIONAL "synthetic per-hero action cadence"). A regular enemy kill
+## pulses ONE hero — slot [code]_strike_rotation_idx % party_size[/code] — then advances the
+## cursor, so successive kills walk the party left-to-right instead of pulsing everyone
+## together (a boss kill is the climactic exception: it pulses the WHOLE party and leaves
+## the cursor untouched, GDD #35 §C.4 "larger / longer"). Advanced ONLY on a VISIBLE beat
+## (after every gate in [method _try_party_strike_beat] passes), so a coalesced or
+## reduce-motion-suppressed beat never skips a hero. Reset in [method on_enter] so each run
+## starts the cadence deterministically at the first hero. This stays truthful to the
+## aggregate-DPS combat model — it is an avowedly SYNTHETIC cadence (cosmetic theater, not
+## per-hero damage attribution, which the resolver can't back — ADR-0025 §"per-hero attack
+## attribution would be a fiction"); the rotation is derived from the live kill stream, never
+## from a per-tick poll (the 20 Hz hot path is untouched; Story 007 guard stays green).
+var _strike_rotation_idx: int = 0
+
 ## One-shot latch for the terminal reaction beat (Story 009 · GDD #35 §C.4 / §E.9).
 ## Set the first time a victory cheer or defeat slump plays; thereafter every
 ## kill/boss strike is suppressed ([method _try_party_strike_beat]) so no late
@@ -351,6 +366,9 @@ func on_enter() -> void:
 	# Reset the terminal-beat latch (Story 009) so this visit's run can play its
 	# victory cheer / defeat slump even if a prior visit already played one.
 	_terminal_beat_played = false
+	# Reset the per-hero strike cadence (Story 013) so each run walks the party from
+	# the first hero — the rotation is deterministic given the run's kill sequence.
+	_strike_rotation_idx = 0
 	_run_end_overlay.visible = false
 
 	# Sprint 19 S19-M3 — set the biome background to match the active dispatch.
@@ -1321,19 +1339,27 @@ func _set_party_idle_animating(enabled: bool) -> void:
 ## Reaction beat for a normal kill (GDD #35 §C.4 "Strike pulse"). Wired to
 ## [signal DungeonRunOrchestrator.enemy_killed] — a HUMAN-FREQUENCY signal, NEVER the
 ## 20 Hz tick (ADR-0025 "two clocks, never the tick"; the Story 007 source guard enforces
-## that [method _on_tick_fired] gains no hero-animation work). The party reacts as a whole
-## (GDD §C.5 / OQ-35-1 — combat emits no per-hero attribution). Args ignored: the beat is
-## the same regardless of tier / archetype / advantage; those drive the gold-burst VFX
-## ([method _on_enemy_killed_vfx]), a distinct concern on the same signal.
+## that [method _on_tick_fired] gains no hero-animation work). Story 013 (ADR-0025
+## Alternative 4 "synthetic per-hero action cadence"): a normal kill pulses ONE hero —
+## the round-robin slot [member _strike_rotation_idx] — so successive kills walk the party
+## left-to-right rather than pulsing everyone together. This is an avowedly SYNTHETIC cadence
+## derived from the live kill stream, NOT per-hero damage attribution (the aggregate-DPS
+## resolver can't back that — ADR-0025 §"per-hero attack attribution would be a fiction"); the
+## boss kill keeps the whole-party climactic pulse ([method _on_boss_killed_beat]). Args
+## ignored: the beat is the same regardless of tier / archetype / advantage; those drive the
+## gold-burst VFX ([method _on_enemy_killed_vfx]), a distinct concern on the same signal.
 func _on_enemy_killed_beat(_tier: int, _archetype: String, _advantaged: bool) -> void:
 	_try_party_strike_beat(KILL_BEAT_SCALE_PUNCH, KILL_BEAT_MS)
 
 
 ## Reaction beat for a boss kill (GDD #35 §C.4 — "larger / longer" than a normal kill).
-## Wired to [signal DungeonRunOrchestrator.boss_killed] (human-frequency). Same party-aggregate
-## pulse as [method _on_enemy_killed_beat] but with the boss scale-punch / duration constants.
+## Wired to [signal DungeonRunOrchestrator.boss_killed] (human-frequency). Unlike the normal
+## kill's round-robin single-hero pulse, a boss is the climactic exception: it pulses the
+## WHOLE party together ([code]per_hero = false[/code]) and leaves the round-robin cursor
+## ([member _strike_rotation_idx]) untouched, so the synthetic per-hero cadence resumes from
+## the same hero on the next normal kill. Uses the boss scale-punch / duration ("larger / longer").
 func _on_boss_killed_beat(_enemy_id: String) -> void:
-	_try_party_strike_beat(BOSS_BEAT_SCALE_PUNCH, BOSS_BEAT_MS)
+	_try_party_strike_beat(BOSS_BEAT_SCALE_PUNCH, BOSS_BEAT_MS, false)
 
 
 ## Gated entry point for every reaction beat. Returns [code]true[/code] iff a tween was
@@ -1347,8 +1373,13 @@ func _on_boss_killed_beat(_enemy_id: String) -> void:
 ## [br]2. [b]coalescing[/b] — suppress if the previous VISIBLE beat began < [constant BEAT_THROTTLE_MS]
 ##    ago (GDD §D.5 anti-strobe), measured via the injectable [method _beat_now_ms] clock seam.
 ## [br]3. [b]empty party[/b] — nothing to animate before the diorama is built / when no heroes.
-## Only after all three pass do we stamp [member _last_beat_ms] and start the tween.
-func _try_party_strike_beat(scale_punch: float, duration_ms: int) -> bool:
+## Only after all four gates pass do we stamp [member _last_beat_ms], pick the slot set, and
+## start the tween. [param per_hero] selects the Story 013 synthetic cadence: when
+## [code]true[/code] (normal kills) ONE round-robin hero pulses and [member _strike_rotation_idx]
+## advances; when [code]false[/code] (boss kills) the WHOLE party pulses and the cursor is left
+## untouched. The cursor advances HERE — after every gate — so a coalesced / reduce-motion-
+## suppressed beat never silently skips a hero.
+func _try_party_strike_beat(scale_punch: float, duration_ms: int, per_hero: bool = true) -> bool:
 	if _terminal_beat_played:
 		return false  # §E.9 — a terminal beat (victory/slump) has played; no late strike
 	if _reduce_motion():
@@ -1360,7 +1391,17 @@ func _try_party_strike_beat(scale_punch: float, duration_ms: int) -> bool:
 	if slots.is_empty():
 		return false
 	_last_beat_ms = now_ms
-	_start_strike_tween(slots, scale_punch, duration_ms)
+	# Story 013 — synthetic per-hero cadence (ADR-0025 Alternative 4). A normal kill pulses
+	# ONE hero (round-robin) so successive kills walk the party; a boss kill pulses the whole
+	# party and leaves the cursor untouched. Cursor advances only here, after every gate, so a
+	# suppressed / coalesced beat never skips a hero. Modulo-at-access stays valid even if the
+	# party size ever changes; the raw int can't realistically overflow (human-frequency stream).
+	var beat_slots: Array = slots
+	if per_hero:
+		var hero: Node = slots[_strike_rotation_idx % slots.size()]
+		_strike_rotation_idx += 1
+		beat_slots = [hero]
+	_start_strike_tween(beat_slots, scale_punch, duration_ms)
 	return true
 
 

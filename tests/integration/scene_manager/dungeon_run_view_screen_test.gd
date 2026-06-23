@@ -1363,6 +1363,8 @@ func test_on_tick_fired_adds_no_hero_animation_work() -> void:
 		"get_action_frames",    # Story 012 — no action-frame slicing on the tick
 		"play_oneshot",         # Story 012 — no action one-shot kicked from the tick
 		"_route_action_or_collect",  # Story 012 — the frames-vs-tween router is beat-only
+		"_try_party_strike_beat",    # Story 013 — the gated beat entry is signal-only
+		"_strike_rotation_idx",      # Story 013 — the round-robin cursor is never read on the tick
 		"get_formation_heroes", # no per-hero roster walk
 		"_IdleAnimator",        # no animator lookup
 	]
@@ -2370,6 +2372,11 @@ func test_idle_animates_when_motion_enabled_gate_is_conditional() -> void:
 #   • reduce_motion defeat → art slot HOLDS the final frame statically (no scale/dim
 #     double-up), the §C.8 terminal-state-without-animation contract
 # All driven through the real human-frequency beat handlers, never the tick.
+#
+# NOTE (Story 013): a NORMAL kill now pulses a SINGLE round-robin hero, so the two
+# whole-party frames-vs-tween demonstrations below fire the BOSS beat (still a whole-party
+# pulse — per_hero=false). The single-hero normal-kill routing is pinned in the Story 013
+# section; the per-slot frames-vs-tween ROUTER itself is class-agnostic and identical either way.
 # ===========================================================================
 
 ## Builds [count] DISTINCT synthetic frame textures (per-frame fill) so a slot's
@@ -2395,9 +2402,11 @@ func _slot_for_class(screen: Control, class_id: String) -> Control:
 	return null
 
 
-func test_strike_beat_plays_action_frames_when_art_exists_and_starts_no_tween() -> void:
-	# A kill beat with attack art present: every slot plays its attack one-shot on the
-	# &"_IdleAnimator", so NO cosmetic tween is started (the frames REPLACE the tween).
+func test_boss_beat_plays_action_frames_when_art_exists_and_starts_no_tween() -> void:
+	# A whole-party beat with attack art present: every slot plays its attack one-shot on the
+	# &"_IdleAnimator", so NO cosmetic tween is started (the frames REPLACE the tween). Driven
+	# via the BOSS beat because Story 013 routes a NORMAL kill to a single round-robin hero —
+	# the boss is the whole-party pulse that exercises ALL slots' frames path in one beat.
 	HeroRosterFixture.reset_hero_roster()
 	HeroRosterFixture.seed_warriors(2)
 	var screen: Control = await _navigate_to_dungeon_run_view_screen()
@@ -2413,13 +2422,13 @@ func test_strike_beat_plays_action_frames_when_art_exists_and_starts_no_tween() 
 	var attack: Array = _make_action_frames(3)
 	screen._action_frames_override["warrior/" + ClassSpriteFactoryScript.POSE_ATTACK] = attack
 
-	# Act — a normal kill arrives via the real handler.
-	screen._on_enemy_killed_beat(1, "goblin", false)
+	# Act — a boss kill arrives via the real handler (whole-party beat).
+	screen._on_boss_killed_beat("forest_warden")
 
 	# Assert — frames replaced the tween: no beat tween, and every warrior slot's
 	# animator is playing the action one-shot showing the first attack frame.
 	assert_object(screen._active_beat_tween).override_failure_message(
-		"with attack art present, the strike beat must play frames and start NO tween"
+		"with attack art present, the boss beat must play frames and start NO tween"
 	).is_null()
 	for slot: Node in screen._party_hero_slots():
 		var c: Control = slot as Control
@@ -2440,10 +2449,12 @@ func test_strike_beat_plays_action_frames_when_art_exists_and_starts_no_tween() 
 	await get_tree().process_frame
 
 
-func test_strike_beat_mixed_party_art_slot_plays_frames_and_artless_slot_tweens() -> void:
+func test_boss_beat_mixed_party_art_slot_plays_frames_and_artless_slot_tweens() -> void:
 	# The per-slot routing proof: a warrior WITH injected attack art plays frames while a
 	# mage WITHOUT art falls back to the cosmetic tween — both in the SAME beat. So a tween
-	# IS started (for the mage) AND the warrior is on its action one-shot.
+	# IS started (for the mage) AND the warrior is on its action one-shot. Driven via the BOSS
+	# beat (whole-party): a normal kill now pulses a SINGLE hero (Story 013), so the boss is the
+	# vehicle that routes BOTH slots in one beat — proving the per-slot router is class-agnostic.
 	HeroRosterFixture.reset_hero_roster()
 	var party: Array[String] = ["warrior", "mage"]
 	HeroRosterFixture.seed_heroes(party)
@@ -2460,8 +2471,8 @@ func test_strike_beat_mixed_party_art_slot_plays_frames_and_artless_slot_tweens(
 	var attack: Array = _make_action_frames(3)
 	screen._action_frames_override["warrior/" + ClassSpriteFactoryScript.POSE_ATTACK] = attack
 
-	# Act
-	screen._on_enemy_killed_beat(1, "goblin", false)
+	# Act — a boss kill (whole-party beat) routes BOTH slots at once.
+	screen._on_boss_killed_beat("forest_warden")
 
 	# Assert — a tween WAS started (the art-less mage needs it)...
 	assert_object(screen._active_beat_tween).override_failure_message(
@@ -2626,6 +2637,291 @@ func test_defeat_static_reduce_motion_holds_final_frame_when_art_exists() -> voi
 
 	# Cleanup
 	sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+# ===========================================================================
+# Story 013 — synthetic per-hero action cadence (GDD #35 §C.4 / ADR-0025
+# Alternative 4 "synthetic per-hero action cadence").
+#
+# A NORMAL kill now pulses ONE hero — the round-robin slot — so successive kills
+# walk the party left-to-right instead of pulsing everyone together (the Phase-2
+# party-aggregate feel). A BOSS kill stays the climactic exception: the WHOLE party
+# pulses and the round-robin cursor is left UNTOUCHED. The cadence is an avowedly
+# SYNTHETIC view-side counter driven off the live enemy_killed / boss_killed stream
+# (NEVER the 20 Hz tick — the Story 007 source guard still holds), NOT per-hero damage
+# attribution (the aggregate-DPS resolver can't back that — ADR-0025 §"fiction").
+#
+# These tests seed a 3-warrior party (so all three slots are art-capable under the
+# SAME "warrior/attack" override) and fire ONE beat per scenario with a controlled
+# starting _strike_rotation_idx, then assert that EXACTLY the expected slot played its
+# action one-shot (the others untouched) and that the cursor advanced / held correctly.
+# Each test builds a fresh screen, so the cursor starts at 0 (reset by on_enter).
+# ===========================================================================
+
+## The SpriteSheetAnimator child of a front-line slot (the Story 012 one-shot lives here).
+func _slot_animator(slot: Node) -> SpriteSheetAnimator:
+	var c: Control = slot as Control
+	if c == null:
+		return null
+	return c.get_node_or_null("_IdleAnimator") as SpriteSheetAnimator
+
+
+## Asserts that EXACTLY the slot at [expected_idx] played its attack one-shot (showing
+## attack frame 0) and every OTHER slot stayed on its idle loop (no one-shot). The
+## single-slot round-robin invariant — the heart of Story 013.
+func _assert_only_slot_pulsed(screen: Control, expected_idx: int, attack: Array) -> void:
+	var slots: Array = screen._party_hero_slots()
+	for i: int in range(slots.size()):
+		var animator: SpriteSheetAnimator = _slot_animator(slots[i])
+		assert_object(animator).is_not_null()
+		var c: Control = slots[i] as Control
+		if i == expected_idx:
+			assert_bool(animator._oneshot).override_failure_message(
+				"slot %d must play its action one-shot (the round-robin selected it)" % i
+			).is_true()
+			assert_object(c.texture).override_failure_message(
+				"the pulsed slot must display attack frame 0"
+			).is_same(attack[0])
+		else:
+			assert_bool(animator._oneshot).override_failure_message(
+				"slot %d must NOT play a one-shot (round-robin pulses ONE hero per kill)" % i
+			).is_false()
+
+
+func test_strike_round_robin_first_kill_pulses_first_hero_only() -> void:
+	# First kill of a run: the round-robin cursor is at 0, so ONLY slot 0 pulses; slots
+	# 1 and 2 stay on their idle loop. The cursor then advances to 1.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(3)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+	assert_int(screen._party_hero_slots().size()).override_failure_message(
+		"this test requires a 3-hero party"
+	).is_equal(3)
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 1000
+
+	var attack: Array = _make_action_frames(3)
+	screen._action_frames_override["warrior/" + ClassSpriteFactoryScript.POSE_ATTACK] = attack
+	screen._strike_rotation_idx = 0
+
+	# Act — one normal kill.
+	screen._on_enemy_killed_beat(1, "goblin", false)
+
+	# Assert — only slot 0 pulsed; cursor advanced to 1; the single art slot played
+	# frames so NO party-wide tween started.
+	_assert_only_slot_pulsed(screen, 0, attack)
+	assert_int(screen._strike_rotation_idx).override_failure_message(
+		"a visible per-hero beat must advance the round-robin cursor"
+	).is_equal(1)
+	assert_object(screen._active_beat_tween).override_failure_message(
+		"the single pulsed slot has art, so it plays frames and starts NO tween"
+	).is_null()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_strike_round_robin_advances_to_next_hero() -> void:
+	# With the cursor already at 1 (a prior kill pulsed slot 0), the next kill pulses
+	# slot 1 — successive kills walk the party left-to-right. Cursor advances to 2.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(3)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 1000
+
+	var attack: Array = _make_action_frames(3)
+	screen._action_frames_override["warrior/" + ClassSpriteFactoryScript.POSE_ATTACK] = attack
+	screen._strike_rotation_idx = 1
+
+	# Act
+	screen._on_enemy_killed_beat(1, "goblin", false)
+
+	# Assert — slot 1 pulsed; cursor advanced to 2.
+	_assert_only_slot_pulsed(screen, 1, attack)
+	assert_int(screen._strike_rotation_idx).override_failure_message(
+		"the cursor must step from 1 to 2"
+	).is_equal(2)
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_strike_round_robin_wraps_around_party() -> void:
+	# The cursor is modulo-indexed: at 3 with a 3-hero party, 3 % 3 == 0 wraps back to
+	# the FIRST hero — the cadence loops cleanly across an arbitrarily long run.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(3)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 1000
+
+	var attack: Array = _make_action_frames(3)
+	screen._action_frames_override["warrior/" + ClassSpriteFactoryScript.POSE_ATTACK] = attack
+	screen._strike_rotation_idx = 3  # 3 % 3 == 0 → wraps to the first hero
+
+	# Act
+	screen._on_enemy_killed_beat(1, "goblin", false)
+
+	# Assert — slot 0 pulsed (wrap); cursor advanced to 4 (the raw count keeps climbing).
+	_assert_only_slot_pulsed(screen, 0, attack)
+	assert_int(screen._strike_rotation_idx).override_failure_message(
+		"the raw cursor keeps climbing; modulo happens at access"
+	).is_equal(4)
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_boss_kill_pulses_whole_party_not_round_robin() -> void:
+	# A boss is the climactic exception: it pulses the WHOLE party (every slot plays its
+	# attack one-shot) and leaves the round-robin cursor UNTOUCHED, so the per-hero cadence
+	# resumes from the same hero on the next normal kill.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(3)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 1000
+
+	var attack: Array = _make_action_frames(3)
+	screen._action_frames_override["warrior/" + ClassSpriteFactoryScript.POSE_ATTACK] = attack
+	screen._strike_rotation_idx = 0
+
+	# Act — a boss falls.
+	screen._on_boss_killed_beat("orc_warlord")
+
+	# Assert — EVERY slot played its one-shot (whole-party pulse)...
+	for slot: Node in screen._party_hero_slots():
+		var animator: SpriteSheetAnimator = _slot_animator(slot)
+		assert_object(animator).is_not_null()
+		assert_bool(animator._oneshot).override_failure_message(
+			"a boss kill must pulse the WHOLE party — every slot plays its one-shot"
+		).is_true()
+
+	# ...and the round-robin cursor is untouched (the cadence resumes from the same hero).
+	assert_int(screen._strike_rotation_idx).override_failure_message(
+		"a boss kill must NOT advance the round-robin cursor"
+	).is_equal(0)
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_strike_round_robin_idx_resets_on_enter() -> void:
+	# Each run starts the cadence from the first hero: a beat advances the cursor, then a
+	# fresh on_enter (a new run visit) resets it to 0 — deterministic given the kill sequence.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(3)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 1000
+
+	var attack: Array = _make_action_frames(3)
+	screen._action_frames_override["warrior/" + ClassSpriteFactoryScript.POSE_ATTACK] = attack
+	screen._strike_rotation_idx = 0
+
+	# A kill advances the cursor...
+	screen._on_enemy_killed_beat(1, "goblin", false)
+	assert_int(screen._strike_rotation_idx).override_failure_message(
+		"the kill must have advanced the cursor before the re-enter"
+	).is_equal(1)
+
+	# Act — re-enter (a new run visit; on_enter is idempotent).
+	screen.on_enter()
+
+	# Assert — cursor reset to the first hero.
+	assert_int(screen._strike_rotation_idx).override_failure_message(
+		"on_enter must reset the round-robin cursor so each run starts at the first hero"
+	).is_equal(0)
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_strike_round_robin_suppressed_beat_does_not_advance_idx() -> void:
+	# A suppressed beat must NOT silently skip a hero: with reduce_motion ON every beat is
+	# suppressed BEFORE the cursor advances, so the cursor stays put and the next VISIBLE
+	# beat still pulses the hero that would have been next.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(3)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", true)  # the suppressor
+	screen._beat_clock_override_ms = 1000
+
+	var attack: Array = _make_action_frames(3)
+	screen._action_frames_override["warrior/" + ClassSpriteFactoryScript.POSE_ATTACK] = attack
+	screen._strike_rotation_idx = 0
+
+	# Act — a kill arrives but reduce_motion suppresses the beat before selection.
+	screen._on_enemy_killed_beat(1, "goblin", false)
+
+	# Assert — cursor unchanged AND no slot pulsed (the beat never reached selection).
+	assert_int(screen._strike_rotation_idx).override_failure_message(
+		"a reduce-motion-suppressed beat must NOT advance the cursor (no hero skipped)"
+	).is_equal(0)
+	for slot: Node in screen._party_hero_slots():
+		var animator: SpriteSheetAnimator = _slot_animator(slot)
+		assert_object(animator).is_not_null()
+		assert_bool(animator._oneshot).override_failure_message(
+			"a suppressed beat must pulse NO hero"
+		).is_false()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
 	screen.on_exit()
 	screen.queue_free()
 	await get_tree().process_frame
