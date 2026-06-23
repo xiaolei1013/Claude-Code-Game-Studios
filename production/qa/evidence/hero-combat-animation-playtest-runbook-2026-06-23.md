@@ -37,6 +37,13 @@ playtester's local `main` actually has. Before playing:
 3. **Dispatch** the formation into any biome/floor. The dungeon run view opens automatically
    (`SceneManager.request_screen("dungeon_run_view", …)` — there is no manual nav).
 
+> **Entry path verified wired (2026-06-23):** `formation_assignment.gd:1216`
+> (`_on_orchestrator_state_changed`, connected to `DungeonRunOrchestrator.state_changed`)
+> fires `request_screen("dungeon_run_view", FADE_TO_BLACK)` on the `ACTIVE_FOREGROUND`
+> transition — i.e. **tap Dispatch → orchestrator validates → on success the view opens**;
+> validation failures toast and stay put. Live code, no disabled gate — step 1 won't
+> dead-end (the `scaffolded-but-unwired` failure mode is ruled out for this path).
+
 **Art note (not a bug):** all seven classes (archer · berserker · cleric · mage · paladin ·
 rogue · warrior) ship a committed 4-frame idle strip, so **any** party shows animated
 sprites — you don't need to curate a specific formation. Per-class **action** sheets
