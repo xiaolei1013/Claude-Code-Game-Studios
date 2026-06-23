@@ -59,8 +59,8 @@ Drain the compounded playtest backlog (3 sessions over the cap-1 guardrail), loc
 ## Definition of Done for this Sprint
 
 - [ ] All Must Have tasks completed
-- [ ] Playtest backlog drained to 0 (all 3 sessions graded)
-- [ ] Sprint 25/26/27 retros marked CLOSED
+- [x] Playtest backlog drained to 0 (3 sessions closed 2026-06-23 via light-touch aggregate verbal PASS — see Closeout)
+- [x] Sprint 25/26/27 retros marked CLOSED (COMMITTED 2026-06-23, light-touch)
 - [ ] Theme direction locked in ADR-0020
 - [ ] VERSION aligned to actual PR count
 - [ ] All Logic/Integration stories have passing unit/integration tests
@@ -86,3 +86,15 @@ Drain the compounded playtest backlog (3 sessions over the cap-1 guardrail), loc
 Channel-light economy (lantern click) — RESOLVED in S28-G2 (user-ratified 2026-06-23): kept as ambient lit warmth with no mechanic; the lantern is non-interactive so there is no false tap-target. Remaining wireframe screens (Recruit restyle, Hero Detail full, Settings/Pause, Prestige modal) are deferred post-theme-decision (S28-M3).
 
 **QA Plan**: `production/qa/qa-plan-sprint-28.md` — generate before S28-S1 implementation begins.
+
+## Closeout — 2026-06-23
+
+**Verdict: PASS (light-touch).** S28-M1 (the unified playtest 16/17/18 session) closed on the
+user's aggregate verbal sign-off — "playtest done, core gameplay working" — authorized as a
+light-touch closure rather than per-axis grading (consistent with the playtest-driven-closure
+precedent; cf. the Sprint 19/20 one-line verdicts). The 15 per-axis rows across
+playtest-16/-17/-18 were NOT individually graded.
+
+Actions taken: Sprint 25/26/27 retros flipped DRAFT → COMMITTED; `sprint-status.yaml` 28-M1 →
+`done` (completed 2026-06-23). Sprint 28 closes 9/9. Post-verdict direction: Sprint 29 = polish
+& feel, theme-first re-skin (guild_hall shipped first, PR #244).

@@ -3,7 +3,7 @@
 > **Sprint Mapping**: S26-M5 (playtest gate + retro authoring per the Sprint 26 retroactive Day-0 plan).
 > **Sprint Window**: 2026-07-10 to 2026-07-23 nominal; actual close 2026-05-16 (thirteenth consecutive same-day-compressed sprint).
 > **Review Mode**: Solo.
-> **Status**: DRAFT — pending playtest-17 verdict per `production/playtests/playtest-17-sprint-26-content-pivot-2026-05-16.md`. Will flip to COMMITTED once the tester grades the 5 per-check rows.
+> **Status**: COMMITTED 2026-06-23 (light-touch) — closed on the user's aggregate verbal PASS of the unified playtest 16/17/18 session ("playtest done, core gameplay working"). The 5 playtest-17 per-check rows were not individually graded; closed on the aggregate verbal sign-off per the playtest-driven-closure precedent (cf. the Sprint 19/20 one-line verdicts).
 
 ## Sprint Goal — Technically MET, awaiting playtest verdict
 
@@ -17,7 +17,7 @@ Final status (technical surface):
 - (e) `/simplify+/review` cleanup — ✅ shipped (PR #162)
 - (f) Parse-error hotfix — ✅ shipped (PR #163)
 - (g) M4 Tier-2 class synergies — ✅ shipped (PR #164)
-- (h) M5 playtest + retro — ⚠️ playtest TBD; this retro is DRAFT until tester grades playtest-17
+- (h) M5 playtest + retro — ✅ closed 2026-06-23 via the unified playtest 16/17/18 session (light-touch aggregate verbal PASS; see Status header)
 
 ## By the Numbers
 
