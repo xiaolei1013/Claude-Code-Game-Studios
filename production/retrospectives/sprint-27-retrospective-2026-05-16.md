@@ -3,7 +3,7 @@
 > **Sprint Mapping**: S27-M2 (playtest gate + retro authoring per the retroactive Sprint 27 Day-0 plan).
 > **Sprint Window**: 2026-07-24 to 2026-08-06 nominal; actual close 2026-05-16 (fourteenth consecutive same-day-compressed sprint).
 > **Review Mode**: Solo.
-> **Status**: DRAFT — pending playtest-18 verdict per `production/playtests/playtest-18-sprint-27-synergy-effect-text-2026-05-16.md`. Flips to COMMITTED once tester grades 5 per-check rows.
+> **Status**: COMMITTED 2026-06-23 (light-touch) — closed on the user's aggregate verbal PASS of the unified playtest 16/17/18 session ("playtest done, core gameplay working"). The 5 playtest-18 per-check rows were not individually graded; closed on the aggregate verbal sign-off per the playtest-driven-closure precedent (cf. the Sprint 19/20 one-line verdicts).
 
 ## Sprint Goal — Technically MET (single Must Have shipped), strategic verdict pending playtest
 
@@ -12,7 +12,7 @@ Original retroactive goal: *"Close the synergy teaching loop by surfacing effect
 Final status (technical surface):
 - (a) M1 Synergy effect text — ✅ shipped (PR #166)
 - (b) `/simplify+/review` cleanup (synergy_effect_text helper hoist + comment cleanup + test relocation) — ✅ shipped (PR #167)
-- (c) M2 playtest + retro — ⚠️ playtest TBD; this retro is DRAFT until tester grades playtest-18
+- (c) M2 playtest + retro — ✅ closed 2026-06-23 via the unified playtest 16/17/18 session (light-touch aggregate verbal PASS; see Status header)
 
 ## By the Numbers
 

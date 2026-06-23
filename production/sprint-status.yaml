@@ -25,11 +25,11 @@ stories:
     name: "Run unified playtest 16/17/18 session"
     file: "production/playtests/unified-playtest-16-17-18-protocol-2026-05-16.md"
     priority: must-have
-    status: ready-for-dev
+    status: done
     owner: "Human (tester)"
     estimate_days: 0.5
-    blocker: "Requires manual game session (not automatable)"
-    completed: ""
+    blocker: ""
+    completed: "2026-06-23"
 
   - id: "28-M2"
     name: "VERSION + CHANGELOG catch-up (PRs #170-#195)"

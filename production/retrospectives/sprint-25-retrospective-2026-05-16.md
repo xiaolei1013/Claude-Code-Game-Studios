@@ -3,7 +3,7 @@
 > **Sprint Mapping**: S25-M5-rev (playtest gate + retro authoring per the Sprint 25 plan + addendum).
 > **Sprint Window**: 2026-06-26 to 2026-07-09 nominal; actual close 2026-05-16 (thirteenth consecutive same-day-compressed sprint).
 > **Review Mode**: Solo.
-> **Status**: DRAFT — pending playtest-16 verdict per `production/playtests/playtest-16-sprint-25-content-pivot-2026-05-16.md`. Will flip to COMMITTED once the tester grades all 5 per-check rows.
+> **Status**: COMMITTED 2026-06-23 (light-touch) — closed on the user's aggregate verbal PASS of the unified playtest 16/17/18 session ("playtest done, core gameplay working"). The 5 playtest-16 per-check rows were not individually graded; closed on the aggregate verbal sign-off per the playtest-driven-closure precedent (cf. the Sprint 19/20 one-line verdicts).
 
 ## Sprint Goal — TBD pending playtest
 
@@ -16,7 +16,7 @@ Final status (technical surface, pending playtest verdict):
 - (b) M3-rev boss floor visual (PR #153) — ✅ shipped; F5 darkens to 65% RGB intensity via `set_biome_for_floor`
 - (c) S2-rev archer class (PR #154) — ✅ shipped; tier-2 ranged-DPS with role="ranged" + counter="swarm"
 - (d) N2-rev floor lock indicator (PR #155) — ✅ shipped; 🔒 prefix + tooltip "Clear floor N first"
-- (e) M5-rev playtest + retro — ⚠️ playtest TBD; this retro is DRAFT until tester grades playtest-16
+- (e) M5-rev playtest + retro — ✅ closed 2026-06-23 via the unified playtest 16/17/18 session (light-touch aggregate verbal PASS; see Status header)
 
 ## By the Numbers
 
