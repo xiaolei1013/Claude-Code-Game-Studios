@@ -20,13 +20,48 @@ extends RefCounted
 const FRAME_COUNT: int = 4
 
 ## Default idle playback rate. 6 fps reads as a calm "breathing" idle at the
-## cozy register, not a frenetic loop.
+## cozy register, not a frenetic loop. This is the full IN-SCENE rate: the dungeon
+## party heroes ([code]dungeon_run_view._make_hero_slot[/code]) animate at it.
 const IDLE_FPS: float = 6.0
+
+## Portrait-tier idle rate as a fraction of the in-scene [constant IDLE_FPS].
+## Story 014 / GDD #35 §D.7 + §G knob: the dungeon in-scene hero breathes at the
+## full IDLE_FPS (restless, alive); the SAME idle on a calm portrait / thumbnail
+## surface (recruit card, hero-detail modal, codex entry, start-menu row) plays at
+## HALF that rate — art-bible §8.1: "Portrait idles are meditative, not restless."
+## A data-driven knob (§G safe range 0.25–1.0), never a magic 3.0 at a call site.
+const PORTRAIT_IDLE_FPS_RATIO: float = 0.5
+
+## Derived portrait-tier idle rate: [constant IDLE_FPS] × [constant PORTRAIT_IDLE_FPS_RATIO]
+## = 3.0 fps. Portrait-tier consumers pass THIS to [method animate], so the in-scene
+## ↔ portrait speed differential has a single source of truth instead of a hardcoded
+## 3.0 sprinkled across screens. (GDScript evaluates const×const at parse time.)
+const PORTRAIT_IDLE_FPS: float = IDLE_FPS * PORTRAIT_IDLE_FPS_RATIO
+
+## Default ACTION playback rate (attack / victory / defeat one-shots). Faster than
+## the breathing idle so a reaction pose reads as a deliberate beat, not idle drift.
+## Story 014 may make this per-class / per-pose data-driven; one rate is enough for
+## the Story 012 frames-vs-tween machinery (the action art does not exist yet).
+const ACTION_FPS: float = 12.0
+
+## Canonical action-pose ids. Each names a per-class action sprite sheet authored by
+## the asset pipeline (manifest images.class_action_sprites in full.json), shipped at
+## [code]assets/art/classes/<class_id>/<pose>.png[/code] beside the idle sprite.png.
+## Single source of truth for "which action poses exist"; the beat→pose mapping lives
+## in the consumer (dungeon_run_view's reaction beats). NOTE: combat is party-AGGREGATE
+## and emits no per-hero "hit" signal — [constant POSE_HIT] art is authored-ahead
+## (GDD #35 §5 / art-bible) but has no firing beat in this epic.
+const POSE_ATTACK: String = "attack"
+const POSE_HIT: String = "hit"
+const POSE_VICTORY: String = "victory"
+const POSE_DEFEAT: String = "defeat"
 
 ## Name of the animator child node attached to a driven TextureRect. Stable so
 ## [method animate] can find-and-reuse it across re-renders instead of stacking
-## duplicate animators on a reused card.
-const _ANIMATOR_NODE_NAME: StringName = &"_IdleAnimator"
+## duplicate animators on a reused card. Public + the single source of truth:
+## external consumers (e.g. dungeon_run_view's run-state idle freeze, Story 007)
+## look the animator up by this exact name instead of re-declaring the literal.
+const ANIMATOR_NODE_NAME: StringName = &"_IdleAnimator"
 
 const SpriteSheetAnimatorScript = preload("res://src/ui/sprite_sheet_animator.gd")
 
@@ -53,6 +88,29 @@ static func get_idle_frames(class_id: String) -> Array:
 	return frames
 
 
+## Returns the ordered ACTION frames for [param class_id]'s [param pose] (one of the
+## [code]POSE_*[/code] ids), or an empty array when the class/pose is empty or its sheet
+## is absent — the art-not-yet-authored path, where the caller falls back to its cosmetic
+## tween (Story 012's "real frames where art exists" contract). Cached per (class_id, pose)
+## under a composite key, so it never collides with [method get_idle_frames]'s bare
+## class_id key. Mirrors the idle loader exactly: same [member ResourceLoader] existence
+## guard (resolves real art in EXPORTED builds, where the source .png is stripped), same
+## [constant FRAME_COUNT] equal-column slice over a single shared sheet.
+static func get_action_frames(class_id: String, pose: String) -> Array:
+	if class_id.is_empty() or pose.is_empty():
+		return []
+	var cache_key: String = "%s/%s" % [class_id, pose]
+	if _frames_cache.has(cache_key):
+		return _frames_cache[cache_key]
+	var frames: Array = []
+	var path: String = "res://assets/art/classes/%s/%s.png" % [class_id, pose]
+	if ResourceLoader.exists(path):
+		var sheet: Texture2D = load(path) as Texture2D
+		frames = slice_sheet(sheet, FRAME_COUNT)
+	_frames_cache[cache_key] = frames
+	return frames
+
+
 ## Slices a horizontal sprite [param sheet] into [param frame_count] equal-width
 ## [AtlasTexture] frames. Pure function (no disk access) so the slicing math is
 ## unit-testable with a synthetic texture. Returns an empty array on a null sheet,
@@ -76,18 +134,40 @@ static func slice_sheet(sheet: Texture2D, frame_count: int) -> Array:
 ## sheet is absent — in the latter case the caller's existing still texture stays.
 ## Idempotent across re-renders: a reused card keeps its single named animator and
 ## is just reconfigured for the (possibly new) class.
-static func animate(target: TextureRect, class_id: String, fps: float = IDLE_FPS) -> void:
+## [param fps] defaults to the full in-scene [constant IDLE_FPS]; calm portrait /
+## thumbnail surfaces pass [constant PORTRAIT_IDLE_FPS] for the half-speed tier
+## (Story 014 speed differential). The same per-class frames are used either way —
+## each class loads its OWN distinct strip via [method get_idle_frames] (keyed on
+## class_id), so the art-bible §8.1 "no hero reuses another's idle motion" invariant
+## holds at the code boundary; the secondary-motion CONTENT is authored into the art.
+## [param reduce_motion]: when true the idle MOTION is suppressed (accessibility,
+## GDD #35 §C.8 + the binding ui-code rule "all animations respect motion prefs") —
+## the slot still receives its animator and holds STATIC frame 0 ([method setup]
+## already assigned it) with [code]_process[/code] disabled, so the hero stays present
+## but nothing moves and the slot costs nothing per frame. The flag is PASSED IN, not
+## read from an autoload, so the factory stays pure-utility / autoload-free (mirrors
+## [method VfxKit.spawn_burst]'s reduce_motion parameter); each caller re-evaluates it
+## on every (re)render, which is the surface's "state evaluation" point (§E.6). The
+## in-scene dungeon slot leaves this false and gates its idle externally (Story 010);
+## the calm portrait surfaces pass their own [code]reduce_motion[/code] read (Story 015).
+static func animate(
+		target: TextureRect, class_id: String, fps: float = IDLE_FPS,
+		reduce_motion: bool = false) -> void:
 	if target == null:
 		return
 	var frames: Array = get_idle_frames(class_id)
 	if frames.is_empty():
 		return
-	var anim: Node = target.get_node_or_null(NodePath(String(_ANIMATOR_NODE_NAME)))
+	var anim: Node = target.get_node_or_null(NodePath(String(ANIMATOR_NODE_NAME)))
 	if anim == null:
 		anim = SpriteSheetAnimatorScript.new()
-		anim.name = _ANIMATOR_NODE_NAME
+		anim.name = ANIMATOR_NODE_NAME
 		target.add_child(anim)
 	anim.setup(target, frames, fps)
+	if reduce_motion:
+		# Accessibility (§C.8): hold the static frame 0 setup() just assigned and stop
+		# the per-frame _process. Presence without motion — the hero is shown, not moving.
+		anim.set_animating(false)
 
 
 ## Clears the frame cache. Tests + editor reload only; not reachable from gameplay.

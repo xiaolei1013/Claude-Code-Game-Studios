@@ -10,7 +10,7 @@ Usage:
     python3 tools/asset-pipeline/generate.py --only sfx           # one section
     python3 tools/asset-pipeline/generate.py --manifest manifests/full.json
 
-Sections: audio (sfx, music), images (backgrounds, portraits, enemy_sprites, class_sprites, vfx).
+Sections: audio (sfx, music), images (backgrounds, portraits, enemy_sprites, class_sprites, class_action_sprites, vfx, ui).
 
 NOTE: endpoint/param details for the ElevenLabs Music API and the Gemini image
 model are best-effort and may need a one-line tweak on first real run (we can't
@@ -479,6 +479,7 @@ _SECTIONS = [
     ("portraits",      "images", gen_image, _fmt_image,  "out"),
     ("enemy_sprites",  "images", gen_image, _fmt_image,  "out"),
     ("class_sprites",  "images", gen_image, _fmt_image,  "out"),
+    ("class_action_sprites", "images", gen_image, _fmt_image, "out"),
     ("vfx",            "images", gen_image, _fmt_image,  "out"),
     ("ui",             "images", gen_image, _fmt_image,  "out"),
 ]

@@ -273,8 +273,13 @@ func _refresh_header() -> void:
 	# the first surface to render the class identity visually.
 	if _class_portrait != null:
 		_class_portrait.texture = ClassPortraitFactoryScript.get_portrait_texture(_hero.class_id)
-		# Demo build: animate the slot through the class idle sheet when present.
-		ClassSpriteFactoryScript.animate(_class_portrait, _hero.class_id)
+		# Demo build: animate the slot through the class idle sheet when present,
+		# at the calm PORTRAIT tier — half the in-scene rate (Story 014 / GDD #35 §D.7).
+		# reduce_motion (Story 015 / §C.8): pass the accessibility read so the idle
+		# holds a static frame instead of looping — presence without motion.
+		ClassSpriteFactoryScript.animate(
+			_class_portrait, _hero.class_id, ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS,
+			_is_reduce_motion_enabled())
 	# DisplayNameLabel — immutable per ADR-0012.
 	_display_name_label.text = _hero.display_name
 	# ClassNameLabel — locale-aware via display_name_key (when class.tres

@@ -74,6 +74,11 @@ const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/d
 const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
 # Demo enemy sprites for the "Enemies ahead" lineup (no-op without demo assets).
 const EnemySpriteFactoryScript = preload("res://src/ui/enemy_sprite_factory.gd")
+# Hero class sprites for the party diorama (Hero Combat Presence epic, GDD #35).
+# Preloaded (not called via the global class_name) so the static get_idle_frames
+# call never races the cold-load class registry — same pattern as the enemy
+# factory above and the _biome_background typed-as-ColorRect note.
+const ClassSpriteFactoryScript = preload("res://src/ui/class_sprite_factory.gd")
 const VfxKitScript = preload("res://src/ui/vfx_kit.gd")
 
 ## VFX particle textures (committed product art). All loaded best-effort in
@@ -153,6 +158,83 @@ const _MILESTONE_TOAST_FONT_SIZE: int = 20
 @onready var _biome_background: ColorRect = $BiomeBackground
 
 # ---------------------------------------------------------------------------
+# Reaction-beat tuning (Hero Combat Presence epic, Story 008 · ADR-0025 §C.4 /
+# GDD #35 §D.2/§D.3/§D.5). Presentation + coalescing values, NOT gameplay —
+# named constants, never inline magic numbers, per the coding standard. The
+# feel knobs are Story-014 / playtest tunable; the throttle is a binding
+# accessibility safeguard (no animation faster than ~8 Hz).
+# ---------------------------------------------------------------------------
+
+## Strike-pulse total duration (ms) for a normal enemy kill — the out-and-back
+## scale punch + brightness flash (GDD #35 §D.2). Short enough to keep up with a
+## fast kill cadence (§D.5), long enough to register.
+const KILL_BEAT_MS: int = 180
+
+## Boss-strike duration (ms) — 2× the kill beat; a boss death is the run's
+## punctuation, so it reads bigger and slightly longer (GDD #35 §D.2).
+const BOSS_BEAT_MS: int = 360
+
+## Peak scale of the kill strike punch (1.0 → this → 1.0). Subtle by design — the
+## cozy register forbids a jarring strobe (GDD #35 §D.3).
+const KILL_BEAT_SCALE_PUNCH: float = 1.08
+
+## Peak scale of the boss strike punch — a touch larger than the kill punch
+## (GDD #35 §D.3).
+const BOSS_BEAT_SCALE_PUNCH: float = 1.14
+
+## Peak brightness multiplier of the strike flash (modulate 1.0 → this → 1.0)
+## over the same interval as the scale punch (GDD #35 §D.3).
+const BEAT_BRIGHTNESS_FLASH: float = 1.25
+
+## Fraction of a beat spent on the "out" (punch-up) phase; the remainder is the
+## "back" (settle) phase. A snappy punch + slightly longer settle reads as a
+## strike — a feel-default; Story 014 may tune it against live 1280×800.
+const BEAT_OUT_PHASE_RATIO: float = 0.4
+
+## Beat-coalescing window (ms) — the anti-strobe safeguard (GDD #35 §D.5, the
+## load-bearing formula). A new kill/boss beat is suppressed (its kill absorbed
+## into the in-flight beat) if the previous VISIBLE beat began < this long ago,
+## capping visible beats at ~8.3/s. Parallels the audio gold-chime throttle.
+const BEAT_THROTTLE_MS: int = 120
+
+# --- Terminal reaction beats (Story 009 · GDD #35 §C.4 / §D.2 / §D.4 / §G) ----
+# The run's two punctuation moments: a VICTORY cheer (floor_cleared_first_time)
+# and a DEFEAT slump (run_defeated). One-shot, NOT coalesced (a terminal beat
+# must play even if the final kill's strike fired < BEAT_THROTTLE_MS ago), and
+# they supersede any in-flight kill/boss strike (precedence victory>boss>kill,
+# §E.9). Durations are capped < RUN_END_DWELL_MS (1500) so the beat completes
+# under the run-end overlay before the auto-route (AC-35-04). Feel knobs are
+# Story-014 / playtest tunable within the §G safe ranges noted below.
+
+## Victory cheer total duration (ms) — out-and-back, like the strike but bigger /
+## longer (GDD §D.2). §G safe range 200–1400; MUST stay < RUN_END_DWELL_MS.
+const VICTORY_BEAT_MS: int = 600
+
+## Defeat slump duration (ms) — the slowest beat; a held one-way sag (GDD §D.2).
+## §G safe range 300–1400; MUST stay < RUN_END_DWELL_MS.
+const DEFEAT_SLUMP_MS: int = 700
+
+## Peak scale of the victory cheer (1.0 → this → 1.0), about a BOTTOM-CENTRE pivot
+## so the party reads as rising on their feet (GDD §D.4 — the upward HOP_PX hop,
+## approximated by bottom-pivot scale under the HBoxContainer position constraint).
+const VICTORY_SCALE_PUNCH: float = 1.10
+
+## Peak brightness multiplier of the victory bloom (modulate 1.0 → this → 1.0) —
+## a touch warmer than the kill flash; the run's celebratory high (GDD §D.4).
+const VICTORY_BRIGHTNESS_BLOOM: float = 1.30
+
+## Held horizontal / vertical scale of the defeat slump about the BOTTOM-CENTRE
+## pivot — a slight sag at the feet (GDD §D.4 SLUMP_OFFSET_PX, §G 2–16 px,
+## approximated by scale). Y compresses more than X so the party "sinks", never
+## reads as a fall / ragdoll / gore (ADR-0021 / §E.11). NOT a death pose.
+const DEFEAT_SLUMP_SCALE_X: float = 0.97
+const DEFEAT_SLUMP_SCALE_Y: float = 0.90
+
+## Held brightness multiplier of the defeat slump (modulate dim) — lanterns dim
+## but the party stays VISIBLE (alpha 1.0), per GDD §D.4 / §C.8.
+const DEFEAT_SLUMP_DIM: float = 0.80
+
+# ---------------------------------------------------------------------------
 # Private state
 # ---------------------------------------------------------------------------
 
@@ -182,6 +264,63 @@ var _float_layer: Control = null
 var _party_hp_bar: ProgressBar = null
 var _party_hp_label: Label = null
 var _enemies_remaining_label: Label = null
+
+## Party diorama layer (Hero Combat Presence epic, GDD #35 · Story 005 · ADR-0025).
+## A dedicated, additive Control holding one hero sprite per OCCUPIED formation
+## slot — the party the player dispatched, rendered center-stage below the enemy
+## lineup. Built once in [method _build_wireframe_once]; null until then. Story 006
+## attaches the idle SpriteSheetAnimator to each slot; Stories 008–009 fire the
+## reaction beats. See [method _build_party_diorama].
+var _party_diorama_layer: Control = null
+
+## Active party reaction-beat tween (Story 008 · ADR-0025 §C.4 / GDD #35 §D.3).
+## A SINGLE party-aggregate tween that pulses every hero slot together (out-and-
+## back scale punch + brightness flash) on a human-frequency kill/boss signal —
+## NEVER the 20 Hz tick. Killed-and-replaced on each new beat (so a rapid cascade
+## never stacks fighting tweens) and killed in [method on_exit] (ADR-0025 §C.7
+## lifecycle). Null while idle.
+var _active_beat_tween: Tween = null
+
+## Timestamp (ms, from [method _beat_now_ms]) at which the last VISIBLE beat began
+## — the coalescing clock (GDD #35 §D.5). Initialized to the −window sentinel (NOT
+## 0) so the very first beat is never wrongly suppressed at low engine uptime (the
+## prestige-audio-throttle lesson: a 0-sentinel + engine-uptime clock mis-fires).
+var _last_beat_ms: int = -BEAT_THROTTLE_MS
+
+## Test seam for the beat-throttle clock (mirrors AudioRouter._throttle_now_ms).
+## −1 → use real engine uptime ([method Time.get_ticks_msec]); a test assigns a
+## fixed value to drive the coalescing window deterministically.
+var _beat_clock_override_ms: int = -1
+
+## Test seam for action-frame lookup (Story 012; mirrors [member _beat_clock_override_ms]).
+## Maps [code]"<class_id>/<pose>"[/code] → Array of frame textures, letting a test inject
+## synthetic action art so the frames-vs-tween split is exercised WITHOUT committing PNGs.
+## Empty (the default) → the real disk lookup via [method ClassSpriteFactory.get_action_frames].
+## See [method _action_frames_for].
+var _action_frames_override: Dictionary = {}
+
+## Round-robin cursor for the synthetic per-hero strike cadence (Story 013 · ADR-0025
+## Alternative 4 — the OPTIONAL "synthetic per-hero action cadence"). A regular enemy kill
+## pulses ONE hero — slot [code]_strike_rotation_idx % party_size[/code] — then advances the
+## cursor, so successive kills walk the party left-to-right instead of pulsing everyone
+## together (a boss kill is the climactic exception: it pulses the WHOLE party and leaves
+## the cursor untouched, GDD #35 §C.4 "larger / longer"). Advanced ONLY on a VISIBLE beat
+## (after every gate in [method _try_party_strike_beat] passes), so a coalesced or
+## reduce-motion-suppressed beat never skips a hero. Reset in [method on_enter] so each run
+## starts the cadence deterministically at the first hero. This stays truthful to the
+## aggregate-DPS combat model — it is an avowedly SYNTHETIC cadence (cosmetic theater, not
+## per-hero damage attribution, which the resolver can't back — ADR-0025 §"per-hero attack
+## attribution would be a fiction"); the rotation is derived from the live kill stream, never
+## from a per-tick poll (the 20 Hz hot path is untouched; Story 007 guard stays green).
+var _strike_rotation_idx: int = 0
+
+## One-shot latch for the terminal reaction beat (Story 009 · GDD #35 §C.4 / §E.9).
+## Set the first time a victory cheer or defeat slump plays; thereafter every
+## kill/boss strike is suppressed ([method _try_party_strike_beat]) so no late
+## strike overrides the run's terminal motion (precedence victory>boss>kill), and
+## a second terminal beat is a no-op (at most one terminal motion per run). Reset
+## in [method on_enter] so a re-entered screen / next run plays its beat afresh.
+var _terminal_beat_played: bool = false
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +363,12 @@ func on_enter() -> void:
 	# Reset both idempotency guards for this screen visit (Story 012 + Story 013).
 	_overlay_shown = false
 	_routed = false
+	# Reset the terminal-beat latch (Story 009) so this visit's run can play its
+	# victory cheer / defeat slump even if a prior visit already played one.
+	_terminal_beat_played = false
+	# Reset the per-hero strike cadence (Story 013) so each run walks the party from
+	# the first hero — the rotation is deterministic given the run's kill sequence.
+	_strike_rotation_idx = 0
 	_run_end_overlay.visible = false
 
 	# Sprint 19 S19-M3 — set the biome background to match the active dispatch.
@@ -289,6 +434,29 @@ func on_enter() -> void:
 	if not DungeonRunOrchestrator.floor_cleared_first_time.is_connected(_on_floor_cleared_vfx):
 		DungeonRunOrchestrator.floor_cleared_first_time.connect(_on_floor_cleared_vfx)
 
+	# Hero reaction beats (Hero Combat Presence epic, Story 008 · ADR-0025 §C.4):
+	# a kill / boss death pulses the WHOLE party (aggregate attribution, GDD #35
+	# §C.5 — combat emits no per-hero events). DISTINCT from the gold-burst VFX
+	# above (that is screen feedback; these animate the hero SPRITES). Triggered by
+	# human-frequency signals ONLY — never the 20 Hz tick (ADR-0025 §C.9; the
+	# per-tick source guard enforces it). Both disconnected in on_exit.
+	if not DungeonRunOrchestrator.enemy_killed.is_connected(_on_enemy_killed_beat):
+		DungeonRunOrchestrator.enemy_killed.connect(_on_enemy_killed_beat)
+	if not DungeonRunOrchestrator.boss_killed.is_connected(_on_boss_killed_beat):
+		DungeonRunOrchestrator.boss_killed.connect(_on_boss_killed_beat)
+
+	# Terminal reaction beats (Story 009 · ADR-0025 §C.4): the run's punctuation —
+	# a VICTORY cheer on first-time floor clear and a DEFEAT slump on run_defeated.
+	# DISTINCT, additive consumers on signals that already drive screen feedback
+	# (floor_cleared_first_time → lantern-glow VFX above; run_defeated → the defeat
+	# OVERLAY below): these animate the hero SPRITES and never route. The route +
+	# idle-freeze stay with _on_state_changed(RUN_ENDED) — the slump is NOT a second
+	# route decision (GDD §E.5). Both disconnected in on_exit.
+	if not DungeonRunOrchestrator.floor_cleared_first_time.is_connected(_on_floor_cleared_beat):
+		DungeonRunOrchestrator.floor_cleared_first_time.connect(_on_floor_cleared_beat)
+	if not DungeonRunOrchestrator.run_defeated.is_connected(_on_run_defeated_beat):
+		DungeonRunOrchestrator.run_defeated.connect(_on_run_defeated_beat)
+
 	# Initial render — snap labels to the current snapshot (covers the case
 	# where this screen is shown after DISPATCHING has already begun and ticks
 	# have already advanced the snapshot before on_enter fires).
@@ -347,6 +515,26 @@ func on_exit() -> void:
 		DungeonRunOrchestrator.enemy_killed.disconnect(_on_enemy_killed_vfx)
 	if DungeonRunOrchestrator.floor_cleared_first_time.is_connected(_on_floor_cleared_vfx):
 		DungeonRunOrchestrator.floor_cleared_first_time.disconnect(_on_floor_cleared_vfx)
+
+	# Hero reaction beats (Story 008): mirror the on_enter subscriptions and kill
+	# any in-flight beat tween so no tween or _process outlives the run (ADR-0025
+	# §C.7 lifecycle). create_tween() binds to this node and is auto-killed on free,
+	# but the explicit kill is the ADR-mandated discipline.
+	if DungeonRunOrchestrator.enemy_killed.is_connected(_on_enemy_killed_beat):
+		DungeonRunOrchestrator.enemy_killed.disconnect(_on_enemy_killed_beat)
+	if DungeonRunOrchestrator.boss_killed.is_connected(_on_boss_killed_beat):
+		DungeonRunOrchestrator.boss_killed.disconnect(_on_boss_killed_beat)
+	# Terminal beats (Story 009): mirror the on_enter subscriptions. A victory /
+	# slump tween shares the _active_beat_tween handle, so the kill below covers it.
+	if DungeonRunOrchestrator.floor_cleared_first_time.is_connected(_on_floor_cleared_beat):
+		DungeonRunOrchestrator.floor_cleared_first_time.disconnect(_on_floor_cleared_beat)
+	if DungeonRunOrchestrator.run_defeated.is_connected(_on_run_defeated_beat):
+		DungeonRunOrchestrator.run_defeated.disconnect(_on_run_defeated_beat)
+	if _active_beat_tween != null:
+		if _active_beat_tween.is_valid():
+			_active_beat_tween.kill()
+		_active_beat_tween = null
+
 	if _vfx_layer != null:
 		_vfx_layer.queue_free()
 		_vfx_layer = null
@@ -446,6 +634,15 @@ func _on_tick_fired(_tick_number: int) -> void:
 func _on_state_changed(new_state: int, _old_state: int) -> void:
 	if new_state != DungeonRunStateScript.State.RUN_ENDED:
 		return
+
+	# Baseline transition (GDD #35 §C.4 / ADR-0025): the run is over — freeze every
+	# hero's looping idle so the party holds its pose under the run-end overlay. This
+	# is the coarse, HUMAN-frequency hero-state reflection (NOT the 20 Hz tick); the
+	# terminal victory/slump beat that plays over the frozen pose is Story 009. Placed
+	# BEFORE the _routed idempotency guard so the freeze fires on every RUN_ENDED entry
+	# (incl. a transition-replayed duplicate) — set_animating(false) is idempotent.
+	_set_party_idle_animating(false)
+
 	if _routed:
 		return  # AC-5 idempotency — route already requested; ignore duplicate.
 	_routed = true
@@ -774,6 +971,7 @@ func _build_wireframe_once() -> void:
 	_reposition_existing_nodes_drv()
 	_build_party_hud()
 	_build_enemy_lineup_drv()
+	_build_party_diorama()
 	_build_run_stats_hud()
 	_build_progress_panel()
 	_build_activity_feed_drv()
@@ -980,6 +1178,522 @@ func _enemy_display_name(enemy_id: String) -> String:
 		if ed != null and ("display_name" in ed) and String(ed.display_name) != "":
 			return String(ed.display_name)
 	return enemy_id.capitalize()
+
+
+# ===========================================================================
+# Party diorama — the front line of heroes the player dispatched
+# (Hero Combat Presence epic, GDD #35 · Story 005 · ADR-0025)
+#
+# Renders one sprite per OCCUPIED formation slot — the count is data-driven from
+# HeroRoster.get_formation_heroes() and is NEVER assumed to be 3 — as a centered
+# HBox of TextureRects on a dedicated, additive PartyDioramaLayer Control. The
+# layer is a SIBLING of the wireframe HUD panels (add_child on root), NOT a
+# reparent of WirePartyHud: the screen's node structure stays hard-path-stable
+# (the screen test binds nodes by path; restructure additively, never reparent).
+#
+# Read-only spectacle (GDD #35 §B.2): every node in the subtree is
+# MOUSE_FILTER_IGNORE so it can never steal a tap — z_index does NOT gate Godot
+# input picking, so the read-only contract is enforced by mouse_filter, not z.
+# The plane sits at z = _PARTY_DIORAMA_Z: in front of the tilt-shift DoF (z = -1)
+# and the biome (z = 0), behind the stats/header (z = 2) and the run-end overlay
+# (z = 5). Theme cascade (ADR-0008) is preserved — every node is a Control, so no
+# type="Node" intermediate silently breaks inheritance.
+#
+# Story 005 renders the STATIC idle frame 0 (or nothing when the class art is
+# absent — ClassSpriteFactory's null-fallback contract; the slot still reserves
+# its layout space). Story 006 attaches the SpriteSheetAnimator to each slot to
+# drive the _process idle loop — NOT in _on_tick_fired (the 20 Hz zero-alloc hot
+# path, ADR-0025 §C.9). Each slot stashes its class_id via set_meta so that
+# wiring needs no roster re-fetch.
+# ===========================================================================
+
+## On-screen display size (px) of each hero sprite — the square bounding box the
+## idle frame is fit into (KEEP_ASPECT_CENTERED). UX spec default 72 (range 48–96).
+const _HERO_SPRITE_DISPLAY_PX: int = 72
+
+## Horizontal gap (px) between adjacent hero sprites in the front-line row.
+const _HERO_SLOT_SEPARATION_PX: int = 24
+
+## Canvas z of the party diorama plane — the sharp focal subjects. In front of
+## the tilt-shift DoF (z = -1) + biome (z = 0); behind stats/header (z = 2) and
+## the run-end overlay (z = 5). Matches the enemy lineup's _WIRE_Z plane.
+const _PARTY_DIORAMA_Z: int = 1
+
+## Metadata key under which each hero slot stashes its class_id, so Story 006's
+## idle-animation wiring drives the right sheet without re-reading the roster.
+const _HERO_SLOT_CLASS_META: StringName = &"hero_class_id"
+
+
+## Center-stage: the party's heroes — one sprite per OCCUPIED formation slot,
+## rendered as a centered front-line row placed just below the enemy lineup, on a
+## dedicated additive PartyDioramaLayer. Count is data-driven from
+## HeroRoster.get_formation_heroes() (empty slots render nothing). Idempotent
+## within a screen instance via [member _party_diorama_layer] (the parent
+## [method _build_wireframe_once] is itself guarded by _wire_built).
+func _build_party_diorama() -> void:
+	if _party_diorama_layer != null:
+		return
+	var layer: Control = Control.new()
+	layer.name = "PartyDioramaLayer"
+	layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.z_index = _PARTY_DIORAMA_Z
+	add_child(layer)
+	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_party_diorama_layer = layer
+
+	# Centered front-line row, placed just below the enemy lineup (which occupies
+	# y≈188–384 at the same 0.5-anchored 560 px-wide band). Offsets per the UX
+	# spec "Hero Combat Presence (GDD #35)" section; Story 014 polish may refine
+	# the ground-line against live 1280×800.
+	var row: HBoxContainer = HBoxContainer.new()
+	row.name = "PartyFrontLine"
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", _HERO_SLOT_SEPARATION_PX)
+	layer.add_child(row)
+	_place(row, 0.5, 0, 0.5, 0, -280.0, 408.0, 280.0, 540.0)
+
+	# One sprite per OCCUPIED formation slot — count is data-driven (never 3).
+	if HeroRoster == null:
+		return
+	var party: Array = HeroRoster.get_formation_heroes()
+	for h: Variant in party:
+		if h == null:
+			continue  # empty formation slot → renders nothing (UX spec)
+		var cls: String = ""
+		if "class_id" in h:
+			cls = String(h.class_id)
+		row.add_child(_make_hero_slot(cls, row.get_child_count()))
+
+	# Story 010 — §C.8 / AC-35-07: reduce_motion suppresses the IDLE loop at build time.
+	# Heroes stay fully present (all K slots built above, modulate untouched at alpha 1.0)
+	# but hold a single static frame — frame 0, which setup() already assigned — with the
+	# animator's _process disabled. Read at build, which IS the idle's "state evaluation"
+	# point per §E.6: set_reduce_motion() emits no signal, and a fresh on_enter rebuilds
+	# the diorama, so toggling the flag freezes/resumes the idle on the next re-enter
+	# (AC-35-08's idle direction). The reaction beats (strike/terminal) read reduce_motion
+	# INDEPENDENTLY at beat time. set_animating(false) → set_process(false), so no frame
+	# ever advances; this is the sole idle-animation surface, hence the sole build gate.
+	if _reduce_motion():
+		_set_party_idle_animating(false)
+
+
+## Builds one hero sprite slot: a TextureRect playing the class's looping idle
+## animation (the calm "breathing" idle). Square [const _HERO_SPRITE_DISPLAY_PX]
+## box, aspect-preserved + nearest-neighbour for the cozy pixel-art register,
+## read-only (MOUSE_FILTER_IGNORE). The class_id is stashed via set_meta so the
+## animator wiring (and later reaction beats) need not re-read the roster.
+##
+## Story 006: [method ClassSpriteFactory.animate] attaches a [SpriteSheetAnimator]
+## child (&"_IdleAnimator") that cycles the idle frames from its OWN _process —
+## NEVER the 20 Hz tick hot path (ADR-0025 §C.9 — animation is _process-driven on
+## a separate node, the tick handler gains nothing). animate() also sets the
+## static frame 0, and is a no-op when the class art is absent (get_idle_frames
+## returns [], the texture stays null) — the slot still reserves its layout box
+## (the factory's null-fallback contract, mirrored from the enemy-lineup greybox
+## path). The animator disables its own _process for ≤1-frame sheets, so an
+## art-less class costs nothing per frame.
+func _make_hero_slot(class_id: String, index: int) -> TextureRect:
+	var slot: TextureRect = TextureRect.new()
+	slot.name = "HeroSprite_%d" % index
+	slot.custom_minimum_size = Vector2(_HERO_SPRITE_DISPLAY_PX, _HERO_SPRITE_DISPLAY_PX)
+	slot.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	slot.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	slot.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.set_meta(_HERO_SLOT_CLASS_META, class_id)
+	# Full IN-SCENE rate (default IDLE_FPS) — the dungeon party animates livelier than
+	# the calm portrait/thumbnail tier (Story 014 speed differential; GDD #35 §D.7).
+	ClassSpriteFactoryScript.animate(slot, class_id)
+	return slot
+
+
+## Returns the live front-line hero slot nodes ([TextureRect]s built by
+## [method _make_hero_slot]), or an empty array before the diorama exists.
+## Single source of truth for "which nodes are the party" — both the idle-toggle
+## ([method _set_party_idle_animating]) and the reaction beats ([method _try_party_strike_beat])
+## walk these. Fully defensive: empty array when the diorama or its row is absent.
+func _party_hero_slots() -> Array:
+	if _party_diorama_layer == null:
+		return []
+	var row: Node = _party_diorama_layer.get_node_or_null("PartyFrontLine")
+	if row == null:
+		return []
+	return row.get_children()
+
+
+## Reflects a COARSE run-state change onto the party diorama by pausing or resuming
+## every hero's looping idle (GDD #35 §C.4 "baseline transition", ADR-0025 §C.9).
+## Called ONLY from human-frequency signal handlers (e.g. [method _on_state_changed]
+## on RUN_ENDED) — NEVER from [method _on_tick_fired]; the 20 Hz hot path must stay
+## free of any per-hero work. Walks the front-line slots and toggles each slot's
+## [SpriteSheetAnimator] child via [method SpriteSheetAnimator.set_animating], which
+## itself honours the static-card invariant (≤1-frame / art-less slots never animate).
+## Fully defensive: a no-op before the diorama is built or when the party is empty.
+func _set_party_idle_animating(enabled: bool) -> void:
+	for slot: Node in _party_hero_slots():
+		var animator: SpriteSheetAnimator = slot.get_node_or_null(
+			NodePath(String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME))) as SpriteSheetAnimator
+		if animator != null:
+			animator.set_animating(enabled)
+
+
+## Reaction beat for a normal kill (GDD #35 §C.4 "Strike pulse"). Wired to
+## [signal DungeonRunOrchestrator.enemy_killed] — a HUMAN-FREQUENCY signal, NEVER the
+## 20 Hz tick (ADR-0025 "two clocks, never the tick"; the Story 007 source guard enforces
+## that [method _on_tick_fired] gains no hero-animation work). Story 013 (ADR-0025
+## Alternative 4 "synthetic per-hero action cadence"): a normal kill pulses ONE hero —
+## the round-robin slot [member _strike_rotation_idx] — so successive kills walk the party
+## left-to-right rather than pulsing everyone together. This is an avowedly SYNTHETIC cadence
+## derived from the live kill stream, NOT per-hero damage attribution (the aggregate-DPS
+## resolver can't back that — ADR-0025 §"per-hero attack attribution would be a fiction"); the
+## boss kill keeps the whole-party climactic pulse ([method _on_boss_killed_beat]). Args
+## ignored: the beat is the same regardless of tier / archetype / advantage; those drive the
+## gold-burst VFX ([method _on_enemy_killed_vfx]), a distinct concern on the same signal.
+func _on_enemy_killed_beat(_tier: int, _archetype: String, _advantaged: bool) -> void:
+	_try_party_strike_beat(KILL_BEAT_SCALE_PUNCH, KILL_BEAT_MS)
+
+
+## Reaction beat for a boss kill (GDD #35 §C.4 — "larger / longer" than a normal kill).
+## Wired to [signal DungeonRunOrchestrator.boss_killed] (human-frequency). Unlike the normal
+## kill's round-robin single-hero pulse, a boss is the climactic exception: it pulses the
+## WHOLE party together ([code]per_hero = false[/code]) and leaves the round-robin cursor
+## ([member _strike_rotation_idx]) untouched, so the synthetic per-hero cadence resumes from
+## the same hero on the next normal kill. Uses the boss scale-punch / duration ("larger / longer").
+func _on_boss_killed_beat(_enemy_id: String) -> void:
+	_try_party_strike_beat(BOSS_BEAT_SCALE_PUNCH, BOSS_BEAT_MS, false)
+
+
+## Gated entry point for every reaction beat. Returns [code]true[/code] iff a tween was
+## actually started; [code]false[/code] when suppressed. Gate order (all per GDD #35 / ADR-0025):
+## [br]0. [b]terminal latch[/b] — once a victory/slump terminal beat has played
+##    ([member _terminal_beat_played]), every kill/boss strike is suppressed so no late
+##    strike overrides the run's terminal motion (precedence victory>boss>kill, §E.9).
+## [br]1. [b]reduce_motion[/b] — read AT BEAT TIME, never cached (GDD §C.8 / §E.6, precedent
+##    prestige_fade_animation_test AC-PR-18); when on, NO beat and the throttle clock is left
+##    untouched (a suppressed beat must not "use up" the throttle window).
+## [br]2. [b]coalescing[/b] — suppress if the previous VISIBLE beat began < [constant BEAT_THROTTLE_MS]
+##    ago (GDD §D.5 anti-strobe), measured via the injectable [method _beat_now_ms] clock seam.
+## [br]3. [b]empty party[/b] — nothing to animate before the diorama is built / when no heroes.
+## Only after all four gates pass do we stamp [member _last_beat_ms], pick the slot set, and
+## start the tween. [param per_hero] selects the Story 013 synthetic cadence: when
+## [code]true[/code] (normal kills) ONE round-robin hero pulses and [member _strike_rotation_idx]
+## advances; when [code]false[/code] (boss kills) the WHOLE party pulses and the cursor is left
+## untouched. The cursor advances HERE — after every gate — so a coalesced / reduce-motion-
+## suppressed beat never silently skips a hero.
+func _try_party_strike_beat(scale_punch: float, duration_ms: int, per_hero: bool = true) -> bool:
+	if _terminal_beat_played:
+		return false  # §E.9 — a terminal beat (victory/slump) has played; no late strike
+	if _reduce_motion():
+		return false
+	var now_ms: int = _beat_now_ms()
+	if now_ms - _last_beat_ms < BEAT_THROTTLE_MS:
+		return false
+	var slots: Array = _party_hero_slots()
+	if slots.is_empty():
+		return false
+	_last_beat_ms = now_ms
+	# Story 013 — synthetic per-hero cadence (ADR-0025 Alternative 4). A normal kill pulses
+	# ONE hero (round-robin) so successive kills walk the party; a boss kill pulses the whole
+	# party and leaves the cursor untouched. Cursor advances only here, after every gate, so a
+	# suppressed / coalesced beat never skips a hero. Modulo-at-access stays valid even if the
+	# party size ever changes; the raw int can't realistically overflow (human-frequency stream).
+	var beat_slots: Array = slots
+	if per_hero:
+		var hero: Node = slots[_strike_rotation_idx % slots.size()]
+		_strike_rotation_idx += 1
+		beat_slots = [hero]
+	_start_strike_tween(beat_slots, scale_punch, duration_ms)
+	return true
+
+
+## Builds + runs the party-aggregate strike tween: a fast scale-punch + brightness flash
+## (out phase) chained into a softer settle back to rest (GDD #35 §D.2 / §D.3). One shared
+## tween for the whole party, killed-and-replaced per beat (via [member _active_beat_tween])
+## so a kill cascade never stacks competing tweens fighting over the same transforms. The
+## out / back split is [constant BEAT_OUT_PHASE_RATIO]; [code].from(...)[/code] pins a clean
+## rest start so a mid-settle re-trigger still snaps to a coherent pose. Pivot is centred so
+## the punch scales about each slot's middle. Purely cosmetic — the phase shape is advisory
+## (not test-pinned); tests target the GATING logic and lifecycle, not tween internals.
+func _start_strike_tween(slots: Array, scale_punch: float, duration_ms: int) -> void:
+	if _active_beat_tween != null and _active_beat_tween.is_valid():
+		_active_beat_tween.kill()
+	# Story 012: slots WITH attack art play the one-shot; the rest get the cosmetic tween.
+	var tween_slots: Array = _route_action_or_collect(slots, ClassSpriteFactoryScript.POSE_ATTACK, false)
+	if tween_slots.is_empty():
+		_active_beat_tween = null  # all slots played frames — no tween needed this beat
+		return
+	var total_s: float = float(duration_ms) / 1000.0
+	var out_s: float = total_s * BEAT_OUT_PHASE_RATIO
+	var back_s: float = total_s - out_s
+	var punch: Vector2 = Vector2(scale_punch, scale_punch)
+	# Brightness flash: lift the white point above 1.0 for an additive-looking pop on
+	# modulate (NOT a palette color — built by component to keep the no-hardcoded-Color
+	# manifest guard strict; alpha stays 1.0 from Color.WHITE).
+	var flash: Color = Color.WHITE
+	flash.r = BEAT_BRIGHTNESS_FLASH
+	flash.g = BEAT_BRIGHTNESS_FLASH
+	flash.b = BEAT_BRIGHTNESS_FLASH
+	var tween: Tween = create_tween().set_parallel(true)
+	for node: Node in tween_slots:
+		var slot: Control = node as Control
+		if slot == null:
+			continue
+		slot.pivot_offset = slot.size * 0.5
+		tween.tween_property(slot, "scale", punch, out_s).from(Vector2.ONE).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(slot, "modulate", flash, out_s).from(Color.WHITE)
+	tween.chain()
+	for node2: Node in tween_slots:
+		var slot2: Control = node2 as Control
+		if slot2 == null:
+			continue
+		tween.tween_property(slot2, "scale", Vector2.ONE, back_s).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		tween.tween_property(slot2, "modulate", Color.WHITE, back_s)
+	_active_beat_tween = tween
+
+
+## Beat-clock seam (mirrors [code]AudioRouter._throttle_now_ms[/code]). Returns the injected
+## override when [member _beat_clock_override_ms] is >= 0, else real engine uptime. The
+## [code]-1[/code] sentinel = "use the real clock"; tests set a concrete ms value to drive the
+## coalescing window deterministically. Lesson (prestige-audio throttle): a 0-sentinel + raw
+## [method Time.get_ticks_msec] wrongly suppresses the first beat at low uptime — hence the
+## [code]>= 0[/code] test and the [code]-BEAT_THROTTLE_MS[/code] init of [member _last_beat_ms].
+func _beat_now_ms() -> int:
+	return _beat_clock_override_ms if _beat_clock_override_ms >= 0 else Time.get_ticks_msec()
+
+
+# ---------------------------------------------------------------------------
+# Story 012 — frames-vs-tween routing (the "real frames where art exists" seam,
+# GDD #35 Phase 3 / ADR-0025). Each reaction-beat builder first routes its slots
+# through here: a slot WHOSE class has action art for the beat's pose plays the
+# action one-shot frames on its &"_IdleAnimator"; a slot WITHOUT art is RETURNED
+# for the caller's Phase-2 cosmetic tween. With NO action PNGs on disk yet,
+# get_action_frames returns [] for every class, so EVERY slot falls through to the
+# tween — behaviour identical to pre-Story-012 — until the per-class sheets land.
+# All on HUMAN-frequency beats, never _on_tick_fired (ADR-0025 §C.9 / Story 007 guard).
+# ---------------------------------------------------------------------------
+
+## Resolves a slot's action frames for [param pose]: the injected override when present
+## (test seam [member _action_frames_override]), else the real factory disk lookup. An
+## empty [param class_id] or absent art → [] (the caller falls back to its cosmetic tween).
+func _action_frames_for(class_id: String, pose: String) -> Array:
+	if class_id.is_empty():
+		return []
+	var key: String = "%s/%s" % [class_id, pose]
+	if _action_frames_override.has(key):
+		return _action_frames_override[key]
+	return ClassSpriteFactoryScript.get_action_frames(class_id, pose)
+
+
+## Splits [param slots] for [param pose]: a slot WITH action art (and an animator) plays
+## the action one-shot on its idle animator ([param hold_last] passed through — true holds
+## the final frame, e.g. the defeat slump); every other slot is appended to (and returned
+## in) the tween list for the caller's cosmetic fallback. The single Story 012 routing seam,
+## shared by the strike + terminal builders.
+func _route_action_or_collect(slots: Array, pose: String, hold_last: bool) -> Array:
+	var tween_slots: Array = []
+	for node: Variant in slots:
+		var slot: Control = node as Control
+		if slot == null:
+			continue
+		var class_id: String = String(slot.get_meta(_HERO_SLOT_CLASS_META, ""))
+		var frames: Array = _action_frames_for(class_id, pose)
+		if frames.is_empty() or not _play_slot_action(slot, frames, hold_last):
+			tween_slots.append(slot)
+	return tween_slots
+
+
+## Plays the action [param frames] as a one-shot on [param slot]'s idle animator (the
+## &"_IdleAnimator" child attached by [method ClassSpriteFactory.animate]), reverting to the
+## idle loop on finish unless [param hold_last]. Returns [code]false[/code] (→ caller uses the
+## tween) when the slot has no animator — an art-less idle never gets one, so a real party
+## slot with action art always has it; the guard just keeps a partial-art edge graceful.
+func _play_slot_action(slot: Control, frames: Array, hold_last: bool) -> bool:
+	var animator: SpriteSheetAnimator = slot.get_node_or_null(
+		NodePath(String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME))) as SpriteSheetAnimator
+	if animator == null:
+		return false
+	animator.play_oneshot(frames, ClassSpriteFactoryScript.ACTION_FPS, hold_last)
+	return true
+
+
+## Shows [param frame] statically on [param slot]'s idle animator (the reduce_motion defeat
+## HELD pose for a class with action art). Returns [code]false[/code] when the slot has no
+## animator, so [method _apply_defeat_slump_static] falls back to the scale/dim static slump.
+func _hold_slot_static_frame(slot: Control, frame: Texture2D) -> bool:
+	var animator: SpriteSheetAnimator = slot.get_node_or_null(
+		NodePath(String(ClassSpriteFactoryScript.ANIMATOR_NODE_NAME))) as SpriteSheetAnimator
+	if animator == null:
+		return false
+	animator.show_static_frame(frame)
+	return true
+
+
+# ---------------------------------------------------------------------------
+# Terminal reaction beats — victory cheer / defeat slump (Story 009 ·
+# GDD #35 §C.4 / §D.2 / §D.4 / §E.5 / §E.9 / §E.11, ADR-0025 §C.4 / ADR-0021).
+# ---------------------------------------------------------------------------
+
+## Victory cheer — wired to [signal DungeonRunOrchestrator.floor_cleared_first_time]
+## (human-frequency, never the tick). Mirrors the lantern-glow VFX gate: a LOSING-run
+## floor clear earns no celebration (the floor stays the retry target) — and crucially
+## must NOT latch, so the subsequent [signal DungeonRunOrchestrator.run_defeated] can
+## still play the slump. Addresses GDD #24 OQ-24-6 (the run-end overlay's hero beat).
+func _on_floor_cleared_beat(_floor_index: int, _biome_id: String, losing_run: bool) -> void:
+	if losing_run:
+		return
+	_play_terminal_beat(true)
+
+
+## Defeat slump — wired to [signal DungeonRunOrchestrator.run_defeated] (human-frequency).
+## A SECOND, additive consumer alongside [method _on_run_defeated] (which shows the defeat
+## overlay): this animates the hero sprites only. It does NOT route — the slump is "not a
+## second independent route decision" (GDD §E.5); the route stays with [method _on_state_changed].
+func _on_run_defeated_beat(_floor_index: int, _biome_id: String) -> void:
+	_play_terminal_beat(false)
+
+
+## Plays the run's ONE terminal beat — a victory cheer ([param victorious] true) or a defeat
+## slump (false). Returns [code]true[/code] iff an animated tween was started. Contract
+## (GDD #35 §C.4 / §E.9 / §C.8, ADR-0025):
+## [br]• [b]one-shot[/b] — [member _terminal_beat_played] latches on the first call; a second
+##   terminal beat is a no-op (at most one terminal motion per run).
+## [br]• [b]supersedes strikes[/b] — kills any in-flight kill/boss beat tween (precedence
+##   victory>boss>kill); the latch then blocks any later strike in [method _try_party_strike_beat].
+## [br]• [b]NOT coalesced[/b] — unlike a strike, a terminal beat ignores [constant BEAT_THROTTLE_MS]
+##   and never stamps [member _last_beat_ms]; it must play even if the final kill's strike just fired.
+## [br]• [b]reduce_motion[/b] (read AT BEAT TIME, §C.8) — no tween: a victory's terminal state IS
+##   rest (nothing to show), a defeat's terminal state is the slump pose, applied INSTANTLY
+##   ([method _apply_defeat_slump_static]) so the party stays visibly slumped, never animated.
+## [br]• [b]empty party[/b] (§E.7) — no-op when the diorama holds no hero slots.
+func _play_terminal_beat(victorious: bool) -> bool:
+	if _terminal_beat_played:
+		return false
+	_terminal_beat_played = true
+
+	var slots: Array = _party_hero_slots()
+	if slots.is_empty():
+		return false
+
+	# Terminal state supersedes any in-flight kill/boss strike (§E.9). Kill it first so the
+	# reduce_motion static path is not left fighting a strike tween, and so the animated path
+	# starts from a clean handle.
+	if _active_beat_tween != null and _active_beat_tween.is_valid():
+		_active_beat_tween.kill()
+	_active_beat_tween = null
+
+	if _reduce_motion():
+		# §C.8 — show the terminal STATE instantly, no animation. Victory resolves back to
+		# rest (no-op: the frozen idle pose already reads as "standing"); defeat holds a slump.
+		if not victorious:
+			_apply_defeat_slump_static(slots)
+		return false
+
+	if victorious:
+		_start_victory_tween(slots)
+	else:
+		_start_defeat_slump_tween(slots)
+	return true
+
+
+## Builds + runs the victory cheer: an out-and-back scale punch + brightness bloom about a
+## BOTTOM-CENTRE pivot (the party rises on their feet — GDD §D.4's upward hop, approximated
+## by bottom-pivot scale since the HBoxContainer owns each slot's position; same constraint
+## the Story 008 strike tween works within). Bigger / longer / warmer than a kill flash. The
+## out/back split reuses [constant BEAT_OUT_PHASE_RATIO]; [code].from(...)[/code] pins a clean
+## rest start so a mid-strike victory still snaps to a coherent pose. Cosmetic — shape advisory.
+func _start_victory_tween(slots: Array) -> void:
+	if _active_beat_tween != null and _active_beat_tween.is_valid():
+		_active_beat_tween.kill()
+	# Story 012: slots WITH victory art play the one-shot; the rest get the cosmetic tween.
+	var tween_slots: Array = _route_action_or_collect(slots, ClassSpriteFactoryScript.POSE_VICTORY, false)
+	if tween_slots.is_empty():
+		_active_beat_tween = null  # all slots played frames — no tween needed this beat
+		return
+	var total_s: float = float(VICTORY_BEAT_MS) / 1000.0
+	var out_s: float = total_s * BEAT_OUT_PHASE_RATIO
+	var back_s: float = total_s - out_s
+	var punch: Vector2 = Vector2(VICTORY_SCALE_PUNCH, VICTORY_SCALE_PUNCH)
+	# Brightness bloom built by component from Color.WHITE (no hardcoded-Color literal — keeps
+	# the manifest grep strict; alpha stays 1.0 so the party never fades).
+	var bloom: Color = Color.WHITE
+	bloom.r = VICTORY_BRIGHTNESS_BLOOM
+	bloom.g = VICTORY_BRIGHTNESS_BLOOM
+	bloom.b = VICTORY_BRIGHTNESS_BLOOM
+	var tween: Tween = create_tween().set_parallel(true)
+	for node: Node in tween_slots:
+		var slot: Control = node as Control
+		if slot == null:
+			continue
+		slot.pivot_offset = Vector2(slot.size.x * 0.5, slot.size.y)  # bottom-centre → "rise"
+		tween.tween_property(slot, "scale", punch, out_s).from(Vector2.ONE).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(slot, "modulate", bloom, out_s).from(Color.WHITE)
+	tween.chain()
+	for node2: Node in tween_slots:
+		var slot2: Control = node2 as Control
+		if slot2 == null:
+			continue
+		tween.tween_property(slot2, "scale", Vector2.ONE, back_s).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		tween.tween_property(slot2, "modulate", Color.WHITE, back_s)
+	_active_beat_tween = tween
+
+
+## Builds + runs the defeat slump: a ONE-WAY, HELD sag — scale to (X,Y) + modulate dim about
+## the BOTTOM-CENTRE pivot, so the party sinks at the feet and the lanterns dim, then HOLDS
+## (no settle-back) under the defeat overlay until the screen routes to guild_hall. Slow
+## EASE_IN_OUT, alpha 1.0 throughout (the party stays visible) — must read as a weary sag,
+## never a fall / ragdoll / gore (ADR-0021 / §E.11). Cosmetic — shape advisory, not test-pinned.
+func _start_defeat_slump_tween(slots: Array) -> void:
+	if _active_beat_tween != null and _active_beat_tween.is_valid():
+		_active_beat_tween.kill()
+	# Story 012: slots WITH defeat art play the one-shot and HOLD its final (slump) frame;
+	# the rest get the cosmetic scale/dim slump tween.
+	var tween_slots: Array = _route_action_or_collect(slots, ClassSpriteFactoryScript.POSE_DEFEAT, true)
+	if tween_slots.is_empty():
+		_active_beat_tween = null  # all slots played frames — no tween needed this beat
+		return
+	var slump_s: float = float(DEFEAT_SLUMP_MS) / 1000.0
+	var slump_scale: Vector2 = Vector2(DEFEAT_SLUMP_SCALE_X, DEFEAT_SLUMP_SCALE_Y)
+	var dim: Color = Color.WHITE
+	dim.r = DEFEAT_SLUMP_DIM
+	dim.g = DEFEAT_SLUMP_DIM
+	dim.b = DEFEAT_SLUMP_DIM
+	var tween: Tween = create_tween().set_parallel(true)
+	for node: Node in tween_slots:
+		var slot: Control = node as Control
+		if slot == null:
+			continue
+		slot.pivot_offset = Vector2(slot.size.x * 0.5, slot.size.y)  # bottom-centre → "sag at the feet"
+		tween.tween_property(slot, "scale", slump_scale, slump_s).from(Vector2.ONE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tween.tween_property(slot, "modulate", dim, slump_s).from(Color.WHITE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_active_beat_tween = tween
+
+
+## reduce_motion defeat path (§C.8): applies the slump pose INSTANTLY — no tween, no animation.
+## Sets the same bottom-centre pivot + held scale + dim modulate the animated slump settles to,
+## so the party reads as slumped the instant the run ends. Alpha stays 1.0 (party visible).
+func _apply_defeat_slump_static(slots: Array) -> void:
+	var slump_scale: Vector2 = Vector2(DEFEAT_SLUMP_SCALE_X, DEFEAT_SLUMP_SCALE_Y)
+	var dim: Color = Color.WHITE
+	dim.r = DEFEAT_SLUMP_DIM
+	dim.g = DEFEAT_SLUMP_DIM
+	dim.b = DEFEAT_SLUMP_DIM
+	for node: Node in slots:
+		var slot: Control = node as Control
+		if slot == null:
+			continue
+		# Story 012: a class WITH defeat art shows its held (final) defeat frame
+		# instantly — the art IS the slump pose, so we do NOT also scale/dim (which
+		# would double up the read). reduce_motion shows the terminal STATE without
+		# animating into it (GDD #35 §C.8). Falls through to the cosmetic scale/dim
+		# static slump when there is no art (or no animator on the slot).
+		var class_id: String = String(slot.get_meta(_HERO_SLOT_CLASS_META, ""))
+		var frames: Array = _action_frames_for(class_id, ClassSpriteFactoryScript.POSE_DEFEAT)
+		if not frames.is_empty() and _hold_slot_static_frame(slot, frames[frames.size() - 1]):
+			continue
+		slot.pivot_offset = Vector2(slot.size.x * 0.5, slot.size.y)
+		slot.scale = slump_scale
+		slot.modulate = dim
 
 
 ## Top-right: run stats backing panel + Return-to-Hall. The real StatsPanel

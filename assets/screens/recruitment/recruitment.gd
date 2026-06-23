@@ -210,8 +210,13 @@ func _render_pool_entry(entry: Control, pool_index: int, class_id: String) -> vo
 	if class_portrait != null:
 		class_portrait.texture = ClassPortraitFactoryScript.get_portrait_texture(class_id)
 		# Demo build: if an idle sprite sheet exists for this class, animate the
-		# slot through it. No-op (keeps the still portrait above) when absent.
-		ClassSpriteFactoryScript.animate(class_portrait, class_id)
+		# slot through it at the calm PORTRAIT tier — half the in-scene rate
+		# (Story 014 / GDD #35 §D.7). No-op (keeps the still portrait) when absent.
+		# reduce_motion (Story 015 / §C.8): pass the accessibility read so the idle
+		# holds a static frame instead of looping — presence without motion.
+		ClassSpriteFactoryScript.animate(
+			class_portrait, class_id, ClassSpriteFactoryScript.PORTRAIT_IDLE_FPS,
+			_is_reduce_motion_enabled())
 
 	# Resolve class via DataRegistry (defensive — orphan class per §C.4 step 2.b).
 	var class_data: Resource = DataRegistry.resolve("classes", class_id)

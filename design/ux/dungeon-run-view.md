@@ -2,10 +2,10 @@
 
 > **Status**: Draft — ready for `/ux-review` before implementation
 > **Author**: user + ux-designer
-> **Last Updated**: 2026-05-15
+> **Last Updated**: 2026-06-22
 > **Journey Phase(s)**: Active dispatch (in-run spectator)
 > **Platform Target**: PC (Steam) + Steam Deck (primary); iOS / Android (post-launch port)
-> **GDD Source**: `design/gdd/dungeon-run-view.md` (#24); reverse-documented from shipped Sprint 5-13 implementation
+> **GDD Source**: `design/gdd/dungeon-run-view.md` (#24); reverse-documented from shipped Sprint 5-13 implementation. **Hero Combat Presence section** added 2026-06-22 for `design/gdd/hero-combat-animation.md` (#35).
 > **Template**: UX Spec
 
 ---
@@ -277,6 +277,120 @@ No HIGH-priority loc concerns.
 - [ ] **UX-DRV-15 (app resume mid-run)**: When the app resumes from background mid-run, tick + kill labels snap to the current `run_snapshot` values within one frame; no flicker
 - [ ] **UX-DRV-16 (no bypass)**: The screen never calls `SceneTree.change_scene_to_*` — all screen changes route via SceneManager per ADR-0007
 - [ ] **UX-DRV-17 (DESIGN.md compliance)**: TickLabel uses `stat-value` Slate Ink 20px; KillCountLabel uses `stat-value` Lantern Gold 20px (the reward signal); RunEndLabel uses `title-screen` IM Fell English 32px
+
+---
+
+## Hero Combat Presence (GDD #35)
+
+> Added 2026-06-22 for the `hero-combat-animation` epic (GDD #35). This section
+> is **additive** — it extends the spectator screen with the party's heroes as
+> animated diorama sprites. It does not alter any behaviour specified above.
+
+Today the party is represented only by **text tiles** in the top-left "Party" HUD (name · class · Lv) plus a single **aggregate** HP bar; the enemies stand center-stage as sprites. The player watches their *enemies* and a *number*, but never sees the heroes they recruited and formed up. This epic puts the heroes on screen as animated sprites standing in the diorama, facing the enemy lineup — **one sprite per occupied formation slot** — and reacting to combat. The screen stays read-only and the 20 Hz hot path stays zero-allocation.
+
+### Hero Placement (where)
+
+The heroes form a **center-stage "front line"** — a horizontal row positioned *below* the existing enemy lineup (which occupies the center-upper band, `_place` offsets top ≈188 → 384). This makes the two-sided HP race read spatially: the threat ahead (enemies, cool-lit, upper) versus the party (heroes, warm-lit, lower-center). Reading top-to-bottom the diorama becomes: **Header → Enemies ahead → Your party → channel-light lantern**.
+
+| Property | Decision |
+|---|---|
+| Container | A new dedicated full-rect `Control` — `PartyDioramaLayer` — added via `add_child` on the screen root, a **sibling** of the existing wireframe panels. **Not** reparented under `WirePartyHud` (screen-node hard-path coupling: restructure additively, never reparent). |
+| Layout | A centered `HBoxContainer` inside that layer; one child per occupied slot. |
+| Count | `HeroRoster.get_formation_heroes().size()` — data-driven (`formation_size`, default 3, **never hardcoded**). Empty/unfilled slots render nothing (no ghost, no placeholder). Empty party (dev-nav idle DRV) → zero sprites, no error. |
+| Starting anchor | `anchor 0.5/0/0.5/0`, offsets ≈ `(-280, 408, 280, 540)` — centered, just below the enemy band, above the bottom-center lantern. **Starting values; Story 005 finalizes against the live 1280×800 layout** and verifies no collision with the lantern / progress / event-feed panels. |
+| Orientation | Reuse the existing in-scene idle sprite orientation (no new art) — pose, not facing, carries the reaction (see OQ-DRV-HERO-2). |
+
+### Hero Sizes
+
+| Property | Decision |
+|---|---|
+| Source art | The in-scene-tier 4-frame strip via `ClassSpriteFactory.get_idle_frames(class_id)` (`FRAME_COUNT = 4`), silhouette-first per art-bible §5 "LOD Philosophy". Same asset already shipping on Recruit cards + Hero Detail modal. |
+| Display height | `HERO_SPRITE_DISPLAY_PX` — tuning knob, default **72px**, range 48–96. Heroes are the diorama focal subjects, so larger than the 48px codex/start-menu thumbnails but within the in-scene tier. |
+| Render | `TextureRect`, `expand_mode = EXPAND_IGNORE_SIZE`, `stretch_mode = STRETCH_KEEP_ASPECT_CENTERED`, **nearest-neighbour** (no blur) — consistent with every existing `ClassSpriteFactory` consumer. |
+| Spacing | Centered `HBox` separation is a tuning knob; for large formations the row shrinks/tightens rather than overflowing (GDD #35 §E.2). Heroes must stay silhouette-distinct and non-overlapping for 1 … `formation_size`. |
+| Scale reference | Art-bible §2: small enemies ≈ one hero-sprite height; boss-tier ≈ 2× hero width. Heroes set the diorama unit scale. |
+
+### Per-Hero vs Aggregate HP — DECISIVE: **Aggregate**
+
+HP is and remains **aggregate**. The combat resolver models party HP as a *single pool* driving the two-sided race (ADR-0010; GDD #34 §I). Per the shipped rationale in `dungeon_run_view.gd:815` — *"per-hero bars would be a fiction the model can't back."* Therefore:
+
+- **No hero carries an individual HP bar, health number, or floating damage number.** None. The single aggregate HP bar + numeric `HP cur/max` label in the top-left Party HUD remains the **sole truthful HP readout** (and stays colorblind-safe — never color-only).
+- Heroes communicate run state through **presence + reaction beats** — idle when calm, a strike/flash beat on `enemy_killed`/`boss_killed`, a slump on `run_defeated`, a flourish on first-clear — **not** through per-hero health UI. This is the whole-party-pulse decision (GDD #35 §C.5): the *party* reacts as one, mirroring the single HP pool.
+- The top-left Party HUD is **unchanged** (aggregate HP bar + per-hero text tiles retained). Division of labor: **HUD = precise readout** (name / level / aggregate HP); **diorama = emotional presence** (the heroes you watch fight). Potential redundancy of the text tiles is flagged for playtest (OQ-DRV-HERO-1), not resolved destructively here.
+
+### Layering (z-order)
+
+| Plane | z | Contents | Focus |
+|---|---|---|---|
+| Far backdrop | −1 | `BiomeBackground` + `BackBufferCopy` + `TiltShiftDof` | **Softened** by the tilt-shift DoF |
+| Diorama plane | 1 (`_WIRE_Z`) | Enemy lineup, **hero front line (NEW)**, greybox HUD panels | **Sharp** focal plane |
+| Live readouts | 2 | `HeaderLabel`, `StatsPanel` (tick/kill) | Sharp |
+| Run-end overlay | 5 | `RunEndOverlay` (victory / defeat) | Top — covers heroes when shown |
+
+- Heroes render at the **diorama plane (z = 1)**, i.e. *in front of* the tilt-shift DoF (z = −1), so they are **sharp, never blurred** — matching art-bible "heroes sit in the sharp mid-plane; the painterly biome backdrop falls into the softer far-plane." The DoF softens only the far biome backdrop it samples through `BackBufferCopy`.
+- The hero row must **not occlude** the HeaderLabel, the aggregate HP bar, the enemy lineup, or the run-end overlay. When `RunEndOverlay` (z = 5) shows, it covers the heroes — and the defeat-slump / victory beat coordinates *with* that overlay rather than fighting it (GDD #35 §E.5; the overlay is the existing `_show_defeat_overlay` / run-end surface, hooked, not replaced — see GDD #35 §C.7).
+- **Theme cascade (ADR-0008):** `PartyDioramaLayer` is a `Control` sibling and must not be inserted between a themed `Control` and its descendants. A `type="Node"` intermediate silently breaks theme inheritance with no error — the layer and the hero `TextureRect`s are `Control` nodes, so the cascade is preserved for all siblings.
+
+### Read-Only — No New Input
+
+The screen is "look, don't touch," and the hero layer must not change that:
+
+- The **entire** hero subtree — `PartyDioramaLayer`, the `HBoxContainer`, and every hero `TextureRect` + its `SpriteSheetAnimator` — is `MOUSE_FILTER_IGNORE`.
+- `z_index` does **not** affect Godot input picking; GUI input routes by **tree order**, so a sprite layer added "on top" *will* steal taps unless it is `MOUSE_FILTER_IGNORE` (this exact mistake caused two prior "can't tap" playtest bugs — victory + dispatch). No hero is a tap target; none takes `FOCUS_ALL`; no hover-only or right-click-only affordance (touch parity).
+- The **Interaction Map above is unchanged** — the hero layer adds **zero** new interactions. The "no interactive elements during ACTIVE_FOREGROUND" promise holds.
+
+### Hot-Path & Lifecycle
+
+- Hero sprites are built **once** (in the existing `_build_wireframe_once()` / `on_enter` build path), **never** in `_on_tick_fired`. The 20 Hz tick handler gains no allocation, format string, `tr()`, or node creation (Story 007 extends the Story-012 per-tick budget test to prove this with heroes + animators present).
+- Idle animation is `_process`-driven on `SpriteSheetAnimator` nodes — its own clock, independent of the tick.
+- Reaction beats fire on the human-frequency signals already subscribed in `on_enter` (`enemy_killed`, `boss_killed`, `floor_cleared_first_time`, `run_defeated`) — never polled per tick.
+- `on_exit` frees `PartyDioramaLayer` (and thus all animators), with no orphaned `_process`; existing subscription teardown parity (per UX-DRV-11) extends to the hero layer.
+
+### Reduce-Motion
+
+Per `SceneManager.reduce_motion` (precedent: `prestige_fade_animation_test` AC-PR-18): idle animation **holds frame 0** — heroes stay *present*, just static (presence ≠ motion) — and **all reaction beats are suppressed** (GDD #35 §C.8). The flag is read **at beat time**, so a mid-run accessibility toggle is honored immediately (GDD #35 §E.6).
+
+### ASCII Wireframe (hero layer added)
+
+```
+┌─────────────────────────────────────────────┐
+│  Forest Reach · Floor 3        ┌──────────┐  │  ← Header (z2) + run-stats (top-right)
+│ ┌────────────┐                 │ Tick: 127│  │
+│ │ Party      │                 │ Kills:  8│  │
+│ │ HP 84/120  │   ┌───────────┐ └──────────┘  │  ← top-left Party HUD = aggregate HP
+│ │ ▓▓▓▓▓▓░░   │   │ Enemies   │               │     (+ retained text tiles)
+│ │ Theron W3  │   │  ahead    │               │
+│ │ Mara   M2  │   │ 👹  👹  👹 │               │  ← enemy lineup (center-upper, z1)
+│ │ Ula    R2  │   │  3 / 5    │               │
+│ └────────────┘   └───────────┘               │
+│                                              │
+│            🛡️42    🔮42    🗡️42             │  ← HERO FRONT LINE (NEW, z1, sharp)
+│           Warrior  Mage   Rogue              │     one sprite / occupied slot
+│                                              │     idle-anim; react to kills/boss/end
+│                   ( 🏮 )                      │  ← channel-light lantern (bottom-center)
+└─────────────────────────────────────────────┘
+   No per-hero HP — the aggregate bar (top-left) is the only HP readout.
+   Heroes are MOUSE_FILTER_IGNORE: tapping one is a no-op.
+```
+
+### Acceptance Criteria (Hero Combat Presence)
+
+- [ ] **UX-DRV-HERO-01 (placement)**: At 1280×800, exactly one hero sprite renders per occupied formation slot, in a centered row below the enemy lineup, not occluding header / HP bar / enemy lineup / run-end overlay.
+- [ ] **UX-DRV-HERO-02 (data-driven count)**: The screen renders `HeroRoster.get_formation_heroes().size()` sprites for any count 1 … `formation_size`; an empty party renders zero sprites with no error (dev-nav idle DRV).
+- [ ] **UX-DRV-HERO-03 (aggregate HP only)**: No per-hero HP bar, health number, or damage number appears anywhere on the screen; the single aggregate HP bar + `HP cur/max` label remains the sole HP readout.
+- [ ] **UX-DRV-HERO-04 (read-only)**: `PartyDioramaLayer` and every descendant report `mouse_filter == MOUSE_FILTER_IGNORE`; a tap on any hero is a no-op and never steals focus or blocks the run-end overlay.
+- [ ] **UX-DRV-HERO-05 (layering / focus plane)**: Heroes render sharp (in front of the tilt-shift DoF); the run-end overlay (z = 5) covers heroes when shown.
+- [ ] **UX-DRV-HERO-06 (hot-path zero-alloc)**: `_on_tick_fired` allocates nothing with heroes + animators present (Story-012 budget test, extended in Story 007); idle animation is `_process`-driven, not tick-driven.
+- [ ] **UX-DRV-HERO-07 (lifecycle cleanup)**: After `on_exit`, `PartyDioramaLayer` is freed, no animator `_process` remains active, and hero-related subscriptions report `is_connected == false`.
+- [ ] **UX-DRV-HERO-08 (reduce-motion)**: With `reduce_motion` enabled, heroes render a static frame (present, not animating) and every reaction beat is suppressed.
+- [ ] **UX-DRV-HERO-09 (sizes / readability)**: Heroes display at `HERO_SPRITE_DISPLAY_PX` with nearest-neighbour scaling (no blur), silhouette-distinct per class, non-overlapping for 1 … `formation_size`.
+- [ ] **UX-DRV-HERO-10 (theme cascade intact)**: Adding `PartyDioramaLayer` does not break theme inheritance for any sibling `Control` (no `type="Node"` intermediate in the cascade path).
+
+### Open Questions (Hero Combat Presence)
+
+- **OQ-DRV-HERO-1**: Once on-screen sprites land, should the top-left Party HUD's per-hero text tiles be **retired** (the sprites carry identity) or **kept** (they show the exact level the 32–48px sprite can't)? Recommend **keep for MVP** — it's additive and test-safe (the `dungeon_run_view_screen_test` binds `WirePartyHud` structure); revisit at the Story 016 playtest if it reads as redundant.
+- **OQ-DRV-HERO-2**: Hero facing — all heroes face the enemy lineup (away/up), or face the viewer (3/4)? The existing in-scene idle art is a fixed 3/4 view; recommend **reuse it** (no new art) and let pose/the reaction beat carry direction. Playtest signal.
+- **OQ-DRV-HERO-3**: Should the hero row parallax or scale subtly with floor tier as a depth cue, or stay fixed? Defer to Phase 4 polish (Story 014/015).
 
 ---
 
