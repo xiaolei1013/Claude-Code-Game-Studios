@@ -83,6 +83,6 @@ Drain the compounded playtest backlog (3 sessions over the cap-1 guardrail), loc
 
 ## Notes
 
-Channel-light economy (lantern click) has no design yet — deferred. Remaining wireframe screens (Recruit restyle, Hero Detail full, Settings/Pause, Prestige modal) are deferred post-theme-decision (S28-M3).
+Channel-light economy (lantern click) — RESOLVED in S28-G2 (user-ratified 2026-06-23): kept as ambient lit warmth with no mechanic; the lantern is non-interactive so there is no false tap-target. Remaining wireframe screens (Recruit restyle, Hero Detail full, Settings/Pause, Prestige modal) are deferred post-theme-decision (S28-M3).
 
 **QA Plan**: `production/qa/qa-plan-sprint-28.md` — generate before S28-S1 implementation begins.

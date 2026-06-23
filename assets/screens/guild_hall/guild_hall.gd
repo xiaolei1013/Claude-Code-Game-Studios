@@ -81,8 +81,6 @@ const _FOOTER_H: float = 56.0
 var _wire_built: bool = false
 var _runs_body: VBoxContainer = null
 var _map_body: VBoxContainer = null
-var _lantern_button: Button = null
-var _float_layer: Control = null
 
 
 func on_enter() -> void:
@@ -682,8 +680,9 @@ func _on_settings_gear_pressed() -> void:
 # the WarmLanternOverlay) so the greybox reads as neutral structure.
 #
 # Real data is wired where cheap (gold, roster, biomes, run state). The lantern
-# is the idle-clicker click target; we have NO channel-light economy mechanic
-# yet, so its click only spawns wireframe feedback (see the caption under it).
+# is ambient lit warmth (WireframeKit.lantern_block, MOUSE_FILTER_IGNORE) — NOT a
+# click target; there is no channel-light economy mechanic (S28-G2, user-ratified
+# 2026-06-23: kept as ambient juice so there is no false tap-target).
 # ===========================================================================
 
 ## Sets a Control's four anchors then four offsets in one call.
@@ -719,7 +718,6 @@ func _build_wireframe_once() -> void:
 	_build_activity_feed()
 	_build_lantern()
 	_build_map_panel()
-	_build_float_layer()
 
 
 ## Moves the pre-existing .tscn nodes into the mock's 3-column layout. Their
@@ -904,55 +902,15 @@ func _build_activity_feed() -> void:
 		body.add_child(l)
 
 
-## Center-bottom: the lantern click target. Idle-clicker hero element.
+## Center-bottom: the lantern — ambient lit warmth, NOT a click target.
+## S28-G2 (user-ratified 2026-06-23): no channel-light economy; the disc is
+## input-transparent (WireframeKit.lantern_display), so there is no false
+## tap-target promising a mechanic that does not exist.
 func _build_lantern() -> void:
-	var wrap: VBoxContainer = VBoxContainer.new()
-	wrap.name = "WireLantern"
-	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	wrap.alignment = BoxContainer.ALIGNMENT_CENTER
-	wrap.add_theme_constant_override("separation", 8)
+	var wrap: VBoxContainer = WireframeKitScript.lantern_block()
 	wrap.z_index = _WIRE_Z
 	add_child(wrap)
 	_place(wrap, 0.5, 1, 0.5, 1, -150.0, -224.0, 150.0, -20.0)
-
-	var cap_top: Label = WireframeKitScript.eyebrow(
-		"Channel · click the lantern", WireframeKitScript.ACCENT)
-	cap_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	cap_top.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	wrap.add_child(cap_top)
-
-	var center_row: HBoxContainer = HBoxContainer.new()
-	center_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	center_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	wrap.add_child(center_row)
-
-	var btn: Button = WireframeKitScript.lantern_button(_on_lantern_pressed)
-	center_row.add_child(btn)
-	_lantern_button = btn
-
-	var note: Label = WireframeKitScript.caption(
-		"Wireframe — click feedback only; channel-light economy TBD",
-		WireframeKitScript.MUTED, 10)
-	note.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	wrap.add_child(note)
-
-
-func _on_lantern_pressed() -> void:
-	_spawn_lantern_float()
-
-
-## Spawns a floating "+ light" number near the lantern (the idle-clicker
-## feedback). Respects reduce_motion: no travel/fade, snap-hide via a timer.
-func _spawn_lantern_float() -> void:
-	if _float_layer == null:
-		return
-	var vp: Vector2 = get_viewport_rect().size
-	var animate: bool = not (SceneManager != null and SceneManager.reduce_motion)
-	WireframeKitScript.spawn_float(
-		_float_layer, "+ light",
-		Vector2(vp.x * 0.5 - 28.0 + randf_range(-26.0, 26.0), vp.y - 210.0),
-		animate)
 
 
 ## Resolves a biome's player-facing name defensively (biomes may carry a
@@ -1020,11 +978,3 @@ func _refresh_map_panel() -> void:
 				break
 	_map_body.add_child(WireframeKitScript.caption(
 		"Choose a party and floor in Dispatch ->", WireframeKitScript.MUTED, 11))
-
-
-## Full-rect input-transparent layer for the lantern's floating numbers.
-func _build_float_layer() -> void:
-	var layer: Control = WireframeKitScript.float_layer()
-	add_child(layer)
-	layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_float_layer = layer

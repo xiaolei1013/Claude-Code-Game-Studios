@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.0.100] - 2026-06-23 — Sprint 28 close-out: ambient lantern, V1 direction locked
+
+> Closes Sprint 28. The lantern on the Guild Hall and Expedition screens is now a
+> purely ambient glow — it no longer looks tappable, so it can't mislead you into
+> expecting a mechanic that isn't there. The V1 visual and prestige directions are
+> locked in as binding design.
+
+### Changed
+
+- The lantern on the Guild Hall and Expedition screens is now an ambient lit
+  display instead of a tap target. It previously rendered as a clickable button
+  that spawned floating "+light" numbers backed by no economy; that false
+  affordance is removed, and the whole lantern subtree is now input-transparent so
+  it never steals taps from the controls beneath it.
+- Locked the V1 direction: light-parchment is the binding visual identity (the
+  dark-mock alternative is closed), and prestige is per-hero retirement granting a
+  compounding global multiplier (the pure-global "ascension" alternative is
+  declined). Both confirm already-shipped behavior — no player-facing change.
+
+### Removed
+
+- The interactive lantern button and its "+light" floating-number handlers on both
+  the Guild Hall and Expedition screens, plus the now-unused lantern hover/pressed
+  styling and float-spawn helpers.
+
 ## [0.0.0.99] - 2026-06-13 — Audio asset pipeline + AudioCue resolve layer (ADR-0022)
 
 > Ships the asset-generation **tooling** and the `AudioCue` resolve infrastructure.

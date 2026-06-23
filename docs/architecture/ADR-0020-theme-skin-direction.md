@@ -13,9 +13,10 @@ parchment**, not to dark.
 > results after all tasks done" (2026-06-08). This ADR does not introduce a new
 > direction — it formally closes the open "dark-mock vs light-parchment" question
 > in favor of the *already-shipped* direction, which is the low-risk choice.
-> User ratification is pending the end-of-batch verification; if the user prefers
-> the dark-mock pivot, this ADR flips to Superseded and a re-skin epic opens (see
-> §Consequences → Negative for the cost of that path).
+> **User ratification CONFIRMED 2026-06-23** — at end-of-batch verification the
+> user ratified light-parchment and declined the dark-mock pivot. The ADR is now
+> Accepted by user verification (see §Sign-Off Trail); the dark-mock alternative
+> is formally closed.
 
 ## Date
 
@@ -27,7 +28,7 @@ parchment**, not to dark.
 
 ## Decision Makers
 
-- Author (user) — final decision; **sign-off pending end-of-batch verification (2026-06-08)**
+- Author (user) — final decision; **ratified by user verification 2026-06-23** (light-parchment confirmed, dark-mock declined)
 - art-director — Art Bible §4 palette + Visual Identity Anchor adherence
 - creative-director — cozy-register preservation
 - godot-specialist — theme cascade (`parchment_theme.tres`) impact scope
@@ -190,10 +191,11 @@ progress; continuing to defer is the worst option for player-visible polish.
 
 1. **The dark-mock's mood is set aside.** The design-handoff bundle's dark-fantasy
    aesthetic is not adopted; only its layout/structure carries forward.
-2. **If the user ratifies a dark pivot instead**, this ADR flips to Superseded and
-   a re-skin epic opens: new StyleBox set, re-authored warm-overlay for a dark
-   ground, re-mapped HD-2D biome palette, and a per-screen visual re-pass. That
-   cost is exactly why ratifying the status quo is the defensible default now.
+2. **Had the user ratified a dark pivot instead**, this ADR would have flipped to
+   Superseded and a re-skin epic opened: new StyleBox set, re-authored warm-overlay
+   for a dark ground, re-mapped HD-2D biome palette, and a per-screen visual re-pass.
+   That path is now closed (ratified 2026-06-23); the avoided cost is recorded here
+   as the rationale for why ratifying the status quo was the defensible default.
 
 ### Neutral
 
@@ -236,7 +238,8 @@ progress; continuing to defer is the worst option for player-visible polish.
 - **2026-06-08** — Selected as the defensible autonomous default per the user
   directive "move on to all tasks; I will verify the results after all tasks
   done." Ratifies the already-locked `DESIGN.md` + Art Bible direction. **User
-  ratification pending end-of-batch verification.** If the user confirms, update
-  this line to "Accepted by user verification 2026-06-08"; if the user prefers the
-  dark pivot, flip Status to "Superseded by ADR-00XX (dark re-skin)" and open the
-  re-skin epic.
+  ratification pending end-of-batch verification.**
+- **2026-06-23** — **Accepted by user verification.** At end-of-batch close-out
+  (Sprint 28 S28-M3) the user ratified light-parchment as the binding visual
+  identity and declined the dark-mock pivot. Status stands at Accepted; the
+  dark-mock alternative is formally closed (no re-skin epic opens).
