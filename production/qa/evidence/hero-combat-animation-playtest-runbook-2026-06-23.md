@@ -106,19 +106,81 @@ which is the permanent fallback by design — not a missing-art defect.
 
 ---
 
-## Optional — capture a presence screenshot (per evidence-dir convention)
+## Presence screenshot — **CAPTURED 2026-06-23** (per evidence-dir convention)
 
-A static frame can be captured for the record using the **headful screenshot harness**
-(project memory `godot-headful-screenshot-harness`): a throwaway `-s SceneTree` script run
-**non-headless** (Vulkan/Metal), seeding a dispatched run, navigating to `dungeon_run_view`,
-and saving the viewport to PNG at frame ≥ 16 (after the diorama builds and the idle advances).
-Per convention the **PNG stays local/untracked** — commit only a short note here describing
-what it showed (e.g. "4 heroes in the front line, mid-idle, no overflow at 1280×800").
+A static presence frame **was captured** via the **headful screenshot harness** (project
+memory `godot-headful-screenshot-harness`): a throwaway `-s SceneTree` script run
+**non-headless** (Metal, macOS), seeding a 3-hero formation (warrior · mage · rogue),
+instantiating the **real** `dungeon_run_view.tscn`, calling `on_enter()`, advancing **36
+frames** (so the idle animator steps past frame 0), then saving the root viewport.
 
-> This is **optional**: the static presence claim is already covered structurally by
+**PNGs (local/untracked per convention — NOT committed):**
+- `production/qa/evidence/hero_combat_presence_dungeon_20260623.png` — full 1649×928 frame.
+- `production/qa/evidence/hero_combat_presence_frontline_crop_20260623.png` — padded close-up
+  of the front-line zone (region `[748,328 · 424×292]`).
+
+**What the frame showed (per-sprite geometry dump at capture time):**
+
+| Sprite | Class | Global rect | Texture | `visible_in_tree` | `modulate.a` |
+|---|---|---|---|---|---|
+| `HeroSprite_0` | warrior | `(828,408) 72×132` | `192×432` (loaded) | `true` | `1.0` |
+| `HeroSprite_1` | mage | `(924,408) 72×132` | `192×432` (loaded) | `true` | `1.0` |
+| `HeroSprite_2` | rogue | `(1020,408) 72×132` | `192×432` (loaded) | `true` | `1.0` |
+
+- **Diorama row child count = 3** for a 3-hero formation — the count is **data-driven from
+  `HeroRoster.get_formation_heroes()`, not hardcoded** (the epic's core requirement).
+- All three sprites are **on-screen** (centred front line, y = 408, 96 px apart), carry a
+  **loaded texture**, and are **fully opaque + visible** — i.e. they genuinely draw, they are
+  not blank/placeholder boxes. The crop confirms three distinct pixel-art figures (crisp
+  nearest-neighbour) standing on the archway lip.
+- `idle_processing = true` after 36 frames — the per-hero `_IdleAnimator`
+  (`SpriteSheetAnimator`) is **live**, confirming the idle loops (not stuck on frame 0).
+
+**What this frame deliberately does NOT prove** (and why the human pass above is still the gate):
+- It seeds **no live run** (`run_snapshot` is null), so it captures the **idle/empty-run**
+  layout — biome bg + chrome + party, *not* a live combat frame with populated HP/enemies.
+  The diorama builds from the formation alone, so presence is valid; the **dynamic** beats
+  are out of scope for any static shot.
+- The window clamped to **1649×928** (display-bounded), not exactly 1280×800 — so **G1's
+  min-spec 60 fps read on real hardware is unaffected and still required.**
+- **Motion, beats, terminal animations, reduce-motion feel, and 60 fps** are all dynamic /
+  on-hardware — exactly what sections A–G exist to verify. The screenshot covers **static
+  presence only**.
+
+<details><summary>Reproduction recipe (the harness is throwaway — not committed; recreate as needed)</summary>
+
+Save as `tools/_capture.gd`, run ``/path/to/Godot --headless`-free, i.e. NON-headless`:
+`/Applications/Godot_mono.app/Contents/MacOS/Godot -s res://tools/_capture.gd </dev/null`
+
+```gdscript
+extends SceneTree
+const HeroRosterFixture = preload("res://tests/helpers/hero_roster_test_fixture.gd")
+const SCENE := "res://assets/screens/dungeon_run_view/dungeon_run_view.tscn"
+func _initialize() -> void: _run()
+func _run() -> void:
+	for _i in range(3): await process_frame          # let autoloads _ready
+	var roster: Node = root.get_node_or_null("HeroRoster")
+	HeroRosterFixture.reset_hero_roster()
+	var classes: Array[String] = ["warrior", "mage", "rogue"]
+	HeroRosterFixture.seed_heroes(classes)            # assigns formation slots 0..2
+	var screen: Control = (load(SCENE) as PackedScene).instantiate()
+	root.add_child(screen)
+	screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	await process_frame
+	screen.on_enter()
+	for _f in range(36): await process_frame          # advance idle past frame 0
+	await RenderingServer.frame_post_draw
+	root.get_texture().get_image().save_png("res://production/qa/evidence/presence.png")
+	quit(0)
+```
+Heroes render from the roster formation at `on_enter`, so **no live run is needed** for a
+presence shot. The diorama nodes live at `PartyDioramaLayer/PartyFrontLine/HeroSprite_<i>`.
+</details>
+
+> The static presence claim is **also** locked structurally by
 > `test_party_diorama_renders_one_sprite_per_occupied_slot_data_driven` +
-> `…_slot_stashes_class_id_and_loads_idle_frame`. The human pass above is what the screenshot
-> can't give — the **motion** and the **feel**.
+> `…_slot_stashes_class_id_and_loads_idle_frame`. This screenshot is corroborating visual
+> evidence; the human pass above is what neither can give — the **motion** and the **feel**.
 
 ---
 
