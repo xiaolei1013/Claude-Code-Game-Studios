@@ -13,7 +13,7 @@
 ##     SceneManager persistence pathways)
 extends Control
 
-const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+const ParchmentKitScript = preload("res://src/ui/parchment_kit.gd")
 const _MIN_DB: float = -80.0  # below this, treat as -INF (silent floor)
 
 # Per GDD #30 §C.2 defaults (audio-system.md §C.7 baselines).
@@ -93,8 +93,24 @@ func _ready() -> void:
 	_refresh_db_label(_music_db_label, AudioRouter.get_music_volume_db())
 	_refresh_db_label(_sfx_db_label, AudioRouter.get_sfx_volume_db())
 
-	# Lantern Guild mock wireframe: add the mock's section framing (greybox).
+	# Parchment skin (ADR-0008): graduate the modal panel to the ParchmentPanel
+	# theme variation. The STANDARD pattern preserves mouse_filter=STOP so taps
+	# inside the panel don't fall through to the dim backdrop (which closes it).
+	UIFramework.apply_parchment_panel($Panel)
+
+	# UI tap chime + 1.05x touch pulse on the action buttons (audio quick-win,
+	# folded in per screen touched — audio-system.md AC-AS-14).
+	UIFramework.wire_touch_feedback(_close_button)
+	UIFramework.wire_touch_feedback(_reset_button)
+	UIFramework.wire_touch_feedback(_quit_to_desktop_button)
+
+	# Parchment section eyebrows (Audio / Accessibility / Data & locale).
 	_build_wireframe()
+
+	# Modal scale-in entrance — the panel settles into place (DESIGN.md §Motion:
+	# `medium` 300ms modal-open duration, `enter` easing). reduce_motion snaps it
+	# straight to 1.0 with no entrance motion. Fire-and-forget coroutine.
+	_play_panel_scale_in()
 
 
 # ---------------------------------------------------------------------------
@@ -268,26 +284,56 @@ func _on_quit_to_desktop_pressed() -> void:
 
 
 # ===========================================================================
-# Lantern Guild mock wireframe — greybox section framing for Settings
-# Additive (no .tscn edits): inserts the mock's "inner workings" eyebrow + per-
-# section eyebrows (Audio / Accessibility / Data & locale) into Panel/VBox.
-# Colors route through WireframeKit (no Color() literals).
+# Parchment section eyebrows for Settings
+# Additive (no .tscn edits): inserts the "inner workings" eyebrow + per-section
+# eyebrows (Audio / Accessibility / Data & locale) into Panel/VBox. Colors route
+# through ParchmentKit (no Color() literals); ParchmentKit.eyebrow renders the
+# parchment small-caps register (uppercased).
 # ===========================================================================
 
 func _build_wireframe() -> void:
 	var vbox: Node = get_node_or_null("Panel/VBox")
 	if vbox == null:
 		return
-	_insert_section(vbox, get_node_or_null("Panel/VBox/HeaderLabel"), "· The inner workings ·", WireframeKitScript.ACCENT)
-	_insert_section(vbox, get_node_or_null("Panel/VBox/MasterRow"), "Audio", WireframeKitScript.MUTED)
-	_insert_section(vbox, get_node_or_null("Panel/VBox/ReduceMotionRow"), "Accessibility", WireframeKitScript.MUTED)
-	_insert_section(vbox, get_node_or_null("Panel/VBox/LocaleRow"), "Data & locale", WireframeKitScript.MUTED)
+	_insert_section(vbox, get_node_or_null("Panel/VBox/HeaderLabel"), "· The inner workings ·", ParchmentKitScript.ACCENT)
+	_insert_section(vbox, get_node_or_null("Panel/VBox/MasterRow"), "Audio", ParchmentKitScript.MUTED)
+	_insert_section(vbox, get_node_or_null("Panel/VBox/ReduceMotionRow"), "Accessibility", ParchmentKitScript.MUTED)
+	_insert_section(vbox, get_node_or_null("Panel/VBox/LocaleRow"), "Data & locale", ParchmentKitScript.MUTED)
 
 
-## Inserts a greybox eyebrow label immediately before [param before] in [param vbox].
+## Inserts a parchment eyebrow label immediately before [param before] in [param vbox].
 func _insert_section(vbox: Node, before: Node, text: String, color: Color) -> void:
 	if vbox == null or before == null:
 		return
-	var eyebrow: Label = WireframeKitScript.eyebrow(text, color)
+	var eyebrow: Label = ParchmentKitScript.eyebrow(text, color)
 	vbox.add_child(eyebrow)
 	vbox.move_child(eyebrow, before.get_index())
+
+
+# ===========================================================================
+# Modal scale-in entrance
+# ===========================================================================
+
+## Grows the panel from 0.94 to 1.0 about its centre so it settles into place
+## (DESIGN.md §Motion: `medium` 300ms modal-open duration, `enter` easing =
+## EASE_OUT/TRANS_QUAD — "panels appearing"). Under reduce_motion (ADR-0007 /
+## DESIGN.md §Reduce motion) the panel stays at 1.0 with no entrance motion.
+## Fire-and-forget coroutine: _ready starts it without awaiting, so the
+## synchronous wiring above is unaffected and tests that don't pump frames
+## never observe a non-1.0 scale.
+func _play_panel_scale_in() -> void:
+	var panel: Control = get_node_or_null("Panel")
+	if panel == null:
+		return
+	if SceneManager.reduce_motion:
+		return
+	# Defer one frame so the panel's laid-out size is valid before we pivot+scale.
+	await get_tree().process_frame
+	if not is_instance_valid(panel):
+		return
+	panel.pivot_offset = panel.size / 2.0
+	panel.scale = Vector2(0.94, 0.94)
+	var tween: Tween = create_tween()
+	tween.set_trans(Tween.TRANS_QUAD)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.tween_property(panel, "scale", Vector2.ONE, 0.3)
