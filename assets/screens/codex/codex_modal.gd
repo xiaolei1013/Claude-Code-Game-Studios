@@ -1,14 +1,13 @@
 extends Control
 ## Codex — read-only catalogue modal (Heroes / Monsters / Dungeons).
 ##
-## Lantern Guild mock wireframe (feat/ui-codex-modal). Built ENTIRELY in code
-## (no .tscn) to avoid the import-order fragility that structural .tscn edits
-## hit. Opened from the Guild Hall "Codex" top-bar tab via
+## Built ENTIRELY in code (no .tscn) to avoid the import-order fragility that
+## structural .tscn edits hit. Opened from the Guild Hall "Codex" top-bar tab via
 ## SceneManager.show_modal(self); closes via SceneManager.hide_modal(self) or a
-## tap on the dim backdrop. Greybox: real data from DataRegistry, neutral
-## WireframeKit styling.
+## tap on the dim backdrop. Real data from DataRegistry; parchment styling via
+## ParchmentKit + the ParchmentPanel / LedgerRowPanel theme variations (ADR-0008).
 
-const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+const ParchmentKitScript = preload("res://src/ui/parchment_kit.gd")
 # Demo art thumbnails per card (no-op fallbacks without demo assets).
 const ClassPortraitFactoryScript = preload("res://src/ui/class_portrait_factory.gd")
 const ClassSpriteFactoryScript = preload("res://src/ui/class_sprite_factory.gd")
@@ -38,8 +37,8 @@ func _build() -> void:
 	# The Codex sheet.
 	var panel: PanelContainer = PanelContainer.new()
 	panel.name = "CodexSheet"
-	panel.add_theme_stylebox_override("panel",
-		WireframeKitScript.stylebox(WireframeKitScript.FILL, WireframeKitScript.LINE, 1, 6, 0))
+	# Parchment sheet (ParchmentPanel variation) instead of the greybox stylebox.
+	UIFramework.apply_parchment_panel(panel)
 	add_child(panel)
 	# Centred 900x600 sheet (explicit offsets — PRESET_CENTER mis-places a
 	# min-sized panel, leaving it right-shifted).
@@ -67,7 +66,7 @@ func _build() -> void:
 	var titles: VBoxContainer = VBoxContainer.new()
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(titles)
-	titles.add_child(WireframeKitScript.eyebrow("· The guild keeps a record ·", WireframeKitScript.ACCENT))
+	titles.add_child(ParchmentKitScript.eyebrow("· The guild keeps a record ·", ParchmentKitScript.ACCENT))
 	var title: Label = Label.new()
 	title.text = "The Codex"
 	title.theme_type_variation = &"IdentityHeader"
@@ -78,9 +77,10 @@ func _build() -> void:
 	close_btn.focus_mode = Control.FOCUS_NONE
 	close_btn.custom_minimum_size = Vector2(100, 44)
 	close_btn.pressed.connect(_on_close_pressed)
+	UIFramework.wire_touch_feedback(close_btn)  # tap chime + 1.05x pulse (audio quick-win)
 	header.add_child(close_btn)
 
-	vbox.add_child(WireframeKitScript.divider())
+	vbox.add_child(ParchmentKitScript.divider())
 
 	# Tabs — each catalogue built from real DataRegistry content.
 	var tabs: TabContainer = TabContainer.new()
@@ -110,7 +110,7 @@ func _make_catalogue_tab(title: String, content_type: String) -> Control:
 	if DataRegistry != null:
 		entries = DataRegistry.get_all_by_type(content_type)
 	if entries.is_empty():
-		grid.add_child(WireframeKitScript.caption("Nothing recorded yet.", WireframeKitScript.MUTED))
+		grid.add_child(ParchmentKitScript.caption("Nothing recorded yet.", ParchmentKitScript.MUTED))
 		return scroll
 	for res: Variant in entries:
 		grid.add_child(_make_card(res, content_type))
@@ -124,8 +124,9 @@ func _make_catalogue_tab(title: String, content_type: String) -> Control:
 func _make_card(res: Variant, content_type: String) -> PanelContainer:
 	var card: PanelContainer = PanelContainer.new()
 	card.custom_minimum_size = Vector2(270, 92)
-	card.add_theme_stylebox_override("panel",
-		WireframeKitScript.stylebox(WireframeKitScript.FILL_RAISED, WireframeKitScript.LINE_SOFT, 1, 4, 10))
+	# Ledger-row register for catalogue cards (parchment sub-panel), replacing the
+	# greybox raised stylebox.
+	card.theme_type_variation = &"LedgerRowPanel"
 
 	var row: HBoxContainer = HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
@@ -144,11 +145,11 @@ func _make_card(res: Variant, content_type: String) -> PanelContainer:
 
 	var meta: String = _meta_line(res)
 	if meta != "":
-		v.add_child(WireframeKitScript.eyebrow(meta))
+		v.add_child(ParchmentKitScript.eyebrow(meta))
 
 	var flavor: String = _field_str(res, "flavor_text")
 	if flavor != "":
-		v.add_child(WireframeKitScript.caption(flavor, WireframeKitScript.MUTED, 11))
+		v.add_child(ParchmentKitScript.caption(flavor, ParchmentKitScript.MUTED, 11))
 	return card
 
 
@@ -174,8 +175,8 @@ func _make_thumbnail(res: Variant, content_type: String) -> Control:
 			var slot: TextureRect = _thumb_rect()
 			slot.texture = tex
 			return slot
-	# No demo art for this entry — neutral greybox box, same footprint.
-	return WireframeKitScript.placeholder_box("", Vector2(_THUMB_PX, _THUMB_PX))
+	# No demo art for this entry — neutral parchment placeholder box, same footprint.
+	return ParchmentKitScript.placeholder_box("", Vector2(_THUMB_PX, _THUMB_PX))
 
 
 ## A square TextureRect sized to the thumbnail footprint, aspect-kept + centred.

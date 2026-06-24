@@ -19,7 +19,7 @@
 extends Control
 
 const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
-const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+const ParchmentKitScript = preload("res://src/ui/parchment_kit.gd")
 const TitleScreenScript = preload("res://assets/screens/title/title_screen.gd")
 
 
@@ -47,7 +47,12 @@ func _ready() -> void:
 	UIFrameworkScript.wire_touch_feedback(_settings_button)
 	UIFrameworkScript.wire_touch_feedback(_quit_button)
 
-	# Lantern Guild mock wireframe: "the guild waits" framing (greybox).
+	# Parchment skin (ADR-0008): graduate the modal panel to the ParchmentPanel
+	# theme variation. STANDARD preserves mouse_filter=STOP so taps inside the
+	# panel don't fall through to the dim backdrop.
+	UIFrameworkScript.apply_parchment_panel($Panel)
+
+	# "The guild waits" parchment framing (eyebrow + tagline).
 	_build_wireframe()
 
 
@@ -93,7 +98,7 @@ func _dismiss() -> void:
 
 
 # ===========================================================================
-# Lantern Guild mock wireframe — greybox "the guild waits" framing for Pause
+# Parchment "the guild waits" framing for Pause
 # Additive: eyebrow above the title + a tagline below it (no .tscn edits).
 # ===========================================================================
 
@@ -101,11 +106,11 @@ func _build_wireframe() -> void:
 	var vbox: Node = get_node_or_null("Panel/VBox")
 	if vbox == null or _title_label == null:
 		return
-	var eyebrow: Label = WireframeKitScript.eyebrow("· The guild waits ·", WireframeKitScript.ACCENT)
+	var eyebrow: Label = ParchmentKitScript.eyebrow("· The guild waits ·", ParchmentKitScript.ACCENT)
 	eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(eyebrow)
 	vbox.move_child(eyebrow, 0)
-	var tagline: Label = WireframeKitScript.caption("The hour-glass turns regardless.", WireframeKitScript.MUTED, 13)
+	var tagline: Label = ParchmentKitScript.caption("The hour-glass turns regardless.", ParchmentKitScript.MUTED, 13)
 	tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(tagline)
 	vbox.move_child(tagline, _title_label.get_index() + 1)
