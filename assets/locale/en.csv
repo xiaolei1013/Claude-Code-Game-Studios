@@ -39,6 +39,7 @@ matchup_select_format,Select Floor %d — %s
 victory_biome_completed_format,%s completed!
 victory_continuation_prompt,Tap to continue
 victory_gold_gained_format,+%d gold
+reward_float_level_up_format,Lv %d
 victory_headline_format,%s — Floor %d cleared
 victory_level_up_format,%s reached level %d
 victory_unlock_format,Floor %d now available.

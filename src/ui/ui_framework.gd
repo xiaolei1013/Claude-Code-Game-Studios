@@ -392,6 +392,31 @@ static func is_gold_pulse_reason(reason: String) -> bool:
 	return reason == "level_up" or reason.begins_with("recruit_")
 
 
+## Pure trigger policy for dungeon_run_view's reward FLOATS — the rising "+N gold"
+## / "Lv N" numbers (S30-S1, GDD #27 OQ-27-1 reward beats). Lives here beside
+## [method is_gold_pulse_reason] so the policy is one testable predicate, decoupled
+## from the screen scene (see tests/unit/ui_framework/should_float_reward_test.gd).
+##
+## Floats ONLY two discrete, human-frequency reward beats:
+##   - [code]"gold_kill"[/code] — a kill that actually credited gold; a zero-gold
+##                                kill (e.g. an unknown tier → base 0) floats nothing,
+##                                so [param amount] must be > 0.
+##   - [code]"level_up"[/code]  — a hero reaching a new level; ALWAYS floats (a
+##                                discrete beat — [param amount] is ignored).
+## Every other event — the per-tick [code]"add_gold"[/code] drip, and any per-hit /
+## damage event (NONE exists to subscribe to: the resolver aggregates DPS and emits
+## no per-hit signal, ADR-0025 §C.5, so floating one would be a fiction) — returns
+## false. Mirrors how [method is_gold_pulse_reason] excludes the continuous drip.
+static func should_float_reward(event_type: String, amount: int = 0) -> bool:
+	match event_type:
+		"gold_kill":
+			return amount > 0
+		"level_up":
+			return true
+		_:
+			return false
+
+
 ## Reason-gated gold pulse: pulses [param label] via [method pulse_gold_counter]
 ## only when [param reason] passes [method is_gold_pulse_reason]. Every screen
 ## bound to [signal Economy.gold_changed] (Guild Hall, Recruitment, Hero Detail,
