@@ -80,6 +80,7 @@ Each SFX has a stable id (StringName), a target sub-bus, and a default volume mu
 | `&"sfx_combat_boss_kill"` | SFX/Combat | 1.4 | `DungeonRunOrchestrator.boss_killed(enemy_id)` | Distinct from enemy_kill — heavier tail, includes brief Stinger duck. |
 | `&"sfx_combat_hero_damaged"` | SFX/Combat | 0.7 | `DungeonRunOrchestrator.hero_damaged(hero_id, hp_remaining)` (Sprint 11+ — signal not yet emitted) | Quieter than kill chime; "bump" not "thud". |
 | `&"sfx_combat_advantage_chime"` | SFX/Combat | 0.8 | `DungeonRunOrchestrator.matchup_advantage_revealed(formation_strength)` (Sprint 12+ for formation-strength reveal) | Plays once per dispatch when advantage > 1.0. |
+| `&"sfx_combat_run_defeated"` | SFX/Combat | 0.9 | `DungeonRunOrchestrator.run_defeated(floor_index, biome_id)` (S30-N1 wired) | Somber, non-punishing run-defeat sting. Distinct from every victory cue; low/soft "driven back" tone, not a thud. Wired-silent until asset sourced (ADR-0016/0022). |
 | `&"sfx_reward_gold_collected"` | SFX/Reward | 1.0 | `Economy.gold_changed(new_balance, delta, reason)` where `delta > 0` | Plays once per gold-add event. Coin-purse texture; warm not metallic. |
 | `&"sfx_reward_level_up_chime"` | SFX/Reward | 1.2 | `HeroRoster.hero_leveled(id, old_level, new_level)` (S10-M4 wired) | Single bell-like tone with warm tail. ~600 ms. Pairs with the level-up toast (S10-M4). |
 | `&"sfx_reward_floor_clear_fanfare"` | SFX/Reward | 1.4 | `DungeonRunOrchestrator.floor_cleared_first_time(floor_index, biome_id, losing_run)` | Multi-note phrase ~1.5 s. The audio's most ceremonial moment per dispatch. |
@@ -352,6 +353,7 @@ If `assets/audio/audio_bus_layout.tres` is missing at boot, Godot's AudioServer 
 | `class_unlocked(class_id)` | HeroClassDatabase (Sprint 12+) | Class unlock fanfare + Music/Stinger |
 | `hero_damaged(hero_id, hp_remaining)` | DungeonRunOrchestrator (Sprint 11+) | Hero-damaged "bump" SFX |
 | `matchup_advantage_revealed(formation_strength)` | DungeonRunOrchestrator (Sprint 12+) | Advantage chime on dispatch |
+| `run_defeated(floor_index, biome_id)` | DungeonRunOrchestrator | Somber run-defeat sting (S30-N1) |
 
 ### Soft dependencies (audio-system enhances these but is not required)
 

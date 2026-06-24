@@ -105,6 +105,7 @@ const _CUE_BUS_MAP: Dictionary = {
 	&"sfx_combat_boss_kill":          &"SFX/Combat",
 	&"sfx_combat_hero_damaged":       &"SFX/Combat",
 	&"sfx_combat_advantage_chime":    &"SFX/Combat",
+	&"sfx_combat_run_defeated":       &"SFX/Combat",
 	&"sfx_reward_gold_collected":     &"SFX/Reward",
 	&"sfx_reward_level_up_chime":     &"SFX/Reward",
 	&"sfx_reward_floor_clear_fanfare":&"SFX/Reward",
@@ -122,6 +123,7 @@ const _CUE_VOLUME_MULT_MAP: Dictionary = {
 	&"sfx_combat_boss_kill":          1.4,
 	&"sfx_combat_hero_damaged":       0.7,
 	&"sfx_combat_advantage_chime":    0.8,
+	&"sfx_combat_run_defeated":       0.9,
 	&"sfx_reward_gold_collected":     1.0,
 	&"sfx_reward_level_up_chime":     1.2,
 	&"sfx_reward_floor_clear_fanfare":1.4,
@@ -248,6 +250,9 @@ func _ready() -> void:
 			orch.boss_killed.connect(_on_boss_killed)
 		if orch.has_signal("floor_cleared_first_time") and not orch.floor_cleared_first_time.is_connected(_on_floor_cleared_first_time):
 			orch.floor_cleared_first_time.connect(_on_floor_cleared_first_time)
+		# S30-N1 defeat-weight: somber run-defeat sting (distinct from every victory cue).
+		if orch.has_signal("run_defeated") and not orch.run_defeated.is_connected(_on_run_defeated):
+			orch.run_defeated.connect(_on_run_defeated)
 		# Class Synergy V1.0 — Story 3 dispatched signal subscription.
 		if orch.has_signal("class_synergy_dispatched_signal") and not orch.class_synergy_dispatched_signal.is_connected(_on_class_synergy_dispatched):
 			orch.class_synergy_dispatched_signal.connect(_on_class_synergy_dispatched)
@@ -685,6 +690,19 @@ func _on_boss_killed(_enemy_id: String) -> void:
 ## many heroes were marked. volume_mult 0.7 per §C.2 — quieter than the kill chime.
 func _on_heroes_injured(_instance_ids: Array, _injured_until_ms: int) -> void:
 	play_sfx(&"sfx_combat_hero_damaged", 1.0, 0.7)
+
+
+## §C.2 run-defeated sting (S30-N1 defeat-weight pass) — the somber, non-punishing
+## counterpart to the floor-clear fanfare. Rides DungeonRunOrchestrator.run_defeated,
+## firing the instant the in-flight run is lost. DELIBERATELY DISTINCT from every
+## victory cue (floor_clear_fanfare / class_unlock_fanfare / level_up_chime): a low,
+## soft tone at volume_mult 0.9 — fuller than the hero-damaged bump (0.7), far under
+## the 1.4 fanfare — so defeat reads as a weighted setback, not a triumph and not a
+## thud. A single sting, NO Stinger (the cozy tone forgives the loss). Wired-silent
+## until the asset is sourced (ADR-0016 / ADR-0022): play_sfx logs the cue then
+## no-ops on the null stream, exactly like the other §C.2 cues awaiting assets.
+func _on_run_defeated(_floor_index: int, _biome_id: String) -> void:
+	play_sfx(&"sfx_combat_run_defeated", 1.0, 0.9)
 
 
 ## §C.2 + §C.3 / §K Story 5: floor clear fanfare (SFX/Reward) + Stinger

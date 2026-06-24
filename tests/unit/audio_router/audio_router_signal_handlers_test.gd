@@ -936,3 +936,57 @@ func test_audio_router_subscribes_to_biome_unlocked_signal_at_ready() -> void:
 	assert_object(fu).is_not_null()
 	assert_bool(fu.has_signal("biome_unlocked")).is_true()
 	assert_bool(fu.biome_unlocked.is_connected(ar._on_biome_unlocked)).is_true()
+
+
+# ===========================================================================
+# §C.2 — Run-defeated somber sting rides DungeonRunOrchestrator.run_defeated
+# (S30-N1 defeat-weight pass). Deliberately distinct from every victory cue;
+# wired-silent until the asset is sourced (ADR-0016/0022) — play_sfx logs the
+# cue to _test_play_sfx_log before resolving the (currently absent) stream.
+# ===========================================================================
+
+func test_run_defeated_plays_run_defeated_sfx() -> void:
+	# Arrange
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	# Act: the in-flight run is lost on floor 3.
+	ar._on_run_defeated(3, "forest_reach")
+
+	# Assert: the somber sting played exactly once.
+	assert_int(_count_plays(&"sfx_combat_run_defeated")).is_equal(1)
+
+
+func test_run_defeated_volume_mult_is_0_point_9() -> void:
+	# §C.2 / _CUE_VOLUME_MULT_MAP: the sting sits at 0.9 — fuller than the 0.7
+	# hero-damaged bump, well under the 1.4 floor-clear fanfare, so defeat reads
+	# as a weighted setback, not a thud.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+
+	ar._on_run_defeated(3, "forest_reach")
+
+	var entry: Dictionary = _last_play(&"sfx_combat_run_defeated")
+	assert_float(float(entry.get("volume_mult", 0.0))).is_equal_approx(0.9, 0.001)
+
+
+func test_run_defeated_routes_through_combat_bus_not_reward() -> void:
+	# §C.2 / _CUE_BUS_MAP: the defeat sting is a combat beat (SFX/Combat), NOT the
+	# Reward bus the victory fanfares ride — a second axis on which it stays distinct.
+	# Guards against a future refactor accidentally giving defeat a victory-bus voice.
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+	assert_str(str(ar._CUE_BUS_MAP.get(&"sfx_combat_run_defeated", &""))).is_equal("SFX/Combat")
+
+
+func test_audio_router_subscribes_to_run_defeated_signal_at_ready() -> void:
+	# Subscription contract (AC-AS-04 via §F): AudioRouter._ready() connects
+	# DungeonRunOrchestrator.run_defeated → _on_run_defeated so a lost run reaches
+	# the audio path automatically (mirrors the heroes_injured / biome_unlocked
+	# subscription contracts above).
+	var ar: Node = _get_ar()
+	assert_object(ar).is_not_null()
+	var orch: Node = get_tree().root.get_node_or_null("DungeonRunOrchestrator")
+	assert_object(orch).is_not_null()
+	assert_bool(orch.has_signal("run_defeated")).is_true()
+	assert_bool(orch.run_defeated.is_connected(ar._on_run_defeated)).is_true()

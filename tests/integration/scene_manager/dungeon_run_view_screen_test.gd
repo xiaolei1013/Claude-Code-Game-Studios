@@ -3148,3 +3148,153 @@ func test_strike_round_robin_suppressed_beat_does_not_advance_idx() -> void:
 	screen.on_exit()
 	screen.queue_free()
 	await get_tree().process_frame
+
+
+# ===========================================================================
+# S30-N1 — Run-end overlay reveal fade. The shared _reveal_run_end_overlay()
+# helper drives BOTH the defeat and victory surfaces: with motion it tweens
+# modulate.a 0 → 1 (fade starts at 0, tween live); under reduce_motion it snaps
+# to full alpha with NO tween (ADR-0007). State is asserted immediately after
+# the call — no frame await — so the tween has not yet ticked and modulate.a
+# still holds the explicit start value.
+# ===========================================================================
+
+func test_defeat_overlay_reveal_fades_in_when_motion_on() -> void:
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(3)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+
+	# Act — the run is lost on floor 3.
+	screen._show_defeat_overlay(3)
+
+	# Assert — overlay revealed, fade begins at alpha 0, tween is live.
+	assert_bool(screen._run_end_overlay.visible).override_failure_message(
+		"the defeat overlay must be made visible on reveal"
+	).is_true()
+	assert_float(screen._run_end_overlay.modulate.a).override_failure_message(
+		"the fade must start at alpha 0 so the overlay eases in (not a hard cut)"
+	).is_equal_approx(0.0, 0.0001)
+	var fade_tween: Tween = screen._run_end_fade_tween
+	assert_object(fade_tween).override_failure_message(
+		"a reveal-fade tween must exist while motion is on"
+	).is_not_null()
+	if fade_tween != null:
+		assert_bool(fade_tween.is_valid()).is_true()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_defeat_overlay_reveal_snaps_when_reduce_motion_on() -> void:
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(3)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", true)  # the suppressor
+
+	# Act — the run is lost on floor 3.
+	screen._show_defeat_overlay(3)
+
+	# Assert — overlay snaps to full alpha with NO tween (reduce_motion, ADR-0007).
+	assert_bool(screen._run_end_overlay.visible).override_failure_message(
+		"the defeat overlay must still be made visible under reduce_motion"
+	).is_true()
+	assert_float(screen._run_end_overlay.modulate.a).override_failure_message(
+		"reduce_motion must snap the overlay to full alpha, not fade it"
+	).is_equal_approx(1.0, 0.0001)
+	assert_object(screen._run_end_fade_tween).override_failure_message(
+		"reduce_motion must create NO reveal-fade tween"
+	).is_null()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_victory_overlay_reveal_fades_in_through_shared_helper() -> void:
+	# Proves the victory caller (_show_run_end_overlay) routes through the SAME
+	# shared reveal helper as defeat — the fade is win/lose-symmetric, not a
+	# defeat-only special case.
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(3)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+
+	# Act — the run completes with 5 kills.
+	screen._show_run_end_overlay(5)
+
+	# Assert — same fade contract as defeat: visible, alpha 0, tween live.
+	assert_bool(screen._run_end_overlay.visible).is_true()
+	assert_float(screen._run_end_overlay.modulate.a).override_failure_message(
+		"the victory overlay must fade in through the shared helper, not hard-cut"
+	).is_equal_approx(0.0, 0.0001)
+	var fade_tween: Tween = screen._run_end_fade_tween
+	assert_object(fade_tween).is_not_null()
+	if fade_tween != null:
+		assert_bool(fade_tween.is_valid()).is_true()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_on_exit_kills_run_end_fade_tween() -> void:
+	# Lifecycle hygiene (S30-N1, ADR-mandated tween discipline): the run-end
+	# reveal-fade tween must not outlive the screen — left live it would tick
+	# modulate on a freed/exited screen. Mirrors test_on_exit_kills_active_beat_tween;
+	# the fade tween has its OWN kill block because it runs concurrently with the
+	# beat tween on a defeat.
+	# Arrange — a party + a revealed defeat overlay (motion on → a live fade tween).
+	HeroRosterFixture.reset_hero_roster()
+	HeroRosterFixture.seed_warriors(2)
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	assert_object(screen).is_not_null()
+
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._show_defeat_overlay(3)
+	assert_object(screen._run_end_fade_tween).override_failure_message(
+		"precondition: a reveal-fade tween should be active before on_exit"
+	).is_not_null()
+
+	# Act — leave the screen.
+	screen.on_exit()
+
+	# Assert — the reveal-fade tween was killed AND the handle cleared (no dangling
+	# tween ticking modulate on a freed screen).
+	assert_object(screen._run_end_fade_tween).override_failure_message(
+		"on_exit must kill and clear the run-end reveal-fade tween"
+	).is_null()
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.queue_free()
+	await get_tree().process_frame
