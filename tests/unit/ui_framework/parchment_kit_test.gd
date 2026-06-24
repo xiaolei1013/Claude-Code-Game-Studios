@@ -129,6 +129,52 @@ func test_list_tile_subtree_is_input_transparent() -> void:
 	)
 
 
+func test_placeholder_box_applies_ledger_row_panel_variation() -> void:
+	# Arrange / Act
+	var box: PanelContainer = ParchmentKit.placeholder_box("loot", Vector2(150, 92))
+	auto_free(box)
+
+	# Assert — placeholder slots use the LedgerRowPanel sub-panel register so they
+	# read as intentional parchment slots, not the default panel or a grey void.
+	assert_str(box.theme_type_variation).is_equal("LedgerRowPanel").override_failure_message(
+		"placeholder_box must apply the LedgerRowPanel theme variation; got '%s'. "
+		% box.theme_type_variation
+		+ "A wrong/empty variation degrades to the default panel with no error."
+	)
+	# Honors the requested min size (the art-region footprint).
+	assert_vector(box.custom_minimum_size).is_equal(Vector2(150, 92))
+
+
+func test_placeholder_box_subtree_is_input_transparent() -> void:
+	# Arrange / Act — a labelled placeholder (panel + centered caption).
+	var box: PanelContainer = ParchmentKit.placeholder_box("portrait", Vector2(68, 68))
+	auto_free(box)
+
+	# Assert — placeholders are decorative art-region stand-ins overlaid on the
+	# ceremony; the whole subtree must be IGNORE so none ever steals a tap.
+	var offenders: Array = _non_ignore_controls(box)
+	assert_array(offenders).is_empty().override_failure_message(
+		"placeholder_box is decorative — its whole subtree must be "
+		+ "MOUSE_FILTER_IGNORE. Non-IGNORE controls found: %s" % str(offenders)
+	)
+
+
+func test_placeholder_box_renders_label_when_set_and_omits_when_empty() -> void:
+	# Arrange / Act — labelled vs bare slot.
+	var labelled: PanelContainer = ParchmentKit.placeholder_box("party", Vector2(140, 64))
+	auto_free(labelled)
+	var bare: PanelContainer = ParchmentKit.placeholder_box("", Vector2(140, 64))
+	auto_free(bare)
+
+	# Assert — a non-empty label renders one centered Label child; an empty label
+	# yields a bare slot (no child), per the signature contract.
+	assert_int(labelled.get_child_count()).is_equal(1)
+	var l: Label = labelled.get_child(0) as Label
+	assert_object(l).is_not_null()
+	assert_str(l.text).is_equal("party")
+	assert_int(bare.get_child_count()).is_equal(0)
+
+
 func test_palette_constants_match_design_tokens() -> void:
 	# Guards the single-source-of-truth wiring: ParchmentKit.ACCENT must be the
 	# canonical Guild Amber from UIFramework, not a drifted local copy.
