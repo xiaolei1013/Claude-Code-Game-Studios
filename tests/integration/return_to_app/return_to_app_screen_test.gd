@@ -716,3 +716,48 @@ func test_no_summary_fallback_hides_defeat_row() -> void:
 	screen.on_exit()
 	screen.queue_free()
 	await get_tree().process_frame
+
+
+# ===========================================================================
+# Group I: Return-chime cue selection (Sprint 29 S29-6)
+#
+# _render_summary plays ONE audio cue as the summary settles, chosen by the
+# pure _select_return_cue(clipped_seconds) helper: a normal (uncapped) return
+# gets the warm welcome-back chime; a capped return (the guild hit its offline
+# ceiling) gets the distinct "threshold reached" cue. These cover the cue
+# DECISION directly — the Group F tests only observe the visual cap notice, so
+# a cue-branch inversion would otherwise go uncaught. The cue plays through
+# AudioRouter, which no-ops under headless, so we assert the pure selector
+# rather than audio output.
+# ===========================================================================
+
+## I-01: a normal (uncapped) return selects the warm welcome-back chime.
+func test_select_return_cue_uncapped_returns_welcome_chime() -> void:
+	# Arrange
+	var screen: Control = await _make_screen()
+
+	# Act — zero clipped seconds means the offline cap was not hit.
+	var cue: StringName = screen._select_return_cue(0)
+
+	# Assert — the warm welcome chime (matches recruitment's success idiom).
+	assert_str(str(cue)).is_equal("sfx_reward_level_up_chime")
+
+	# Cleanup
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+## I-02: a capped return selects the distinct threshold-reached cue.
+func test_select_return_cue_capped_returns_threshold_cue() -> void:
+	# Arrange
+	var screen: Control = await _make_screen()
+
+	# Act — any positive clipped-seconds value means the cap was hit.
+	var cue: StringName = screen._select_return_cue(7200)
+
+	# Assert — the distinct cap cue, NOT the welcome chime (cap precedence).
+	assert_str(str(cue)).is_equal("sfx_prestige_completed")
+
+	# Cleanup
+	screen.queue_free()
+	await get_tree().process_frame

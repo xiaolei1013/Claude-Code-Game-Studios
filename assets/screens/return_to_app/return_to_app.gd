@@ -260,6 +260,14 @@ func _render_summary(summary: OfflineProgressionEngine.OfflineSummary) -> void:
 	else:
 		_cap_notice.visible = false
 
+	# Audio quick-win (Sprint 29 S29-6): one chime as the summary settles. The cue
+	# is chosen by _select_return_cue (cap-precedence, mutually exclusive — see
+	# there). Reuses `clipped` computed just above. Fires once per entry on the cold
+	# path and again on any live re-render (a genuine new reward). AudioRouter no-ops
+	# under headless, so tests stay silent. Audio is not motion — intentionally NOT
+	# reduce_motion-gated.
+	_play_audio_cue(_select_return_cue(clipped))
+
 
 ## Renders the "new region unlocked" celebration row from the summary's
 ## "_biomes_unlocked" meta (a typed Array[String] of biome ids set by
@@ -386,6 +394,34 @@ func _on_cap_reached(seconds_clipped: int) -> void:
 ## SceneManager.request_screen (no SceneTree.change_scene_to_* per ADR-0007).
 func _on_acknowledge_button_pressed() -> void:
 	SceneManager.request_screen("guild_hall", SceneManager.TransitionType.CROSS_FADE)
+
+
+# ---------------------------------------------------------------------------
+# Audio
+# ---------------------------------------------------------------------------
+
+## Selects the return-to-app chime by cap state. Pure (no I/O) so the
+## cap-precedence decision is unit-testable without the audio singleton.
+## Mutually exclusive by design: a capped return ([param clipped_seconds] > 0,
+## the guild reached its offline ceiling) gets the distinct "threshold reached"
+## cue; a normal return gets the warm welcome-back chime. The exact cues are a
+## taste call the audio director can retune — only the cap-vs-normal split is
+## load-bearing here.
+func _select_return_cue(clipped_seconds: int) -> StringName:
+	if clipped_seconds > 0:
+		return &"sfx_prestige_completed"
+	return &"sfx_reward_level_up_chime"
+
+
+## Plays a one-shot SFX cue through the AudioRouter autoload, mirroring the
+## recruitment screen's defensive idiom (UI sounds route via AudioRouter). No-ops
+## when the autoload is absent (headless tests) or lacks play_sfx, so this never
+## crashes a test that runs without the audio singleton.
+func _play_audio_cue(cue: StringName) -> void:
+	var router: Node = get_node_or_null("/root/AudioRouter")
+	if router == null or not router.has_method("play_sfx"):
+		return
+	router.play_sfx(cue)
 
 
 # ===========================================================================
