@@ -9,106 +9,55 @@
 #   done           ↔  Complete
 #   blocked        ↔  Blocked
 #
-# Sprint 28 Day-0 plan authored 2026-06-03.
-# Theme: drain playtest backlog + theme ADR + per-floor matchup hints (playtest-gated).
+# Sprint 30 Day-0 plan authored 2026-06-24.
+# Theme: victory-moment ceremony juice (GDD #25) + reward-float / defeat-weight polish.
+# S29 ran informally via PRs #244-#249 (theme re-skin + chimes) — not formally tracked.
 # Prior sprint history archived in production/sprints/sprint-{N}.md files.
 
-sprint: 28
-goal: "Drain the compounded playtest backlog, lock the theme direction, and ship per-floor matchup hints contingent on playtest verdict."
-start: "2026-06-03"
-end: "2026-06-16"
-generated: "2026-06-03"
-updated: "2026-06-23"
+sprint: 30
+goal: "Land the victory-moment ceremony (GDD #25) plus reward-float and defeat-weight polish, closing the win/lose visible-feel gaps on the core loop."
+start: "2026-06-24"
+end: "2026-07-07"
+generated: "2026-06-24"
+updated: "2026-06-24"
 
 stories:
-  - id: "28-M1"
-    name: "Run unified playtest 16/17/18 session"
-    file: "production/playtests/unified-playtest-16-17-18-protocol-2026-05-16.md"
-    priority: must-have
-    status: done
-    owner: "Human (tester)"
-    estimate_days: 0.5
-    blocker: ""
-    completed: "2026-06-23"
-
-  - id: "28-M2"
-    name: "VERSION + CHANGELOG catch-up (PRs #170-#195)"
+  - id: "30-M1"
+    name: "Victory-moment ceremony animations (fade-in + staggered reveal + prompt pulse + audio sting)"
     file: ""
     priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: ""
-    completed: "2026-06-03"
-
-  - id: "28-M3"
-    name: "Theme skin ADR-0020: dark-mock vs light-parchment"
-    file: "docs/architecture/ADR-0020-theme-skin-direction.md"
-    priority: must-have
-    status: done
-    owner: ""
-    estimate_days: 0.5
-    blocker: "RATIFIED by user 2026-06-23 — light-parchment confirmed as binding visual identity; dark-mock pivot declined. ADR-0020 accepted by user verification."
-    completed: "2026-06-23"
-
-  - id: "28-S1"
-    name: "Per-floor matchup hint on floor picker"
-    file: ""
-    priority: should-have
-    status: done
-    owner: "godot-gdscript-specialist"
-    estimate_days: 1.5
-    blocker: ""
-    completed: "2026-06-08"
-
-  - id: "28-S2"
-    name: "Prestige GDD #31 /design-review → APPROVED (or pivot)"
-    file: "design/gdd/reviews/prestige-system-review-log.md"
-    priority: should-have
-    status: done
-    owner: "systems-designer"
-    estimate_days: 0.5
-    blocker: "RATIFIED by user 2026-06-23 — per-hero-retire → global-multiplier model accepted (already built + tested); pure-global ascension declined. GDD #31 is the binding prestige design."
-    completed: "2026-06-23"
-
-  - id: "28-N1"
-    name: "VFX: particle layer (aura/bubble/batwing) wired to gameplay signals"
-    file: ""
-    priority: nice-to-have
-    status: done
-    owner: "godot-gdscript-specialist"
-    estimate_days: 1.0
-    blocker: "Merged PR #204 (VfxKit + enemy_killed gold-burst; tests green). Particle FEEL is playtest-advisory (S28-M1); remaining OQ-27-1 hooks are VfxKit-ready follow-ups."
-    completed: "2026-06-08"
-
-  - id: "28-N2"
-    name: "Offline-unlock surfacing at return-to-app"
-    file: ""
-    priority: nice-to-have
-    status: done
-    owner: "godot-gdscript-specialist"
+    status: ready-for-dev
+    owner: "godot-specialist"
     estimate_days: 1.0
     blocker: ""
-    completed: "2026-06-06"
+    completed: ""
 
-  # --- GDD-gap stories surfaced 2026-06-08 by grep-first analysis (user directive:
-  # "all tasks in gdd and sprint plan"). Not in the Day-0 S28 plan. ---
-  - id: "28-G1"
-    name: "Foreground per-tick gold drip (economy GDD §C.2.1/§D.1 — MVP-scope, unbuilt)"
-    file: "design/gdd/economy-system.md"
+  - id: "30-S1"
+    name: "Reward-number floats on the dungeon run (gold/level-up only — NOT damage, per ADR-0025)"
+    file: ""
     priority: should-have
-    status: done
-    owner: "godot-gdscript-specialist"
-    estimate_days: 1.0
-    blocker: "Merged PR #203 — bit-exact offline parity (segment-count model), 12 tests + full-suite CI green."
-    completed: "2026-06-08"
-
-  - id: "28-G2"
-    name: "Channel-light lantern: wire to a real mechanic OR formally cut"
-    file: "src/ui/wireframe_kit.gd"
-    priority: nice-to-have
-    status: done
-    owner: ""
+    status: backlog
+    owner: "godot-specialist"
     estimate_days: 0.5
-    blocker: "DECIDED by user 2026-06-23 — keep as ambient juice, no mechanic. Lantern made non-interactive (WireframeKit.lantern_display/lantern_block, MOUSE_FILTER_IGNORE) on Hall + Expedition so there is no false tap-target. Regression tests added (ui_framework input-transparency suite green)."
-    completed: "2026-06-23"
+    blocker: ""
+    completed: ""
+
+  - id: "30-N1"
+    name: "Defeat-moment weight pass (run_defeated overlay fade + somber audio parity)"
+    file: ""
+    priority: nice-to-have
+    status: backlog
+    owner: "godot-specialist"
+    estimate_days: 0.5
+    blocker: ""
+    completed: ""
+
+  - id: "30-N2"
+    name: "OQ-27-1 VFX follow-up: wire OR retire the unused aura/bubble/batwing demo textures"
+    file: ""
+    priority: nice-to-have
+    status: backlog
+    owner: "technical-artist"
+    estimate_days: 0.5
+    blocker: ""
+    completed: ""
