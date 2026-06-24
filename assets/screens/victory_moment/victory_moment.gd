@@ -26,7 +26,7 @@
 extends Screen
 
 const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
-const WireframeKitScript = preload("res://src/ui/wireframe_kit.gd")
+const ParchmentKitScript = preload("res://src/ui/parchment_kit.gd")
 
 # Pacing constants per GDD §G.
 const TAP_GRACE_MS: int = 200
@@ -48,7 +48,7 @@ var _hero_level_deltas: Array = []
 # Tap-debounce grace from on_enter (per GDD §C.9).
 var _enter_time_msec: int = 0
 
-# Lantern Guild mock wireframe (feat/ui-wireframe-core-loop) — greybox state.
+# Loot-reveal chrome (eyebrow + party badges + spoils + loot grid) build-once guard.
 var _wire_built: bool = false
 
 # Top-most tap-anywhere catcher (playtest fix 2026-06-03 — see on_enter).
@@ -344,15 +344,16 @@ func _compute_hero_level_deltas(snapshot: RunSnapshot) -> Array:
 
 
 # ===========================================================================
-# Lantern Guild mock wireframe — greybox loot-reveal augmentation
-# (feat/ui-wireframe-core-loop)
+# Loot-reveal chrome — parchment-themed ceremony augmentation (Sprint 29 S29-4)
 #
-# The mock's Result screen is a loot ceremony: "the party returns" eyebrow →
-# title → party badges → SPOILS divider → gold → loot grid → continue. Our
-# screen already renders the title, kills, gold, level-ups and continuation
-# prompt. This adds the missing mock structure (eyebrow, party badges, spoils
-# divider, 4-tile loot grid) into the existing CenterVBox without disturbing
-# the tested nodes. Loot is a placeholder — we have no loot system yet.
+# The Result ceremony reads as: "the party returns" eyebrow → title → party
+# badges → SPOILS divider → gold → loot grid → continue. The screen already
+# renders the title, kills, gold, level-ups and continuation prompt; this adds
+# the remaining ceremony structure (eyebrow, party badges, spoils divider,
+# 4-tile loot grid) into the existing CenterVBox without disturbing the tested
+# nodes. Skinned with ParchmentKit (was WireframeKit greybox; theme-first pass).
+# Loot tiles are placeholders — there is no loot system yet (the staggered loot
+# reveal + number animation are the deferred S30 ceremony, not this chrome pass).
 # ===========================================================================
 
 func _build_wireframe_once() -> void:
@@ -363,8 +364,12 @@ func _build_wireframe_once() -> void:
 	if vbox == null:
 		return
 
-	# Widen the ceremony panel so the loot grid fits (mock Result is wide).
+	# Graduate the ceremony panel to the ParchmentPanel 9-patch (warm-document
+	# frame, 18/14 padding) and widen it so the loot grid fits. STANDARD pattern
+	# leaves mouse_filter at STOP, so the top-most TapCatcher (on_enter) still
+	# owns tap-to-continue — see the playtest-fix contract.
 	if _center_panel != null:
+		UIFrameworkScript.apply_parchment_panel(_center_panel)
 		_center_panel.custom_minimum_size = Vector2(720, 460)
 		_center_panel.offset_left = -360.0
 		_center_panel.offset_right = 360.0
@@ -372,8 +377,8 @@ func _build_wireframe_once() -> void:
 		_center_panel.offset_bottom = 230.0
 	vbox.add_theme_constant_override("separation", 10)
 
-	# Top eyebrow — "the party returns".
-	var eyebrow: Label = WireframeKitScript.eyebrow("· The party returns ·", WireframeKitScript.ACCENT)
+	# Top eyebrow — "the party returns" (amber accent register).
+	var eyebrow: Label = ParchmentKitScript.eyebrow("· The party returns ·", ParchmentKitScript.ACCENT)
 	eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(eyebrow)
 	vbox.move_child(eyebrow, 0)
@@ -382,7 +387,7 @@ func _build_wireframe_once() -> void:
 	vbox.add_child(_build_party_badges())
 
 	# SPOILS divider + loot grid (placeholder — no loot system in MVP).
-	var spoils: Label = WireframeKitScript.eyebrow("Spoils", WireframeKitScript.MUTED)
+	var spoils: Label = ParchmentKitScript.eyebrow("Spoils", ParchmentKitScript.MUTED)
 	spoils.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(spoils)
 	vbox.add_child(_build_loot_grid())
@@ -399,14 +404,14 @@ func _build_party_badges() -> HBoxContainer:
 	row.add_theme_constant_override("separation", 12)
 	var heroes: Array = _wire_party_heroes()
 	if heroes.is_empty():
-		row.add_child(WireframeKitScript.placeholder_box("party", Vector2(140, 64)))
+		row.add_child(ParchmentKitScript.placeholder_box("party", Vector2(140, 64)))
 		return row
 	for h: Dictionary in heroes:
 		var box: VBoxContainer = VBoxContainer.new()
 		box.alignment = BoxContainer.ALIGNMENT_CENTER
 		box.add_theme_constant_override("separation", 4)
-		box.add_child(WireframeKitScript.placeholder_box("portrait", Vector2(68, 68)))
-		var nl: Label = WireframeKitScript.caption(String(h.get("name", "Hero")), WireframeKitScript.TEXT, 12)
+		box.add_child(ParchmentKitScript.placeholder_box("portrait", Vector2(68, 68)))
+		var nl: Label = ParchmentKitScript.caption(String(h.get("name", "Hero")), ParchmentKitScript.MUTED, 12)
 		nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		box.add_child(nl)
 		row.add_child(box)
@@ -451,5 +456,5 @@ func _build_loot_grid() -> GridContainer:
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 10)
 	for _i: int in range(4):
-		grid.add_child(WireframeKitScript.placeholder_box("loot", Vector2(150, 92)))
+		grid.add_child(ParchmentKitScript.placeholder_box("loot", Vector2(150, 92)))
 	return grid

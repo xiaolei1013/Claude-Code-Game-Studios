@@ -148,3 +148,31 @@ static func list_tile(title: String, subtitle: String = "", right: String = "") 
 		v.add_child(caption(subtitle, MUTED, 11))
 
 	return p
+
+
+## A labelled placeholder for an art region (party badge, portrait slot, loot
+## tile) whose final art is not sourced yet. The parchment counterpart to
+## [method WireframeKit.placeholder_box]: a LedgerRowPanel slot (theme-driven —
+## no raw hex) with a centered muted caption, so a graduating screen's
+## art-region placeholders read as intentional parchment slots rather than the
+## grey voids the greybox kit drew. Pass an empty [param label] for a bare slot.
+##
+## Display-only: the whole subtree is MOUSE_FILTER_IGNORE (decorative-IGNORE
+## contract) so a placeholder can never steal a tap from a control it overlays.
+static func placeholder_box(label: String, min_size: Vector2) -> PanelContainer:
+	var p: PanelContainer = PanelContainer.new()
+	p.theme_type_variation = &"LedgerRowPanel"
+	if min_size != Vector2.ZERO:
+		p.custom_minimum_size = min_size
+	p.clip_contents = true
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if label != "":
+		var l: Label = Label.new()
+		l.text = label
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		l.add_theme_color_override("font_color", MUTED)
+		l.add_theme_font_size_override("font_size", 12)
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		p.add_child(l)
+	return p
