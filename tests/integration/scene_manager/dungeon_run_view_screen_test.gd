@@ -595,6 +595,137 @@ func test_level_up_spawns_parchment_shimmer_burst() -> void:
 
 
 # ===========================================================================
+# Reward floats (S30-S1 · GDD #27 OQ-27-1): the rising "+N gold" / "Lv N" beats.
+# The PURE trigger policy is unit-tested in should_float_reward_test.gd; these guard
+# the SCREEN-side spawn — that a gold-crediting kill and a level-up each drop exactly
+# one Label into _float_layer, that reduce_motion snap-replaces it to zero (OQ-27-3),
+# and that a multi-kill tick coalesces to one float (the anti-strobe throttle). The
+# floats are Labels in _float_layer, so _count_particles(_vfx_layer) is unaffected.
+# reduce_motion is snapshot+restored per test so the live SceneManager isn't leaked.
+# ===========================================================================
+
+## Counts the live float Labels under the reward-float layer (S30-S1). A float is
+## "live" until its parallel rise+fade tween chains to queue_free (well after these
+## synchronous asserts). Distinct from _count_particles (which reads _vfx_layer): the
+## floats are Labels in _float_layer; the bursts are CPUParticles2D in _vfx_layer.
+func _count_labels(layer: Node) -> int:
+	if layer == null:
+		return 0
+	var n: int = 0
+	for child: Node in layer.get_children():
+		if child is Label:
+			n += 1
+	return n
+
+
+func test_kill_spawns_one_gold_reward_float() -> void:
+	# Arrange
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+
+	# Act — a tier-1 advantaged kill. With no active run (synergy "") and a default
+	# prestige multiplier, _credited_kill_gold = floori(5 × 1.5) = 7 > 0, so it floats.
+	screen.call("_on_enemy_killed_vfx", 1, "warrior", true)
+
+	# Assert — exactly one "+N gold" Label in the float layer (NOT the VFX layer).
+	assert_int(_count_labels(screen._float_layer)).override_failure_message(
+		"a gold-crediting kill should spawn exactly one +N gold float"
+	).is_equal(1)
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_reward_float_suppressed_under_reduce_motion() -> void:
+	# Arrange — reduce_motion ON snap-replaces the float (OQ-27-3): the reward still
+	# credits, only the motion is cut.
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", true)
+
+	# Act — the same gold-crediting kill as the spawn test.
+	screen.call("_on_enemy_killed_vfx", 1, "warrior", true)
+
+	# Assert — no float Label spawned under reduce_motion.
+	assert_int(_count_labels(screen._float_layer)).override_failure_message(
+		"reduce_motion must suppress the reward float (snap-replace, OQ-27-3)"
+	).is_equal(0)
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_multi_kill_tick_coalesces_to_one_float() -> void:
+	# Arrange — a 5-kill tick fires enemy_killed synchronously per kill in one frame;
+	# the anti-strobe throttle must coalesce the burst to ONE float. Pin the clock so
+	# the window is deterministic (not reliant on call latency). All three kills credit
+	# gold (>0), so each reaches the throttle — the throttle, not the gold gate, is
+	# what limits the count to one.
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+	screen._beat_clock_override_ms = 5000  # fixed clock → all calls share one window
+
+	# Act — three kills "in the same tick" (same clock reading).
+	screen.call("_on_enemy_killed_vfx", 1, "warrior", true)
+	screen.call("_on_enemy_killed_vfx", 2, "mage", false)
+	screen.call("_on_enemy_killed_vfx", 1, "rogue", true)
+
+	# Assert — only the first kill floated; the rest coalesced into it.
+	assert_int(_count_labels(screen._float_layer)).override_failure_message(
+		"a multi-kill tick must coalesce to exactly one reward float (anti-strobe)"
+	).is_equal(1)
+
+	# Cleanup — restore the clock seam + live autoload state.
+	screen._beat_clock_override_ms = -1
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_level_up_spawns_one_reward_float() -> void:
+	# Arrange
+	var screen: Control = await _navigate_to_dungeon_run_view_screen()
+	var sm: Node = screen.get_node_or_null("/root/SceneManager")
+	var prior_rm: bool = bool(sm.get("reduce_motion")) if sm != null else false
+	if sm != null:
+		sm.set("reduce_motion", false)
+
+	# Act — a routine level-up (also spawns the top-centre toast + shimmer, covered
+	# elsewhere; the toast Label lives under the screen, not _float_layer).
+	screen.call("_on_hero_leveled", 7001, 4, 5)
+
+	# Assert — exactly one "Lv N" float Label in the float layer.
+	assert_int(_count_labels(screen._float_layer)).override_failure_message(
+		"a hero level-up should spawn exactly one Lv N reward float"
+	).is_equal(1)
+
+	# Cleanup
+	if sm != null:
+		sm.set("reduce_motion", prior_rm)
+	screen.on_exit()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+# ===========================================================================
 # AC-8: Routed via SceneManager.request_screen (structural file + extends check)
 # ===========================================================================
 

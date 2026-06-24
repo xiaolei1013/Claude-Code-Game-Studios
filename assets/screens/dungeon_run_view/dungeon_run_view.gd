@@ -99,6 +99,14 @@ var _vfx_burst_texture: Texture2D = null
 var _vfx_levelup_texture: Texture2D = null
 var _vfx_floor_clear_texture: Texture2D = null
 
+## Reward-float host (S30-S1) — the first consumer of WireframeKit.float_layer(),
+## a scaffold that shipped unwired with the wireframe core loop. A full-rect,
+## input-transparent Control created in on_enter + freed in on_exit. Hosts the
+## rising "+N gold" / "Lv N" labels so they never pollute the screen's direct
+## children (the _live_toast_count scan) NOR _vfx_layer's particle count (the
+## integration test's _count_particles assertions read _vfx_layer only).
+var _float_layer: Control = null
+
 # ---------------------------------------------------------------------------
 # Constants (Story 013)
 # ---------------------------------------------------------------------------
@@ -197,6 +205,25 @@ const BEAT_OUT_PHASE_RATIO: float = 0.4
 ## capping visible beats at ~8.3/s. Parallels the audio gold-chime throttle.
 const BEAT_THROTTLE_MS: int = 120
 
+# --- Reward floats (S30-S1 · GDD #27 OQ-27-1 reward beats) -------------------
+# Rising "+N gold" / "Lv N" labels on the live run screen. DESIGN.md defines no
+# float-specific tokens, so these compose from the generic motion scale: the 0.8 s
+# life sits at DESIGN.md's `long` ceiling ("reward ceremony max"); the rise is a
+# modest cozy drift; the throttle is the same anti-strobe safeguard as the strike
+# beat — a multi-kill tick (enemy_killed fires synchronously PER kill in one frame)
+# coalesces to ONE float so a 5-kill tick can't stack 5 labels (Steam-Deck budget,
+# GDD #27 §F emit-and-free). Distinct window from BEAT_THROTTLE_MS (a different
+# beat), but shares the injectable _beat_now_ms clock seam.
+
+## Reward-float lifetime (s) — rise + fade run in parallel over this, then self-free.
+const REWARD_FLOAT_LIFETIME_SEC: float = 0.8
+
+## Upward travel (px) over the float's lifetime — a gentle drift, not a leap.
+const REWARD_FLOAT_RISE_PX: float = 48.0
+
+## Anti-strobe coalescing window (ms) for reward floats (~5 floats/s ceiling).
+const REWARD_FLOAT_THROTTLE_MS: int = 200
+
 # --- Terminal reaction beats (Story 009 · GDD #35 §C.4 / §D.2 / §D.4 / §G) ----
 # The run's two punctuation moments: a VICTORY cheer (floor_cleared_first_time)
 # and a DEFEAT slump (run_defeated). One-shot, NOT coalesced (a terminal beat
@@ -285,6 +312,12 @@ var _active_beat_tween: Tween = null
 ## 0) so the very first beat is never wrongly suppressed at low engine uptime (the
 ## prestige-audio-throttle lesson: a 0-sentinel + engine-uptime clock mis-fires).
 var _last_beat_ms: int = -BEAT_THROTTLE_MS
+
+## Timestamp (ms, [method _beat_now_ms]) of the last reward float (S30-S1) — its
+## own coalescing window (REWARD_FLOAT_THROTTLE_MS), separate from _last_beat_ms but
+## sharing the same injectable clock. −window sentinel (NOT 0) so the first float at
+## low engine uptime is never wrongly suppressed (the prestige-audio-throttle lesson).
+var _last_float_ms: int = -REWARD_FLOAT_THROTTLE_MS
 
 ## Test seam for the beat-throttle clock (mirrors AudioRouter._throttle_now_ms).
 ## −1 → use real engine uptime ([method Time.get_ticks_msec]); a test assigns a
@@ -422,6 +455,13 @@ func on_enter() -> void:
 		_vfx_layer = Node2D.new()
 		_vfx_layer.name = "VfxBurstLayer"
 		add_child(_vfx_layer)
+	# Reward-float host (S30-S1): WireframeKit.float_layer() finally wired to a
+	# consumer. Full-rect + input-transparent so the rising labels drift over the
+	# whole screen and never catch a tap (ADR-0008 touch parity).
+	if _float_layer == null:
+		_float_layer = WireframeKitScript.float_layer()
+		add_child(_float_layer)
+		_float_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_vfx_burst_texture = _ensure_vfx_texture(_vfx_burst_texture, VFX_BURST_TEXTURE_PATH)
 	_vfx_levelup_texture = _ensure_vfx_texture(_vfx_levelup_texture, VFX_LEVELUP_TEXTURE_PATH)
 	_vfx_floor_clear_texture = _ensure_vfx_texture(_vfx_floor_clear_texture, VFX_FLOOR_CLEAR_TEXTURE_PATH)
@@ -540,6 +580,13 @@ func on_exit() -> void:
 		_vfx_burst_texture = null
 		_vfx_levelup_texture = null
 		_vfx_floor_clear_texture = null
+
+	# Reward-float host teardown (mirror the on_enter create). queue_free frees the
+	# layer AND any in-flight float labels (their tweens are parented to the labels,
+	# so each tween dies with its label — no orphaned tween outlives the screen).
+	if _float_layer != null:
+		_float_layer.queue_free()
+		_float_layer = null
 
 
 ## Called by SceneManager when a modal overlay opens on top of this screen.
@@ -765,6 +812,16 @@ func _on_hero_leveled(instance_id: int, _old_level: int, new_level: int) -> void
 			_vfx_layer, size * Vector2(0.5, 0.2), _vfx_levelup_texture,
 			VfxKitScript.MOSS_SAGE, shimmer_amount, 0.7, _reduce_motion())
 
+	# "Lv N" reward float (S30-S1) — the rising-number beat that complements the
+	# top-centre toast + parchment-shimmer (GDD #27 OQ-27-1 level-up beat). Rises near
+	# the party diorama (y 0.34 — between the top-centre toast stack and the diorama
+	# centre at 0.42) in MOSS_SAGE (the level-up accent, matching the shimmer). A
+	# level-up always floats (a discrete beat — should_float_reward ignores amount).
+	if UIFrameworkScript.should_float_reward("level_up"):
+		_spawn_reward_float(
+			UIFrameworkScript.format_localized("reward_float_level_up_format", [new_level]),
+			size * Vector2(0.5, 0.34), VfxKitScript.MOSS_SAGE)
+
 
 ## Felt-progression: a new region unlocked mid-run (a gate floor cleared). Shows
 ## an emphasized toast naming the region. Defensive — skips if the biome can't be
@@ -813,20 +870,87 @@ func _spawn_run_toast(text: String, node_name: String, emphasized: bool) -> void
 	tween.tween_callback(toast.queue_free)
 
 
-## S28-N1: spawns a kill-feedback gold-burst when an enemy dies mid-run. Matchup-
-## advantaged kills burst brighter Lantern Gold; neutral kills Guild Amber; higher
-## tiers burst bigger (GDD #27 OQ-27-1 "gold-coin-burst sized by tier"). Origin is
-## the diorama centre — a feel-default that playtest tuning (S28-M1) will refine.
-## reduce_motion suppresses the burst (VfxKit snap-replace, OQ-27-3). No-op when the
-## gitignored demo texture is absent (CI / fresh clone).
-func _on_enemy_killed_vfx(tier: int, _archetype: String, advantaged: bool) -> void:
-	if _vfx_layer == null or _vfx_burst_texture == null:
-		return
-	var tint: Color = VfxKitScript.LANTERN_GOLD if advantaged else VfxKitScript.GUILD_AMBER
-	var amount: int = clampi(6 + tier * 2, 6, 20)
+## S28-N1 / S30-S1: kill feedback when an enemy dies mid-run — a gold-coin burst PLUS
+## a rising "+N gold" reward float. Matchup-advantaged kills burst brighter Lantern
+## Gold; neutral kills Guild Amber; higher tiers burst bigger (GDD #27 OQ-27-1
+## "gold-coin-burst sized by tier"). Origin is the diorama centre. The burst is gated
+## by its OWN texture so a missing demo PNG (CI / fresh clone) no-ops the particles
+## WITHOUT suppressing the float (a Label needs no texture); the float is gated by
+## [method UIFramework.should_float_reward] + reduce_motion + the coalescing throttle
+## inside [method _spawn_reward_float]. reduce_motion snap-replaces both per OQ-27-3.
+func _on_enemy_killed_vfx(tier: int, archetype: String, advantaged: bool) -> void:
 	var origin: Vector2 = size * Vector2(0.5, 0.42)
-	VfxKitScript.spawn_burst(
-		_vfx_layer, origin, _vfx_burst_texture, tint, amount, 0.55, _reduce_motion())
+	if _vfx_layer != null and _vfx_burst_texture != null:
+		var tint: Color = VfxKitScript.LANTERN_GOLD if advantaged else VfxKitScript.GUILD_AMBER
+		var amount: int = clampi(6 + tier * 2, 6, 20)
+		VfxKitScript.spawn_burst(
+			_vfx_layer, origin, _vfx_burst_texture, tint, amount, 0.55, _reduce_motion())
+
+	# "+N gold" float — N is the EXACT gold this kill credited (see _credited_kill_gold).
+	# A zero-gold kill (unknown tier → base 0) floats nothing (should_float_reward gate).
+	var gold: int = _credited_kill_gold(tier, advantaged, archetype)
+	if UIFrameworkScript.should_float_reward("gold_kill", gold):
+		_spawn_reward_float(
+			UIFrameworkScript.format_localized("victory_gold_gained_format", [gold]),
+			origin, VfxKitScript.LANTERN_GOLD)
+
+
+## Reproduces the EXACT gold a single kill credited, for the "+N gold" float (S30-S1).
+## [signal DungeonRunOrchestrator.enemy_killed] fires SYNCHRONOUSLY from the orchestrator's
+## per-kill loop immediately after [code]economy.add_gold(gold)[/code], and both factors
+## below are constant for the run, so this returns the same value the loop credited:
+##   floori(attribute_kill_gold(tier, advantaged, false, synergy_id, archetype) × prestige)
+## (attribute_kill_gold ignores losing_run in Phase 1.) Recomputing here keeps the float
+## screen-local — no cross-domain signal change to carry the amount (coordination rule:
+## no unilateral cross-domain changes). Returns base×matchup when no run is active
+## (run_snapshot null → empty synergy; prestige defaults to 1.0).
+func _credited_kill_gold(tier: int, advantaged: bool, archetype: String) -> int:
+	var snap: RunSnapshot = DungeonRunOrchestrator.run_snapshot
+	var synergy_id: String = snap.synergy_id if snap != null else ""
+	var gold_pre: int = DungeonRunOrchestrator.attribute_kill_gold(
+		tier, advantaged, false, synergy_id, archetype)
+	return floori(float(gold_pre) * HeroRoster.get_prestige_multiplier())
+
+
+## Spawns a rising, self-fading, self-freeing reward float into the input-transparent
+## _float_layer — the "+N gold" / "Lv N" juice beat (S30-S1). Gated by reduce_motion
+## (snap-replace → NO float; the reward still credits — GDD #27 OQ-27-3) and an
+## anti-strobe throttle so a multi-kill tick (enemy_killed fires synchronously PER kill
+## in one frame) coalesces to ONE float (Steam-Deck budget). The owning Tween is
+## parented to the label, so it auto-cleans if the screen exits mid-rise (Tween freed
+## with its node — the _spawn_run_toast precedent). [param origin] is in _float_layer's
+## full-rect local space (= screen space); [param tint] is a VfxKit palette constant
+## (never a raw Color literal, AC-7). No-op before _float_layer is built (pre-on_enter).
+func _spawn_reward_float(text: String, origin: Vector2, tint: Color) -> void:
+	if _float_layer == null:
+		return
+	if _reduce_motion():
+		return  # snap-replace: leave the throttle clock untouched (mirrors the beat).
+	var now_ms: int = _beat_now_ms()
+	if now_ms - _last_float_ms < REWARD_FLOAT_THROTTLE_MS:
+		return
+	_last_float_ms = now_ms
+
+	var label: Label = Label.new()
+	label.text = text
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.grow_horizontal = Control.GROW_DIRECTION_BOTH  # centre the label on origin
+	label.add_theme_color_override("font_color", tint)
+	label.position = origin
+	_float_layer.add_child(label)
+
+	# Rise (position.y up) + fade (modulate.a → 0) in parallel, then self-free. DESIGN.md
+	# motion: the fade eases IN (the `exit` curve, TRANS_QUAD); the rise eases OUT so it
+	# decelerates as it fades — a gentle cozy drift, not a leap (Art Bible warm register).
+	var end_pos: Vector2 = origin + Vector2(0.0, -REWARD_FLOAT_RISE_PX)
+	var tween: Tween = label.create_tween().set_parallel(true)
+	var rise: PropertyTweener = tween.tween_property(label, "position", end_pos, REWARD_FLOAT_LIFETIME_SEC)
+	rise.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	var fade: PropertyTweener = tween.tween_property(label, "modulate:a", 0.0, REWARD_FLOAT_LIFETIME_SEC)
+	fade.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.chain()
+	tween.tween_callback(label.queue_free)
 
 
 ## GDD #27 OQ-27-1: the first-time clear of a floor earns a ceremonial lantern-glow
