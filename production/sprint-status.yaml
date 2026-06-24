@@ -26,7 +26,7 @@ stories:
     name: "Victory-moment ceremony animations (fade-in + staggered reveal + prompt pulse + audio sting)"
     file: ""
     priority: must-have
-    status: ready-for-dev
+    status: review
     owner: "godot-specialist"
     estimate_days: 1.0
     blocker: ""
@@ -36,7 +36,7 @@ stories:
     name: "Reward-number floats on the dungeon run (gold/level-up only — NOT damage, per ADR-0025)"
     file: ""
     priority: should-have
-    status: backlog
+    status: review
     owner: "godot-specialist"
     estimate_days: 0.5
     blocker: ""
