@@ -4,9 +4,10 @@
 ## Sprint 16 S16-S1 candidate scaffold (pre-emptively authored 2026-05-07
 ## per the established cadence). Ships the contract layer + minimal .tscn
 ## layout per Unlock / Victory Moment GDD #25 §C.1 / §C.2 / §C.3 / §C.4
-## / §C.5 / §C.7. Visual polish (anchors + theme variations + portrait
-## sourcing + DimBackdrop fade-in + ContinuationPrompt pulse + staggered
-## reveal animations) deferred to post-`/design-review` of GDD #25.
+## / §C.5 / §C.7. Sprint 30 S30-M1 landed the §C.6 ceremony: DimBackdrop
+## fade-in + staggered row reveal + ContinuationPrompt pulse + a one-shot
+## victory sting, all reduce_motion-gated to a snap. Portrait sourcing +
+## per-biome tint remain V1.0+ (GDD §G / §I).
 ##
 ## Foreground-only invariant per GDD §C.7: this screen is entered ONLY
 ## via dungeon_run_view's RUN_ENDED handler. Offline replay floor-clears
@@ -32,6 +33,15 @@ const ParchmentKitScript = preload("res://src/ui/parchment_kit.gd")
 const TAP_GRACE_MS: int = 200
 const CONTINUATION_DWELL_MS: int = 1500
 
+# Ceremony timing per GDD §C.6 / §G + DESIGN.md motion tokens. reduce_motion
+# (SceneManager.reduce_motion) snaps past all of these.
+const DIM_FADE_SEC: float = 0.2          # DimBackdrop fade-in (GDD §G: 200ms)
+const REVEAL_STAGGER_SEC: float = 0.08   # per-row stagger start (DESIGN micro=80ms)
+const REVEAL_FADE_SEC: float = 0.15      # per-row fade (DESIGN short=150ms)
+const REVEAL_TOTAL_CAP_SEC: float = 0.5  # GDD §C.6: stagger span ≤500ms
+const PULSE_HALF_SEC: float = 0.75       # half of the 1.5s pulse cycle (GDD §C.6)
+const PROMPT_PULSE_MIN_A: float = 0.8    # GDD §C.6: prompt pulses 0.8 → 1.0
+
 
 # Captured render data — populated in on_enter from DungeonRunOrchestrator
 # + Economy + HeroRoster + FloorUnlock.
@@ -54,6 +64,19 @@ var _wire_built: bool = false
 # Top-most tap-anywhere catcher (playtest fix 2026-06-03 — see on_enter).
 var _tap_catcher: Control = null
 
+# Ceremony tweens (GDD §C.6), stored so on_exit can kill them and tests can
+# assert animated-vs-snap. null in the reduce_motion (snap) path.
+var _dim_tween: Tween = null
+var _reveal_tween: Tween = null
+var _pulse_tween: Tween = null
+# DimBackdrop resting alpha, captured in _ready from the .tscn-authored color
+# (the fade animates 0 → this; reduce_motion snaps straight to it).
+var _dim_target_alpha: float = 0.0
+# True once on_exit has run. Guards the fire-and-forget dwell SceneTreeTimer
+# callback from revealing / pulsing (and orphaning a looping tween) on a screen
+# the player already tapped through before the 1.5s dwell elapsed.
+var _exited: bool = false
+
 
 @onready var _dim_backdrop: ColorRect = $DimBackdrop
 # Sprint 22 S22-M3: BiomeBackground at z=-1, set to the cleared biome's
@@ -75,11 +98,15 @@ var _tap_catcher: Control = null
 # ---------------------------------------------------------------------------
 
 func _ready() -> void:
-	pass  # No buttons in MVP — tap-anywhere via DimBackdrop input handler.
+	# Capture the .tscn-authored DimBackdrop alpha as the fade-in target before
+	# any ceremony animation mutates it (GDD §C.6 fades 0 → resting).
+	if _dim_backdrop != null:
+		_dim_target_alpha = _dim_backdrop.color.a
 
 
 func on_enter() -> void:
 	_enter_time_msec = Time.get_ticks_msec()
+	_exited = false
 
 	# Defensive _replay_in_flight invariant guard per GDD §C.7 + AC-25-15
 	# + §E.12. Foreground-only — if invariant violated, route to guild_hall.
@@ -189,6 +216,13 @@ func on_enter() -> void:
 	# null-snapshot / replay-in-flight early-returns above).
 	_build_wireframe_once()
 
+	# Ceremony (GDD §C.6): DimBackdrop fade-in + staggered reveal (reduce_motion
+	# → snap). Runs after _build_wireframe_once so every ceremony row exists.
+	_play_entrance_ceremony()
+	# One-shot victory sting as the screen settles (GDD §F). Not reduce_motion-
+	# gated — audio is not motion. New-high vs re-clear picks the cue.
+	_play_audio_cue(_select_victory_cue(_is_new_high_clear))
+
 
 func on_exit() -> void:
 	if gui_input.is_connected(_on_backdrop_input):
@@ -197,6 +231,9 @@ func on_exit() -> void:
 		_dim_backdrop.gui_input.disconnect(_on_backdrop_input)
 	if _tap_catcher != null and _tap_catcher.gui_input.is_connected(_on_backdrop_input):
 		_tap_catcher.gui_input.disconnect(_on_backdrop_input)
+
+	_exited = true
+	_kill_ceremony_tweens()
 
 
 func on_pause() -> void:
@@ -287,11 +324,145 @@ func _on_backdrop_input(event: InputEvent) -> void:
 
 
 func _on_continuation_dwell_elapsed() -> void:
+	# Fire-and-forget SceneTreeTimer: if the player tapped through to guild_hall
+	# before the dwell elapsed, on_exit has already run — bail so we neither
+	# reveal nor orphan a looping pulse tween on an exited screen.
+	if _exited or not is_inside_tree():
+		return
 	_continuation_prompt.visible = true
+	if SceneManager.reduce_motion:
+		# Static at full alpha — no pulse (§C.6 reduce_motion).
+		_continuation_prompt.modulate.a = 1.0
+		return
+	# Gentle 0.8 ↔ 1.0 alpha pulse on a 1.5s loop (§C.6). Tween-level trans/ease
+	# applies to both legs; only the up-leg overrides its start via .from().
+	_pulse_tween = create_tween().set_loops().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_pulse_tween.tween_property(_continuation_prompt, "modulate:a", 1.0, PULSE_HALF_SEC).from(PROMPT_PULSE_MIN_A)
+	_pulse_tween.tween_property(_continuation_prompt, "modulate:a", PROMPT_PULSE_MIN_A, PULSE_HALF_SEC)
 
 
 func _continue_to_guild_hall() -> void:
 	SceneManager.request_screen("guild_hall", SceneManager.TransitionType.CROSS_FADE)
+
+
+# ---------------------------------------------------------------------------
+# Entrance ceremony — DimBackdrop fade-in + staggered reveal (GDD #25 §C.6).
+# All reduce_motion-gated to a snap per §C.6 + ADR-0007. §C.8 no-skip: there is
+# no control to bypass the ceremony — tap-to-continue (after grace + dwell) is
+# the only dismissal. The TapCatcher is a root sibling (not a CenterVBox row),
+# so the reveal never touches tap routing (playtest-fix contract).
+# ---------------------------------------------------------------------------
+
+func _play_entrance_ceremony() -> void:
+	if SceneManager.reduce_motion:
+		# Snap: DimBackdrop straight to its resting alpha; rows stay fully
+		# opaque (untouched). No tweens created (§C.6 reduce_motion).
+		_set_dim_alpha(_dim_target_alpha)
+		return
+
+	# DimBackdrop gentle fade-in 0 → resting over DIM_FADE_SEC, ease-in (§C.6).
+	# Resting alpha is the .tscn-authored value (captured in _ready), NOT the
+	# GDD §G 0.4 — the shipped 0.75 was tuned over the S22 biome background,
+	# which postdates the GDD. Adding the fade is this story's scope; re-tuning
+	# the resting dim level is not.
+	_set_dim_alpha(0.0)
+	_dim_tween = create_tween()
+	_dim_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_dim_tween.tween_property(_dim_backdrop, "color:a", _dim_target_alpha, DIM_FADE_SEC).from(0.0)
+
+	# Staggered fade-in of the ceremony rows in visual order (cozy progressive
+	# reveal). GDD §C.6 names HeroPortraitRow → DividerLine → … but those nodes
+	# do not exist in this flat-CenterVBox scene; we map the reveal onto the
+	# actual rows.
+	var rows: Array[Control] = _reveal_rows()
+	if rows.is_empty():
+		return
+	# Cap the TOTAL reveal at REVEAL_TOTAL_CAP_SEC (§C.6 "total ≤500ms"): the last
+	# row starts at step*(n-1) and then fades for REVEAL_FADE_SEC, so the trailing
+	# fade has to fit inside the cap too — not just the stagger span. Budget the
+	# stagger as (cap − fade); prefer the natural REVEAL_STAGGER_SEC when rows are
+	# few. (Dividing the cap by n alone overshoots once n ≥ 6.)
+	var stagger_budget: float = maxf(0.0, REVEAL_TOTAL_CAP_SEC - REVEAL_FADE_SEC)
+	var step: float = minf(REVEAL_STAGGER_SEC, stagger_budget / float(maxi(1, rows.size() - 1)))
+	# Tween-level trans/ease applies to every row; only the per-row start delay
+	# differs (the staggered fade-in).
+	_reveal_tween = create_tween().set_parallel(true).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	for i: int in range(rows.size()):
+		var row: Control = rows[i]
+		row.modulate.a = 0.0
+		_reveal_tween.tween_property(row, "modulate:a", 1.0, REVEAL_FADE_SEC).set_delay(step * float(i))
+
+
+## The CenterVBox rows to stagger-reveal, in child (visual) order, excluding the
+## ContinuationPrompt (it has its own dwell + pulse). Built after
+## _build_wireframe_once so eyebrow / party badges / spoils / loot rows exist.
+## Assumption: every OTHER CenterVBox child is a reveal row — if a non-row node
+## (spacer, separator) is later added to that VBox, exclude it here too.
+func _reveal_rows() -> Array[Control]:
+	var rows: Array[Control] = []
+	var vbox: Node = _continuation_prompt.get_parent()
+	if vbox == null:
+		return rows
+	for child: Node in vbox.get_children():
+		if child == _continuation_prompt:
+			continue
+		var ctrl: Control = child as Control
+		if ctrl != null:
+			rows.append(ctrl)
+	return rows
+
+
+func _set_dim_alpha(a: float) -> void:
+	if _dim_backdrop != null:
+		_dim_backdrop.color.a = a
+
+
+## Kills a tween if it is live (null-safe + valid-guarded).
+func _kill_tween(tw: Tween) -> void:
+	if tw != null and tw.is_valid():
+		tw.kill()
+
+
+## Kills any in-flight ceremony tweens (fade / reveal / pulse) and clears the
+## handles. Called from on_exit so a looping pulse never outlives the screen.
+func _kill_ceremony_tweens() -> void:
+	_kill_tween(_dim_tween)
+	_kill_tween(_reveal_tween)
+	_kill_tween(_pulse_tween)
+	_dim_tween = null
+	_reveal_tween = null
+	_pulse_tween = null
+
+
+# ---------------------------------------------------------------------------
+# Victory audio sting (GDD #25 §F / §C.1 R5). Mirrors return_to_app's pure
+# cue-selector + defensive play helper. Audio is NOT reduce_motion-gated.
+# ---------------------------------------------------------------------------
+
+## Selects the victory sting by clear significance. Pure (no I/O) so the
+## new-high-vs-re-clear split is unit-testable without the audio singleton. A
+## new-high advancement (a floor newly added to the high-water mark — WIN or
+## LOSING first-clear alike, per Floor Unlock §C.1 R5) gets the celebratory
+## milestone fanfare; a re-clear gets the warm settle chime (the cozy "quieter
+## confirmation" of GDD §A / §C.3). Distinct from the in-dungeon
+## sfx_reward_floor_clear_fanfare that already fired ~1.5s earlier on a
+## first-clear, so there is no double. The exact cues are a taste call the audio
+## director can retune — only the new-high-vs-re-clear split is load-bearing.
+func _select_victory_cue(is_new_high: bool) -> StringName:
+	if is_new_high:
+		return &"sfx_reward_class_unlock_fanfare"
+	return &"sfx_reward_level_up_chime"
+
+
+## Plays a one-shot SFX cue through the AudioRouter autoload, mirroring the
+## return_to_app / recruitment defensive idiom (UI sounds route via AudioRouter).
+## No-ops when the autoload is absent (headless tests) or lacks play_sfx, so this
+## never crashes a test that runs without the audio singleton.
+func _play_audio_cue(cue: StringName) -> void:
+	var router: Node = get_node_or_null("/root/AudioRouter")
+	if router == null or not router.has_method("play_sfx"):
+		return
+	router.play_sfx(cue)
 
 
 # ---------------------------------------------------------------------------

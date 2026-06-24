@@ -32,6 +32,13 @@ func _make_screen() -> Node:
 # Track injected heroes for cleanup.
 var _injected_hero_ids: Array[int] = []
 
+# Snapshot of the live SceneManager.reduce_motion flag, saved in before_test and
+# restored in after_test so motion-vs-snap toggles never leak across tests.
+# reduce_motion is a plain var (scene_manager.gd:312) — direct assignment does
+# NOT persist to user://settings.cfg (only set_reduce_motion() does), mirroring
+# reduce_motion_clamp_test.gd's "bypass ConfigFile" pattern.
+var _saved_reduce_motion: bool = false
+
 
 func _inject_hero(id: int, class_id: String, level: int = 1) -> RefCounted:
 	var fake: RefCounted = HeroInstanceScript.new()
@@ -45,6 +52,14 @@ func _inject_hero(id: int, class_id: String, level: int = 1) -> RefCounted:
 	return fake
 
 
+func before_test() -> void:
+	# Default every test to the reduce_motion snap path so the existing contract
+	# tests create no ceremony tweens; the motion-path tests (Group G) opt back
+	# in with SceneManager.reduce_motion = false explicitly.
+	_saved_reduce_motion = SceneManager.reduce_motion
+	SceneManager.reduce_motion = true
+
+
 func after_test() -> void:
 	for id: int in _injected_hero_ids:
 		HeroRoster._heroes.erase(id)
@@ -53,6 +68,8 @@ func after_test() -> void:
 	DungeonRunOrchestrator.run_snapshot = null
 	DungeonRunOrchestrator._dispatched_floor_index = 0
 	DungeonRunOrchestrator._dispatched_biome_id = ""
+	# Restore the live reduce_motion flag snapshotted in before_test.
+	SceneManager.reduce_motion = _saved_reduce_motion
 
 
 # Helper to build a synthetic run_snapshot for the Victory Moment screen
@@ -319,3 +336,132 @@ func test_victory_moment_tap_catcher_covers_content_above_panel() -> void:
 	screen.on_exit()
 	# Disconnected after on_exit (mirrors the DimBackdrop lifecycle).
 	assert_bool(catcher.gui_input.is_connected(screen._on_backdrop_input)).is_false()
+
+
+# ===========================================================================
+# Group G — Entrance ceremony (GDD §C.6): reduce_motion snap vs animated path.
+#
+# reduce_motion is the live SceneManager flag; before_test defaults it to true
+# (snap), so these tests set it explicitly per case. The DimBackdrop resting
+# alpha is captured from the .tscn in _ready (shipped 0.75, tuned over the S22
+# biome bg — the GDD §G 0.4 predates that bg), so we assert against the captured
+# _dim_target_alpha rather than a hardcoded literal.
+# ===========================================================================
+
+# G-01: reduce_motion ON → DimBackdrop snaps straight to its resting alpha and
+# NO fade/reveal tweens are created (§C.6 reduce_motion).
+func test_victory_moment_reduce_motion_snaps_dim_backdrop_no_tweens() -> void:
+	var screen: Node = _make_screen()
+	SceneManager.reduce_motion = true
+	_seed_run_snapshot(1, "forest_reach", 3, 100, [])
+	screen.on_enter()
+	assert_float(screen._dim_backdrop.color.a).is_equal(screen._dim_target_alpha)
+	assert_bool(screen._dim_tween == null).is_true()
+	assert_bool(screen._reveal_tween == null).is_true()
+	screen.on_exit()
+
+
+# G-02: reduce_motion OFF → DimBackdrop fade + staggered reveal tweens are
+# created and live; on_exit kills and clears them (no tween leak past the screen).
+func test_victory_moment_motion_on_creates_and_clears_ceremony_tweens() -> void:
+	var screen: Node = _make_screen()
+	SceneManager.reduce_motion = false
+	_seed_run_snapshot(1, "forest_reach", 3, 100, [])
+	screen.on_enter()
+	assert_bool(screen._dim_tween != null).is_true()
+	assert_bool(screen._reveal_tween != null).is_true()
+	assert_bool(screen._dim_tween.is_valid()).is_true()
+	assert_bool(screen._reveal_tween.is_valid()).is_true()
+	screen.on_exit()
+	# on_exit → _kill_ceremony_tweens clears the handles.
+	assert_bool(screen._dim_tween == null).is_true()
+	assert_bool(screen._reveal_tween == null).is_true()
+	# Exiting before the ~1.5s dwell ever fires must leave no orphaned pulse
+	# either — the fast tap-through path (the pulse is born only at the dwell).
+	assert_bool(screen._pulse_tween == null).is_true()
+
+
+# G-03: reduce_motion ON → continuation prompt is static at full alpha after the
+# dwell, with NO pulse tween (§C.6 reduce_motion).
+func test_victory_moment_reduce_motion_continuation_prompt_static_no_pulse() -> void:
+	var screen: Node = _make_screen()
+	SceneManager.reduce_motion = true
+	_seed_run_snapshot(1, "forest_reach", 0, 100, [])
+	screen.on_enter()
+	screen._on_continuation_dwell_elapsed()
+	assert_bool(screen._continuation_prompt.visible).is_true()
+	assert_float(screen._continuation_prompt.modulate.a).is_equal(1.0)
+	assert_bool(screen._pulse_tween == null).is_true()
+	screen.on_exit()
+
+
+# G-04: reduce_motion OFF → continuation prompt pulses (looping tween created +
+# live); on_exit kills it.
+func test_victory_moment_motion_on_continuation_prompt_pulses() -> void:
+	var screen: Node = _make_screen()
+	SceneManager.reduce_motion = false
+	_seed_run_snapshot(1, "forest_reach", 0, 100, [])
+	screen.on_enter()
+	screen._on_continuation_dwell_elapsed()
+	assert_bool(screen._continuation_prompt.visible).is_true()
+	assert_bool(screen._pulse_tween != null).is_true()
+	assert_bool(screen._pulse_tween.is_valid()).is_true()
+	screen.on_exit()
+	assert_bool(screen._pulse_tween == null).is_true()
+
+
+# ===========================================================================
+# Group H — Victory audio cue selection (GDD §F / §C.1 R5).
+#
+# _select_victory_cue is pure (no AudioRouter dependency), so the
+# new-high-vs-re-clear split is unit-testable directly. Audio is NOT
+# reduce_motion-gated — it fires on the valid path in on_enter regardless.
+# ===========================================================================
+
+# H-01: new-high clear → the milestone fanfare cue; and the two cues differ
+# (the load-bearing split — exact ids are a retune-able taste call).
+func test_victory_moment_select_cue_new_high_returns_milestone_fanfare() -> void:
+	var screen: Node = _make_screen()
+	var new_high_cue: StringName = screen._select_victory_cue(true)
+	var re_clear_cue: StringName = screen._select_victory_cue(false)
+	assert_str(String(new_high_cue)).is_equal("sfx_reward_class_unlock_fanfare")
+	# The split must be real — new-high and re-clear are distinct cues.
+	assert_bool(new_high_cue != re_clear_cue).is_true()
+
+
+# H-02: re-clear → the warm settle chime (cozy "quieter confirmation").
+func test_victory_moment_select_cue_re_clear_returns_settle_chime() -> void:
+	var screen: Node = _make_screen()
+	assert_str(String(screen._select_victory_cue(false))).is_equal("sfx_reward_level_up_chime")
+
+
+# ===========================================================================
+# Group I — Edge cases (GDD §E)
+# ===========================================================================
+
+# E.3: zero kills renders "0" (data honesty — the row is NOT hidden).
+func test_victory_moment_zero_kills_renders_zero() -> void:
+	var screen: Node = _make_screen()
+	_seed_run_snapshot(1, "forest_reach", 0, 100, [])
+	screen.on_enter()
+	assert_str(screen._kill_count_value.text).is_equal("0")
+	screen.on_exit()
+
+
+# E.10 (grace half): a tap inside the TAP_GRACE_MS window is ignored — the early
+# return fires BEFORE _continue_to_guild_hall, so SceneManager.request_screen
+# (which needs MainRoot, absent headless — see Group B) is never reached and the
+# screen survives. The post-grace dismiss itself is a playtest item (Group B).
+func test_victory_moment_tap_within_grace_is_ignored() -> void:
+	var screen: Node = _make_screen()
+	_seed_run_snapshot(1, "forest_reach", 3, 100, [])
+	screen.on_enter()
+	# Guarantee we are inside the grace window regardless of test-runner timing.
+	screen._enter_time_msec = Time.get_ticks_msec()
+	var ev: InputEventMouseButton = InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	screen._on_backdrop_input(ev)
+	# No navigation attempted → screen still valid (no partial-state crash).
+	assert_bool(is_instance_valid(screen)).is_true()
+	screen.on_exit()
