@@ -112,6 +112,30 @@ var pseudolocale_enabled: bool = false
 
 
 # ---------------------------------------------------------------------------
+# Locale persistence (Settings GDD #30 §C.5 / ADR-0026 §C.5, D-b)
+# ---------------------------------------------------------------------------
+
+## ConfigFile section + key under which the player's chosen locale persists,
+## per Settings GDD #30 §C.5 and ADR-0026 §C.5. The boot-read
+## ([method _apply_persisted_locale]) and the write ([method persist_locale])
+## both address exactly this section/key.
+const SETTINGS_LOCALE_SECTION: String = "locale"
+const SETTINGS_LOCALE_KEY: String = "active_locale"
+
+## Path to the persisted-settings ConfigFile. This is the SAME file
+## SceneManager persists [code][accessibility]/reduce_motion[/code] into, so
+## every write here is load-modify-save (see [method persist_locale]) to avoid
+## clobbering unrelated sections.
+##
+## Overridable by tests: assign before the autoload's [method _ready] runs (or
+## before calling the persistence methods on a fresh instance) so
+## locale-persistence specs isolate from the real
+## [code]user://settings.cfg[/code]. Mirrors SceneManager's
+## [code]_settings_cfg_path[/code] — the canonical path-override pattern.
+var _settings_cfg_path: String = "user://settings.cfg"
+
+
+# ---------------------------------------------------------------------------
 # Boot
 # ---------------------------------------------------------------------------
 
@@ -131,6 +155,77 @@ func _ready() -> void:
 		var path: String = LOCALE_DIR_PATH + "/" + filename
 		_load_csv_file(path)
 	TranslationServer.set_locale(DEFAULT_LOCALE)
+	# Apply the player's persisted locale (if any) OVER the default just set.
+	# Owned here rather than in Settings because LocaleLoader already owns the
+	# boot-time set_locale and is a boot autoload — a Settings screen cannot run
+	# before boot, so the read cannot live there (ADR-0026 D-b). Settings only
+	# triggers the write, via [method persist_locale].
+	_apply_persisted_locale()
+
+
+# ---------------------------------------------------------------------------
+# Locale persistence
+# ---------------------------------------------------------------------------
+
+## Reads the player's persisted locale from [member _settings_cfg_path] and, if
+## it names a currently-loaded locale, switches [TranslationServer] to it.
+## Called from [method _ready] AFTER [code]set_locale(DEFAULT_LOCALE)[/code], so
+## a valid persisted choice overrides the default while an absent or invalid one
+## leaves the default in place.
+##
+## Robustness (a broken settings file must never brick localization at boot):
+## [br]- A missing file is the expected first-launch path — silent, no warning.
+## [br]- Any other load error warns once and keeps the default locale.
+## [br]- A present-but-non-[String] value is type-guarded:
+##   [method ConfigFile.get_value] returns the supplied default ONLY when the
+##   key is ABSENT, not when it is present with the wrong type, so a stored
+##   non-string would otherwise slip through.
+## [br]- A locale not in [method TranslationServer.get_loaded_locales] is
+##   ignored (e.g. a save naming a locale a later build dropped).
+func _apply_persisted_locale() -> void:
+	var cfg := ConfigFile.new()
+	var err: Error = cfg.load(_settings_cfg_path)
+	if err == ERR_FILE_NOT_FOUND:
+		return
+	if err != OK:
+		push_warning("[LocaleLoader] _apply_persisted_locale: could not parse %s (err=%d); default locale kept." % [_settings_cfg_path, err])
+		return
+	var raw: Variant = cfg.get_value(SETTINGS_LOCALE_SECTION, SETTINGS_LOCALE_KEY, "")
+	if typeof(raw) != TYPE_STRING:
+		return
+	# An empty id (the absent-key default) is never a loaded locale, so the
+	# membership test alone correctly leaves the default in place.
+	var active: String = raw
+	if active != "" and active in TranslationServer.get_loaded_locales():
+		TranslationServer.set_locale(active)
+
+
+## Persists [param locale_id] as the player's chosen locale to
+## [member _settings_cfg_path]. Called by the Settings overlay's
+## [code]_on_locale_selected[/code] (ADR-0026 D-b: Settings triggers the write;
+## the boot-read in [method _apply_persisted_locale] is owned here so it runs
+## before any screen exists).
+##
+## Load-modify-save: the file is shared with SceneManager's
+## [code][accessibility]/reduce_motion[/code], so existing contents are loaded
+## first and only [code][locale]/active_locale[/code] is set — unrelated
+## sections are preserved. A save failure warns but does not raise: the
+## in-memory [method TranslationServer.set_locale] has already applied, so only
+## cross-restart persistence is lost, not the current switch.
+func persist_locale(locale_id: String) -> void:
+	if locale_id == "":
+		return  # Defensive: never persist an empty locale id.
+	var cfg := ConfigFile.new()
+	# Load existing contents to preserve unrelated sections; a missing file is
+	# the normal first-write case. Any other read error is surfaced, but we
+	# still write so the player's choice is not silently dropped.
+	var load_err: Error = cfg.load(_settings_cfg_path)
+	if load_err != OK and load_err != ERR_FILE_NOT_FOUND:
+		push_warning("[LocaleLoader] persist_locale: could not read %s before write (err=%d); unrelated settings keys may be overwritten." % [_settings_cfg_path, load_err])
+	cfg.set_value(SETTINGS_LOCALE_SECTION, SETTINGS_LOCALE_KEY, locale_id)
+	var save_err: Error = cfg.save(_settings_cfg_path)
+	if save_err != OK:
+		push_warning("[LocaleLoader] persist_locale: failed to persist locale '%s' to %s (err=%d)." % [locale_id, _settings_cfg_path, save_err])
 
 
 # ---------------------------------------------------------------------------

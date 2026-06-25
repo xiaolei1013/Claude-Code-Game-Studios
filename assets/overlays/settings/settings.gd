@@ -236,6 +236,11 @@ func _populate_locale_options() -> void:
 func _on_locale_selected(index: int) -> void:
 	var locale_id: String = _locale_option.get_item_text(index)
 	TranslationServer.set_locale(locale_id)
+	# Persist the choice so it survives a restart (closes Settings GDD #30 §C.5).
+	# The write is owned by LocaleLoader (load-modify-save preserves the shared
+	# user://settings.cfg, e.g. [accessibility]/reduce_motion); the matching
+	# boot-read lives there too, per ADR-0026 D-b.
+	LocaleLoader.persist_locale(locale_id)
 
 
 # ---------------------------------------------------------------------------

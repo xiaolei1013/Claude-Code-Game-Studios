@@ -24,6 +24,15 @@ var _snapshot_music_db: float = 0.0
 var _snapshot_sfx_db: float = 0.0
 var _snapshot_reduce_motion: bool = false
 var _snapshot_master_muted: bool = false
+# Reset (and any locale change) now persists via LocaleLoader.persist_locale,
+# which writes the SHARED user://settings.cfg. Redirect that write to a unique
+# temp path so these overlay tests never touch the dev machine's real settings.
+var _snapshot_locale_cfg_path: String = ""
+var _temp_locale_cfg_path: String = ""
+# The Reset/locale-select path also calls TranslationServer.set_locale; snapshot
+# and restore the live locale so a future multi-locale build can't leak it across
+# tests (today it is always "en", but the isolation must not depend on that).
+var _snapshot_locale: String = ""
 
 
 func before_test() -> void:
@@ -32,6 +41,10 @@ func before_test() -> void:
 	_snapshot_sfx_db = AudioRouter.get_sfx_volume_db()
 	_snapshot_reduce_motion = SceneManager.reduce_motion
 	_snapshot_master_muted = AudioRouter.is_master_muted()
+	_snapshot_locale_cfg_path = LocaleLoader._settings_cfg_path
+	_temp_locale_cfg_path = "user://test_%d_settings_overlay_locale.cfg" % Time.get_ticks_msec()
+	LocaleLoader._settings_cfg_path = _temp_locale_cfg_path
+	_snapshot_locale = TranslationServer.get_locale()
 
 
 func after_test() -> void:
@@ -40,6 +53,10 @@ func after_test() -> void:
 	AudioRouter.set_sfx_volume_db(_snapshot_sfx_db)
 	SceneManager.set_reduce_motion(_snapshot_reduce_motion)
 	AudioRouter.set_master_muted(_snapshot_master_muted)
+	LocaleLoader._settings_cfg_path = _snapshot_locale_cfg_path
+	TranslationServer.set_locale(_snapshot_locale)
+	if FileAccess.file_exists(_temp_locale_cfg_path):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(_temp_locale_cfg_path))
 
 
 # ---------------------------------------------------------------------------
