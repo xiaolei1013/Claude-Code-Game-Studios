@@ -88,7 +88,7 @@ func _build() -> void:
 	# Game title wordmark.
 	var title_label: Label = Label.new()
 	title_label.name = "Wordmark"
-	title_label.text = "Lantern Guild"
+	title_label.text = tr("app_wordmark")
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.theme_type_variation = &"IdentityHeader"
 	title_label.add_theme_font_size_override("font_size", 52)
@@ -96,7 +96,7 @@ func _build() -> void:
 
 	# Tagline.
 	var tagline: Label = ParchmentKitScript.caption(
-		"The dungeon is dark. Send a light.", ParchmentKitScript.MUTED, 16)
+		tr("app_tagline"), ParchmentKitScript.MUTED, 16)
 	tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(tagline)
 
@@ -110,11 +110,11 @@ func _build() -> void:
 	col.add_child(gap)
 
 	# Primary CTA.
-	var start_btn: Button = _nav_button("Start Expedition", _on_start_pressed)
+	var start_btn: Button = _nav_button(tr("start_menu_start_button"), _on_start_pressed)
 	start_btn.name = "StartButton"
 	col.add_child(start_btn)
 
-	var quit_btn: Button = _nav_button("Quit", _on_quit_pressed)
+	var quit_btn: Button = _nav_button(tr("start_menu_quit_button"), _on_quit_pressed)
 	quit_btn.name = "QuitButton"
 	col.add_child(quit_btn)
 

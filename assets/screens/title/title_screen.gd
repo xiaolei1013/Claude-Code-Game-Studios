@@ -52,7 +52,7 @@ func _build() -> void:
 	# Wordmark.
 	var wordmark: Label = Label.new()
 	wordmark.name = "Wordmark"
-	wordmark.text = "Lantern Guild"
+	wordmark.text = tr("app_wordmark")
 	wordmark.theme_type_variation = &"IdentityHeader"
 	wordmark.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	wordmark.add_theme_font_size_override("font_size", 48)
@@ -60,7 +60,7 @@ func _build() -> void:
 
 	# Tagline.
 	var tagline: Label = ParchmentKitScript.caption(
-		"The dungeon is dark. Send a light.", ParchmentKitScript.MUTED, 16)
+		tr("app_tagline"), ParchmentKitScript.MUTED, 16)
 	tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	center.add_child(tagline)
 
@@ -69,9 +69,9 @@ func _build() -> void:
 	center.add_child(gap)
 
 	# Menu.
-	center.add_child(_menu_button("Continue the Watch", _on_continue_pressed))
-	center.add_child(_menu_button("Settings", _on_settings_pressed))
-	center.add_child(_menu_button("Quit to Desktop", _on_quit_pressed))
+	center.add_child(_menu_button(tr("title_screen_continue_button"), _on_continue_pressed))
+	center.add_child(_menu_button(tr("title_screen_settings_button"), _on_settings_pressed))
+	center.add_child(_menu_button(tr("settings_quit_to_desktop_button"), _on_quit_pressed))
 
 	# Footer build-meta.
 	var footer: Label = ParchmentKitScript.eyebrow(_footer_text())

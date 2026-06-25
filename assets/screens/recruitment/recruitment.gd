@@ -43,6 +43,7 @@ var POOL_SIZE: int = RecruitmentScript.POOL_SIZE
 ]
 @onready var _gold_counter: Label = $HeaderBar/HeaderHBox/GoldCounter
 @onready var _back_button: Button = $HeaderBar/HeaderHBox/BackButton
+@onready var _screen_title_label: Label = $HeaderBar/HeaderHBox/ScreenTitleLabel
 @onready var _refresh_pool_button: Button = $FooterBar/RefreshPoolButton
 # Sprint 22 S22-M3: BiomeBackground at z=-1 (cozy tavern preset). Typed as
 # ColorRect (base class) — `class_name BiomeBackground` global registration
@@ -67,6 +68,11 @@ var _wire_built: bool = false
 
 
 func _ready() -> void:
+	# Scene-baked label text wired here so localization applies at runtime
+	# without editing the .tscn (i18n invariant: en locale == original literal).
+	_back_button.text = tr("back_to_guild_hall_button")
+	if _screen_title_label != null:
+		_screen_title_label.text = tr("recruitment_screen_title")
 	# Touch-feedback wired in _ready (one-time, .tscn-defined Buttons).
 	# Per-row RecruitButtons are wired in on_enter (signal-bind per row).
 	UIFrameworkScript.wire_touch_feedback(_back_button)
@@ -150,8 +156,9 @@ func _refresh_gold_counter() -> void:
 	# Sprint 17 S17-S5: UIFramework.format_short_number now ships; gold
 	# values >= 1000 render as "1.2K" / "4.5M" / etc. per cozy-display
 	# thresholds (Recruit Screen GDD #21 §C.3).
-	_gold_counter.text = "%s gold" % UIFrameworkScript.format_short_number(
-		Economy.get_gold_balance()
+	_gold_counter.text = UIFrameworkScript.format_localized(
+		"recruitment_gold_counter_format",
+		[UIFrameworkScript.format_short_number(Economy.get_gold_balance())]
 	)
 
 
@@ -240,13 +247,19 @@ func _render_pool_entry(entry: Control, pool_index: int, class_id: String) -> vo
 		class_display = class_id.capitalize()
 	var counter_archetype: String = String(class_data.counter_archetype) if "counter_archetype" in class_data else ""
 	if counter_archetype != "":
-		class_name_label.text = "%s · vs %s" % [class_display, counter_archetype]
+		class_name_label.text = UIFrameworkScript.format_localized(
+			"recruitment_class_matchup_format",
+			[class_display, counter_archetype]
+		)
 	else:
 		class_name_label.text = class_display
 
 	# CostLabel via Recruitment.get_recruit_cost(pool_index).
 	var cost: int = Recruitment.get_recruit_cost(pool_index)
-	cost_label.text = "%s gold" % UIFrameworkScript.format_short_number(cost)
+	cost_label.text = UIFrameworkScript.format_localized(
+		"recruitment_gold_counter_format",
+		[UIFrameworkScript.format_short_number(cost)]
+	)
 
 	# OwnedLabel via HeroRoster.get_copies_owned.
 	var copies: int = HeroRoster.get_copies_owned(class_id)
@@ -260,7 +273,7 @@ func _render_pool_entry(entry: Control, pool_index: int, class_id: String) -> vo
 	var affordable: bool = Economy.get_gold_balance() >= cost and cost > 0
 	recruit_button.disabled = not affordable
 	recruit_button.modulate.a = 1.0 if affordable else 0.4
-	recruit_button.text = tr("dispatch_button") if false else "Recruit"  # Placeholder; tr key is "recruit_button" candidate post-/design-review
+	recruit_button.text = tr("recruitment_recruit_button")
 
 
 func _refresh_refresh_button_cost() -> void:
@@ -268,7 +281,10 @@ func _refresh_refresh_button_cost() -> void:
 		return
 	var refreshes_today: int = Recruitment.get_refreshes_today()
 	var cost: int = Recruitment.refresh_cost(refreshes_today)
-	_refresh_pool_button.text = "Refresh Pool — %s gold" % UIFrameworkScript.format_short_number(cost)
+	_refresh_pool_button.text = UIFrameworkScript.format_localized(
+		"recruitment_refresh_pool_button_format",
+		[UIFrameworkScript.format_short_number(cost)]
+	)
 	var affordable: bool = Economy.get_gold_balance() >= cost
 	_refresh_pool_button.disabled = not affordable
 	# Sprint 21 S21-M2: Affordability Gating pattern #14 — 40% opacity on

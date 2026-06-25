@@ -307,6 +307,16 @@ var _party_hp_bar: ProgressBar = null
 var _party_hp_label: Label = null
 var _enemies_remaining_label: Label = null
 
+## Cached localized "%d/%d" format strings for the per-tick battle-status
+## readout. Resolved ONCE in [method _ready] — never inside the 20 Hz tick path
+## ([method _refresh_battle_status] is driven by [method _on_tick_fired]), where
+## a TranslationServer lookup every tick would be wasted work that this view's
+## hot-path contract forbids. Defaults match the en CSV so the readout is
+## correct even before _ready runs; PR4's format-parity test keeps the "%d/%d"
+## specifiers invariant across locales.
+var _hp_format: String = "HP %d/%d"
+var _enemies_format: String = "Enemies %d/%d"
+
 ## Party diorama layer (Hero Combat Presence epic, GDD #35 · Story 005 · ADR-0025).
 ## A dedicated, additive Control holding one hero sprite per OCCUPIED formation
 ## slot — the party the player dispatched, rendered center-stage below the enemy
@@ -387,6 +397,19 @@ func _ready() -> void:
 	$StatsPanel/TickRow/TickPrefixLabel.text = tr("tick_label_prefix")
 	$StatsPanel/KillCountRow/KillCountPrefixLabel.text = tr("kill_count_label_prefix")
 	$HeaderLabel.text = tr("dungeon_run_view_title")
+
+	# Cache the two per-tick battle-status format strings ONCE. Resolving them
+	# inside _on_tick_fired (20 Hz) would hit TranslationServer every tick.
+	# Mirror UIFramework.format_localized's "% only when a specifier is present"
+	# guard here: a missing key makes tr() return the bare key (no "%"), and a
+	# "%"-less `_hp_format % [...]` is a FATAL GDScript abort — so only adopt the
+	# localized value when it carries a specifier; otherwise keep the safe default.
+	var hp_fmt: String = tr("dungeon_run_hp_format")
+	if "%" in hp_fmt:
+		_hp_format = hp_fmt
+	var enemies_fmt: String = tr("dungeon_run_enemies_format")
+	if "%" in enemies_fmt:
+		_enemies_format = enemies_fmt
 
 	# Ensure overlay is hidden at scene-ready time (redundant with .tscn default
 	# but makes the intent explicit for code readers).
@@ -783,9 +806,9 @@ func _refresh_battle_status() -> void:
 		_party_hp_bar.max_value = maxf(1.0, float(max_hp))
 		_party_hp_bar.value = float(cur_hp)
 	if _party_hp_label != null:
-		_party_hp_label.text = "HP %d/%d" % [cur_hp, max_hp]
+		_party_hp_label.text = _hp_format % [cur_hp, max_hp]
 	if _enemies_remaining_label != null:
-		_enemies_remaining_label.text = "Enemies %d/%d" % [remaining, total]
+		_enemies_remaining_label.text = _enemies_format % [remaining, total]
 
 
 # ---------------------------------------------------------------------------
@@ -1875,7 +1898,7 @@ func _build_run_stats_hud() -> void:
 
 	var btn: Button = Button.new()
 	btn.name = "WireReturnButton"
-	btn.text = "Return to Hall"
+	btn.text = tr("dungeon_run_return_to_hall_button")
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.custom_minimum_size = Vector2(150, 44)
 	btn.z_index = 2

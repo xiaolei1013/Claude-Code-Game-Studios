@@ -66,14 +66,14 @@ func _build() -> void:
 	var titles: VBoxContainer = VBoxContainer.new()
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(titles)
-	titles.add_child(ParchmentKitScript.eyebrow("· The guild keeps a record ·", ParchmentKitScript.ACCENT))
+	titles.add_child(ParchmentKitScript.eyebrow(tr("codex_eyebrow"), ParchmentKitScript.ACCENT))
 	var title: Label = Label.new()
-	title.text = "The Codex"
+	title.text = tr("codex_title")
 	title.theme_type_variation = &"IdentityHeader"
 	titles.add_child(title)
 	var close_btn: Button = Button.new()
 	close_btn.name = "CloseButton"
-	close_btn.text = "Close"
+	close_btn.text = tr("codex_close_button")
 	close_btn.focus_mode = Control.FOCUS_NONE
 	close_btn.custom_minimum_size = Vector2(100, 44)
 	close_btn.pressed.connect(_on_close_pressed)
@@ -88,8 +88,11 @@ func _build() -> void:
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(tabs)
 	tabs.add_child(_make_catalogue_tab("Heroes", "classes"))
+	tabs.set_tab_title(0, tr("codex_tab_heroes"))
 	tabs.add_child(_make_catalogue_tab("Monsters", "enemies"))
+	tabs.set_tab_title(1, tr("codex_tab_monsters"))
 	tabs.add_child(_make_catalogue_tab("Dungeons", "biomes"))
+	tabs.set_tab_title(2, tr("codex_tab_dungeons"))
 
 
 ## One catalogue tab: a scrollable grid of cards built from
@@ -110,7 +113,7 @@ func _make_catalogue_tab(title: String, content_type: String) -> Control:
 	if DataRegistry != null:
 		entries = DataRegistry.get_all_by_type(content_type)
 	if entries.is_empty():
-		grid.add_child(ParchmentKitScript.caption("Nothing recorded yet.", ParchmentKitScript.MUTED))
+		grid.add_child(ParchmentKitScript.caption(tr("codex_empty_state"), ParchmentKitScript.MUTED))
 		return scroll
 	for res: Variant in entries:
 		grid.add_child(_make_card(res, content_type))

@@ -98,6 +98,7 @@ var _wire_built: bool = false
 @onready var _class_name_label: Label = $DetailPanel/ContentVBox/HeaderRow/HeaderLabels/ClassNameLabel
 @onready var _owned_count_label: Label = $DetailPanel/ContentVBox/HeaderRow/HeaderLabels/OwnedCountLabel
 @onready var _counter_archetype_label: Label = $DetailPanel/ContentVBox/HeaderRow/HeaderLabels/CounterArchetypeLabel
+@onready var _level_label: Label = $DetailPanel/ContentVBox/StatsBlock/LevelRow/LevelLabel
 @onready var _level_value_label: Label = $DetailPanel/ContentVBox/StatsBlock/LevelRow/LevelValueLabel
 @onready var _xp_label: Label = $DetailPanel/ContentVBox/StatsBlock/XPRow/XPLabel
 @onready var _xp_progress_bar: ProgressBar = $DetailPanel/ContentVBox/StatsBlock/XPRow/XPProgressBar
@@ -139,6 +140,15 @@ func _ready() -> void:
 	UIFrameworkScript.wire_touch_feedback(_prestige_button)
 	UIFrameworkScript.wire_touch_feedback(_prestige_confirm_button)
 	UIFrameworkScript.wire_touch_feedback(_prestige_cancel_button)
+	# i18n — static labels (scene-baked text → tr()).
+	_level_label.text = tr("hero_detail_level_label")
+	_close_button.text = tr("hero_detail_close_button")
+	_prestige_cancel_button.text = tr("prestige_confirmation_button_cancel")
+	_prestige_confirm_button.text = tr("prestige_confirmation_button_confirm")
+	# i18n — scaffold pre-paints (overwritten at runtime by on_enter/_refresh_*).
+	_display_name_label.text = tr("hero_detail_name_scaffold")
+	_class_name_label.text = tr("hero_detail_class_scaffold")
+	_level_up_button.text = tr("hero_detail_level_up_button")
 
 
 func on_enter() -> void:
@@ -296,7 +306,7 @@ func _refresh_header() -> void:
 	# stays empty (rendered hidden via implicit zero-height layout).
 	var counter: String = String(_class_data.counter_archetype) if "counter_archetype" in _class_data else ""
 	if counter != "":
-		_counter_archetype_label.text = "Strong vs: %s" % counter
+		_counter_archetype_label.text = UIFrameworkScript.format_localized("hero_detail_counter_archetype_format", [counter])
 	else:
 		_counter_archetype_label.text = ""
 
@@ -330,7 +340,7 @@ func _refresh_level_up_button() -> void:
 	var tier: int = int(_class_data.get("tier")) if "tier" in _class_data else 1
 	var cost: int = Economy.level_cost(tier, _hero.current_level)
 	_cached_level_up_cost = cost
-	_level_up_button.text = tr("hero_detail_level_up_format") % UIFrameworkScript.format_short_number(cost)
+	_level_up_button.text = UIFrameworkScript.format_localized("hero_detail_level_up_format", [UIFrameworkScript.format_short_number(cost)])
 	_level_up_button.disabled = (Economy.get_gold_balance() < cost)
 
 

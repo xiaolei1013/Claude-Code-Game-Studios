@@ -106,11 +106,11 @@ func _build_wireframe() -> void:
 	var vbox: Node = get_node_or_null("Panel/VBox")
 	if vbox == null or _title_label == null:
 		return
-	var eyebrow: Label = ParchmentKitScript.eyebrow("· The guild waits ·", ParchmentKitScript.ACCENT)
+	var eyebrow: Label = ParchmentKitScript.eyebrow(tr("pause_menu_eyebrow"), ParchmentKitScript.ACCENT)
 	eyebrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(eyebrow)
 	vbox.move_child(eyebrow, 0)
-	var tagline: Label = ParchmentKitScript.caption("The hour-glass turns regardless.", ParchmentKitScript.MUTED, 13)
+	var tagline: Label = ParchmentKitScript.caption(tr("pause_menu_tagline"), ParchmentKitScript.MUTED, 13)
 	tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(tagline)
 	vbox.move_child(tagline, _title_label.get_index() + 1)
@@ -119,7 +119,7 @@ func _build_wireframe() -> void:
 	# screen as a modal. Boot still routes to Guild Hall (onboarding intact).
 	var to_title: Button = Button.new()
 	to_title.name = "ReturnToTitleButton"
-	to_title.text = "Return to Title"
+	to_title.text = tr("pause_menu_return_to_title_button")
 	to_title.focus_mode = Control.FOCUS_NONE
 	to_title.custom_minimum_size = Vector2(0, 52)
 	to_title.pressed.connect(_on_return_to_title_pressed)
