@@ -14,6 +14,7 @@
 ## 7 → 6. Tab labels are localized at runtime in on_enter.
 extends Screen
 
+@onready var _screen_title_label: Label = $ScreenTitleLabel
 @onready var _dispatch_nav_button: Button = $DispatchNavButton
 @onready var _toast_label: Label = $ToastLabel
 @onready var _gold_counter: Label = $GoldCounter
@@ -89,6 +90,8 @@ var _map_body: VBoxContainer = null
 
 
 func on_enter() -> void:
+	if _screen_title_label != null:
+		_screen_title_label.text = tr("guild_hall_title")
 	if _dispatch_nav_button == null:
 		push_error("[GuildHall] _dispatch_nav_button is NULL — @onready did not resolve. Check .tscn node name 'DispatchNavButton'.")
 		return
@@ -100,12 +103,14 @@ func on_enter() -> void:
 		_biome_background.set_biome("guild_hall_tavern")
 	# MVP icon: Guild Amber dispatch arrow alongside the CTA label (primary CTA
 	# = icon + text). NEAREST filter keeps the 24px pixel art crisp under stretch.
+	_dispatch_nav_button.text = tr("guild_hall_dispatch_button")
 	_dispatch_nav_button.icon = ICON_DISPATCH_ARROW
 	_dispatch_nav_button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	if not _dispatch_nav_button.pressed.is_connected(_on_dispatch_nav_pressed):
 		_dispatch_nav_button.pressed.connect(_on_dispatch_nav_pressed)
 
 	if _recruit_nav_button != null:
+		_recruit_nav_button.text = tr("guild_hall_recruit_button")
 		if not _recruit_nav_button.pressed.is_connected(_on_recruit_nav_pressed):
 			_recruit_nav_button.pressed.connect(_on_recruit_nav_pressed)
 	_refresh_gold_counter()
@@ -232,7 +237,7 @@ func _refresh_multiplier_label() -> void:
 	if _multiplier_label == null:
 		return
 	var mult: float = HeroRoster.get_prestige_multiplier()
-	_multiplier_label.text = "×%.2f" % mult
+	_multiplier_label.text = UIFrameworkScript.format_localized("guild_hall_prestige_multiplier_format", [mult])
 
 
 ## Tears down the current Retired-tab card children and rebuilds from
@@ -349,7 +354,7 @@ func _refresh_gold_counter() -> void:
 ## Updates the gold counter label, guarding against redundant assignments
 ## (Label.text setter marks the node dirty even on identical-value writes).
 func _set_gold_text(balance: int) -> void:
-	var formatted: String = "Gold: %d" % balance
+	var formatted: String = UIFrameworkScript.format_localized("guild_hall_gold_counter_format", [balance])
 	if _gold_counter.text != formatted:
 		_gold_counter.text = formatted
 
@@ -420,7 +425,7 @@ func _refresh_synergy_badge() -> void:
 	# so the locale-key convention lives in one place.
 	var display_name: String = UIFrameworkScript.synergy_display_name(synergy_id)
 	var effect_text: String = UIFrameworkScript.synergy_effect_text(synergy_id)
-	_synergy_label.text = "%s: %s" % [display_name, effect_text]
+	_synergy_label.text = UIFrameworkScript.format_localized("guild_hall_synergy_badge_format", [display_name, effect_text])
 	_synergy_badge.visible = true
 
 
@@ -534,18 +539,18 @@ func _build_hero_card(hero: RefCounted) -> Button:
 	if class_data != null and "counter_archetype" in class_data:
 		counter = String(class_data.counter_archetype)
 	if counter != "":
-		summary_label.text = "%s · %s · Lv %d · vs %s" % [
+		summary_label.text = UIFrameworkScript.format_localized("guild_hall_hero_card_counter_format", [
 			String(hero.get("display_name")),
 			class_id_str,
 			int(hero.get("current_level")),
 			counter,
-		]
+		])
 	else:
-		summary_label.text = "%s · %s · Lv %d" % [
+		summary_label.text = UIFrameworkScript.format_localized("guild_hall_hero_card_format", [
 			String(hero.get("display_name")),
 			class_id_str,
 			int(hero.get("current_level")),
-		]
+		])
 	summary_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.add_child(summary_label)
 

@@ -271,6 +271,59 @@ func _ready() -> void:
 	UIFrameworkScript.wire_touch_feedback(_preset_delete_confirm_button)
 	UIFrameworkScript.wire_touch_feedback(_preset_delete_cancel_button)
 
+	# i18n (PR2): wire scene-baked static strings that the .tscn scaffolds but
+	# the .gd does not otherwise overwrite at runtime. All keys exist in en.csv
+	# with byte-identical values so English output is unchanged.
+
+	# BackButton ("← Guild Hall") — shared key reused across screens.
+	_back_button.text = tr("back_to_guild_hall_button")
+
+	# DispatchButton ("Dispatch") — static label, not runtime-overwritten.
+	_dispatch_button.text = tr("dispatch_button")
+
+	# PresetsPanel title label ("Saved Formations").
+	var _presets_title_label: Label = $PresetsPanel/PresetsVBox/PresetsTitleLabel as Label
+	if _presets_title_label != null:
+		_presets_title_label.text = tr("formation_presets_panel_title")
+
+	# PresetsRow buttons: Recall / Save / Delete.
+	_preset_recall_button.text = tr("formation_presets_recall_button")
+	_preset_save_button.text = tr("formation_presets_save_button")
+	_preset_delete_button.text = tr("formation_presets_delete_button")
+
+	# Mid-run confirm modal: body label, Confirm button ("End Run & Change"),
+	# Cancel button.
+	var _confirm_body: Label = $MidRunReassignConfirmation/ConfirmPanel/ConfirmContent/ConfirmBodyLabel as Label
+	if _confirm_body != null:
+		_confirm_body.text = tr("formation_assignment_mid_run_confirm_body")
+	_reassign_confirm_button.text = tr("formation_assignment_end_run_confirm_button")
+	_reassign_cancel_button.text = tr("formation_assignment_cancel_button")
+
+	# Floor Picker header: Cancel button ("← Cancel") and title label
+	# ("Choose Your Run"). PickerSelectButton text is runtime-set by
+	# _select_floor_in_picker; do NOT wire it here.
+	_floor_picker_cancel_button.text = tr("formation_assignment_picker_cancel_button")
+	var _picker_title: Label = $FloorPickerOverlay/PickerPanel/PickerContent/PickerHeader/PickerTitleLabel as Label
+	if _picker_title != null:
+		_picker_title.text = tr("formation_assignment_picker_title")
+
+	# Preset Save modal: title label ("Name this formation"), LineEdit
+	# placeholder ("My formation"), Save confirm button, Cancel button.
+	var _save_title: Label = $PresetSaveModal/SavePanel/SaveContent/SaveTitleLabel as Label
+	if _save_title != null:
+		_save_title.text = tr("formation_presets_save_modal_title")
+	if _preset_name_line_edit != null:
+		_preset_name_line_edit.placeholder_text = tr("formation_presets_name_placeholder")
+	_preset_save_confirm_button.text = tr("formation_presets_save_button")
+	_preset_save_cancel_button.text = tr("formation_assignment_cancel_button")
+
+	# Preset Delete modal: body label, Delete confirm button, Cancel button.
+	var _delete_body: Label = $PresetDeleteModal/DeletePanel/DeleteContent/DeleteBodyLabel as Label
+	if _delete_body != null:
+		_delete_body.text = tr("formation_presets_delete_confirm_body")
+	_preset_delete_confirm_button.text = tr("formation_presets_delete_button")
+	_preset_delete_cancel_button.text = tr("formation_assignment_cancel_button")
+
 
 # ---------------------------------------------------------------------------
 # Screen lifecycle hooks (ADR-0007 — all four MUST be declared)
@@ -520,9 +573,15 @@ func _refresh_roster_panel() -> void:
 		# class has no counter_archetype (data drift defensive path).
 		var counter: String = class_to_counter.get(String(hero.class_id), "")
 		if counter != "":
-			btn.text = "%s (%s Lv%d · vs %s)" % [hero.display_name, hero.class_id, hero.current_level, counter]
+			btn.text = UIFrameworkScript.format_localized(
+					"formation_assignment_hero_slot_counter_format",
+					[hero.display_name, hero.class_id, hero.current_level, counter]
+				)
 		else:
-			btn.text = "%s (%s Lv%d)" % [hero.display_name, hero.class_id, hero.current_level]
+			btn.text = UIFrameworkScript.format_localized(
+					"formation_assignment_hero_slot_format",
+					[hero.display_name, hero.class_id, hero.current_level]
+				)
 		btn.custom_minimum_size = Vector2(120, 44)
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -1014,8 +1073,9 @@ func _refresh_floor_context_label() -> void:
 func _refresh_gold_counter() -> void:
 	if _gold_counter == null:
 		return
-	_gold_counter.text = "Gold: %s" % UIFrameworkScript.format_short_number(
-		Economy.get_gold_balance()
+	_gold_counter.text = UIFrameworkScript.format_localized(
+		"formation_assignment_gold_counter_format",
+		[UIFrameworkScript.format_short_number(Economy.get_gold_balance())]
 	)
 
 
@@ -1119,7 +1179,7 @@ func _show_floor_picker() -> void:
 		_select_floor_in_picker(initial_biome, initial_floor)
 	else:
 		_floor_picker_select_button.disabled = true
-		_floor_picker_select_button.text = "No biomes available"
+		_floor_picker_select_button.text = tr("formation_assignment_no_biomes")
 		# No floor selected → hide any stale recommendation from a prior open.
 		if _floor_recommendation_label != null:
 			_floor_recommendation_label.visible = false
@@ -1255,7 +1315,10 @@ func _render_floor_picker_biome_tabs() -> void:
 			var hint_label: Label = Label.new()
 			hint_label.name = "MatchupHintLabel"
 			if recommended.is_empty():
-				hint_label.text = "Common: %s" % ", ".join(archetypes)
+				hint_label.text = UIFrameworkScript.format_localized(
+						"formation_assignment_common_archetypes_format",
+						[", ".join(archetypes)]
+					)
 			else:
 				hint_label.text = tr("matchup_floor_recommended_format") % ", ".join(recommended)
 			biome_tab.add_child(hint_label)
@@ -1274,10 +1337,14 @@ func _render_floor_picker_biome_tabs() -> void:
 			# because MVP has no skip-ahead unlocks; chained-biome floor-1 is gated
 			# by Biome.unlock_after, not by this tooltip's predecessor reference.
 			if is_unlocked:
-				floor_button.text = "F%d" % floor_index
+				floor_button.text = UIFrameworkScript.format_localized(
+						"formation_assignment_floor_button_format", [floor_index]
+					)
 				floor_button.tooltip_text = ""
 			else:
-				floor_button.text = "🔒 F%d" % floor_index
+				floor_button.text = UIFrameworkScript.format_localized(
+						"formation_assignment_floor_button_locked_format", [floor_index]
+					)
 				floor_button.tooltip_text = tr("matchup_floor_locked_tooltip_format") % (floor_index - 1)
 			floor_button.custom_minimum_size = Vector2(60, 60)
 			floor_button.focus_mode = Control.FOCUS_NONE
@@ -1295,10 +1362,10 @@ func _select_floor_in_picker(biome_id: String, floor_index: int) -> void:
 	_fp_selected_floor_index = floor_index
 	if FloorUnlock.is_unlocked_in_biome(biome_id, floor_index):
 		_floor_picker_select_button.disabled = false
-		_floor_picker_select_button.text = tr("matchup_select_format") % [floor_index, biome_id.capitalize()]
+		_floor_picker_select_button.text = UIFrameworkScript.format_localized("matchup_select_format", [floor_index, biome_id.capitalize()])
 	else:
 		_floor_picker_select_button.disabled = true
-		_floor_picker_select_button.text = "Select (locked)"
+		_floor_picker_select_button.text = tr("formation_assignment_select_locked")
 	# S28-S1: surface the per-floor matchup recommendation for the selected floor.
 	_update_floor_recommendation_label(biome_id, floor_index)
 
@@ -1665,7 +1732,9 @@ func _refresh_synergy_badge() -> void:
 	# Show path: render localized "Display Name: Effect" text. AC-CS-15.
 	var display_name: String = UIFrameworkScript.synergy_display_name(synergy_id)
 	var effect_text: String = UIFrameworkScript.synergy_effect_text(synergy_id)
-	_synergy_badge.text = "%s: %s" % [display_name, effect_text]
+	_synergy_badge.text = UIFrameworkScript.format_localized(
+			"formation_assignment_synergy_badge_format", [display_name, effect_text]
+		)
 
 	# Theme variation per AC-CS-17: animated default vs reduce-motion variant.
 	# Both variants render at modulate.a = 1.0 once visible; the difference

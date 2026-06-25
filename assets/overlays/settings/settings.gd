@@ -14,6 +14,7 @@
 extends Control
 
 const ParchmentKitScript = preload("res://src/ui/parchment_kit.gd")
+const UIFrameworkScript = preload("res://src/ui/ui_framework.gd")
 const _MIN_DB: float = -80.0  # below this, treat as -INF (silent floor)
 
 # Per GDD #30 §C.2 defaults (audio-system.md §C.7 baselines).
@@ -28,6 +29,14 @@ const _DEFAULT_LOCALE: String = "en"
 const _DEFAULT_TELEMETRY_OPT_IN: bool = false
 
 
+@onready var _header_label: Label = $Panel/VBox/HeaderLabel
+@onready var _master_label: Label = $Panel/VBox/MasterRow/MasterLabel
+@onready var _music_label: Label = $Panel/VBox/MusicRow/MusicLabel
+@onready var _sfx_label: Label = $Panel/VBox/SFXRow/SFXLabel
+@onready var _mute_label: Label = $Panel/VBox/MuteRow/MuteLabel
+@onready var _reduce_motion_label: Label = $Panel/VBox/ReduceMotionRow/ReduceMotionLabel
+@onready var _locale_label: Label = $Panel/VBox/LocaleRow/LocaleLabel
+@onready var _telemetry_label: Label = $Panel/VBox/TelemetryRow/TelemetryLabel
 @onready var _dim_backdrop: ColorRect = $DimBackdrop
 @onready var _master_slider: HSlider = $Panel/VBox/MasterRow/MasterSlider
 @onready var _master_db_label: Label = $Panel/VBox/MasterRow/MasterDbLabel
@@ -87,6 +96,18 @@ func _ready() -> void:
 	_quit_to_desktop_button.text = tr("settings_quit_to_desktop_button")
 	_quit_to_desktop_button.pressed.connect(_on_quit_to_desktop_pressed)
 	_refresh_version_label()
+
+	# i18n: wire scene-baked label text through tr() so they update on locale change.
+	_header_label.text = tr("settings_title")
+	_master_label.text = tr("settings_volume_master_label")
+	_music_label.text = tr("settings_volume_music_label")
+	_sfx_label.text = tr("settings_volume_sfx_label")
+	_mute_label.text = tr("settings_mute_label")
+	_reduce_motion_label.text = tr("settings_reduce_motion_label")
+	_locale_label.text = tr("settings_language_label")
+	_telemetry_label.text = tr("settings_telemetry_label")
+	_reset_button.text = tr("settings_reset_button")
+	_close_button.text = tr("settings_close_button")
 
 	# Seed dB display labels from current state.
 	_refresh_db_label(_master_db_label, AudioRouter.get_master_volume_db())
@@ -150,9 +171,9 @@ func _on_sfx_slider_changed(value: float) -> void:
 ## Renders dB value as integer dB ("-6 dB") or "-INF" at the silent floor.
 func _refresh_db_label(label: Label, db: float) -> void:
 	if db <= _MIN_DB:
-		label.text = "-INF"
+		label.text = tr("settings_volume_silent_label")
 	else:
-		label.text = "%d dB" % roundi(db)
+		label.text = UIFrameworkScript.format_localized("settings_volume_db_format", [roundi(db)])
 
 
 # ---------------------------------------------------------------------------
@@ -295,10 +316,10 @@ func _build_wireframe() -> void:
 	var vbox: Node = get_node_or_null("Panel/VBox")
 	if vbox == null:
 		return
-	_insert_section(vbox, get_node_or_null("Panel/VBox/HeaderLabel"), "· The inner workings ·", ParchmentKitScript.ACCENT)
-	_insert_section(vbox, get_node_or_null("Panel/VBox/MasterRow"), "Audio", ParchmentKitScript.MUTED)
-	_insert_section(vbox, get_node_or_null("Panel/VBox/ReduceMotionRow"), "Accessibility", ParchmentKitScript.MUTED)
-	_insert_section(vbox, get_node_or_null("Panel/VBox/LocaleRow"), "Data & locale", ParchmentKitScript.MUTED)
+	_insert_section(vbox, get_node_or_null("Panel/VBox/HeaderLabel"), tr("settings_eyebrow_header"), ParchmentKitScript.ACCENT)
+	_insert_section(vbox, get_node_or_null("Panel/VBox/MasterRow"), tr("settings_section_audio"), ParchmentKitScript.MUTED)
+	_insert_section(vbox, get_node_or_null("Panel/VBox/ReduceMotionRow"), tr("settings_section_accessibility"), ParchmentKitScript.MUTED)
+	_insert_section(vbox, get_node_or_null("Panel/VBox/LocaleRow"), tr("settings_section_data_locale"), ParchmentKitScript.MUTED)
 
 
 ## Inserts a parchment eyebrow label immediately before [param before] in [param vbox].

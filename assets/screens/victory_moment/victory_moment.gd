@@ -87,7 +87,9 @@ var _exited: bool = false
 @onready var _center_panel: PanelContainer = $CenterPanel
 @onready var _headline_label: Label = $CenterPanel/CenterVBox/HeadlineLabel
 @onready var _unlock_notice_label: Label = $CenterPanel/CenterVBox/UnlockNoticeLabel
+@onready var _kill_count_label: Label = $CenterPanel/CenterVBox/StatsBlock/KillCountRow/KillCountLabel
 @onready var _kill_count_value: Label = $CenterPanel/CenterVBox/StatsBlock/KillCountRow/KillCountValue
+@onready var _gold_gained_label: Label = $CenterPanel/CenterVBox/StatsBlock/GoldGainedRow/GoldGainedLabel
 @onready var _gold_gained_value: Label = $CenterPanel/CenterVBox/StatsBlock/GoldGainedRow/GoldGainedValue
 @onready var _level_ups_block: VBoxContainer = $CenterPanel/CenterVBox/StatsBlock/LevelUpsBlock
 @onready var _continuation_prompt: Label = $CenterPanel/CenterVBox/ContinuationPromptLabel
@@ -102,6 +104,14 @@ func _ready() -> void:
 	# any ceremony animation mutates it (GDD §C.6 fades 0 → resting).
 	if _dim_backdrop != null:
 		_dim_target_alpha = _dim_backdrop.color.a
+	# Wire scene-baked static labels to the localization system so all locales
+	# render their translated strings rather than the .tscn-baked English literal.
+	if _kill_count_label != null:
+		_kill_count_label.text = tr("victory_kills_label")
+	if _gold_gained_label != null:
+		_gold_gained_label.text = tr("victory_gold_gained_label")
+	if _continuation_prompt != null:
+		_continuation_prompt.text = tr("victory_continuation_prompt")
 
 
 func on_enter() -> void:
@@ -289,7 +299,7 @@ func _render_stats() -> void:
 	else:
 		# Defensive — runs only credit gold in MVP; a 0-delta run is
 		# possible if no gold-crediting kills occurred.
-		_gold_gained_value.text = "0 gold"
+		_gold_gained_value.text = tr("victory_zero_gold_label")
 
 
 func _render_level_ups() -> void:

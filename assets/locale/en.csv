@@ -99,3 +99,83 @@ formation_presets_name_empty_toast,Enter a name for this formation.
 formation_presets_missing_toast,%d saved hero(es) are no longer in your guild — those slots are empty.
 formation_presets_recall_unknown_toast,That formation is no longer available.
 formation_presets_deleted_toast,Formation deleted.
+app_wordmark,Lantern Guild
+app_tagline,The dungeon is dark. Send a light.
+back_to_guild_hall_button,← Guild Hall
+title_screen_continue_button,Continue the Watch
+title_screen_settings_button,Settings
+start_menu_start_button,Start Expedition
+start_menu_quit_button,Quit
+codex_eyebrow,· The guild keeps a record ·
+codex_title,The Codex
+codex_close_button,Close
+codex_tab_heroes,Heroes
+codex_tab_monsters,Monsters
+codex_tab_dungeons,Dungeons
+codex_empty_state,Nothing recorded yet.
+pause_menu_eyebrow,· The guild waits ·
+pause_menu_tagline,The hour-glass turns regardless.
+pause_menu_return_to_title_button,Return to Title
+dungeon_run_hp_format,HP %d/%d
+dungeon_run_enemies_format,Enemies %d/%d
+dungeon_run_return_to_hall_button,Return to Hall
+victory_zero_gold_label,0 gold
+formation_assignment_gold_counter_format,Gold: %s
+formation_assignment_no_biomes,No biomes available
+formation_assignment_common_archetypes_format,Common: %s
+formation_assignment_floor_button_format,F%d
+formation_assignment_floor_button_locked_format,🔒 F%d
+formation_assignment_select_locked,Select (locked)
+formation_assignment_synergy_badge_format,%s: %s
+formation_assignment_hero_slot_counter_format,%s (%s Lv%d · vs %s)
+formation_assignment_hero_slot_format,%s (%s Lv%d)
+formation_presets_panel_title,Saved Formations
+formation_presets_recall_button,Recall
+formation_presets_save_button,Save
+formation_presets_delete_button,Delete
+formation_assignment_mid_run_confirm_body,Changing your formation will end the current run. Continue?
+formation_assignment_cancel_button,Cancel
+formation_assignment_end_run_confirm_button,End Run & Change
+formation_assignment_picker_cancel_button,← Cancel
+formation_assignment_picker_title,Choose Your Run
+formation_assignment_picker_select_button,Select
+formation_presets_save_modal_title,Name this formation
+formation_presets_name_placeholder,My formation
+formation_presets_delete_confirm_body,Delete this formation? This can't be undone.
+hero_detail_counter_archetype_format,Strong vs: %s
+hero_detail_name_scaffold,Hero Name
+hero_detail_class_scaffold,Class
+hero_detail_level_label,Level
+hero_detail_level_up_button,Level Up
+hero_detail_close_button,Close
+recruitment_gold_counter_format,%s gold
+recruitment_recruit_button,Recruit
+recruitment_refresh_pool_button_format,Refresh Pool — %s gold
+recruitment_class_matchup_format,%s · vs %s
+recruitment_screen_title,Recruit
+guild_hall_prestige_multiplier_format,×%.2f
+guild_hall_gold_counter_format,Gold: %d
+guild_hall_synergy_badge_format,%s: %s
+guild_hall_hero_card_counter_format,%s · %s · Lv %d · vs %s
+guild_hall_hero_card_format,%s · %s · Lv %d
+guild_hall_title,Guild Hall
+guild_hall_dispatch_button,Go to Dispatch
+guild_hall_recruit_button,Recruit
+victory_kills_label,Kills
+victory_gold_gained_label,Gold gained
+settings_volume_silent_label,-INF
+settings_volume_db_format,%d dB
+settings_eyebrow_header,· The inner workings ·
+settings_section_audio,Audio
+settings_section_accessibility,Accessibility
+settings_section_data_locale,Data & locale
+settings_title,Settings
+settings_volume_master_label,Master
+settings_volume_music_label,Music
+settings_volume_sfx_label,SFX
+settings_mute_label,Mute (master)
+settings_reduce_motion_label,Reduce motion
+settings_language_label,Language
+settings_telemetry_label,Share anonymous diagnostic data
+settings_reset_button,Reset to Defaults
+settings_close_button,Close
