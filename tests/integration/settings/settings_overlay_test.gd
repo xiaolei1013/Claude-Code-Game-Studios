@@ -1,10 +1,15 @@
-# Settings overlay wiring per GDD #30 §C.1-C.4 + AC-30-01..05.
+# Settings overlay wiring per GDD #30 §C.1-C.6 + AC-30-01..09.
 #
 # Test groups:
-#   A — overlay scene loads + wires its onready references without crash
-#   B — slider value writes through AudioRouter.set_*_volume_db (db curve)
-#   C — reduce_motion checkbox writes through SceneManager.set_reduce_motion
-#   D — Guild Hall SettingsGearButton invokes SceneManager.push_overlay("settings")
+#   A  — overlay scene loads + wires its onready references without crash
+#   B  — slider value writes through AudioRouter.set_*_volume_db (db curve)
+#   C  — reduce_motion checkbox writes through SceneManager.set_reduce_motion
+#   C2 — mute checkbox writes through AudioRouter.set_master_muted
+#   E  — dB display labels render slider values ("0 dB" / "-INF")
+#   F  — Reset button restores GDD §C.2-§C.5 defaults
+#   G  — locale dropdown population + single-locale disabled state
+#   D  — Guild Hall SettingsGearButton invokes SceneManager.push_overlay("settings")
+#   H  — AC-30-09: Escape (ui_cancel) closes Settings when topmost
 extends GdUnitTestSuite
 
 const SettingsOverlayScene: PackedScene = preload(
@@ -33,6 +38,14 @@ var _temp_locale_cfg_path: String = ""
 # and restore the live locale so a future multi-locale build can't leak it across
 # tests (today it is always "en", but the isolation must not depend on that).
 var _snapshot_locale: String = ""
+# Group H seeds SceneManager._active_overlays directly to exercise the Escape
+# topmost-overlay guard against the live autoload (settings.gd couples to the
+# SceneManager singleton, not an injectable instance). Snapshot/restore the
+# overlay stack, FSM state, and current_screen so the seed never leaks across
+# tests or suites (memory: feedback_test_isolation_live_autoload).
+var _snapshot_active_overlays: Dictionary = {}
+var _snapshot_sm_state: int = 0
+var _snapshot_current_screen: Node = null
 
 
 func before_test() -> void:
@@ -45,6 +58,9 @@ func before_test() -> void:
 	_temp_locale_cfg_path = "user://test_%d_settings_overlay_locale.cfg" % Time.get_ticks_msec()
 	LocaleLoader._settings_cfg_path = _temp_locale_cfg_path
 	_snapshot_locale = TranslationServer.get_locale()
+	_snapshot_active_overlays = SceneManager._active_overlays
+	_snapshot_sm_state = SceneManager.state
+	_snapshot_current_screen = SceneManager.current_screen
 
 
 func after_test() -> void:
@@ -55,6 +71,9 @@ func after_test() -> void:
 	AudioRouter.set_master_muted(_snapshot_master_muted)
 	LocaleLoader._settings_cfg_path = _snapshot_locale_cfg_path
 	TranslationServer.set_locale(_snapshot_locale)
+	SceneManager._active_overlays = _snapshot_active_overlays
+	SceneManager.state = _snapshot_sm_state
+	SceneManager.current_screen = _snapshot_current_screen
 	if FileAccess.file_exists(_temp_locale_cfg_path):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(_temp_locale_cfg_path))
 
@@ -256,3 +275,114 @@ func test_settings_gear_button_pressed_handler_is_wired() -> void:
 	# At least one connection should exist (the _on_settings_gear_pressed bind).
 	var conns: Array = gear.pressed.get_connections()
 	assert_int(conns.size()).is_greater_equal(1)
+
+
+# ===========================================================================
+# Group H — AC-30-09: Escape (ui_cancel) closes the Settings overlay
+#
+# settings.gd._unhandled_input mirrors pause_menu.gd: it consumes ui_cancel and
+# closes ONLY when Settings is the topmost overlay, so a pause → Settings chain
+# closes Settings first (revealing the pause menu beneath) instead of the pause
+# handler firing underneath. These tests seed SceneManager._active_overlays
+# directly (the overlay couples to the live autoload, not an injectable
+# instance) and drive _unhandled_input synthetically; before_test/after_test
+# snapshot and restore the overlay stack so the seed never leaks.
+# ===========================================================================
+
+func _ui_cancel_event() -> InputEventAction:
+	var ev: InputEventAction = InputEventAction.new()
+	ev.action = "ui_cancel"
+	ev.pressed = true
+	return ev
+
+
+func _escape_key_event() -> InputEventKey:
+	# The real, physical Escape key event (what the OS delivers), as opposed to the
+	# pre-resolved InputEventAction. Both keycode and physical_keycode are set so
+	# event_is_action() matches regardless of how ui_cancel is bound.
+	var ev: InputEventKey = InputEventKey.new()
+	ev.keycode = KEY_ESCAPE
+	ev.physical_keycode = KEY_ESCAPE
+	ev.pressed = true
+	return ev
+
+
+func test_escape_closes_settings_when_topmost() -> void:
+	# Arrange — register Settings as the sole (topmost) overlay on the live
+	# autoload. pause_on_open=false so pop touches no pause counter; null
+	# current_screen so pop's on_resume path is a guarded no-op (determinism).
+	var tracked: Control = Control.new()
+	tracked.set_meta("scene_manager_pause_on_open", false)
+	SceneManager._active_overlays = {"settings": tracked}
+	SceneManager.current_screen = null
+	var overlay: Control = _make_overlay_in_tree()
+	assert_str(SceneManager.topmost_overlay_id()).is_equal("settings")
+
+	# Act — Esc arrives as unhandled input.
+	overlay._unhandled_input(_ui_cancel_event())
+
+	# Assert — Settings popped itself and consumed the event.
+	assert_bool(SceneManager._active_overlays.has("settings")).is_false()
+	assert_bool(overlay.get_viewport().is_input_handled()).is_true()
+
+
+func test_escape_ignored_when_settings_not_topmost() -> void:
+	# Arrange — a DIFFERENT overlay sits on top of Settings (e.g. another modal
+	# pushed after it). Settings must DEFER: not consume Esc, not pop anything —
+	# the chain-safety guard that keeps the topmost overlay owning Esc.
+	var settings_stub: Control = Control.new()
+	settings_stub.set_meta("scene_manager_pause_on_open", false)
+	auto_free(settings_stub)
+	var other: Control = Control.new()
+	other.set_meta("scene_manager_pause_on_open", false)
+	auto_free(other)
+	SceneManager._active_overlays = {"settings": settings_stub, "other_modal": other}
+	var overlay: Control = _make_overlay_in_tree()
+	assert_str(SceneManager.topmost_overlay_id()).is_not_equal("settings")
+
+	# Act
+	overlay._unhandled_input(_ui_cancel_event())
+
+	# Assert — the topmost overlay is untouched (Settings did not pop it).
+	assert_bool(SceneManager._active_overlays.has("other_modal")).is_true()
+
+
+func test_non_cancel_input_ignored_when_settings_topmost() -> void:
+	# Arrange — Settings topmost, but a non-cancel action arrives.
+	var tracked: Control = Control.new()
+	tracked.set_meta("scene_manager_pause_on_open", false)
+	auto_free(tracked)
+	SceneManager._active_overlays = {"settings": tracked}
+	var overlay: Control = _make_overlay_in_tree()
+
+	# Act — ui_accept is not ui_cancel; the handler must ignore it.
+	var ev: InputEventAction = InputEventAction.new()
+	ev.action = "ui_accept"
+	ev.pressed = true
+	overlay._unhandled_input(ev)
+
+	# Assert — Settings is still open (Esc-close path not triggered).
+	assert_bool(SceneManager._active_overlays.has("settings")).is_true()
+
+
+func test_escape_key_event_maps_to_cancel_and_closes_settings() -> void:
+	# Production Esc arrives as a physical InputEventKey, not an InputEventAction.
+	# The action-based tests above would keep passing even if Escape were unmapped
+	# from ui_cancel in project.godot; this test guards that binding end to end —
+	# event_is_action() goes false the moment the keymap regresses.
+	assert_bool(InputMap.event_is_action(_escape_key_event(), "ui_cancel")).is_true()
+
+	# Arrange — Settings is the sole (topmost) overlay; pop frees `tracked`.
+	var tracked: Control = Control.new()
+	tracked.set_meta("scene_manager_pause_on_open", false)
+	SceneManager._active_overlays = {"settings": tracked}
+	SceneManager.current_screen = null
+	var overlay: Control = _make_overlay_in_tree()
+	assert_str(SceneManager.topmost_overlay_id()).is_equal("settings")
+
+	# Act — the real Escape key arrives as unhandled input.
+	overlay._unhandled_input(_escape_key_event())
+
+	# Assert — Settings popped itself and consumed the event.
+	assert_bool(SceneManager._active_overlays.has("settings")).is_false()
+	assert_bool(overlay.get_viewport().is_input_handled()).is_true()

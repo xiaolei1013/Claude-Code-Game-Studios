@@ -1,16 +1,22 @@
-## Settings overlay — volume sliders + reduce_motion toggle + close.
+## Settings overlay — audio (master/music/sfx volume + mute), accessibility
+## (reduce_motion), data & locale (language dropdown, telemetry opt-in),
+## Reset to Defaults, version readout, and Quit-to-Desktop. Per Settings GDD #30.
 ##
-## Per Settings GDD #30 §C.1 (minimum-viable subset: 3 volume rows + reduce_motion
-## row + close; mute toggle, locale selector, dB display, Reset to Defaults
-## deferred to polish iteration).
-##
-## Invoked from Guild Hall gear icon via SceneManager.push_overlay("settings", false)
-## per AC-30-01. Wires:
+## Invoked from the Guild Hall gear icon via SceneManager.push_overlay(
+## "settings", false) per AC-30-01 (pause_on_open=false so an in-flight offline
+## replay keeps ticking). Also chained from the Pause Menu (pause → Settings).
+## Wires:
 ##   - 3 volume sliders → AudioRouter.set_master_volume_db / set_music_volume_db
-##     / set_sfx_volume_db using linear-to-dB curve from GDD §C.2
+##     / set_sfx_volume_db using the linear-to-dB curve from GDD §C.2
+##   - mute checkbox → AudioRouter.set_master_muted
 ##   - reduce_motion checkbox → SceneManager.set_reduce_motion (S12-S2 wiring)
-##   - close button → SceneManager.pop_overlay (auto-saves via AudioRouter +
-##     SceneManager persistence pathways)
+##   - locale dropdown → TranslationServer.set_locale + LocaleLoader.persist_locale
+##   - telemetry checkbox → TelemetrySink.set_opt_in
+##
+## Auto-save model: there is NO separate Save button. Every change persists
+## immediately through its consumer surface (AudioRouter, SceneManager, and
+## LocaleLoader's settings.cfg writes). Close (button), tap-outside (AC-30-08),
+## and Esc (AC-30-09) all simply pop the overlay — state is already saved.
 extends Control
 
 const ParchmentKitScript = preload("res://src/ui/parchment_kit.gd")
@@ -196,16 +202,42 @@ func _on_telemetry_toggled(value: bool) -> void:
 
 
 # ---------------------------------------------------------------------------
-# Close handlers
+# Close handlers — close button, tap-outside (AC-30-08), Esc (AC-30-09).
+# All three route through _request_close(); the overlay auto-saves on every
+# change, so closing only needs to pop the overlay (nothing to persist here).
 # ---------------------------------------------------------------------------
 
 func _on_close_pressed() -> void:
-	SceneManager.pop_overlay("settings")
+	_request_close()
 
 
 func _on_backdrop_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
-		SceneManager.pop_overlay("settings")
+		_request_close()
+
+
+## Routes the `ui_cancel` action (default Esc) to close — AC-30-09. Mirrors
+## pause_menu.gd: only the TOPMOST overlay consumes Esc, so a pause → Settings
+## chain closes Settings first (revealing the pause menu beneath) rather than
+## the pause-menu Esc handler firing underneath and orphaning Settings on top.
+## Consuming the event (set_input_as_handled) also stops Screen._unhandled_input
+## from treating the same Esc as a fresh pause-menu request.
+func _unhandled_input(event: InputEvent) -> void:
+	if not event.is_action_pressed("ui_cancel"):
+		return
+	if SceneManager.topmost_overlay_id() != "settings":
+		return
+	get_viewport().set_input_as_handled()
+	_request_close()
+
+
+## Single close path shared by the close button, tap-outside backdrop, Esc, and
+## quit-to-desktop. Pops the Settings overlay; every control persists its own edit
+## immediately via its consumer setter (AudioRouter / SceneManager.set_reduce_motion
+## / LocaleLoader.persist_locale / TelemetrySink.set_opt_in — the auto-save model),
+## so closing has nothing left to flush.
+func _request_close() -> void:
+	SceneManager.pop_overlay("settings")
 
 
 # ---------------------------------------------------------------------------
@@ -305,7 +337,7 @@ func _on_quit_to_desktop_pressed() -> void:
 	# before the tree exits. Without this, the modal pause counter would
 	# stay incremented through the exit handler — harmless in practice
 	# but produces a noisy warning in debug builds.
-	SceneManager.pop_overlay("settings")
+	_request_close()
 	get_tree().quit()
 
 
