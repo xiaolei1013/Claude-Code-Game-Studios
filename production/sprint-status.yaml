@@ -46,18 +46,18 @@ stories:
     name: "Defeat-moment weight pass (run_defeated overlay fade + somber audio parity)"
     file: ""
     priority: nice-to-have
-    status: review
+    status: done
     owner: "godot-specialist"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-06-25"
 
   - id: "30-N2"
     name: "OQ-27-1 VFX follow-up: wire OR retire the unused aura/bubble/batwing demo textures"
     file: ""
     priority: nice-to-have
-    status: backlog
+    status: done
     owner: "technical-artist"
     estimate_days: 0.5
     blocker: ""
-    completed: ""
+    completed: "2026-06-25"
