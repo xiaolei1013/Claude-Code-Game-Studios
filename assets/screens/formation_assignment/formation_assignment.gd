@@ -1592,6 +1592,11 @@ func _on_validation_failed(reason: String, _payload: Dictionary) -> void:
 			_show_toast(tr("dispatch_error_empty_formation"))
 		"floor_locked":
 			_show_toast(tr("dispatch_error_floor_locked"))
+		"run_already_active":
+			# Player re-entered the formation screen mid-run and pressed Dispatch.
+			# The orchestrator's FSM rejects a second dispatch while a run is in
+			# flight; surface that as a toast instead of a silent dead control.
+			_show_toast(tr("dispatch_error_run_already_active"))
 		_:
 			push_warning(
 				"[FormationAssignment] unhandled validation_failed reason: %s" % reason

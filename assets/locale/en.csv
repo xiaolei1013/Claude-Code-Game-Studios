@@ -7,6 +7,7 @@ injured_badge_format,Injured · %s,Verletzt · %s
 dispatch_button,Dispatch,Entsenden
 dispatch_error_empty_formation,Assign at least one hero to your formation.,Weise deiner Formation mindestens einen Helden zu.
 dispatch_error_floor_locked,That floor is locked.,Diese Ebene ist gesperrt.
+dispatch_error_run_already_active,A run is already in progress.,Ein Lauf ist bereits im Gange.
 dispatch_error_generic,Something went wrong. Try again.,Etwas ist schiefgelaufen. Versuche es erneut.
 recruit_a_hero_label,Recruit a hero to begin.,"Rekrutiere einen Helden, um zu beginnen."
 floor_label_forest_reach_1,Forest Reach — Floor 1,Waldgrund — Ebene 1
