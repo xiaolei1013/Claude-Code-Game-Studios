@@ -19,7 +19,7 @@ goal: "Land the victory-moment ceremony (GDD #25) plus reward-float and defeat-w
 start: "2026-06-24"
 end: "2026-07-07"
 generated: "2026-06-24"
-updated: "2026-06-24"
+updated: "2026-06-25"
 
 stories:
   - id: "30-M1"
@@ -46,7 +46,7 @@ stories:
     name: "Defeat-moment weight pass (run_defeated overlay fade + somber audio parity)"
     file: ""
     priority: nice-to-have
-    status: backlog
+    status: review
     owner: "godot-specialist"
     estimate_days: 0.5
     blocker: ""

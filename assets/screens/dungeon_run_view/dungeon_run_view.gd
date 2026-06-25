@@ -121,6 +121,14 @@ var _float_layer: Control = null
 ## superseded by playtest evidence. See sprint-9.md S9-M2 closure note.
 const RUN_END_DWELL_MS: int = 1500
 
+## Fade-in duration (seconds) of the shared RunEndOverlay — the gentle reveal that
+## BOTH the victory and defeat run-end surfaces use (S30-N1 defeat-weight pass).
+## Mirrors victory_moment's DimBackdrop entrance fade so the run-end beat lands with
+## a little weight instead of snapping in hard. reduce_motion snaps it to full alpha
+## with no tween (ADR-0007). §G safe range 0.10–0.40; MUST stay well under
+## RUN_END_DWELL_MS (1.5 s) so the fade completes before the auto-route fires.
+const RUN_END_FADE_SEC: float = 0.2
+
 ## Lifetime in seconds for the S10-M4 level-up toast. AC: "auto-dismisses ~3s".
 ## Pattern: 0–2.4 s held visible at full alpha; 2.4–3.0 s fade-out via Tween.
 const LEVEL_UP_TOAST_LIFETIME_SEC: float = 3.0
@@ -269,6 +277,14 @@ const DEFEAT_SLUMP_DIM: float = 0.80
 ## idempotent (overlay shows exactly once per screen lifetime, even if
 ## state_changed fires more than once with RUN_ENDED — defensive guard).
 var _overlay_shown: bool = false
+
+## Run-end overlay reveal-fade tween (S30-N1). The shared RunEndOverlay (victory +
+## defeat) fades modulate alpha 0 → 1 on reveal; this holds that tween so [method
+## on_exit] can kill it (ADR-mandated tween discipline). SEPARATE from [member
+## _active_beat_tween]: the overlay fade and the party-diorama slump/cheer beat run
+## CONCURRENTLY on a defeat, so a shared handle would have one kill the other. Null
+## while idle.
+var _run_end_fade_tween: Tween = null
 
 ## Set to true after request_screen("victory_moment") fires so _on_state_changed
 ## is idempotent on the routing side (AC-5 Story 013). Guards against a second
@@ -573,6 +589,15 @@ func on_exit() -> void:
 		if _active_beat_tween.is_valid():
 			_active_beat_tween.kill()
 		_active_beat_tween = null
+
+	# S30-N1: kill the run-end overlay reveal-fade tween (distinct from the beat tween
+	# above — the two run concurrently on a defeat). create_tween() binds to
+	# _run_end_overlay and auto-kills on free, but the explicit kill is the ADR-mandated
+	# discipline (mirrors the _active_beat_tween block).
+	if _run_end_fade_tween != null:
+		if _run_end_fade_tween.is_valid():
+			_run_end_fade_tween.kill()
+		_run_end_fade_tween = null
 
 	if _vfx_layer != null:
 		_vfx_layer.queue_free()
@@ -1017,7 +1042,7 @@ func _show_run_end_overlay(final_kill_count: int) -> void:
 	)
 	if _stats_panel != null:
 		_stats_panel.visible = false
-	_run_end_overlay.visible = true
+	_reveal_run_end_overlay()
 
 
 # ---------------------------------------------------------------------------
@@ -1053,7 +1078,30 @@ func _show_defeat_overlay(floor_index: int) -> void:
 	)
 	if _stats_panel != null:
 		_stats_panel.visible = false
+	_reveal_run_end_overlay()
+
+
+## Reveals the shared RunEndOverlay with a gentle fade-in — the ONE reveal path for
+## both the victory ([method _show_run_end_overlay]) and defeat
+## ([method _show_defeat_overlay]) run-end surfaces (S30-N1 defeat-weight pass). Sets
+## the overlay visible, then tweens modulate alpha 0 → 1 over [constant RUN_END_FADE_SEC]
+## (QUAD / EASE_IN, mirroring victory_moment's DimBackdrop entrance). Under reduce_motion
+## it snaps to full alpha with no tween (ADR-0007). The tween is held in [member
+## _run_end_fade_tween] and killed in [method on_exit] so it never ticks modulate on an
+## exited screen. The once-per-visit show guard lives in the callers ([member
+## _overlay_shown]); the leading kill here is belt-and-suspenders against any re-reveal.
+func _reveal_run_end_overlay() -> void:
+	if _run_end_fade_tween != null and _run_end_fade_tween.is_valid():
+		_run_end_fade_tween.kill()
+	_run_end_fade_tween = null
 	_run_end_overlay.visible = true
+	if _reduce_motion():
+		_run_end_overlay.modulate.a = 1.0
+		return
+	_run_end_overlay.modulate.a = 0.0
+	_run_end_fade_tween = _run_end_overlay.create_tween()
+	_run_end_fade_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_run_end_fade_tween.tween_property(_run_end_overlay, "modulate:a", 1.0, RUN_END_FADE_SEC).from(0.0)
 
 
 # ===========================================================================
