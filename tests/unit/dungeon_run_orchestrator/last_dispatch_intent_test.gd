@@ -18,6 +18,28 @@ extends GdUnitTestSuite
 
 const OrchestratorScript = preload("res://src/core/dungeon_run_orchestrator/dungeon_run_orchestrator.gd")
 const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/dungeon_run_state.gd")
+const HeroRosterFixture = preload("res://tests/helpers/hero_roster_test_fixture.gd")
+
+# Snapshot of the live /root/HeroRoster, captured before each test and restored
+# after, so this suite neither suffers nor causes a cross-test roster leak.
+var _roster_snapshot: Dictionary = {}
+
+
+# These tests dispatch raw formation dicts whose instance_ids collide with the
+# live /root/HeroRoster's starter heroes. A successful dispatch on an unlocked
+# floor drives REAL combat; a defeat injures those shared heroes (GDD #34 /
+# ADR-0021 — correct production behavior), which then trips the dispatch-time
+# injured-hero gate on the next same-id dispatch, leaving last_dispatch_intent
+# empty — so this suite can poison itself or other suites. Reset the live roster
+# to empty per test (every dispatched id reads as a healthy unknown) and restore
+# afterward so we leak nothing (memory: feedback_test_isolation_live_autoload).
+func before_test() -> void:
+	_roster_snapshot = HeroRosterFixture.snapshot_via_save_data()
+	HeroRosterFixture.reset_hero_roster()
+
+
+func after_test() -> void:
+	HeroRosterFixture.restore_via_load_save_data(_roster_snapshot)
 
 
 func _make_orch() -> Node:

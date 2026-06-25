@@ -62,6 +62,12 @@ func before_test() -> void:
 	DungeonRunOrchestrator._last_dispatch_ms = 0
 	# Clear floor_unlock injection (fail-open default: floor lock check skipped).
 	DungeonRunOrchestrator.set_floor_unlock(null)
+	# Normalize the live orchestrator FSM at the INBOUND boundary so every test —
+	# including the structural/navigate ones that never touch the FSM — starts
+	# from a clean pre-dispatch NO_RUN regardless of suite order (this closes the
+	# reorder hazard). A bare `state = NO_RUN` is not enough; see
+	# _reset_orchestrator_to_no_run for the full foreground-context teardown.
+	_reset_orchestrator_to_no_run()
 
 
 func after_test() -> void:
@@ -70,6 +76,32 @@ func after_test() -> void:
 	# Restore orchestrator debounce and floor_unlock.
 	DungeonRunOrchestrator._last_dispatch_ms = 0
 	DungeonRunOrchestrator.set_floor_unlock(null)
+	# Fully tear down any foreground context so this suite never leaks a dirty
+	# orchestrator to later suites. The dispatch test calls the real dispatch(),
+	# which enters ACTIVE_FOREGROUND and subscribes the live TickSystem tick —
+	# a bare `state = NO_RUN` would leave that subscription (and the snapshots)
+	# dangling. See _reset_orchestrator_to_no_run.
+	_reset_orchestrator_to_no_run()
+
+
+# Fully normalize the live DungeonRunOrchestrator to a clean NO_RUN state.
+# A prior test here — the dispatch test calls the real dispatch() — or another
+# suite sharing this live autoload can leave it in ACTIVE_FOREGROUND with a live
+# TickSystem.tick_fired subscription, a non-null run_snapshot / _combat_snapshot,
+# and stale _dispatched_floor_index / _dispatched_biome_id. dispatch() is the
+# ONLY writer of ACTIVE_FOREGROUND — MainRoot's boot drives ACTIVE_OFFLINE_REPLAY
+# and never leaves foreground state. Tear the context down the way
+# _exit_active_foreground would, but via direct field writes so state_changed
+# does NOT fire (no telemetry / signal-spy pollution). Called from both
+# before_test and after_test: immune to an upstream leak, never leaks downstream.
+func _reset_orchestrator_to_no_run() -> void:
+	if TickSystem.tick_fired.is_connected(DungeonRunOrchestrator._on_tick_fired):
+		TickSystem.tick_fired.disconnect(DungeonRunOrchestrator._on_tick_fired)
+	DungeonRunOrchestrator.run_snapshot = null
+	DungeonRunOrchestrator._combat_snapshot = null
+	DungeonRunOrchestrator._dispatched_floor_index = 0
+	DungeonRunOrchestrator._dispatched_biome_id = ""
+	DungeonRunOrchestrator.state = DungeonRunStateScript.State.NO_RUN
 
 
 # ---------------------------------------------------------------------------
@@ -351,15 +383,10 @@ func test_formation_assignment_screen_dispatch_with_empty_formation_surfaces_toa
 	# Pre-assert — toast is hidden.
 	assert_bool(toast_label.visible).is_false()
 
-	# The wired MainRoot boot (offline-replay bootstrap in MainRoot._ready)
-	# leaves the live DungeonRunOrchestrator autoload in ACTIVE_FOREGROUND,
-	# where dispatch_pressed is rejected by the FSM before validation runs.
-	# In the real game an EMPTY formation means no run is active (NO_RUN) —
-	# the only realistic pre-dispatch state. Reset to it so the dispatch
-	# reaches the empty_formation validation that surfaces the toast.
-	DungeonRunOrchestrator.state = DungeonRunStateScript.State.NO_RUN
-
-	# Act — dispatch with empty formation.
+	# Act — dispatch with empty formation. before_test already normalized the
+	# orchestrator to NO_RUN, and the wired MainRoot boot drives ACTIVE_OFFLINE_REPLAY
+	# (never ACTIVE_FOREGROUND), so the dispatch reaches the empty_formation
+	# validation that surfaces the toast — no extra reset needed.
 	screen._on_dispatch_pressed()
 	await get_tree().process_frame
 
@@ -404,13 +431,10 @@ func test_formation_assignment_screen_dispatch_with_locked_floor_surfaces_toast(
 	assert_object(toast_label).is_not_null()
 	assert_bool(toast_label.visible).is_false()
 
-	# See the empty-formation test above: the wired MainRoot boot leaves the
-	# orchestrator in ACTIVE_FOREGROUND (dispatch_pressed rejected). Reset to
-	# NO_RUN — the realistic pre-dispatch state — so the floor-lock validation
-	# runs and surfaces its toast.
-	DungeonRunOrchestrator.state = DungeonRunStateScript.State.NO_RUN
-
-	# Act — dispatch; floor lock check will fire via the stub.
+	# Act — dispatch; floor lock check fires via the stub. before_test normalized
+	# the orchestrator to NO_RUN and the wired MainRoot boot never enters
+	# ACTIVE_FOREGROUND, so the dispatch reaches the floor-lock validation that
+	# surfaces its toast — no extra reset needed.
 	screen._on_dispatch_pressed()
 	await get_tree().process_frame
 
