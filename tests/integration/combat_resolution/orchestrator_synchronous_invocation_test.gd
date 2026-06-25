@@ -15,6 +15,7 @@ const DefaultMatchupResolverScript = preload("res://src/core/matchup_resolver/de
 const HeroInstanceScript = preload("res://src/core/hero_roster/hero_instance.gd")
 const CombatTickEventsScript = preload("res://src/core/combat/combat_tick_events.gd")
 const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/dungeon_run_state.gd")
+const HeroRosterFixture = preload("res://tests/helpers/hero_roster_test_fixture.gd")
 
 
 # Counting spy CombatResolver — extends RefCounted, exposes the methods the
@@ -43,6 +44,27 @@ class CountingCombatResolverSpy extends RefCounted:
 
 	func is_stub() -> String:
 		return "DefaultCombatResolver (counting spy wrapper)"
+
+
+# Snapshot of the live /root/HeroRoster, captured before each test and restored
+# after. These tests dispatch synthetic formations whose instance_ids collide
+# with the live starter heroes; a defeat on an unlocked floor injures those
+# shared heroes (GDD #34 / ADR-0021), which would trip the dispatch-time
+# injured-hero gate in a later test or suite (the orchestrator reads the live
+# /root/HeroRoster even when constructed locally). Reset to empty per test so
+# every dispatched id reads as a healthy unknown, and restore afterward so this
+# suite neither suffers nor causes a cross-test roster leak
+# (memory: feedback_test_isolation_live_autoload).
+var _roster_snapshot: Dictionary = {}
+
+
+func before_test() -> void:
+	_roster_snapshot = HeroRosterFixture.snapshot_via_save_data()
+	HeroRosterFixture.reset_hero_roster()
+
+
+func after_test() -> void:
+	HeroRosterFixture.restore_via_load_save_data(_roster_snapshot)
 
 
 func _make_hero(class_id: String, instance_id: int, level: int = 1) -> RefCounted:

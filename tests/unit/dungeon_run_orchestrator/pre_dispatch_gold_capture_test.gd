@@ -20,6 +20,29 @@ extends GdUnitTestSuite
 const OrchestratorScript = preload("res://src/core/dungeon_run_orchestrator/dungeon_run_orchestrator.gd")
 const RunSnapshotScript = preload("res://src/core/dungeon_run_orchestrator/run_snapshot.gd")
 const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/dungeon_run_state.gd")
+const HeroRosterFixture = preload("res://tests/helpers/hero_roster_test_fixture.gd")
+
+
+# Snapshot of the live /root/HeroRoster, taken before each test and restored
+# after, so this suite is isolated from roster state leaked by other suites.
+var _roster_snapshot: Dictionary = {}
+
+
+# dispatch() reads the live /root/HeroRoster for its injured-hero gate (GDD #34
+# / ADR-0021). These tests dispatch raw formation dicts (instance_id 1/2) and
+# assume those heroes are healthy — but a prior suite can leave a same-id hero
+# INJURED in the shared roster, which makes the gate reject the dispatch and
+# leave run_snapshot null, crashing the snapshot assertions below. Reset the
+# live roster to empty per test so every dispatched id reads as a healthy
+# unknown, regardless of suite execution order
+# (memory: feedback_test_isolation_live_autoload).
+func before_test() -> void:
+	_roster_snapshot = HeroRosterFixture.snapshot_via_save_data()
+	HeroRosterFixture.reset_hero_roster()
+
+
+func after_test() -> void:
+	HeroRosterFixture.restore_via_load_save_data(_roster_snapshot)
 
 
 func _make_orch() -> Node:
@@ -128,6 +151,11 @@ func test_orchestrator_redispatch_captures_fresh_pre_dispatch_gold() -> void:
 	orch._floor_unlock = PermissiveFloorUnlock.new()
 	# First dispatch.
 	orch.dispatch([{"instance_id": 1, "class_id": "warrior"}], 1, "ashen_glade")
+	# Guard the run_snapshot read: a rejected dispatch leaves it null, and an
+	# unguarded null deref is a HARD runtime error that aborts the test before
+	# after_test() can restore the roster (leaking the emptied roster to later
+	# suites). A failed assertion fails cleanly and still runs after_test.
+	assert_object(orch.run_snapshot).is_not_null()
 	var first_capture: int = orch.run_snapshot.pre_dispatch_gold
 	# Force back to RUN_ENDED so dispatch can be called again.
 	orch._set_state(DungeonRunStateScript.validate_transition(

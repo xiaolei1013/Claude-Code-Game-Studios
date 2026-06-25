@@ -22,9 +22,32 @@ const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/d
 const DefaultCombatResolverScript = preload("res://src/core/combat/default_combat_resolver.gd")
 const DefaultMatchupResolverScript = preload("res://src/core/matchup_resolver/default_matchup_resolver.gd")
 const HeroInstanceScript = preload("res://src/core/hero_roster/hero_instance.gd")
+const HeroRosterFixture = preload("res://tests/helpers/hero_roster_test_fixture.gd")
 
 const WARRIOR_ID := "warrior"
 const MAGE_ID := "mage"
+
+
+# Snapshot of the live /root/HeroRoster, taken before each test and restored
+# after, so this suite is isolated from roster state leaked by other suites.
+var _roster_snapshot: Dictionary = {}
+
+
+# dispatch() reads the live /root/HeroRoster for its injured-hero gate (GDD #34
+# / ADR-0021). These tests dispatch raw formation dicts (instance_id 1/2/3) and
+# assume those heroes are healthy — but a prior suite can leave a same-id hero
+# INJURED in the shared roster, which makes the gate reject the dispatch and
+# leave run_snapshot null, crashing the snapshot assertions below. Reset the
+# live roster to empty per test so every dispatched id reads as a healthy
+# unknown, regardless of suite execution order
+# (memory: feedback_test_isolation_live_autoload).
+func before_test() -> void:
+	_roster_snapshot = HeroRosterFixture.snapshot_via_save_data()
+	HeroRosterFixture.reset_hero_roster()
+
+
+func after_test() -> void:
+	HeroRosterFixture.restore_via_load_save_data(_roster_snapshot)
 
 
 func _make_hero(class_id: String, instance_id: int, level: int = 1) -> RefCounted:
