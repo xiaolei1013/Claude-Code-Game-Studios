@@ -849,7 +849,10 @@ func set_floor_unlock(fu: Object) -> void:
 ##   2. State transition: NO_RUN / RUN_ENDED + dispatch_pressed → DISPATCHING.
 ##      From DISPATCHING / ACTIVE_FOREGROUND / ACTIVE_OFFLINE_REPLAY, the
 ##      transition matrix rejects the dispatch via push_error and stays put;
-##      the dispatch method returns without further work.
+##      the dispatch method emits `validation_failed("run_already_active",
+##      {"state": state})` so the UI can surface feedback (the dispatch button
+##      is otherwise a silent dead control mid-run), then returns without
+##      further work.
 ##   3. Empty formation: emit `validation_failed("empty_formation", {})` and
 ##      transition DISPATCHING → RUN_ENDED.
 ##   4. Floor locked: if [member _floor_unlock] is non-null AND
@@ -888,7 +891,27 @@ func dispatch(formation: Array, floor_index: int, biome_id: String) -> void:
 		state, DungeonRunStateScript.TRIGGER_DISPATCH_PRESSED
 	)
 	if next_state == state:
-		# Matrix rejected the trigger — push_error already logged.
+		# Matrix rejected the trigger (push_error already logged). The only
+		# from-states that self-return on dispatch_pressed are the three busy
+		# states — DISPATCHING / ACTIVE_FOREGROUND / ACTIVE_OFFLINE_REPLAY (see
+		# dungeon_run_state.gd rows 2-4) — so this branch is unambiguously "a run
+		# is already in flight." Emit validation_failed so callers can surface
+		# player feedback rather than the dispatch being a silent dead-control
+		# no-op. A rapid double-tap is absorbed by the debounce return above, so
+		# this never fires twice in a row (no UI toast spam). The current state
+		# rides along in the payload for telemetry/debug.
+		#
+		# Drift tripwire: the "self-return ⇒ busy state" inference holds ONLY while
+		# no dispatch_pressed row is a *valid* self-loop. assert() (free at runtime,
+		# stripped from release) fails loudly in tests/editor if a future matrix
+		# edit breaks that — instead of silently mis-emitting run_already_active.
+		assert(
+			state == DungeonRunStateScript.State.DISPATCHING
+			or state == DungeonRunStateScript.State.ACTIVE_FOREGROUND
+			or state == DungeonRunStateScript.State.ACTIVE_OFFLINE_REPLAY,
+			"run_already_active emitted from non-busy state %d — dispatch_pressed matrix drifted" % state
+		)
+		validation_failed.emit("run_already_active", {"state": state})
 		return
 	_set_state(next_state)  # → DISPATCHING
 

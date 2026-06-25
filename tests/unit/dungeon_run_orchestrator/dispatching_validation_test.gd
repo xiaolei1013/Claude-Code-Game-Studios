@@ -206,6 +206,71 @@ func test_dispatch_from_active_foreground_is_rejected_by_matrix() -> void:
 
 
 # ===========================================================================
+# Group F2: busy-state reject EMITS run_already_active feedback (bug regression)
+#
+# Re-entering the formation screen during an active run and pressing Dispatch
+# used to be a silent no-op — the matrix rejected dispatch_pressed with only a
+# push_error, so the player got zero feedback. The reject path now emits
+# validation_failed("run_already_active", {"state": <from>}) so the UI can show
+# a toast. The three busy from-states (DISPATCHING / ACTIVE_FOREGROUND /
+# ACTIVE_OFFLINE_REPLAY) are the ONLY states that self-return on dispatch_pressed
+# (NO_RUN / RUN_ENDED both advance to DISPATCHING), so all three must emit while
+# the state stays put. These tests connect the spy that Group F deliberately
+# omitted — Group F pins state-invariance, Group F2 pins the new emission.
+# ===========================================================================
+
+func test_dispatch_from_active_foreground_emits_run_already_active() -> void:
+	_spy_validation_count = 0
+	_spy_validation_reason = ""
+	var orch: Node = _make_orch()
+	orch.validation_failed.connect(_on_validation_failed)
+	orch.state = DungeonRunStateScript.State.ACTIVE_FOREGROUND
+	orch.dispatch([{"id": 1}], 1, "forest_reach")
+	assert_int(_spy_validation_count).is_equal(1)
+	assert_str(_spy_validation_reason).is_equal("run_already_active")
+	# State unchanged — the live run keeps running; only feedback is emitted.
+	assert_int(orch.state).is_equal(DungeonRunStateScript.State.ACTIVE_FOREGROUND)
+
+
+func test_dispatch_from_dispatching_emits_run_already_active() -> void:
+	_spy_validation_count = 0
+	_spy_validation_reason = ""
+	var orch: Node = _make_orch()
+	orch.validation_failed.connect(_on_validation_failed)
+	orch.state = DungeonRunStateScript.State.DISPATCHING
+	orch.dispatch([{"id": 1}], 1, "forest_reach")
+	assert_int(_spy_validation_count).is_equal(1)
+	assert_str(_spy_validation_reason).is_equal("run_already_active")
+	assert_int(orch.state).is_equal(DungeonRunStateScript.State.DISPATCHING)
+
+
+func test_dispatch_from_offline_replay_emits_run_already_active() -> void:
+	_spy_validation_count = 0
+	_spy_validation_reason = ""
+	var orch: Node = _make_orch()
+	orch.validation_failed.connect(_on_validation_failed)
+	orch.state = DungeonRunStateScript.State.ACTIVE_OFFLINE_REPLAY
+	orch.dispatch([{"id": 1}], 1, "forest_reach")
+	assert_int(_spy_validation_count).is_equal(1)
+	assert_str(_spy_validation_reason).is_equal("run_already_active")
+	assert_int(orch.state).is_equal(DungeonRunStateScript.State.ACTIVE_OFFLINE_REPLAY)
+
+
+func test_run_already_active_payload_carries_the_busy_state() -> void:
+	_spy_validation_count = 0
+	_spy_validation_reason = ""
+	_spy_validation_payload = {}
+	var orch: Node = _make_orch()
+	orch.validation_failed.connect(_on_validation_failed)
+	orch.state = DungeonRunStateScript.State.ACTIVE_FOREGROUND
+	orch.dispatch([{"id": 1}], 1, "forest_reach")
+	assert_bool(_spy_validation_payload.has("state")).is_true()
+	assert_int(int(_spy_validation_payload["state"])).is_equal(
+		DungeonRunStateScript.State.ACTIVE_FOREGROUND
+	)
+
+
+# ===========================================================================
 # Group G: validation_failed signal arity + types
 # ===========================================================================
 
