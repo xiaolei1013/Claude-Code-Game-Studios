@@ -33,6 +33,7 @@ extends GdUnitTestSuite
 const SceneManagerScript = preload("res://src/core/scene_manager/scene_manager.gd")
 const FormationAssignmentScript = preload("res://assets/screens/formation_assignment/formation_assignment.gd")
 const HeroRosterScript = preload("res://src/core/hero_roster/hero_roster.gd")
+const DungeonRunStateScript = preload("res://src/core/dungeon_run_orchestrator/dungeon_run_state.gd")
 const MAIN_ROOT_SCENE_PATH: String = "res://src/core/scene_manager/MainRoot.tscn"
 const FORMATION_SCREEN_PATH: String = "res://assets/screens/formation_assignment/formation_assignment.tscn"
 
@@ -350,6 +351,14 @@ func test_formation_assignment_screen_dispatch_with_empty_formation_surfaces_toa
 	# Pre-assert — toast is hidden.
 	assert_bool(toast_label.visible).is_false()
 
+	# The wired MainRoot boot (offline-replay bootstrap in MainRoot._ready)
+	# leaves the live DungeonRunOrchestrator autoload in ACTIVE_FOREGROUND,
+	# where dispatch_pressed is rejected by the FSM before validation runs.
+	# In the real game an EMPTY formation means no run is active (NO_RUN) —
+	# the only realistic pre-dispatch state. Reset to it so the dispatch
+	# reaches the empty_formation validation that surfaces the toast.
+	DungeonRunOrchestrator.state = DungeonRunStateScript.State.NO_RUN
+
 	# Act — dispatch with empty formation.
 	screen._on_dispatch_pressed()
 	await get_tree().process_frame
@@ -394,6 +403,12 @@ func test_formation_assignment_screen_dispatch_with_locked_floor_surfaces_toast(
 	var toast_label: Label = screen.get_node_or_null("ToastLabel") as Label
 	assert_object(toast_label).is_not_null()
 	assert_bool(toast_label.visible).is_false()
+
+	# See the empty-formation test above: the wired MainRoot boot leaves the
+	# orchestrator in ACTIVE_FOREGROUND (dispatch_pressed rejected). Reset to
+	# NO_RUN — the realistic pre-dispatch state — so the floor-lock validation
+	# runs and surfaces its toast.
+	DungeonRunOrchestrator.state = DungeonRunStateScript.State.NO_RUN
 
 	# Act — dispatch; floor lock check will fire via the stub.
 	screen._on_dispatch_pressed()
