@@ -107,7 +107,7 @@ func test_run_already_active_toast_differs_from_generic_fallback() -> void:
 # B-01: the dispatch_error_run_already_active row exists in en.csv, so the
 # toast shows localized copy rather than the raw key. Reads the committed CSV
 # directly (deterministic, no dependency on regenerated .translation files),
-# mirroring the existing locale_de_column_test.gd pattern. Guards the data edit
+# mirroring the locale_columns_test.gd CSV-read pattern. Guards the data edit
 # against an accidental revert.
 func test_dispatch_error_run_already_active_key_present_in_locale_csv() -> void:
 	var file: FileAccess = FileAccess.open(LOCALE_CSV_PATH, FileAccess.READ)

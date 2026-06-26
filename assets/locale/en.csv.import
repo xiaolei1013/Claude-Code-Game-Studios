@@ -6,10 +6,10 @@ uid="uid://c10dt2rqdb2by"
 
 [deps]
 
-files=["res://assets/locale/en.en.translation", "res://assets/locale/en.de.translation", "res://assets/locale/en.zh_CN.translation"]
+files=["res://assets/locale/en.en.translation", "res://assets/locale/en.de.translation", "res://assets/locale/en.zh_CN.translation", "res://assets/locale/en.fr.translation", "res://assets/locale/en.zh_TW.translation", "res://assets/locale/en.ja.translation", "res://assets/locale/en.ko.translation", "res://assets/locale/en.es.translation", "res://assets/locale/en.es_MX.translation", "res://assets/locale/en.pt_PT.translation", "res://assets/locale/en.pt_BR.translation", "res://assets/locale/en.ru.translation"]
 
 source_file="res://assets/locale/en.csv"
-dest_files=["res://assets/locale/en.en.translation", "res://assets/locale/en.de.translation", "res://assets/locale/en.zh_CN.translation"]
+dest_files=["res://assets/locale/en.en.translation", "res://assets/locale/en.de.translation", "res://assets/locale/en.zh_CN.translation", "res://assets/locale/en.fr.translation", "res://assets/locale/en.zh_TW.translation", "res://assets/locale/en.ja.translation", "res://assets/locale/en.ko.translation", "res://assets/locale/en.es.translation", "res://assets/locale/en.es_MX.translation", "res://assets/locale/en.pt_PT.translation", "res://assets/locale/en.pt_BR.translation", "res://assets/locale/en.ru.translation"]
 
 [params]
 

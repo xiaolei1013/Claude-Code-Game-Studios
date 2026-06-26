@@ -50,8 +50,9 @@ This ADR resolves that deferral and ships Simplified Chinese.
 4. **Translations are machine-authored, needs-native-review** — consistent with
    [ADR-0026](ADR-0026-localization-architecture.md) D-c for German. CI asserts
    **structure** (every key non-empty per D-e; `%`-format-specifier parity with `en`)
-   via `tests/unit/locale_loader/locale_zh_column_test.gd`, never exact wording, so a
-   native reviewer can refine the Chinese freely without breaking the build.
+   via `tests/unit/locale_loader/locale_columns_test.gd` (the parameterized suite that
+   superseded the per-locale twins), never exact wording, so a native reviewer can
+   refine the Chinese freely without breaking the build.
 
 ## Consequences
 
@@ -125,7 +126,7 @@ This ADR resolves that deferral and ships Simplified Chinese.
 - [ ] Native-grade `zh_CN` review pass (wording/tone), same as the German follow-up.
 - [ ] If repo size matters at release: subset Noto Sans CJK SC to the shipped glyph set.
 - [ ] Optional: vendor a Bold weight if RichTextLabel faux-bold reads poorly in CJK.
-- [ ] Future CJK locales (ja / ko / zh_TW) — add as CSV columns; font already covers them
-      (zh_TW ideally uses the TC variant for region-correct glyph forms — revisit then).
+- [x] Future CJK locales (ja / ko / zh_TW) — **shipped on the SC face via [ADR-0028](ADR-0028-full-locale-set.md)**;
+      region-correct TC/JP/KR fonts (the glyph-form polish) re-scoped to a dedicated follow-up there.
 - [ ] Localize the locale dropdown to show endonyms (中文 / Deutsch / English) instead of
       raw codes (`zh_CN` / `de` / `en`) — a pre-existing Settings nicety, not CJK-specific.
