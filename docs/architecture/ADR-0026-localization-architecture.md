@@ -299,7 +299,7 @@ SETTINGS (player switches language)
 | `design/gdd/settings-options-accessibility.md` (#30) | Settings | §C.5/§D/§E.7 — persist `active_locale` to `user://settings.cfg` | Decision ② + D-b: Settings writes on change, LocaleLoader reads at boot |
 | `.claude/rules/ui-code.md` | UI | All UI text through the localization system — no hardcoded strings | String-extraction stories + the pseudolocale gate enforce it |
 | `DESIGN.md` | Design system | §Typography — type scale "tested for 140% expansion (German, Hungarian)" | D-c: German is the proof locale that exercises that budget |
-| `DESIGN.md` / `design/art/art-bible.md` | Visual identity | (deferred) CJK font + fallback for non-Latin locales | Explicitly scoped OUT; handed to a future font-identity ADR with art-director |
+| `DESIGN.md` / `design/art/art-bible.md` | Visual identity | (deferred) CJK font + fallback for non-Latin locales | Was scoped OUT; **resolved by [ADR-0027](ADR-0027-cjk-font-identity.md)** (Noto Sans CJK SC as theme default_font; zh_CN shipped) |
 
 ## Related
 
@@ -312,4 +312,4 @@ SETTINGS (player switches language)
 - **Settings GDD #30** — §C.5/§D/§E.7 persistence spec
 - **Tests** — `tests/unit/locale_loader/`, `tests/unit/ui_framework/ui_framework_helpers_test.gd`
 - **Rule** — `.claude/rules/ui-code.md` (no hardcoded user-facing strings)
-- **Follow-ups** — native-grade German review; **CJK/Chinese font-identity ADR** (the deferred half)
+- **Follow-ups** — native-grade German review; **CJK/Chinese font-identity ADR** → resolved by [ADR-0027](ADR-0027-cjk-font-identity.md) (Noto Sans CJK SC + zh_CN, 2026-06-26)
