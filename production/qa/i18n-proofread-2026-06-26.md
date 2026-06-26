@@ -41,7 +41,16 @@ The 3 High + 7 Medium were **applied** (commit on PR #263). The 22 Low are defer
 - **pt_PT — victory_biome_completed_format** "%s concluída" (feminine, mis-agrees with a variable
   biome name) → "Concluíste %s!".
 
-## Deferred (Low — for the human native pass)
+## Low-severity nits
+
+**STATUS — 2026-06-26**: **21 cells APPLIED** in a follow-up PR (locale + theme + settings suites green, %-parity preserved). Still open — need human/native judgment, NOT applied:
+- `en` `return_to_app_seconds_credited_format` **key rename** (dev-facing key/value mismatch; touches calling code — deferred).
+- `ja` `ビジル` / Vigil badge — translating only it would break the deliberate all-katakana synergy-badge set; native call.
+- `fr` / `pt` reduce-motion wording — the OS a11y-standard term is language-specific; only `es`/`es_MX` → "Reducir movimiento" applied (iOS-Spanish standard), `fr` "animations" may be the iOS-French standard.
+- EN biome-string **restructure** (`%s completed!`) — a source-side English-UX change; instead fixed `fr` per-locale ("Région terminée : %s"), matching the pt_PT fix.
+- `pt_PT` quit-to-desktop button length — a visual truncation check, not a text edit.
+
+Original findings (for the record; ✓ = applied):
 
 - **en**: `level`/`Level` casing inconsistent across level-up toasts; `return_to_app_seconds_credited_format`
   key name says "seconds" but value is minutes (dev-facing only).
