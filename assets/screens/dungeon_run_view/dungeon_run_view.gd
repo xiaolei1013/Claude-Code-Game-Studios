@@ -1397,13 +1397,15 @@ func _enemy_display_name(enemy_id: String) -> String:
 # wiring needs no roster re-fetch.
 # ===========================================================================
 
-## On-screen display size (px) of each hero sprite — the square bounding box the
-## idle frame is fit into (KEEP_ASPECT_CENTERED). UX spec range 48–96 (spec default
-## 72); the party diorama is the focal subject, so we run at the TOP of the range —
-## the playtest flagged the heroes (and their reaction-beat action poses) as too
-## small to read (#5). Source frames are 192 px wide, so 96 px still DOWNSCALES
-## (nearest-neighbour keeps the pixel register crisp). Fits even a max formation:
-## 10 × 96 + 9 × 24 sep = 1176 px < 1280 viewport, so no per-count shrink is needed.
+## On-screen display size (px) of each hero sprite — the square box the idle frame
+## fits into (KEEP_ASPECT_CENTERED). UX spec range 48–96 (default 72); playtest #5
+## read the heroes + their reaction-beat poses as too small, so we run at the top of
+## the range. The idle frames are tall — 192×432 (768×432 strips ÷ 4 cols) — so the square
+## box is height-bound: 96 px renders each frame ~43×96 centered, a downscale of the
+## source art (never a blurry upscale). Flat box at every count: the default 3-hero party
+## fits the row's centered ~560 px band (±280 offsets); 5+ heroes outgrow it, which the
+## spec's deferred large-formation shrink/tighten (GDD #35 §E.2, UX-DRV-HERO-09) — not
+## this constant — is meant to handle.
 const _HERO_SPRITE_DISPLAY_PX: int = 96
 
 ## Horizontal gap (px) between adjacent hero sprites in the front-line row.
