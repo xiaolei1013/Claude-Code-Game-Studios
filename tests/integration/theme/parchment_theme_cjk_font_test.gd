@@ -1,56 +1,67 @@
-# GdUnit4 — the parchment theme's default font must render CJK (no tofu) for zh_CN.
+# GdUnit4 — the parchment theme's default font must render EVERY shipped locale's
+# glyphs (no tofu). Covers all non-ASCII scripts present in en.csv: CJK ideographs +
+# Kana + Hangul (zh_CN / zh_TW / ja / ko), Cyrillic (ru), and accented Latin
+# (fr / es / es_MX / pt_PT / pt_BR / de). This is the deterministic "no tofu boxes"
+# guard — it loads the live theme and asserts its default face carries the glyphs the
+# locale columns actually use, complementing the human eyeball check. If someone
+# removes default_font or swaps in a Latin-only face, non-Latin locales would silently
+# render as boxes (□); this fails CI instead.
 #
-# ADR-0027: zh_CN ships by setting the theme's default_font to Noto Sans CJK SC.
-# This is the deterministic "no tofu boxes" guard — it loads the live theme
-# resource and asserts its default face actually carries the CJK glyphs the
-# zh_CN column uses, complementing the human screenshot check. If someone removes
-# default_font or swaps in a Latin-only face, Chinese would silently render as
-# boxes (□); this fails CI instead of shipping it to a Chinese player.
+# ADR-0027 (Noto Sans CJK SC as default_font) + ADR-0028 (the 12-locale set, all on
+# that single face). File name is historical (was zh_CN-only); it now guards all locales.
 extends GdUnitTestSuite
 
 const THEME_PATH: String = "res://assets/ui/parchment_theme.tres"
 const CSV_PATH: String = "res://assets/locale/en.csv"
-const LOCALE_CODE: String = "zh_CN"
 
-# CJK Unified Ideographs block. The coverage test derives its glyph set from the
-# LIVE zh_CN column filtered to this range, so it tracks the shipped translations
-# (and any native-reviewer rewording) rather than a hard-coded specimen. Emoji
-# (e.g. 🔒), full-width punctuation, and Latin are deliberately excluded: they
-# render via the same fallback path for en/de and are not the CJK "tofu" risk this
-# suite owns (Noto Sans CJK does not even contain emoji — asserting it would false-fail).
-const CJK_IDEOGRAPH_LO: int = 0x4E00
-const CJK_IDEOGRAPH_HI: int = 0x9FFF
-
-
-func test_parchment_theme_defines_a_default_font() -> void:
-	var theme: Theme = load(THEME_PATH) as Theme
-	assert_object(theme).override_failure_message(
-		"parchment_theme.tres failed to load as a Theme at %s" % THEME_PATH
-	).is_not_null()
-	assert_object(theme.default_font).override_failure_message(
-		"parchment_theme.tres has no default_font — zh_CN (and all text) would fall back to the engine Latin-only font (ADR-0027)."
-	).is_not_null()
+# Unicode ranges for the scripts that would render as tofu on a Latin-ASCII-only font
+# — the actual coverage risk. Glyphs are derived per-locale from the LIVE columns, so
+# the guard tracks shipped text and any native-reviewer rewording. Includes CJK symbols
+# & full-width punctuation (。、：！（） — CJK-exclusive; en/de never use them, so the
+# default font must carry them directly, not via a shared fallback). Deliberately
+# EXCLUDES only emoji (e.g. 🔒 — also present in en, and absent from Noto Sans CJK, so
+# asserting it would false-fail) and plain ASCII.
+const SCRIPT_RANGES: Array = [
+	[0x00C0, 0x024F],  # Latin-1 Supplement + Latin Extended-A/B (é ñ ç ã ü à ...)
+	[0x0400, 0x04FF],  # Cyrillic (ru)
+	[0x3000, 0x303F],  # CJK Symbols & Punctuation (。 、 「 」 …)
+	[0x3040, 0x30FF],  # Hiragana + Katakana (ja)
+	[0x3400, 0x4DBF],  # CJK Unified Ideographs Extension A
+	[0x4E00, 0x9FFF],  # CJK Unified Ideographs (zh_CN / zh_TW / ja kanji / ko hanja)
+	[0xAC00, 0xD7A3],  # Hangul syllables (ko)
+	[0xFF00, 0xFFEF],  # Halfwidth/Fullwidth Forms (： ！ （ ） full-width digits)
+]
 
 
-# Every CJK ideograph that actually appears in the live zh_CN column. Reading the
-# column here (rather than reusing the sibling locale suite's full row-parser) keeps
-# the guard self-contained and purpose-specific — it needs codepoints, not rows.
-func _zh_cn_ideographs() -> PackedInt32Array:
+func _in_script_range(cp: int) -> bool:
+	for pair in SCRIPT_RANGES:
+		if cp >= pair[0] and cp <= pair[1]:
+			return true
+	return false
+
+
+# Every in-script-range glyph that actually appears across ALL translated locale
+# columns (header minus `keys`/`en`) of the live en.csv. Self-contained read — it
+# needs codepoints, not the locale suite's parsed rows.
+func _shipped_script_glyphs() -> PackedInt32Array:
 	var seen: Dictionary = {}
 	var f: FileAccess = FileAccess.open(CSV_PATH, FileAccess.READ)
 	if f == null:
 		return PackedInt32Array()
 	var header: PackedStringArray = f.get_csv_line()
-	var zi: int = header.find(LOCALE_CODE)
-	if zi != -1:
-		while not f.eof_reached():
-			var row: PackedStringArray = f.get_csv_line()
-			if zi >= row.size():
+	var cols: Array[int] = []
+	for i in header.size():
+		if header[i] != "keys" and header[i] != "en":
+			cols.append(i)
+	while not f.eof_reached():
+		var row: PackedStringArray = f.get_csv_line()
+		for ci in cols:
+			if ci >= row.size():
 				continue
-			var value: String = row[zi]
+			var value: String = row[ci]
 			for i in value.length():
 				var cp: int = value.unicode_at(i)
-				if cp >= CJK_IDEOGRAPH_LO and cp <= CJK_IDEOGRAPH_HI:
+				if _in_script_range(cp):
 					seen[cp] = true
 	f.close()
 	var out: PackedInt32Array = PackedInt32Array()
@@ -59,34 +70,44 @@ func _zh_cn_ideographs() -> PackedInt32Array:
 	return out
 
 
-func test_parchment_default_font_covers_every_zh_cn_ideograph() -> void:
-	# The real "no tofu" invariant: every Chinese character a zh_CN player will see
-	# must exist in the default face. Derived from the live column, so it never drifts
-	# from the shipped translations (ADR-0027).
+func test_parchment_theme_defines_a_default_font() -> void:
+	var theme: Theme = load(THEME_PATH) as Theme
+	assert_object(theme).override_failure_message(
+		"parchment_theme.tres failed to load as a Theme at %s" % THEME_PATH
+	).is_not_null()
+	assert_object(theme.default_font).override_failure_message(
+		"parchment_theme.tres has no default_font — non-Latin locales would fall back to a Latin-only font (ADR-0027/0028)."
+	).is_not_null()
+
+
+func test_parchment_default_font_covers_every_shipped_locale_glyph() -> void:
+	# The real "no tofu" invariant across all locales: every CJK / Kana / Hangul /
+	# Cyrillic / accented-Latin glyph a player will see must exist in the default face.
+	# Derived from the live columns, so it never drifts from the shipped translations.
 	var theme: Theme = load(THEME_PATH) as Theme
 	var font: Font = theme.default_font
 	assert_object(font).is_not_null()
-	var glyphs: PackedInt32Array = _zh_cn_ideographs()
+	var glyphs: PackedInt32Array = _shipped_script_glyphs()
 	assert_int(glyphs.size()).override_failure_message(
-		"found no CJK ideographs in the %s column of %s — cannot verify coverage" % [LOCALE_CODE, CSV_PATH]
+		"found no in-script-range glyphs across the locale columns of %s — cannot verify coverage" % CSV_PATH
 	).is_greater(0)
 	var missing: Array[String] = []
 	for cp in glyphs:
 		if not font.has_char(cp):
 			missing.append(char(cp))
 	assert_int(missing.size()).override_failure_message(
-		"default_font is missing %d CJK glyph(s) used by zh_CN: %s — these would render as tofu (ADR-0027)." % [missing.size(), str(missing)]
+		"default_font is missing %d shipped-locale glyph(s): %s — these would render as tofu (ADR-0028)." % [missing.size(), str(missing)]
 	).is_equal(0)
 
 
 func test_parchment_default_font_still_covers_latin() -> void:
-	# The CJK font must not have cost Latin coverage. Noto Sans CJK SC includes
-	# Latin (its glyphs are the prior engine default's Noto Sans design), so en/de
-	# and all UI chrome keep rendering.
+	# The CJK font must not have cost basic Latin coverage (Noto Sans CJK SC includes
+	# Latin — its glyphs are the engine default's Noto Sans design), so en + the
+	# Latin-script locales and all UI chrome keep rendering.
 	var theme: Theme = load(THEME_PATH) as Theme
 	var font: Font = theme.default_font
 	var latin: String = "Az0"
 	for i in latin.length():
 		assert_bool(font.has_char(latin.unicode_at(i))).override_failure_message(
-			"default_font missing basic Latin glyph '%s' — Latin/UI text would break (ADR-0027)." % latin[i]
+			"default_font missing basic Latin glyph '%s' — Latin/UI text would break." % latin[i]
 		).is_true()

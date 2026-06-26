@@ -1,182 +1,182 @@
-keys,en,de,zh_CN
-formation_assignment_instructional_header,Send your guild to:,Schicke deine Gilde nach:,派遣你的公会前往：
-slot_empty_label,Empty,Leer,空缺
-slot_selected_badge,Selected,Ausgewählt,已选择
-injured_badge_label,Injured,Verletzt,受伤
-injured_badge_format,Injured · %s,Verletzt · %s,受伤 · %s
-dispatch_button,Dispatch,Entsenden,派遣
-dispatch_error_empty_formation,Assign at least one hero to your formation.,Weise deiner Formation mindestens einen Helden zu.,请至少为你的阵容指派一名英雄。
-dispatch_error_floor_locked,That floor is locked.,Diese Ebene ist gesperrt.,该层尚未解锁。
-dispatch_error_run_already_active,A run is already in progress.,Ein Lauf ist bereits im Gange.,已有一场远征正在进行。
-dispatch_error_generic,Something went wrong. Try again.,Etwas ist schiefgelaufen. Versuche es erneut.,出了点问题，请重试。
-recruit_a_hero_label,Recruit a hero to begin.,"Rekrutiere einen Helden, um zu beginnen.",先招募一名英雄开始吧。
-floor_label_forest_reach_1,Forest Reach — Floor 1,Waldgrund — Ebene 1,森林边境 — 第1层
-dungeon_run_view_title,Dungeon Run,Verlieslauf,地下城远征
-tick_label_prefix,Tick:,Takt:,回合：
-kill_count_label_prefix,Kills:,Besiegt:,击杀：
-run_complete_kill_count_format,Run Complete — %d kills,Zug abgeschlossen — %d Gegner besiegt,远征完成 — 击杀 %d
-run_defeat_floor_format,Driven back at Floor %d — your guild is recovering.,Zurückgeschlagen auf Ebene %d — deine Gilde erholt sich.,在第 %d 层被击退 — 你的公会正在恢复。
-hero_level_up_toast_format,%s reached level %d!,%s hat Stufe %d erreicht!,%s 升到了 %d 级！
-hero_milestone_toast_format,Milestone! %s is now Level %d,Meilenstein! %s ist jetzt Stufe %d,里程碑！%s 现已达到 %d 级
-biome_unlocked_toast_format,New region unlocked: %s,Neue Region freigeschaltet: %s,解锁新区域：%s
-return_to_app_title,Welcome back!,Willkommen zurück!,欢迎回来！
-return_to_app_seconds_credited_format,You were away for %d minutes.,Du warst %d Minuten weg.,你离开了 %d 分钟。
-return_to_app_gold_earned_format,+%d gold earned,+%d Gold verdient,+%d 金币
-return_to_app_kills_format,%d enemies defeated,%d Gegner besiegt,击败 %d 个敌人
-return_to_app_floors_format,%d floors cleared,%d Ebenen geschafft,通关 %d 层
-return_to_app_cap_reached_notice_format,(Capped at %d hours offline.),(Begrenzt auf %d Stunden offline.),（离线收益上限为 %d 小时。）
-return_to_app_acknowledge_button,Continue,Weiter,继续
-return_to_app_no_summary_fallback,No recent rewards to summarize.,Keine neuen Belohnungen zusammenzufassen.,暂无可汇总的奖励。
-recruit_error_insufficient_gold,Not enough gold.,Nicht genug Gold.,金币不足。
-recruit_error_roster_full,Roster full.,Kader voll.,队伍已满。
-recruit_error_unresolvable_class,This class is no longer available.,Diese Klasse ist nicht mehr verfügbar.,该职业已不可用。
-recruit_owned_format,(owned: %d),(im Besitz: %d),（已拥有：%d）
-hero_detail_level_up_format,Level Up — %s gold,Stufenaufstieg — %s Gold,升级 — %s 金币
-hero_detail_owned_format,(%d %s total),(%d %s insgesamt),（共 %d 名 %s）
-hero_detail_xp_capped,MAX LEVEL,MAX. STUFE,满级
-hero_detail_xp_format,XP: %d / %d,XP: %d / %d,经验：%d / %d
-matchup_floor_locked_format,Clear Floor %d to unlock.,"Räume Ebene %d, um freizuschalten.",通关第 %d 层以解锁。
-matchup_select_format,Select Floor %d — %s,Ebene %d wählen — %s,选择第 %d 层 — %s
-victory_biome_completed_format,%s completed!,%s abgeschlossen!,%s 已完成！
-victory_continuation_prompt,Tap to continue,Zum Fortfahren tippen,点击继续
-victory_gold_gained_format,+%d gold,+%d Gold,+%d 金币
-reward_float_level_up_format,Lv %d,St. %d,%d 级
-victory_headline_format,%s — Floor %d cleared,%s — Ebene %d geschafft,%s — 第 %d 层通关
-victory_level_up_format,%s reached level %d,%s hat Stufe %d erreicht,%s 升到了 %d 级
-victory_unlock_format,Floor %d now available.,Ebene %d jetzt verfügbar.,第 %d 层现已开放。
-class_synergy_badge_steel_wall,Steel Wall,Stahlwall,钢铁壁垒
-class_synergy_badge_arcane_elite,Arcane Elite,Arkane Elite,奥术精英
-class_synergy_badge_triple_strike,Triple Strike,Dreifachschlag,三重打击
-class_synergy_badge_triple_threat,Triple Threat,Dreifachgefahr,三重威胁
-class_synergy_badge_bastion,Bastion,Bastion,堡垒
-class_synergy_badge_volley,Volley,Salve,齐射
-class_synergy_badge_frenzy,Frenzy,Raserei,狂乱
-class_synergy_badge_vigil,Vigil,Wacht,守望
-class_synergy_effect_steel_wall,+25% gold vs bruisers,+25% Gold gegen Schläger,对斗士 +25% 金币
-class_synergy_effect_arcane_elite,+20% XP from all kills,+20% XP für alle Siege,所有击杀 +20% 经验
-class_synergy_effect_triple_strike,+25% gold vs armored,+25% Gold gegen Gepanzerte,对重甲 +25% 金币
-class_synergy_effect_triple_threat,+15% gold from all kills,+15% Gold für alle Siege,所有击杀 +15% 金币
-class_synergy_effect_bastion,+25% gold vs casters,+25% Gold gegen Zauberer,对施法者 +25% 金币
-class_synergy_effect_volley,+25% gold vs swarm,+25% Gold gegen Schwärme,对群集 +25% 金币
-class_synergy_effect_frenzy,+25% gold vs bruisers,+25% Gold gegen Schläger,对斗士 +25% 金币
-class_synergy_effect_vigil,+20% XP from all kills,+20% XP für alle Siege,所有击杀 +20% 经验
-prestige_button_label,Prestige Hero,Held verabschieden,英雄荣休
-prestige_confirmation_modal_body,"%s has earned their retirement. They'll join the Hall of Retired Heroes — your guild will remember them, and every future run will earn +5% more gold and XP, forever.","%s hat sich den Ruhestand verdient. Sie ziehen in die Halle der Veteranen ein — deine Gilde wird sich an sie erinnern, und jeder künftige Zug bringt für immer +5% mehr Gold und XP.",%s 已赢得荣休。他们将进入荣退英雄殿 — 你的公会会永远铭记他们，且此后每一次远征都将永久获得 +5% 的额外金币与经验。
-prestige_confirmation_button_confirm,Prestige Hero,Held verabschieden,英雄荣休
-prestige_confirmation_button_cancel,Cancel,Abbrechen,取消
-prestige_complete_toast,%s joined the Hall of Retired Heroes.,%s ist in die Halle der Veteranen eingezogen.,%s 已进入荣退英雄殿。
-hall_of_retired_heroes_title,Hall of Retired Heroes,Halle der Veteranen,荣退英雄殿
-hall_card_metadata_format,%s · %s · Lv %d · Retired Day %d,%s · %s · St. %d · Ruhestand Tag %d,%s · %s · %d 级 · 荣退于第 %d 天
-prestige_disabled_active_run_tooltip,Prestige a hero between runs.,Verabschiede einen Helden zwischen den Zügen.,请在两次远征之间让英雄荣休。
-hall_empty_state_placeholder,No retired heroes yet.,Noch keine Veteranen.,还没有荣退的英雄。
-recruit_pool_empty_placeholder,The pool is rebuilding. Refresh to scout new heroes.,"Der Pool füllt sich wieder. Aktualisiere, um neue Helden zu finden.",候选池正在重建。刷新以发掘新英雄。
-matchup_floor_locked_tooltip_format,Clear floor %d first,Räume zuerst Ebene %d,请先通关第 %d 层
-matchup_floor_recommended_format,Recommended: %s,Empfohlen: %s,推荐：%s
-guild_hall_roster_tab_active,Active,Aktiv,现役
-guild_hall_roster_tab_retired,Retired,Veteranen,荣退
-guild_hall_all_injured_format,Your guild is recovering — ready in %s.,Deine Gilde erholt sich — bereit in %s.,你的公会正在恢复 — %s 后就绪。
-guild_hall_all_injured_no_timer,Your guild is recovering.,Deine Gilde erholt sich.,你的公会正在恢复。
-guild_hall_all_injured_under_minute,less than a minute,weniger als eine Minute,不到一分钟
-pause_menu_title,Paused,Pausiert,已暂停
-pause_menu_resume_button,Resume,Fortsetzen,继续
-pause_menu_settings_button,Settings,Einstellungen,设置
-pause_menu_quit_to_guild_hall_button,Quit to Guild Hall,Zur Gildenhalle,返回公会大厅
-settings_version_label_format,Version %s,Version %s,版本 %s
-settings_quit_to_desktop_button,Quit to Desktop,Zum Desktop beenden,退出到桌面
-synergy_preview_none_format,Synergy: %s,Synergie: %s,羁绊：%s
-synergy_preview_none_label,None,Keine,无
-synergy_tier_none,None,Keine,无
-synergy_tier_bronze,Bronze,Bronze,青铜
-synergy_tier_silver,Silver,Silber,白银
-synergy_tier_gold,Gold,Gold,黄金
-synergy_tier_platinum,Platinum,Platin,铂金
-synergy_preview_tiered_format,Synergy: %s (%s),Synergie: %s (%s),羁绊：%s（%s）
-synergy_preview_tiered_format_with_effect,Synergy: %s (%s) — %s,Synergie: %s (%s) — %s,羁绊：%s（%s）— %s
-formation_presets_none_option,(none),(keine),（无）
-formation_presets_saved_toast,Formation saved.,Formation gespeichert.,阵容已保存。
-formation_presets_truncated_toast,Name shortened to fit.,"Name gekürzt, um zu passen.",名称已缩短以适应。
-formation_presets_at_cap_toast,You've saved the most formations you can. Delete one to make room.,"Du hast die maximale Anzahl an Formationen gespeichert. Lösche eine, um Platz zu schaffen.",你保存的阵容已达上限。删除一个以腾出空间。
-formation_presets_name_empty_toast,Enter a name for this formation.,Gib dieser Formation einen Namen.,请为该阵容输入一个名称。
-formation_presets_missing_toast,%d saved hero(es) are no longer in your guild — those slots are empty.,%d gespeicherte Held(en) sind nicht mehr in deiner Gilde — diese Plätze sind leer.,%d 名已保存的英雄已不在你的公会中 — 这些位置为空。
-formation_presets_recall_unknown_toast,That formation is no longer available.,Diese Formation ist nicht mehr verfügbar.,该阵容已不可用。
-formation_presets_deleted_toast,Formation deleted.,Formation gelöscht.,阵容已删除。
-app_wordmark,Lantern Guild,Lantern Guild,Lantern Guild
-app_tagline,The dungeon is dark. Send a light.,Das Verlies ist dunkel. Schick ein Licht.,地下城一片漆黑。送去一束光。
-back_to_guild_hall_button,← Guild Hall,← Gildenhalle,← 公会大厅
-title_screen_continue_button,Continue the Watch,Die Wacht fortsetzen,继续守望
-title_screen_settings_button,Settings,Einstellungen,设置
-start_menu_start_button,Start Expedition,Expedition starten,开始远征
-start_menu_quit_button,Quit,Beenden,退出
-codex_eyebrow,· The guild keeps a record ·,· Die Gilde führt Buch ·,· 公会留有记录 ·
-codex_title,The Codex,Der Kodex,图鉴
-codex_close_button,Close,Schließen,关闭
-codex_tab_heroes,Heroes,Helden,英雄
-codex_tab_monsters,Monsters,Monster,怪物
-codex_tab_dungeons,Dungeons,Verliese,地下城
-codex_empty_state,Nothing recorded yet.,Noch nichts aufgezeichnet.,还没有任何记录。
-pause_menu_eyebrow,· The guild waits ·,· Die Gilde wartet ·,· 公会静候 ·
-pause_menu_tagline,The hour-glass turns regardless.,Die Sanduhr läuft trotzdem weiter.,沙漏依旧流转。
-pause_menu_return_to_title_button,Return to Title,Zum Titel zurück,返回标题
-dungeon_run_hp_format,HP %d/%d,TP %d/%d,生命 %d/%d
-dungeon_run_enemies_format,Enemies %d/%d,Gegner %d/%d,敌人 %d/%d
-dungeon_run_return_to_hall_button,Return to Hall,Zurück zur Halle,返回大厅
-victory_zero_gold_label,0 gold,0 Gold,0 金币
-formation_assignment_gold_counter_format,Gold: %s,Gold: %s,金币：%s
-formation_assignment_no_biomes,No biomes available,Keine Regionen verfügbar,暂无可用区域
-formation_assignment_common_archetypes_format,Common: %s,Häufig: %s,常见：%s
-formation_assignment_floor_button_format,F%d,E%d,%d层
-formation_assignment_floor_button_locked_format,🔒 F%d,🔒 E%d,🔒 %d层
-formation_assignment_select_locked,Select (locked),Wählen (gesperrt),选择（已锁定）
-formation_assignment_synergy_badge_format,%s: %s,%s: %s,%s：%s
-formation_assignment_hero_slot_counter_format,%s (%s Lv%d · vs %s),%s (%s St.%d · vs %s),%s（%s %d级 · 克制 %s）
-formation_assignment_hero_slot_format,%s (%s Lv%d),%s (%s St.%d),%s（%s %d级）
-formation_presets_panel_title,Saved Formations,Gespeicherte Formationen,已保存的阵容
-formation_presets_recall_button,Recall,Abrufen,取出
-formation_presets_save_button,Save,Speichern,保存
-formation_presets_delete_button,Delete,Löschen,删除
-formation_assignment_mid_run_confirm_body,Changing your formation will end the current run. Continue?,"Wenn du die Formation änderst, endet der aktuelle Zug. Fortfahren?",更改阵容将结束当前远征。是否继续？
-formation_assignment_cancel_button,Cancel,Abbrechen,取消
-formation_assignment_end_run_confirm_button,End Run & Change,Zug beenden & ändern,结束远征并更改
-formation_assignment_picker_cancel_button,← Cancel,← Abbrechen,← 取消
-formation_assignment_picker_title,Choose Your Run,Wähle deinen Zug,选择你的远征
-formation_assignment_picker_select_button,Select,Wählen,选择
-formation_presets_save_modal_title,Name this formation,Benenne diese Formation,为该阵容命名
-formation_presets_name_placeholder,My formation,Meine Formation,我的阵容
-formation_presets_delete_confirm_body,Delete this formation? This can't be undone.,Diese Formation löschen? Das kann nicht rückgängig gemacht werden.,删除该阵容？此操作无法撤销。
-hero_detail_counter_archetype_format,Strong vs: %s,Stark gegen: %s,克制：%s
-hero_detail_name_scaffold,Hero Name,Heldenname,英雄名称
-hero_detail_class_scaffold,Class,Klasse,职业
-hero_detail_level_label,Level,Stufe,等级
-hero_detail_level_up_button,Level Up,Stufenaufstieg,升级
-hero_detail_close_button,Close,Schließen,关闭
-recruitment_gold_counter_format,%s gold,%s Gold,%s 金币
-recruitment_recruit_button,Recruit,Rekrutieren,招募
-recruitment_refresh_pool_button_format,Refresh Pool — %s gold,Pool auffrischen — %s Gold,刷新候选池 — %s 金币
-recruitment_class_matchup_format,%s · vs %s,%s · vs %s,%s · 克制 %s
-recruitment_screen_title,Recruit,Rekrutieren,招募
-guild_hall_prestige_multiplier_format,×%.2f,×%.2f,×%.2f
-guild_hall_gold_counter_format,Gold: %d,Gold: %d,金币：%d
-guild_hall_synergy_badge_format,%s: %s,%s: %s,%s：%s
-guild_hall_hero_card_counter_format,%s · %s · Lv %d · vs %s,%s · %s · St. %d · vs %s,%s · %s · %d级 · 克制 %s
-guild_hall_hero_card_format,%s · %s · Lv %d,%s · %s · St. %d,%s · %s · %d级
-guild_hall_title,Guild Hall,Gildenhalle,公会大厅
-guild_hall_dispatch_button,Go to Dispatch,Zur Entsendung,前往派遣
-guild_hall_recruit_button,Recruit,Rekrutieren,招募
-victory_kills_label,Kills,Besiegt,击杀
-victory_gold_gained_label,Gold gained,Gold erhalten,获得金币
-settings_volume_silent_label,-INF,-INF,-INF
-settings_volume_db_format,%d dB,%d dB,%d dB
-settings_eyebrow_header,· The inner workings ·,· Das Innenleben ·,· 内部运作 ·
-settings_section_audio,Audio,Audio,音频
-settings_section_accessibility,Accessibility,Barrierefreiheit,无障碍
-settings_section_data_locale,Data & locale,Daten & Sprache,数据与语言
-settings_title,Settings,Einstellungen,设置
-settings_volume_master_label,Master,Gesamt,主音量
-settings_volume_music_label,Music,Musik,音乐
-settings_volume_sfx_label,SFX,Effekte,音效
-settings_mute_label,Mute (master),Stumm (gesamt),静音（主）
-settings_reduce_motion_label,Reduce motion,Bewegung reduzieren,减弱动态效果
-settings_language_label,Language,Sprache,语言
-settings_telemetry_label,Share anonymous diagnostic data,Anonyme Diagnosedaten teilen,分享匿名诊断数据
-settings_reset_button,Reset to Defaults,Auf Standard zurücksetzen,恢复默认设置
-settings_close_button,Close,Schließen,关闭
+keys,en,de,zh_CN,fr,zh_TW,ja,ko,es,es_MX,pt_PT,pt_BR,ru
+formation_assignment_instructional_header,Send your guild to:,Schicke deine Gilde nach:,派遣你的公会前往：,Envoyez votre guilde vers :,派遣你的公會前往：,ギルドの派遣先：,길드를 파견할 곳:,Envía a tu gremio a:,Envía a tu gremio a:,Envia a tua guilda para:,Envie sua guilda para:,Отправьте гильдию в:
+slot_empty_label,Empty,Leer,空缺,Vide,空缺,空き,비어 있음,Vacío,Vacío,Vazio,Vazio,Пусто
+slot_selected_badge,Selected,Ausgewählt,已选择,Sélectionné,已選擇,選択中,선택됨,Seleccionado,Seleccionado,Selecionado,Selecionado,Выбрано
+injured_badge_label,Injured,Verletzt,受伤,Blessé,受傷,負傷,부상,Herido,Herido,Ferido,Ferido,Ранен
+injured_badge_format,Injured · %s,Verletzt · %s,受伤 · %s,Blessé · %s,受傷 · %s,負傷 · %s,부상 · %s,Herido · %s,Herido · %s,Ferido · %s,Ferido · %s,Ранен · %s
+dispatch_button,Dispatch,Entsenden,派遣,Déployer,派遣,派遣,파견,Desplegar,Enviar,Despachar,Despachar,Отправить
+dispatch_error_empty_formation,Assign at least one hero to your formation.,Weise deiner Formation mindestens einen Helden zu.,请至少为你的阵容指派一名英雄。,Assignez au moins un héros à votre formation.,請至少為你的陣容指派一名英雄。,編成に最低1人のヒーローを配置してください。,편성에 영웅을 최소 한 명 배치하세요.,Asigna al menos un héroe a tu formación.,Asigna al menos un héroe a tu formación.,Atribui pelo menos um herói à tua formação.,Atribua pelo menos um herói à sua formação.,Добавьте в состав хотя бы одного героя.
+dispatch_error_floor_locked,That floor is locked.,Diese Ebene ist gesperrt.,该层尚未解锁。,Cet étage est verrouillé.,該樓層尚未解鎖。,その階はまだ解放されていません。,해당 층은 잠겨 있습니다.,Esa planta está bloqueada.,Ese piso está bloqueado.,Esse piso está bloqueado.,Esse andar está bloqueado.,Этот этаж заблокирован.
+dispatch_error_run_already_active,A run is already in progress.,Ein Lauf ist bereits im Gange.,已有一场远征正在进行。,Une expédition est déjà en cours.,已有一場遠征正在進行。,すでに遠征が進行中です。,이미 원정이 진행 중입니다.,Ya hay una expedición en curso.,Ya hay una expedición en curso.,Já está uma expedição em curso.,Já há uma expedição em andamento.,Поход уже идёт.
+dispatch_error_generic,Something went wrong. Try again.,Etwas ist schiefgelaufen. Versuche es erneut.,出了点问题，请重试。,Une erreur est survenue. Réessayez.,出了點問題，請重試。,エラーが発生しました。もう一度お試しください。,문제가 발생했습니다. 다시 시도하세요.,Algo ha salido mal. Inténtalo de nuevo.,Algo salió mal. Inténtalo de nuevo.,Algo correu mal. Tenta novamente.,Algo deu errado. Tente novamente.,Что-то пошло не так. Попробуйте снова.
+recruit_a_hero_label,Recruit a hero to begin.,"Rekrutiere einen Helden, um zu beginnen.",先招募一名英雄开始吧。,Recrutez un héros pour commencer.,先招募一名英雄開始吧。,ヒーローを採用して始めましょう。,영웅을 모집하여 시작하세요.,Recluta a un héroe para empezar.,Recluta a un héroe para empezar.,Recruta um herói para começar.,Recrute um herói para começar.,"Наймите героя, чтобы начать."
+floor_label_forest_reach_1,Forest Reach — Floor 1,Waldgrund — Ebene 1,森林边境 — 第1层,Confins de la forêt — Étage 1,森林邊境 — 第1層,森の辺境 — 1階,숲의 변경 — 1층,Confín del Bosque — Planta 1,Confín del Bosque — Piso 1,Confins da Floresta — Piso 1,Confins da Floresta — Andar 1,Лесная окраина — Этаж 1
+dungeon_run_view_title,Dungeon Run,Verlieslauf,地下城远征,Expédition en donjon,地城遠征,ダンジョン遠征,던전 원정,Expedición a la mazmorra,Expedición a la mazmorra,Expedição na Masmorra,Expedição na Masmorra,Поход в подземелье
+tick_label_prefix,Tick:,Takt:,回合：,Tour :,回合：,ティック：,틱:,Turno:,Turno:,Turno:,Turno:,Такт:
+kill_count_label_prefix,Kills:,Besiegt:,击杀：,Éliminations :,擊殺：,撃破：,처치:,Bajas:,Bajas:,Abates:,Abates:,Убийства:
+run_complete_kill_count_format,Run Complete — %d kills,Zug abgeschlossen — %d Gegner besiegt,远征完成 — 击杀 %d,Expédition terminée — %d éliminations,遠征完成 — 擊殺 %d,遠征完了 — %d 体撃破,원정 완료 — %d 처치,Expedición completada — %d bajas,Expedición completada — %d bajas,Expedição concluída — %d abates,Expedição concluída — %d abates,Поход завершён — убийств: %d
+run_defeat_floor_format,Driven back at Floor %d — your guild is recovering.,Zurückgeschlagen auf Ebene %d — deine Gilde erholt sich.,在第 %d 层被击退 — 你的公会正在恢复。,Repoussé à l'étage %d — votre guilde récupère.,在第 %d 層被擊退 — 你的公會正在恢復。,%d 階で撃退されました — ギルドは回復中です。,%d층에서 격퇴당함 — 길드가 회복 중입니다.,Rechazados en la planta %d — tu gremio se está recuperando.,Rechazados en el piso %d — tu gremio se está recuperando.,Repelidos no Piso %d — a tua guilda está a recuperar.,Repelidos no Andar %d — sua guilda está se recuperando.,Отброшены на этаже %d — гильдия восстанавливается.
+hero_level_up_toast_format,%s reached level %d!,%s hat Stufe %d erreicht!,%s 升到了 %d 级！,%s a atteint le niveau %d !,%s 升到了 %d 級！,%s がレベル %d に到達！,%s이(가) %d레벨에 도달했습니다!,¡%s ha alcanzado el nivel %d!,¡%s alcanzó el nivel %d!,%s chegou ao nível %d!,%s chegou ao nível %d!,%s получает уровень %d!
+hero_milestone_toast_format,Milestone! %s is now Level %d,Meilenstein! %s ist jetzt Stufe %d,里程碑！%s 现已达到 %d 级,Palier ! %s est désormais niveau %d,里程碑！%s 現已達到 %d 級,節目達成！%s はレベル %d になりました,이정표 달성! %s이(가) 이제 %d레벨입니다,¡Hito! %s ahora es nivel %d,¡Hito! %s ahora es nivel %d,Marco alcançado! %s está agora no Nível %d,Marco alcançado! %s agora está no Nível %d,Рубеж! %s теперь уровень %d
+biome_unlocked_toast_format,New region unlocked: %s,Neue Region freigeschaltet: %s,解锁新区域：%s,Nouvelle région débloquée : %s,解鎖新區域：%s,新しい地域を解放：%s,새 지역 해금: %s,Nueva región desbloqueada: %s,Nueva región desbloqueada: %s,Nova região desbloqueada: %s,Nova região desbloqueada: %s,Открыт новый регион: %s
+return_to_app_title,Welcome back!,Willkommen zurück!,欢迎回来！,Bon retour !,歡迎回來！,おかえりなさい！,돌아오신 걸 환영합니다!,¡Bienvenido de nuevo!,¡Bienvenido de nuevo!,Bem-vindo de volta!,Bem-vindo de volta!,С возвращением!
+return_to_app_seconds_credited_format,You were away for %d minutes.,Du warst %d Minuten weg.,你离开了 %d 分钟。,Vous avez été absent %d minutes.,你離開了 %d 分鐘。,%d 分間留守にしていました。,%d분 동안 자리를 비우셨습니다.,Has estado fuera %d minutos.,Estuviste fuera %d minutos.,Estiveste ausente %d minutos.,Você ficou ausente por %d minutos.,Вас не было %d мин.
+return_to_app_gold_earned_format,+%d gold earned,+%d Gold verdient,+%d 金币,+%d or gagné,+%d 金幣,+%d ゴールド獲得,+%d 골드 획득,+%d de oro ganado,+%d de oro ganado,+%d de ouro ganho,+%d de ouro ganho,Получено золота: +%d
+return_to_app_kills_format,%d enemies defeated,%d Gegner besiegt,击败 %d 个敌人,%d ennemis vaincus,擊敗 %d 個敵人,%d 体の敵を撃破,적 %d마리 처치,%d enemigos derrotados,%d enemigos derrotados,%d inimigos derrotados,%d inimigos derrotados,Побеждено врагов: %d
+return_to_app_floors_format,%d floors cleared,%d Ebenen geschafft,通关 %d 层,%d étages franchis,通關 %d 層,%d 階を踏破,%d개 층 클리어,%d plantas superadas,%d pisos superados,%d pisos concluídos,%d andares concluídos,Пройдено этажей: %d
+return_to_app_cap_reached_notice_format,(Capped at %d hours offline.),(Begrenzt auf %d Stunden offline.),（离线收益上限为 %d 小时。）,(Limité à %d heures hors ligne.),（離線收益上限為 %d 小時。）,（オフライン報酬は %d 時間が上限です。）,(오프라인 보상은 %d시간으로 제한됩니다.),(Máximo de %d horas sin conexión.),(Máximo de %d horas sin conexión.),(Limitado a %d horas offline.),(Limitado a %d horas offline.),(Максимум %d ч. офлайн.)
+return_to_app_acknowledge_button,Continue,Weiter,继续,Continuer,繼續,続ける,계속,Continuar,Continuar,Continuar,Continuar,Продолжить
+return_to_app_no_summary_fallback,No recent rewards to summarize.,Keine neuen Belohnungen zusammenzufassen.,暂无可汇总的奖励。,Aucune récompense récente à résumer.,暫無可彙總的獎勵。,まとめる報酬はありません。,요약할 최근 보상이 없습니다.,No hay recompensas recientes que resumir.,No hay recompensas recientes que resumir.,Não há recompensas recentes para resumir.,Não há recompensas recentes para resumir.,Нет новых наград для сводки.
+recruit_error_insufficient_gold,Not enough gold.,Nicht genug Gold.,金币不足。,Or insuffisant.,金幣不足。,ゴールドが足りません。,골드가 부족합니다.,No tienes suficiente oro.,No tienes suficiente oro.,Ouro insuficiente.,Ouro insuficiente.,Недостаточно золота.
+recruit_error_roster_full,Roster full.,Kader voll.,队伍已满。,Effectif complet.,隊伍已滿。,ロスターが満員です。,로스터가 가득 찼습니다.,Plantilla llena.,Plantilla llena.,Equipa cheia.,Equipe cheia.,Состав заполнен.
+recruit_error_unresolvable_class,This class is no longer available.,Diese Klasse ist nicht mehr verfügbar.,该职业已不可用。,Cette classe n'est plus disponible.,此職業已不再可用。,このクラスは現在利用できません。,이 직업은 더 이상 사용할 수 없습니다.,Esta clase ya no está disponible.,Esta clase ya no está disponible.,Esta classe já não está disponível.,Esta classe não está mais disponível.,Этот класс больше недоступен.
+recruit_owned_format,(owned: %d),(im Besitz: %d),（已拥有：%d）,(possédés : %d),（已擁有：%d）,（所持：%d）,(보유: %d),(tienes: %d),(tienes: %d),(em posse: %d),(em posse: %d),(в наличии: %d)
+hero_detail_level_up_format,Level Up — %s gold,Stufenaufstieg — %s Gold,升级 — %s 金币,Améliorer — %s or,升級 — %s 金幣,レベルアップ — %s ゴールド,레벨 업 — %s 골드,Subir de nivel — %s de oro,Subir de nivel — %s de oro,Subir de nível — %s de ouro,Subir de nível — %s de ouro,Повысить уровень — %s золота
+hero_detail_owned_format,(%d %s total),(%d %s insgesamt),（共 %d 名 %s）,(%d %s au total),（共 %d 名 %s）,（%d 名の %s）,(총 %d명의 %s),(%d %s en total),(%d %s en total),(%d %s no total),(%d %s no total),(всего %d %s)
+hero_detail_xp_capped,MAX LEVEL,MAX. STUFE,满级,NIVEAU MAX,滿級,最大レベル,최대 레벨,NIVEL MÁX.,NIVEL MÁX.,NÍVEL MÁX.,NÍVEL MÁX.,МАКС. УРОВЕНЬ
+hero_detail_xp_format,XP: %d / %d,XP: %d / %d,经验：%d / %d,XP : %d / %d,經驗：%d / %d,経験値：%d / %d,경험치: %d / %d,EXP: %d / %d,EXP: %d / %d,XP: %d / %d,XP: %d / %d,Опыт: %d / %d
+matchup_floor_locked_format,Clear Floor %d to unlock.,"Räume Ebene %d, um freizuschalten.",通关第 %d 层以解锁。,Franchissez l'étage %d pour débloquer.,通關第 %d 層以解鎖。,%d 階をクリアして解放。,%d층을 클리어하여 해금하세요.,Supera la planta %d para desbloquear.,Supera el piso %d para desbloquear.,Conclui o Piso %d para desbloquear.,Conclua o Andar %d para desbloquear.,"Пройдите этаж %d, чтобы открыть."
+matchup_select_format,Select Floor %d — %s,Ebene %d wählen — %s,选择第 %d 层 — %s,Sélectionner l'étage %d — %s,選擇第 %d 層 — %s,%d 階を選択 — %s,%d층 선택 — %s,Elegir planta %d — %s,Elegir piso %d — %s,Selecionar Piso %d — %s,Selecionar Andar %d — %s,Выбрать этаж %d — %s
+victory_biome_completed_format,%s completed!,%s abgeschlossen!,%s 已完成！,%s terminé !,%s 已完成！,%s 制覇！,%s 완료!,¡Has completado %s!,¡Completaste %s!,%s concluída!,%s concluída!,Регион %s пройден!
+victory_continuation_prompt,Tap to continue,Zum Fortfahren tippen,点击继续,Appuyez pour continuer,點擊繼續,タップして続ける,탭하여 계속,Toca para continuar,Toca para continuar,Toca para continuar,Toque para continuar,"Нажмите, чтобы продолжить"
+victory_gold_gained_format,+%d gold,+%d Gold,+%d 金币,+%d or,+%d 金幣,+%d ゴールド,+%d 골드,+%d de oro,+%d de oro,+%d de ouro,+%d de ouro,+%d золота
+reward_float_level_up_format,Lv %d,St. %d,%d 级,Niv. %d,%d 級,Lv %d,Lv %d,Nv %d,Nv %d,Nv %d,Nv %d,Ур. %d
+victory_headline_format,%s — Floor %d cleared,%s — Ebene %d geschafft,%s — 第 %d 层通关,%s — Étage %d franchi,%s — 第 %d 層通關,%s — %d 階クリア,%s — %d층 클리어,%s — Planta %d superada,%s — Piso %d superado,%s — Piso %d concluído,%s — Andar %d concluído,%s — этаж %d пройден
+victory_level_up_format,%s reached level %d,%s hat Stufe %d erreicht,%s 升到了 %d 级,%s a atteint le niveau %d,%s 升到了 %d 級,%s がレベル %d に到達,%s이(가) %d레벨에 도달,%s ha alcanzado el nivel %d,%s alcanzó el nivel %d,%s chegou ao nível %d,%s chegou ao nível %d,%s получает уровень %d
+victory_unlock_format,Floor %d now available.,Ebene %d jetzt verfügbar.,第 %d 层现已开放。,Étage %d désormais disponible.,第 %d 層現已開放。,%d 階が解放されました。,%d층이 이제 개방되었습니다.,Planta %d ya disponible.,Piso %d ya disponible.,Piso %d agora disponível.,Andar %d agora disponível.,Этаж %d теперь доступен.
+class_synergy_badge_steel_wall,Steel Wall,Stahlwall,钢铁壁垒,Mur d'acier,鋼鐵壁壘,スチールウォール,강철 방벽,Muro de Acero,Muro de Acero,Muralha de Aço,Muralha de Aço,Стальная стена
+class_synergy_badge_arcane_elite,Arcane Elite,Arkane Elite,奥术精英,Élite arcanique,奧術精英,アーケインエリート,비전 정예,Élite Arcana,Élite Arcana,Elite Arcana,Elite Arcana,Магическая элита
+class_synergy_badge_triple_strike,Triple Strike,Dreifachschlag,三重打击,Triple frappe,三重打擊,トリプルストライク,삼연격,Triple Golpe,Triple Golpe,Golpe Triplo,Golpe Triplo,Тройной удар
+class_synergy_badge_triple_threat,Triple Threat,Dreifachgefahr,三重威胁,Triple menace,三重威脅,トリプルスレット,삼중 위협,Triple Amenaza,Triple Amenaza,Tripla Ameaça,Tripla Ameaça,Тройная угроза
+class_synergy_badge_bastion,Bastion,Bastion,堡垒,Bastion,堡壘,バスティオン,성채,Bastión,Bastión,Bastião,Bastião,Бастион
+class_synergy_badge_volley,Volley,Salve,齐射,Volée,齊射,ボレー,일제 사격,Andanada,Andanada,Saraivada,Saraivada,Залп
+class_synergy_badge_frenzy,Frenzy,Raserei,狂乱,Frénésie,狂亂,フレンジー,광란,Frenesí,Frenesí,Frenesi,Frenesi,Ярость
+class_synergy_badge_vigil,Vigil,Wacht,守望,Veille,守望,ビジル,불침번,Vigilia,Vigilia,Vigília,Vigília,Дозор
+class_synergy_effect_steel_wall,+25% gold vs bruisers,+25% Gold gegen Schläger,对斗士 +25% 金币,+25 % d'or contre les brutes,對鬥士 +25% 金幣,ブルーザーに対し +25% ゴールド,강타형 상대 골드 +25%,+25% de oro contra brutos,+25% de oro contra brutos,+25% de ouro vs brutamontes,+25% de ouro vs brutamontes,+25% золота против громил
+class_synergy_effect_arcane_elite,+20% XP from all kills,+20% XP für alle Siege,所有击杀 +20% 经验,+20 % XP sur toutes les éliminations,所有擊殺 +20% 經驗,全ての撃破で +20% 経験値,모든 처치 시 경험치 +20%,+20% de EXP por cada baja,+20% de EXP por cada baja,+20% de XP de todos os abates,+20% de XP de todos os abates,+20% опыта за все убийства
+class_synergy_effect_triple_strike,+25% gold vs armored,+25% Gold gegen Gepanzerte,对重甲 +25% 金币,+25 % d'or contre les blindés,對重甲 +25% 金幣,重装に対し +25% ゴールド,중장갑 상대 골드 +25%,+25% de oro contra acorazados,+25% de oro contra acorazados,+25% de ouro vs blindados,+25% de ouro vs blindados,+25% золота против бронированных
+class_synergy_effect_triple_threat,+15% gold from all kills,+15% Gold für alle Siege,所有击杀 +15% 金币,+15 % d'or sur toutes les éliminations,所有擊殺 +15% 金幣,全ての撃破で +15% ゴールド,모든 처치 시 골드 +15%,+15% de oro por cada baja,+15% de oro por cada baja,+15% de ouro de todos os abates,+15% de ouro de todos os abates,+15% золота за все убийства
+class_synergy_effect_bastion,+25% gold vs casters,+25% Gold gegen Zauberer,对施法者 +25% 金币,+25 % d'or contre les lanceurs de sorts,對施法者 +25% 金幣,キャスターに対し +25% ゴールド,시전자 상대 골드 +25%,+25% de oro contra hechiceros,+25% de oro contra hechiceros,+25% de ouro vs conjuradores,+25% de ouro vs conjuradores,+25% золота против заклинателей
+class_synergy_effect_volley,+25% gold vs swarm,+25% Gold gegen Schwärme,对群集 +25% 金币,+25 % d'or contre les essaims,對群集 +25% 金幣,群れに対し +25% ゴールド,군집 상대 골드 +25%,+25% de oro contra enjambres,+25% de oro contra enjambres,+25% de ouro vs enxames,+25% de ouro vs enxames,+25% золота против роя
+class_synergy_effect_frenzy,+25% gold vs bruisers,+25% Gold gegen Schläger,对斗士 +25% 金币,+25 % d'or contre les brutes,對鬥士 +25% 金幣,ブルーザーに対し +25% ゴールド,강타형 상대 골드 +25%,+25% de oro contra brutos,+25% de oro contra brutos,+25% de ouro vs brutamontes,+25% de ouro vs brutamontes,+25% золота против громил
+class_synergy_effect_vigil,+20% XP from all kills,+20% XP für alle Siege,所有击杀 +20% 经验,+20 % XP sur toutes les éliminations,所有擊殺 +20% 經驗,全ての撃破で +20% 経験値,모든 처치 시 경험치 +20%,+20% de EXP por cada baja,+20% de EXP por cada baja,+20% de XP de todos os abates,+20% de XP de todos os abates,+20% опыта за все убийства
+prestige_button_label,Prestige Hero,Held verabschieden,英雄荣休,Honorer le héros,英雄榮退,栄誉の引退,영웅 명예 은퇴,Jubilar héroe,Jubilar héroe,Reformar herói,Aposentar herói,Проводить на покой
+prestige_confirmation_modal_body,"%s has earned their retirement. They'll join the Hall of Retired Heroes — your guild will remember them, and every future run will earn +5% more gold and XP, forever.","%s hat sich den Ruhestand verdient. Sie ziehen in die Halle der Veteranen ein — deine Gilde wird sich an sie erinnern, und jeder künftige Zug bringt für immer +5% mehr Gold und XP.",%s 已赢得荣休。他们将进入荣退英雄殿 — 你的公会会永远铭记他们，且此后每一次远征都将永久获得 +5% 的额外金币与经验。,"%s a mérité sa retraite et rejoindra le Hall des héros retraités — votre guilde s'en souviendra, et chaque future expédition rapportera à jamais +5 % d'or et d'XP supplémentaires.",%s 已贏得榮退。他們將進入榮退英雄殿 — 你的公會會永遠記得他們，且此後每一次遠征都將永久多獲得 +5% 的金幣與經驗。,%s は引退にふさわしい働きをしました。栄誉の英雄殿堂に迎えられます — ギルドは彼らを永遠に忘れません。これ以降のすべての遠征で、ゴールドと経験値が永久に +5% 増加します。,"%s이(가) 은퇴할 자격을 얻었습니다. 이들은 은퇴 영웅의 전당에 합류합니다 — 길드는 그들을 기억할 것이며, 앞으로의 모든 원정에서 골드와 경험치를 영원히 +5% 더 얻게 됩니다.","%s se ha ganado su jubilación. Se unirá al Salón de Héroes Jubilados — tu gremio lo recordará, y cada expedición futura ganará un +5% más de oro y EXP, para siempre.","%s se ganó su jubilación. Se unirá al Salón de Héroes Jubilados — tu gremio lo recordará, y cada expedición futura ganará un +5% más de oro y EXP, para siempre.","%s mereceu a sua reforma. Vai juntar-se ao Salão dos Heróis Reformados — a tua guilda vai lembrar-se dele, e todas as expedições futuras vão render +5% mais ouro e XP, para sempre.","%s mereceu sua aposentadoria. Vai se juntar ao Salão dos Heróis Aposentados — sua guilda vai se lembrar dele, e todas as expedições futuras vão render +5% mais ouro e XP, para sempre.","%s заслуживает почётной отставки. Этот герой войдёт в Зал героев на покое — гильдия будет помнить его, и каждый будущий поход навсегда будет приносить +5% золота и опыта."
+prestige_confirmation_button_confirm,Prestige Hero,Held verabschieden,英雄荣休,Honorer le héros,英雄榮退,引退させる,영웅 명예 은퇴,Jubilar héroe,Jubilar héroe,Reformar herói,Aposentar herói,Проводить на покой
+prestige_confirmation_button_cancel,Cancel,Abbrechen,取消,Annuler,取消,キャンセル,취소,Cancelar,Cancelar,Cancelar,Cancelar,Отмена
+prestige_complete_toast,%s joined the Hall of Retired Heroes.,%s ist in die Halle der Veteranen eingezogen.,%s 已进入荣退英雄殿。,%s a rejoint le Hall des héros retraités.,%s 已進入榮退英雄殿。,%s が栄誉の英雄殿堂に加わりました。,%s이(가) 은퇴 영웅의 전당에 합류했습니다.,%s se ha unido al Salón de Héroes Jubilados.,%s se unió al Salón de Héroes Jubilados.,%s juntou-se ao Salão dos Heróis Reformados.,%s se juntou ao Salão dos Heróis Aposentados.,%s теперь в Зале героев на покое.
+hall_of_retired_heroes_title,Hall of Retired Heroes,Halle der Veteranen,荣退英雄殿,Hall des héros retraités,榮退英雄殿,栄誉の英雄殿堂,은퇴 영웅의 전당,Salón de Héroes Jubilados,Salón de Héroes Jubilados,Salão dos Heróis Reformados,Salão dos Heróis Aposentados,Зал героев на покое
+hall_card_metadata_format,%s · %s · Lv %d · Retired Day %d,%s · %s · St. %d · Ruhestand Tag %d,%s · %s · %d 级 · 荣退于第 %d 天,%s · %s · Niv. %d · Retraité jour %d,%s · %s · %d 級 · 榮退於第 %d 天,%s · %s · Lv %d · %d 日目に引退,%s · %s · Lv %d · 은퇴 %d일차,%s · %s · Nv %d · Jubilado el día %d,%s · %s · Nv %d · Jubilado el día %d,%s · %s · Nv %d · Reformado no Dia %d,%s · %s · Nv %d · Aposentado no Dia %d,%s · %s · Ур. %d · На покое с дня %d
+prestige_disabled_active_run_tooltip,Prestige a hero between runs.,Verabschiede einen Helden zwischen den Zügen.,请在两次远征之间让英雄荣休。,Honorez un héros entre deux expéditions.,請在兩次遠征之間讓英雄榮退。,遠征の合間に英雄を引退させましょう。,원정 사이에 영웅을 은퇴시키세요.,Jubila a un héroe entre expediciones.,Jubila a un héroe entre expediciones.,Reforma um herói entre expedições.,Aposente um herói entre expedições.,Провожайте героев на покой между походами.
+hall_empty_state_placeholder,No retired heroes yet.,Noch keine Veteranen.,还没有荣退的英雄。,Aucun héros retraité pour l'instant.,還沒有榮退的英雄。,まだ引退した英雄はいません。,아직 은퇴한 영웅이 없습니다.,Aún no hay héroes jubilados.,Aún no hay héroes jubilados.,Ainda não há heróis reformados.,Ainda não há heróis aposentados.,Пока нет героев на покое.
+recruit_pool_empty_placeholder,The pool is rebuilding. Refresh to scout new heroes.,"Der Pool füllt sich wieder. Aktualisiere, um neue Helden zu finden.",候选池正在重建。刷新以发掘新英雄。,Le vivier se reconstitue. Actualisez pour repérer de nouveaux héros.,候選池正在重建。刷新即可發掘新英雄。,候補が再構成中です。更新して新しいヒーローを探しましょう。,후보군을 다시 채우는 중입니다. 새로고침하여 새 영웅을 탐색하세요.,La reserva se está reponiendo. Actualiza para buscar nuevos héroes.,La reserva se está reponiendo. Actualiza para buscar nuevos héroes.,A reserva está a renovar-se. Atualiza para procurar novos heróis.,A reserva está se renovando. Atualize para buscar novos heróis.,"Список пополняется. Обновите, чтобы найти новых героев."
+matchup_floor_locked_tooltip_format,Clear floor %d first,Räume zuerst Ebene %d,请先通关第 %d 层,Franchissez d'abord l'étage %d,請先通關第 %d 層,先に %d 階をクリア,먼저 %d층을 클리어하세요,Primero supera la planta %d,Primero supera el piso %d,Conclui primeiro o piso %d,Conclua primeiro o andar %d,Сначала пройдите этаж %d
+matchup_floor_recommended_format,Recommended: %s,Empfohlen: %s,推荐：%s,Recommandé : %s,推薦：%s,おすすめ：%s,추천: %s,Recomendado: %s,Recomendado: %s,Recomendado: %s,Recomendado: %s,Рекомендуется: %s
+guild_hall_roster_tab_active,Active,Aktiv,现役,Actifs,現役,現役,현역,Activos,Activos,Ativos,Ativos,Активные
+guild_hall_roster_tab_retired,Retired,Veteranen,荣退,Retraités,榮退,引退,은퇴,Jubilados,Jubilados,Reformados,Aposentados,На покое
+guild_hall_all_injured_format,Your guild is recovering — ready in %s.,Deine Gilde erholt sich — bereit in %s.,你的公会正在恢复 — %s 后就绪。,Votre guilde récupère — prête dans %s.,你的公會正在恢復 — %s 後就緒。,ギルドは回復中です — %s 後に再開可能。,길드가 회복 중입니다 — %s 후 준비 완료.,Tu gremio se está recuperando — listo en %s.,Tu gremio se está recuperando — listo en %s.,A tua guilda está a recuperar — pronta em %s.,Sua guilda está se recuperando — pronta em %s.,Гильдия восстанавливается — готова через %s.
+guild_hall_all_injured_no_timer,Your guild is recovering.,Deine Gilde erholt sich.,你的公会正在恢复。,Votre guilde récupère.,你的公會正在恢復。,ギルドは回復中です。,길드가 회복 중입니다.,Tu gremio se está recuperando.,Tu gremio se está recuperando.,A tua guilda está a recuperar.,Sua guilda está se recuperando.,Гильдия восстанавливается.
+guild_hall_all_injured_under_minute,less than a minute,weniger als eine Minute,不到一分钟,moins d'une minute,不到一分鐘,1分未満,1분 미만,menos de un minuto,menos de un minuto,menos de um minuto,menos de um minuto,меньше минуты
+pause_menu_title,Paused,Pausiert,已暂停,En pause,已暫停,一時停止中,일시정지,En pausa,En pausa,Em pausa,Pausado,Пауза
+pause_menu_resume_button,Resume,Fortsetzen,继续,Reprendre,繼續,再開,계속하기,Reanudar,Reanudar,Retomar,Retomar,Продолжить
+pause_menu_settings_button,Settings,Einstellungen,设置,Paramètres,設定,設定,설정,Ajustes,Configuración,Definições,Configurações,Настройки
+pause_menu_quit_to_guild_hall_button,Quit to Guild Hall,Zur Gildenhalle,返回公会大厅,Quitter vers le Hall de la guilde,返回公會大廳,ギルドホールに戻る,길드 홀로 나가기,Salir al salón del gremio,Salir al salón del gremio,Sair para o Salão da Guilda,Sair para o Salão da Guilda,Выйти в Зал гильдии
+settings_version_label_format,Version %s,Version %s,版本 %s,Version %s,版本 %s,バージョン %s,버전 %s,Versión %s,Versión %s,Versão %s,Versão %s,Версия %s
+settings_quit_to_desktop_button,Quit to Desktop,Zum Desktop beenden,退出到桌面,Quitter vers le bureau,退出至桌面,デスクトップに戻る,바탕화면으로 종료,Salir al escritorio,Salir al escritorio,Sair para o ambiente de trabalho,Sair para a área de trabalho,Выйти на рабочий стол
+synergy_preview_none_format,Synergy: %s,Synergie: %s,羁绊：%s,Synergie : %s,羈絆：%s,シナジー：%s,시너지: %s,Sinergia: %s,Sinergia: %s,Sinergia: %s,Sinergia: %s,Синергия: %s
+synergy_preview_none_label,None,Keine,无,Aucune,無,なし,없음,Ninguna,Ninguna,Nenhuma,Nenhuma,Нет
+synergy_tier_none,None,Keine,无,Aucune,無,なし,없음,Ninguna,Ninguna,Nenhuma,Nenhuma,Нет
+synergy_tier_bronze,Bronze,Bronze,青铜,Bronze,青銅,ブロンズ,브론즈,Bronce,Bronce,Bronze,Bronze,Бронза
+synergy_tier_silver,Silver,Silber,白银,Argent,白銀,シルバー,실버,Plata,Plata,Prata,Prata,Серебро
+synergy_tier_gold,Gold,Gold,黄金,Or,黃金,ゴールド,골드,Oro,Oro,Ouro,Ouro,Золото
+synergy_tier_platinum,Platinum,Platin,铂金,Platine,白金,プラチナ,플래티넘,Platino,Platino,Platina,Platina,Платина
+synergy_preview_tiered_format,Synergy: %s (%s),Synergie: %s (%s),羁绊：%s（%s）,Synergie : %s (%s),羈絆：%s（%s）,シナジー：%s（%s）,시너지: %s (%s),Sinergia: %s (%s),Sinergia: %s (%s),Sinergia: %s (%s),Sinergia: %s (%s),Синергия: %s (%s)
+synergy_preview_tiered_format_with_effect,Synergy: %s (%s) — %s,Synergie: %s (%s) — %s,羁绊：%s（%s）— %s,Synergie : %s (%s) — %s,羈絆：%s（%s）— %s,シナジー：%s（%s）— %s,시너지: %s (%s) — %s,Sinergia: %s (%s) — %s,Sinergia: %s (%s) — %s,Sinergia: %s (%s) — %s,Sinergia: %s (%s) — %s,Синергия: %s (%s) — %s
+formation_presets_none_option,(none),(keine),（无）,(aucune),（無）,（なし）,(없음),(ninguna),(ninguna),(nenhuma),(nenhuma),(нет)
+formation_presets_saved_toast,Formation saved.,Formation gespeichert.,阵容已保存。,Formation enregistrée.,陣容已儲存。,編成を保存しました。,편성이 저장되었습니다.,Formación guardada.,Formación guardada.,Formação guardada.,Formação salva.,Состав сохранён.
+formation_presets_truncated_toast,Name shortened to fit.,"Name gekürzt, um zu passen.",名称已缩短以适应。,Nom raccourci pour tenir.,名稱已縮短以符合長度。,名前を短縮しました。,이름을 길이에 맞게 줄였습니다.,Nombre acortado para que quepa.,Nombre acortado para que quepa.,Nome encurtado para caber.,Nome encurtado para caber.,Название сокращено.
+formation_presets_at_cap_toast,You've saved the most formations you can. Delete one to make room.,"Du hast die maximale Anzahl an Formationen gespeichert. Lösche eine, um Platz zu schaffen.",你保存的阵容已达上限。删除一个以腾出空间。,Vous avez atteint le nombre maximal de formations. Supprimez-en une pour faire de la place.,你儲存的陣容數量已達上限。請刪除一個以騰出空間。,保存できる編成数が上限に達しました。1つ削除して空きを作ってください。,저장할 수 있는 편성이 가득 찼습니다. 하나를 삭제하여 공간을 확보하세요.,Has guardado el máximo de formaciones posible. Elimina una para hacer sitio.,Guardaste el máximo de formaciones posible. Elimina una para hacer espacio.,Já guardaste o máximo de formações possível. Elimina uma para abrir espaço.,Você já salvou o máximo de formações possível. Exclua uma para abrir espaço.,"Достигнут предел сохранённых составов. Удалите один, чтобы освободить место."
+formation_presets_name_empty_toast,Enter a name for this formation.,Gib dieser Formation einen Namen.,请为该阵容输入一个名称。,Saisissez un nom pour cette formation.,請為此陣容輸入名稱。,この編成の名前を入力してください。,이 편성의 이름을 입력하세요.,Introduce un nombre para esta formación.,Ingresa un nombre para esta formación.,Introduz um nome para esta formação.,Digite um nome para esta formação.,Введите название состава.
+formation_presets_missing_toast,%d saved hero(es) are no longer in your guild — those slots are empty.,%d gespeicherte Held(en) sind nicht mehr in deiner Gilde — diese Plätze sind leer.,%d 名已保存的英雄已不在你的公会中 — 这些位置为空。,%d héros enregistré(s) ne font plus partie de votre guilde — ces emplacements sont vides.,%d 名已儲存的英雄已不在你的公會中 — 這些欄位目前是空的。,保存された %d 名のヒーローがギルドにいません — それらの枠は空です。,저장된 영웅 %d명이 더 이상 길드에 없습니다 — 해당 슬롯은 비어 있습니다.,%d héroe(s) guardado(s) ya no están en tu gremio — esos puestos están vacíos.,%d héroe(s) guardado(s) ya no están en tu gremio — esos puestos están vacíos.,%d herói(s) guardado(s) já não estão na tua guilda — esses espaços estão vazios.,%d herói(s) salvo(s) não estão mais na sua guilda — esses espaços estão vazios.,Часть сохранённых героев больше не в вашей гильдии (%d) — эти ячейки пусты.
+formation_presets_recall_unknown_toast,That formation is no longer available.,Diese Formation ist nicht mehr verfügbar.,该阵容已不可用。,Cette formation n'est plus disponible.,此陣容已不再可用。,その編成は利用できません。,해당 편성은 더 이상 사용할 수 없습니다.,Esa formación ya no está disponible.,Esa formación ya no está disponible.,Essa formação já não está disponível.,Essa formação não está mais disponível.,Этот состав больше недоступен.
+formation_presets_deleted_toast,Formation deleted.,Formation gelöscht.,阵容已删除。,Formation supprimée.,陣容已刪除。,編成を削除しました。,편성이 삭제되었습니다.,Formación eliminada.,Formación eliminada.,Formação eliminada.,Formação excluída.,Состав удалён.
+app_wordmark,Lantern Guild,Lantern Guild,Lantern Guild,Lantern Guild,Lantern Guild,Lantern Guild,Lantern Guild,Lantern Guild,Lantern Guild,Lantern Guild,Lantern Guild,Lantern Guild
+app_tagline,The dungeon is dark. Send a light.,Das Verlies ist dunkel. Schick ein Licht.,地下城一片漆黑。送去一束光。,Le donjon est sombre. Envoyez une lumière.,地城一片漆黑。送去一束光。,ダンジョンは暗い。光を送ろう。,던전은 어둡습니다. 빛을 보내세요.,La mazmorra está oscura. Envía una luz.,La mazmorra está oscura. Envía una luz.,A masmorra é escura. Envia uma luz.,A masmorra é escura. Envie uma luz.,В подземелье темно. Пошлите свет.
+back_to_guild_hall_button,← Guild Hall,← Gildenhalle,← 公会大厅,← Hall de la guilde,← 公會大廳,← ギルドホール,← 길드 홀,← Salón del gremio,← Salón del gremio,← Salão da Guilda,← Salão da Guilda,← Зал гильдии
+title_screen_continue_button,Continue the Watch,Die Wacht fortsetzen,继续守望,Poursuivre la veille,繼續守望,守りを続ける,수호 이어가기,Continuar la vigilia,Continuar la vigilia,Continuar a Vigília,Continuar a Vigília,Продолжить дозор
+title_screen_settings_button,Settings,Einstellungen,设置,Paramètres,設定,設定,설정,Ajustes,Configuración,Definições,Configurações,Настройки
+start_menu_start_button,Start Expedition,Expedition starten,开始远征,Lancer l'expédition,開始遠征,遠征を開始,원정 시작,Iniciar expedición,Iniciar expedición,Iniciar Expedição,Iniciar Expedição,Начать поход
+start_menu_quit_button,Quit,Beenden,退出,Quitter,退出,終了,종료,Salir,Salir,Sair,Sair,Выход
+codex_eyebrow,· The guild keeps a record ·,· Die Gilde führt Buch ·,· 公会留有记录 ·,· La guilde tient un registre ·,· 公會留有記錄 ·,· ギルドは記録を残す ·,· 길드는 기록을 남깁니다 ·,· El gremio lleva un registro ·,· El gremio lleva un registro ·,· A guilda mantém um registo ·,· A guilda mantém um registro ·,· Гильдия ведёт записи ·
+codex_title,The Codex,Der Kodex,图鉴,Le Codex,圖鑑,図鑑,코덱스,El Códice,El Códice,O Códice,O Códice,Кодекс
+codex_close_button,Close,Schließen,关闭,Fermer,關閉,閉じる,닫기,Cerrar,Cerrar,Fechar,Fechar,Закрыть
+codex_tab_heroes,Heroes,Helden,英雄,Héros,英雄,ヒーロー,영웅,Héroes,Héroes,Heróis,Heróis,Герои
+codex_tab_monsters,Monsters,Monster,怪物,Monstres,怪物,モンスター,몬스터,Monstruos,Monstruos,Monstros,Monstros,Монстры
+codex_tab_dungeons,Dungeons,Verliese,地下城,Donjons,地城,ダンジョン,던전,Mazmorras,Mazmorras,Masmorras,Masmorras,Подземелья
+codex_empty_state,Nothing recorded yet.,Noch nichts aufgezeichnet.,还没有任何记录。,Rien d'enregistré pour l'instant.,還沒有任何記錄。,まだ何も記録されていません。,아직 기록된 것이 없습니다.,Aún no hay nada registrado.,Aún no hay nada registrado.,Ainda nada registado.,Ainda nada registrado.,Пока ничего не записано.
+pause_menu_eyebrow,· The guild waits ·,· Die Gilde wartet ·,· 公会静候 ·,· La guilde attend ·,· 公會靜候 ·,· ギルドは待っている ·,· 길드가 기다립니다 ·,· El gremio espera ·,· El gremio espera ·,· A guilda aguarda ·,· A guilda aguarda ·,· Гильдия ждёт ·
+pause_menu_tagline,The hour-glass turns regardless.,Die Sanduhr läuft trotzdem weiter.,沙漏依旧流转。,Le sablier s'écoule malgré tout.,沙漏依舊流轉。,それでも砂時計は流れ続ける。,모래시계는 그래도 흐릅니다.,El reloj de arena sigue girando de todos modos.,El reloj de arena sigue girando de todos modos.,A ampulheta gira na mesma.,A ampulheta gira mesmo assim.,Песочные часы всё равно идут.
+pause_menu_return_to_title_button,Return to Title,Zum Titel zurück,返回标题,Retour au menu principal,返回標題畫面,タイトルに戻る,타이틀로 돌아가기,Volver al título,Volver al título,Voltar ao Ecrã Inicial,Voltar à Tela Inicial,Вернуться в меню
+dungeon_run_hp_format,HP %d/%d,TP %d/%d,生命 %d/%d,PV %d/%d,生命 %d/%d,HP %d/%d,HP %d/%d,PV %d/%d,PV %d/%d,PV %d/%d,PV %d/%d,ОЗ %d/%d
+dungeon_run_enemies_format,Enemies %d/%d,Gegner %d/%d,敌人 %d/%d,Ennemis %d/%d,敵人 %d/%d,敵 %d/%d,적 %d/%d,Enemigos %d/%d,Enemigos %d/%d,Inimigos %d/%d,Inimigos %d/%d,Враги %d/%d
+dungeon_run_return_to_hall_button,Return to Hall,Zurück zur Halle,返回大厅,Retour au Hall,返回大廳,ホールに戻る,길드 홀로 돌아가기,Volver al salón,Volver al salón,Voltar ao Salão,Voltar ao Salão,Вернуться в зал
+victory_zero_gold_label,0 gold,0 Gold,0 金币,0 or,0 金幣,0 ゴールド,0 골드,0 de oro,0 de oro,0 de ouro,0 de ouro,0 золота
+formation_assignment_gold_counter_format,Gold: %s,Gold: %s,金币：%s,Or : %s,金幣：%s,ゴールド：%s,골드: %s,Oro: %s,Oro: %s,Ouro: %s,Ouro: %s,Золото: %s
+formation_assignment_no_biomes,No biomes available,Keine Regionen verfügbar,暂无可用区域,Aucune région disponible,暫無可用區域,利用可能な地域がありません,사용 가능한 지역 없음,No hay regiones disponibles,No hay regiones disponibles,Nenhuma região disponível,Nenhuma região disponível,Нет доступных регионов
+formation_assignment_common_archetypes_format,Common: %s,Häufig: %s,常见：%s,Communs : %s,常見：%s,頻出：%s,흔한 적: %s,Comunes: %s,Comunes: %s,Comuns: %s,Comuns: %s,Часто: %s
+formation_assignment_floor_button_format,F%d,E%d,%d层,É%d,%d層,%d階,%d층,P%d,P%d,P%d,A%d,Э%d
+formation_assignment_floor_button_locked_format,🔒 F%d,🔒 E%d,🔒 %d层,🔒 É%d,🔒 %d層,🔒 %d階,🔒 %d층,🔒 P%d,🔒 P%d,🔒 P%d,🔒 A%d,🔒 Э%d
+formation_assignment_select_locked,Select (locked),Wählen (gesperrt),选择（已锁定）,Sélectionner (verrouillé),選擇（已鎖定）,選択（ロック中）,선택 (잠김),Elegir (bloqueado),Elegir (bloqueado),Selecionar (bloqueado),Selecionar (bloqueado),Выбрать (заблокировано)
+formation_assignment_synergy_badge_format,%s: %s,%s: %s,%s：%s,%s : %s,%s：%s,%s：%s,%s: %s,%s: %s,%s: %s,%s: %s,%s: %s,%s: %s
+formation_assignment_hero_slot_counter_format,%s (%s Lv%d · vs %s),%s (%s St.%d · vs %s),%s（%s %d级 · 克制 %s）,%s (%s Niv.%d · vs %s),%s（%s %d級 · 剋制 %s）,%s（%s Lv%d · vs %s）,%s (%s Lv%d · vs %s),%s (%s Nv%d · vs %s),%s (%s Nv%d · vs %s),%s (%s Nv%d · vs %s),%s (%s Nv%d · vs %s),%s (%s Ур.%d · против %s)
+formation_assignment_hero_slot_format,%s (%s Lv%d),%s (%s St.%d),%s（%s %d级）,%s (%s Niv.%d),%s（%s %d級）,%s（%s Lv%d）,%s (%s Lv%d),%s (%s Nv%d),%s (%s Nv%d),%s (%s Nv%d),%s (%s Nv%d),%s (%s Ур.%d)
+formation_presets_panel_title,Saved Formations,Gespeicherte Formationen,已保存的阵容,Formations enregistrées,已儲存的陣容,保存した編成,저장된 편성,Formaciones guardadas,Formaciones guardadas,Formações Guardadas,Formações Salvas,Сохранённые составы
+formation_presets_recall_button,Recall,Abrufen,取出,Rappeler,載入,呼び出す,불러오기,Recuperar,Recuperar,Recuperar,Recuperar,Загрузить
+formation_presets_save_button,Save,Speichern,保存,Enregistrer,儲存,保存,저장,Guardar,Guardar,Guardar,Salvar,Сохранить
+formation_presets_delete_button,Delete,Löschen,删除,Supprimer,刪除,削除,삭제,Eliminar,Eliminar,Eliminar,Excluir,Удалить
+formation_assignment_mid_run_confirm_body,Changing your formation will end the current run. Continue?,"Wenn du die Formation änderst, endet der aktuelle Zug. Fortfahren?",更改阵容将结束当前远征。是否继续？,Changer de formation mettra fin à l'expédition en cours. Continuer ?,更改陣容將結束目前的遠征。是否繼續？,編成を変更すると現在の遠征が終了します。続けますか？,편성을 변경하면 현재 원정이 종료됩니다. 계속하시겠습니까?,Cambiar tu formación terminará la expedición actual. ¿Continuar?,Cambiar tu formación terminará la expedición actual. ¿Continuar?,Alterar a tua formação terminará a expedição atual. Continuar?,Alterar sua formação encerrará a expedição atual. Continuar?,Смена состава завершит текущий поход. Продолжить?
+formation_assignment_cancel_button,Cancel,Abbrechen,取消,Annuler,取消,キャンセル,취소,Cancelar,Cancelar,Cancelar,Cancelar,Отмена
+formation_assignment_end_run_confirm_button,End Run & Change,Zug beenden & ändern,结束远征并更改,Terminer et changer,結束遠征並更改,遠征を終了して変更,원정 종료 후 변경,Terminar y cambiar,Terminar y cambiar,Terminar e alterar,Encerrar e alterar,Завершить поход и сменить
+formation_assignment_picker_cancel_button,← Cancel,← Abbrechen,← 取消,← Annuler,← 取消,← キャンセル,← 취소,← Cancelar,← Cancelar,← Cancelar,← Cancelar,← Отмена
+formation_assignment_picker_title,Choose Your Run,Wähle deinen Zug,选择你的远征,Choisissez votre expédition,選擇你的遠征,遠征を選択,원정 선택,Elige tu expedición,Elige tu expedición,Escolhe a tua expedição,Escolha sua expedição,Выберите поход
+formation_assignment_picker_select_button,Select,Wählen,选择,Sélectionner,選擇,選択,선택,Elegir,Elegir,Selecionar,Selecionar,Выбрать
+formation_presets_save_modal_title,Name this formation,Benenne diese Formation,为该阵容命名,Nommez cette formation,為此陣容命名,この編成に名前を付ける,이 편성의 이름 정하기,Nombra esta formación,Nombra esta formación,Dá um nome a esta formação,Dê um nome a esta formação,Назовите этот состав
+formation_presets_name_placeholder,My formation,Meine Formation,我的阵容,Ma formation,我的陣容,私の編成,내 편성,Mi formación,Mi formación,A minha formação,Minha formação,Мой состав
+formation_presets_delete_confirm_body,Delete this formation? This can't be undone.,Diese Formation löschen? Das kann nicht rückgängig gemacht werden.,删除该阵容？此操作无法撤销。,Supprimer cette formation ? Action irréversible.,刪除此陣容？此操作無法復原。,この編成を削除しますか？元に戻せません。,이 편성을 삭제할까요? 되돌릴 수 없습니다.,¿Eliminar esta formación? Esto no se puede deshacer.,¿Eliminar esta formación? Esto no se puede deshacer.,Eliminar esta formação? Isto não pode ser anulado.,Excluir esta formação? Isso não pode ser desfeito.,Удалить этот состав? Это нельзя отменить.
+hero_detail_counter_archetype_format,Strong vs: %s,Stark gegen: %s,克制：%s,Fort contre : %s,剋制：%s,得意な相手：%s,강한 상대: %s,Fuerte contra: %s,Fuerte contra: %s,Forte contra: %s,Forte contra: %s,Силён против: %s
+hero_detail_name_scaffold,Hero Name,Heldenname,英雄名称,Nom du héros,英雄名稱,ヒーロー名,영웅 이름,Nombre del héroe,Nombre del héroe,Nome do herói,Nome do herói,Имя героя
+hero_detail_class_scaffold,Class,Klasse,职业,Classe,職業,クラス,직업,Clase,Clase,Classe,Classe,Класс
+hero_detail_level_label,Level,Stufe,等级,Niveau,等級,レベル,레벨,Nivel,Nivel,Nível,Nível,Уровень
+hero_detail_level_up_button,Level Up,Stufenaufstieg,升级,Améliorer,升級,レベルアップ,레벨 업,Subir de nivel,Subir de nivel,Subir de nível,Subir de nível,Повысить уровень
+hero_detail_close_button,Close,Schließen,关闭,Fermer,關閉,閉じる,닫기,Cerrar,Cerrar,Fechar,Fechar,Закрыть
+recruitment_gold_counter_format,%s gold,%s Gold,%s 金币,%s or,%s 金幣,%s ゴールド,%s 골드,%s de oro,%s de oro,%s de ouro,%s de ouro,%s золота
+recruitment_recruit_button,Recruit,Rekrutieren,招募,Recruter,招募,採用,모집,Reclutar,Reclutar,Recrutar,Recrutar,Нанять
+recruitment_refresh_pool_button_format,Refresh Pool — %s gold,Pool auffrischen — %s Gold,刷新候选池 — %s 金币,Actualiser le vivier — %s or,刷新候選池 — %s 金幣,候補を更新 — %s ゴールド,후보군 새로고침 — %s 골드,Actualizar reserva — %s de oro,Actualizar reserva — %s de oro,Atualizar reserva — %s de ouro,Atualizar reserva — %s de ouro,Обновить список — %s золота
+recruitment_class_matchup_format,%s · vs %s,%s · vs %s,%s · 克制 %s,%s · vs %s,%s · 剋制 %s,%s · vs %s,%s · vs %s,%s · vs %s,%s · vs %s,%s · vs %s,%s · vs %s,%s · против %s
+recruitment_screen_title,Recruit,Rekrutieren,招募,Recrutement,招募,採用,모집,Reclutar,Reclutar,Recrutar,Recrutar,Наём
+guild_hall_prestige_multiplier_format,×%.2f,×%.2f,×%.2f,×%.2f,×%.2f,×%.2f,×%.2f,×%.2f,×%.2f,×%.2f,×%.2f,×%.2f
+guild_hall_gold_counter_format,Gold: %d,Gold: %d,金币：%d,Or : %d,金幣：%d,ゴールド：%d,골드: %d,Oro: %d,Oro: %d,Ouro: %d,Ouro: %d,Золото: %d
+guild_hall_synergy_badge_format,%s: %s,%s: %s,%s：%s,%s : %s,%s：%s,%s：%s,%s: %s,%s: %s,%s: %s,%s: %s,%s: %s,%s: %s
+guild_hall_hero_card_counter_format,%s · %s · Lv %d · vs %s,%s · %s · St. %d · vs %s,%s · %s · %d级 · 克制 %s,%s · %s · Niv. %d · vs %s,%s · %s · %d級 · 剋制 %s,%s · %s · Lv %d · vs %s,%s · %s · Lv %d · vs %s,%s · %s · Nv %d · vs %s,%s · %s · Nv %d · vs %s,%s · %s · Nv %d · vs %s,%s · %s · Nv %d · vs %s,%s · %s · Ур. %d · против %s
+guild_hall_hero_card_format,%s · %s · Lv %d,%s · %s · St. %d,%s · %s · %d级,%s · %s · Niv. %d,%s · %s · %d級,%s · %s · Lv %d,%s · %s · Lv %d,%s · %s · Nv %d,%s · %s · Nv %d,%s · %s · Nv %d,%s · %s · Nv %d,%s · %s · Ур. %d
+guild_hall_title,Guild Hall,Gildenhalle,公会大厅,Hall de la guilde,公會大廳,ギルドホール,길드 홀,Salón del gremio,Salón del gremio,Salão da Guilda,Salão da Guilda,Зал гильдии
+guild_hall_dispatch_button,Go to Dispatch,Zur Entsendung,前往派遣,Aller au déploiement,前往派遣,派遣へ,파견하러 가기,Ir a desplegar,Ir a enviar,Ir para o Despacho,Ir para o Despacho,Перейти к отправке
+guild_hall_recruit_button,Recruit,Rekrutieren,招募,Recruter,招募,採用,모집,Reclutar,Reclutar,Recrutar,Recrutar,Нанять
+victory_kills_label,Kills,Besiegt,击杀,Éliminations,擊殺,撃破,처치,Bajas,Bajas,Abates,Abates,Убийства
+victory_gold_gained_label,Gold gained,Gold erhalten,获得金币,Or gagné,獲得金幣,獲得ゴールド,획득 골드,Oro ganado,Oro ganado,Ouro ganho,Ouro ganho,Получено золота
+settings_volume_silent_label,-INF,-INF,-INF,-INF,-INF,-INF,-INF,-INF,-INF,-INF,-INF,-INF
+settings_volume_db_format,%d dB,%d dB,%d dB,%d dB,%d dB,%d dB,%d dB,%d dB,%d dB,%d dB,%d dB,%d dB
+settings_eyebrow_header,· The inner workings ·,· Das Innenleben ·,· 内部运作 ·,· Les rouages ·,· 內部運作 ·,· 内部の仕組み ·,· 내부 작동 ·,· Los entresijos ·,· El funcionamiento interno ·,· Os bastidores ·,· Os bastidores ·,· Внутреннее устройство ·
+settings_section_audio,Audio,Audio,音频,Audio,音訊,オーディオ,오디오,Audio,Audio,Áudio,Áudio,Звук
+settings_section_accessibility,Accessibility,Barrierefreiheit,无障碍,Accessibilité,無障礙,アクセシビリティ,접근성,Accesibilidad,Accesibilidad,Acessibilidade,Acessibilidade,Доступность
+settings_section_data_locale,Data & locale,Daten & Sprache,数据与语言,Données et langue,資料與語言,データと言語,데이터 및 언어,Datos e idioma,Datos e idioma,Dados e idioma,Dados e idioma,Данные и язык
+settings_title,Settings,Einstellungen,设置,Paramètres,設定,設定,설정,Ajustes,Configuración,Definições,Configurações,Настройки
+settings_volume_master_label,Master,Gesamt,主音量,Général,主音量,マスター,마스터,General,General,Geral,Geral,Общий
+settings_volume_music_label,Music,Musik,音乐,Musique,音樂,音楽,음악,Música,Música,Música,Música,Музыка
+settings_volume_sfx_label,SFX,Effekte,音效,Effets,音效,効果音,효과음,Efectos,Efectos,Efeitos,Efeitos,Эффекты
+settings_mute_label,Mute (master),Stumm (gesamt),静音（主）,Muet (général),靜音（主）,ミュート（マスター）,음소거 (마스터),Silenciar (general),Silenciar (general),Silenciar (geral),Silenciar (geral),Без звука (общий)
+settings_reduce_motion_label,Reduce motion,Bewegung reduzieren,减弱动态效果,Réduire les animations,減少動態效果,モーションを減らす,모션 줄이기,Reducir animaciones,Reducir animaciones,Reduzir animações,Reduzir animações,Уменьшить анимацию
+settings_language_label,Language,Sprache,语言,Langue,語言,言語,언어,Idioma,Idioma,Idioma,Idioma,Язык
+settings_telemetry_label,Share anonymous diagnostic data,Anonyme Diagnosedaten teilen,分享匿名诊断数据,Partager des données de diagnostic anonymes,分享匿名診斷資料,匿名の診断データを共有,익명 진단 데이터 공유,Compartir datos de diagnóstico anónimos,Compartir datos de diagnóstico anónimos,Partilhar dados de diagnóstico anónimos,Compartilhar dados de diagnóstico anônimos,Делиться анонимными диагностическими данными
+settings_reset_button,Reset to Defaults,Auf Standard zurücksetzen,恢复默认设置,Rétablir les valeurs par défaut,重設為預設值,デフォルトに戻す,기본값으로 초기화,Restablecer valores por defecto,Restablecer valores predeterminados,Repor predefinições,Restaurar padrões,Сбросить настройки
+settings_close_button,Close,Schließen,关闭,Fermer,關閉,閉じる,닫기,Cerrar,Cerrar,Fechar,Fechar,Закрыть
