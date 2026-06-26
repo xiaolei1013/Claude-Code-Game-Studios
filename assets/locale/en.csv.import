@@ -6,10 +6,10 @@ uid="uid://c10dt2rqdb2by"
 
 [deps]
 
-files=["res://assets/locale/en.en.translation", "res://assets/locale/en.de.translation"]
+files=["res://assets/locale/en.en.translation", "res://assets/locale/en.de.translation", "res://assets/locale/en.zh_CN.translation"]
 
 source_file="res://assets/locale/en.csv"
-dest_files=["res://assets/locale/en.en.translation", "res://assets/locale/en.de.translation"]
+dest_files=["res://assets/locale/en.en.translation", "res://assets/locale/en.de.translation", "res://assets/locale/en.zh_CN.translation"]
 
 [params]
 

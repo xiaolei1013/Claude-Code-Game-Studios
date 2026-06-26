@@ -1,182 +1,182 @@
-keys,en,de
-formation_assignment_instructional_header,Send your guild to:,Schicke deine Gilde nach:
-slot_empty_label,Empty,Leer
-slot_selected_badge,Selected,Ausgewählt
-injured_badge_label,Injured,Verletzt
-injured_badge_format,Injured · %s,Verletzt · %s
-dispatch_button,Dispatch,Entsenden
-dispatch_error_empty_formation,Assign at least one hero to your formation.,Weise deiner Formation mindestens einen Helden zu.
-dispatch_error_floor_locked,That floor is locked.,Diese Ebene ist gesperrt.
-dispatch_error_run_already_active,A run is already in progress.,Ein Lauf ist bereits im Gange.
-dispatch_error_generic,Something went wrong. Try again.,Etwas ist schiefgelaufen. Versuche es erneut.
-recruit_a_hero_label,Recruit a hero to begin.,"Rekrutiere einen Helden, um zu beginnen."
-floor_label_forest_reach_1,Forest Reach — Floor 1,Waldgrund — Ebene 1
-dungeon_run_view_title,Dungeon Run,Verlieslauf
-tick_label_prefix,Tick:,Takt:
-kill_count_label_prefix,Kills:,Besiegt:
-run_complete_kill_count_format,Run Complete — %d kills,Zug abgeschlossen — %d Gegner besiegt
-run_defeat_floor_format,Driven back at Floor %d — your guild is recovering.,Zurückgeschlagen auf Ebene %d — deine Gilde erholt sich.
-hero_level_up_toast_format,%s reached level %d!,%s hat Stufe %d erreicht!
-hero_milestone_toast_format,Milestone! %s is now Level %d,Meilenstein! %s ist jetzt Stufe %d
-biome_unlocked_toast_format,New region unlocked: %s,Neue Region freigeschaltet: %s
-return_to_app_title,Welcome back!,Willkommen zurück!
-return_to_app_seconds_credited_format,You were away for %d minutes.,Du warst %d Minuten weg.
-return_to_app_gold_earned_format,+%d gold earned,+%d Gold verdient
-return_to_app_kills_format,%d enemies defeated,%d Gegner besiegt
-return_to_app_floors_format,%d floors cleared,%d Ebenen geschafft
-return_to_app_cap_reached_notice_format,(Capped at %d hours offline.),(Begrenzt auf %d Stunden offline.)
-return_to_app_acknowledge_button,Continue,Weiter
-return_to_app_no_summary_fallback,No recent rewards to summarize.,Keine neuen Belohnungen zusammenzufassen.
-recruit_error_insufficient_gold,Not enough gold.,Nicht genug Gold.
-recruit_error_roster_full,Roster full.,Kader voll.
-recruit_error_unresolvable_class,This class is no longer available.,Diese Klasse ist nicht mehr verfügbar.
-recruit_owned_format,(owned: %d),(im Besitz: %d)
-hero_detail_level_up_format,Level Up — %s gold,Stufenaufstieg — %s Gold
-hero_detail_owned_format,(%d %s total),(%d %s insgesamt)
-hero_detail_xp_capped,MAX LEVEL,MAX. STUFE
-hero_detail_xp_format,XP: %d / %d,XP: %d / %d
-matchup_floor_locked_format,Clear Floor %d to unlock.,"Räume Ebene %d, um freizuschalten."
-matchup_select_format,Select Floor %d — %s,Ebene %d wählen — %s
-victory_biome_completed_format,%s completed!,%s abgeschlossen!
-victory_continuation_prompt,Tap to continue,Zum Fortfahren tippen
-victory_gold_gained_format,+%d gold,+%d Gold
-reward_float_level_up_format,Lv %d,St. %d
-victory_headline_format,%s — Floor %d cleared,%s — Ebene %d geschafft
-victory_level_up_format,%s reached level %d,%s hat Stufe %d erreicht
-victory_unlock_format,Floor %d now available.,Ebene %d jetzt verfügbar.
-class_synergy_badge_steel_wall,Steel Wall,Stahlwall
-class_synergy_badge_arcane_elite,Arcane Elite,Arkane Elite
-class_synergy_badge_triple_strike,Triple Strike,Dreifachschlag
-class_synergy_badge_triple_threat,Triple Threat,Dreifachgefahr
-class_synergy_badge_bastion,Bastion,Bastion
-class_synergy_badge_volley,Volley,Salve
-class_synergy_badge_frenzy,Frenzy,Raserei
-class_synergy_badge_vigil,Vigil,Wacht
-class_synergy_effect_steel_wall,+25% gold vs bruisers,+25% Gold gegen Schläger
-class_synergy_effect_arcane_elite,+20% XP from all kills,+20% XP für alle Siege
-class_synergy_effect_triple_strike,+25% gold vs armored,+25% Gold gegen Gepanzerte
-class_synergy_effect_triple_threat,+15% gold from all kills,+15% Gold für alle Siege
-class_synergy_effect_bastion,+25% gold vs casters,+25% Gold gegen Zauberer
-class_synergy_effect_volley,+25% gold vs swarm,+25% Gold gegen Schwärme
-class_synergy_effect_frenzy,+25% gold vs bruisers,+25% Gold gegen Schläger
-class_synergy_effect_vigil,+20% XP from all kills,+20% XP für alle Siege
-prestige_button_label,Prestige Hero,Held verabschieden
-prestige_confirmation_modal_body,"%s has earned their retirement. They'll join the Hall of Retired Heroes — your guild will remember them, and every future run will earn +5% more gold and XP, forever.","%s hat sich den Ruhestand verdient. Sie ziehen in die Halle der Veteranen ein — deine Gilde wird sich an sie erinnern, und jeder künftige Zug bringt für immer +5% mehr Gold und XP."
-prestige_confirmation_button_confirm,Prestige Hero,Held verabschieden
-prestige_confirmation_button_cancel,Cancel,Abbrechen
-prestige_complete_toast,%s joined the Hall of Retired Heroes.,%s ist in die Halle der Veteranen eingezogen.
-hall_of_retired_heroes_title,Hall of Retired Heroes,Halle der Veteranen
-hall_card_metadata_format,%s · %s · Lv %d · Retired Day %d,%s · %s · St. %d · Ruhestand Tag %d
-prestige_disabled_active_run_tooltip,Prestige a hero between runs.,Verabschiede einen Helden zwischen den Zügen.
-hall_empty_state_placeholder,No retired heroes yet.,Noch keine Veteranen.
-recruit_pool_empty_placeholder,The pool is rebuilding. Refresh to scout new heroes.,"Der Pool füllt sich wieder. Aktualisiere, um neue Helden zu finden."
-matchup_floor_locked_tooltip_format,Clear floor %d first,Räume zuerst Ebene %d
-matchup_floor_recommended_format,Recommended: %s,Empfohlen: %s
-guild_hall_roster_tab_active,Active,Aktiv
-guild_hall_roster_tab_retired,Retired,Veteranen
-guild_hall_all_injured_format,Your guild is recovering — ready in %s.,Deine Gilde erholt sich — bereit in %s.
-guild_hall_all_injured_no_timer,Your guild is recovering.,Deine Gilde erholt sich.
-guild_hall_all_injured_under_minute,less than a minute,weniger als eine Minute
-pause_menu_title,Paused,Pausiert
-pause_menu_resume_button,Resume,Fortsetzen
-pause_menu_settings_button,Settings,Einstellungen
-pause_menu_quit_to_guild_hall_button,Quit to Guild Hall,Zur Gildenhalle
-settings_version_label_format,Version %s,Version %s
-settings_quit_to_desktop_button,Quit to Desktop,Zum Desktop beenden
-synergy_preview_none_format,Synergy: %s,Synergie: %s
-synergy_preview_none_label,None,Keine
-synergy_tier_none,None,Keine
-synergy_tier_bronze,Bronze,Bronze
-synergy_tier_silver,Silver,Silber
-synergy_tier_gold,Gold,Gold
-synergy_tier_platinum,Platinum,Platin
-synergy_preview_tiered_format,Synergy: %s (%s),Synergie: %s (%s)
-synergy_preview_tiered_format_with_effect,Synergy: %s (%s) — %s,Synergie: %s (%s) — %s
-formation_presets_none_option,(none),(keine)
-formation_presets_saved_toast,Formation saved.,Formation gespeichert.
-formation_presets_truncated_toast,Name shortened to fit.,"Name gekürzt, um zu passen."
-formation_presets_at_cap_toast,You've saved the most formations you can. Delete one to make room.,"Du hast die maximale Anzahl an Formationen gespeichert. Lösche eine, um Platz zu schaffen."
-formation_presets_name_empty_toast,Enter a name for this formation.,Gib dieser Formation einen Namen.
-formation_presets_missing_toast,%d saved hero(es) are no longer in your guild — those slots are empty.,%d gespeicherte Held(en) sind nicht mehr in deiner Gilde — diese Plätze sind leer.
-formation_presets_recall_unknown_toast,That formation is no longer available.,Diese Formation ist nicht mehr verfügbar.
-formation_presets_deleted_toast,Formation deleted.,Formation gelöscht.
-app_wordmark,Lantern Guild,Lantern Guild
-app_tagline,The dungeon is dark. Send a light.,Das Verlies ist dunkel. Schick ein Licht.
-back_to_guild_hall_button,← Guild Hall,← Gildenhalle
-title_screen_continue_button,Continue the Watch,Die Wacht fortsetzen
-title_screen_settings_button,Settings,Einstellungen
-start_menu_start_button,Start Expedition,Expedition starten
-start_menu_quit_button,Quit,Beenden
-codex_eyebrow,· The guild keeps a record ·,· Die Gilde führt Buch ·
-codex_title,The Codex,Der Kodex
-codex_close_button,Close,Schließen
-codex_tab_heroes,Heroes,Helden
-codex_tab_monsters,Monsters,Monster
-codex_tab_dungeons,Dungeons,Verliese
-codex_empty_state,Nothing recorded yet.,Noch nichts aufgezeichnet.
-pause_menu_eyebrow,· The guild waits ·,· Die Gilde wartet ·
-pause_menu_tagline,The hour-glass turns regardless.,Die Sanduhr läuft trotzdem weiter.
-pause_menu_return_to_title_button,Return to Title,Zum Titel zurück
-dungeon_run_hp_format,HP %d/%d,TP %d/%d
-dungeon_run_enemies_format,Enemies %d/%d,Gegner %d/%d
-dungeon_run_return_to_hall_button,Return to Hall,Zurück zur Halle
-victory_zero_gold_label,0 gold,0 Gold
-formation_assignment_gold_counter_format,Gold: %s,Gold: %s
-formation_assignment_no_biomes,No biomes available,Keine Regionen verfügbar
-formation_assignment_common_archetypes_format,Common: %s,Häufig: %s
-formation_assignment_floor_button_format,F%d,E%d
-formation_assignment_floor_button_locked_format,🔒 F%d,🔒 E%d
-formation_assignment_select_locked,Select (locked),Wählen (gesperrt)
-formation_assignment_synergy_badge_format,%s: %s,%s: %s
-formation_assignment_hero_slot_counter_format,%s (%s Lv%d · vs %s),%s (%s St.%d · vs %s)
-formation_assignment_hero_slot_format,%s (%s Lv%d),%s (%s St.%d)
-formation_presets_panel_title,Saved Formations,Gespeicherte Formationen
-formation_presets_recall_button,Recall,Abrufen
-formation_presets_save_button,Save,Speichern
-formation_presets_delete_button,Delete,Löschen
-formation_assignment_mid_run_confirm_body,Changing your formation will end the current run. Continue?,"Wenn du die Formation änderst, endet der aktuelle Zug. Fortfahren?"
-formation_assignment_cancel_button,Cancel,Abbrechen
-formation_assignment_end_run_confirm_button,End Run & Change,Zug beenden & ändern
-formation_assignment_picker_cancel_button,← Cancel,← Abbrechen
-formation_assignment_picker_title,Choose Your Run,Wähle deinen Zug
-formation_assignment_picker_select_button,Select,Wählen
-formation_presets_save_modal_title,Name this formation,Benenne diese Formation
-formation_presets_name_placeholder,My formation,Meine Formation
-formation_presets_delete_confirm_body,Delete this formation? This can't be undone.,Diese Formation löschen? Das kann nicht rückgängig gemacht werden.
-hero_detail_counter_archetype_format,Strong vs: %s,Stark gegen: %s
-hero_detail_name_scaffold,Hero Name,Heldenname
-hero_detail_class_scaffold,Class,Klasse
-hero_detail_level_label,Level,Stufe
-hero_detail_level_up_button,Level Up,Stufenaufstieg
-hero_detail_close_button,Close,Schließen
-recruitment_gold_counter_format,%s gold,%s Gold
-recruitment_recruit_button,Recruit,Rekrutieren
-recruitment_refresh_pool_button_format,Refresh Pool — %s gold,Pool auffrischen — %s Gold
-recruitment_class_matchup_format,%s · vs %s,%s · vs %s
-recruitment_screen_title,Recruit,Rekrutieren
-guild_hall_prestige_multiplier_format,×%.2f,×%.2f
-guild_hall_gold_counter_format,Gold: %d,Gold: %d
-guild_hall_synergy_badge_format,%s: %s,%s: %s
-guild_hall_hero_card_counter_format,%s · %s · Lv %d · vs %s,%s · %s · St. %d · vs %s
-guild_hall_hero_card_format,%s · %s · Lv %d,%s · %s · St. %d
-guild_hall_title,Guild Hall,Gildenhalle
-guild_hall_dispatch_button,Go to Dispatch,Zur Entsendung
-guild_hall_recruit_button,Recruit,Rekrutieren
-victory_kills_label,Kills,Besiegt
-victory_gold_gained_label,Gold gained,Gold erhalten
-settings_volume_silent_label,-INF,-INF
-settings_volume_db_format,%d dB,%d dB
-settings_eyebrow_header,· The inner workings ·,· Das Innenleben ·
-settings_section_audio,Audio,Audio
-settings_section_accessibility,Accessibility,Barrierefreiheit
-settings_section_data_locale,Data & locale,Daten & Sprache
-settings_title,Settings,Einstellungen
-settings_volume_master_label,Master,Gesamt
-settings_volume_music_label,Music,Musik
-settings_volume_sfx_label,SFX,Effekte
-settings_mute_label,Mute (master),Stumm (gesamt)
-settings_reduce_motion_label,Reduce motion,Bewegung reduzieren
-settings_language_label,Language,Sprache
-settings_telemetry_label,Share anonymous diagnostic data,Anonyme Diagnosedaten teilen
-settings_reset_button,Reset to Defaults,Auf Standard zurücksetzen
-settings_close_button,Close,Schließen
+keys,en,de,zh_CN
+formation_assignment_instructional_header,Send your guild to:,Schicke deine Gilde nach:,派遣你的公会前往：
+slot_empty_label,Empty,Leer,空缺
+slot_selected_badge,Selected,Ausgewählt,已选择
+injured_badge_label,Injured,Verletzt,受伤
+injured_badge_format,Injured · %s,Verletzt · %s,受伤 · %s
+dispatch_button,Dispatch,Entsenden,派遣
+dispatch_error_empty_formation,Assign at least one hero to your formation.,Weise deiner Formation mindestens einen Helden zu.,请至少为你的阵容指派一名英雄。
+dispatch_error_floor_locked,That floor is locked.,Diese Ebene ist gesperrt.,该层尚未解锁。
+dispatch_error_run_already_active,A run is already in progress.,Ein Lauf ist bereits im Gange.,已有一场远征正在进行。
+dispatch_error_generic,Something went wrong. Try again.,Etwas ist schiefgelaufen. Versuche es erneut.,出了点问题，请重试。
+recruit_a_hero_label,Recruit a hero to begin.,"Rekrutiere einen Helden, um zu beginnen.",先招募一名英雄开始吧。
+floor_label_forest_reach_1,Forest Reach — Floor 1,Waldgrund — Ebene 1,森林边境 — 第1层
+dungeon_run_view_title,Dungeon Run,Verlieslauf,地下城远征
+tick_label_prefix,Tick:,Takt:,回合：
+kill_count_label_prefix,Kills:,Besiegt:,击杀：
+run_complete_kill_count_format,Run Complete — %d kills,Zug abgeschlossen — %d Gegner besiegt,远征完成 — 击杀 %d
+run_defeat_floor_format,Driven back at Floor %d — your guild is recovering.,Zurückgeschlagen auf Ebene %d — deine Gilde erholt sich.,在第 %d 层被击退 — 你的公会正在恢复。
+hero_level_up_toast_format,%s reached level %d!,%s hat Stufe %d erreicht!,%s 升到了 %d 级！
+hero_milestone_toast_format,Milestone! %s is now Level %d,Meilenstein! %s ist jetzt Stufe %d,里程碑！%s 现已达到 %d 级
+biome_unlocked_toast_format,New region unlocked: %s,Neue Region freigeschaltet: %s,解锁新区域：%s
+return_to_app_title,Welcome back!,Willkommen zurück!,欢迎回来！
+return_to_app_seconds_credited_format,You were away for %d minutes.,Du warst %d Minuten weg.,你离开了 %d 分钟。
+return_to_app_gold_earned_format,+%d gold earned,+%d Gold verdient,+%d 金币
+return_to_app_kills_format,%d enemies defeated,%d Gegner besiegt,击败 %d 个敌人
+return_to_app_floors_format,%d floors cleared,%d Ebenen geschafft,通关 %d 层
+return_to_app_cap_reached_notice_format,(Capped at %d hours offline.),(Begrenzt auf %d Stunden offline.),（离线收益上限为 %d 小时。）
+return_to_app_acknowledge_button,Continue,Weiter,继续
+return_to_app_no_summary_fallback,No recent rewards to summarize.,Keine neuen Belohnungen zusammenzufassen.,暂无可汇总的奖励。
+recruit_error_insufficient_gold,Not enough gold.,Nicht genug Gold.,金币不足。
+recruit_error_roster_full,Roster full.,Kader voll.,队伍已满。
+recruit_error_unresolvable_class,This class is no longer available.,Diese Klasse ist nicht mehr verfügbar.,该职业已不可用。
+recruit_owned_format,(owned: %d),(im Besitz: %d),（已拥有：%d）
+hero_detail_level_up_format,Level Up — %s gold,Stufenaufstieg — %s Gold,升级 — %s 金币
+hero_detail_owned_format,(%d %s total),(%d %s insgesamt),（共 %d 名 %s）
+hero_detail_xp_capped,MAX LEVEL,MAX. STUFE,满级
+hero_detail_xp_format,XP: %d / %d,XP: %d / %d,经验：%d / %d
+matchup_floor_locked_format,Clear Floor %d to unlock.,"Räume Ebene %d, um freizuschalten.",通关第 %d 层以解锁。
+matchup_select_format,Select Floor %d — %s,Ebene %d wählen — %s,选择第 %d 层 — %s
+victory_biome_completed_format,%s completed!,%s abgeschlossen!,%s 已完成！
+victory_continuation_prompt,Tap to continue,Zum Fortfahren tippen,点击继续
+victory_gold_gained_format,+%d gold,+%d Gold,+%d 金币
+reward_float_level_up_format,Lv %d,St. %d,%d 级
+victory_headline_format,%s — Floor %d cleared,%s — Ebene %d geschafft,%s — 第 %d 层通关
+victory_level_up_format,%s reached level %d,%s hat Stufe %d erreicht,%s 升到了 %d 级
+victory_unlock_format,Floor %d now available.,Ebene %d jetzt verfügbar.,第 %d 层现已开放。
+class_synergy_badge_steel_wall,Steel Wall,Stahlwall,钢铁壁垒
+class_synergy_badge_arcane_elite,Arcane Elite,Arkane Elite,奥术精英
+class_synergy_badge_triple_strike,Triple Strike,Dreifachschlag,三重打击
+class_synergy_badge_triple_threat,Triple Threat,Dreifachgefahr,三重威胁
+class_synergy_badge_bastion,Bastion,Bastion,堡垒
+class_synergy_badge_volley,Volley,Salve,齐射
+class_synergy_badge_frenzy,Frenzy,Raserei,狂乱
+class_synergy_badge_vigil,Vigil,Wacht,守望
+class_synergy_effect_steel_wall,+25% gold vs bruisers,+25% Gold gegen Schläger,对斗士 +25% 金币
+class_synergy_effect_arcane_elite,+20% XP from all kills,+20% XP für alle Siege,所有击杀 +20% 经验
+class_synergy_effect_triple_strike,+25% gold vs armored,+25% Gold gegen Gepanzerte,对重甲 +25% 金币
+class_synergy_effect_triple_threat,+15% gold from all kills,+15% Gold für alle Siege,所有击杀 +15% 金币
+class_synergy_effect_bastion,+25% gold vs casters,+25% Gold gegen Zauberer,对施法者 +25% 金币
+class_synergy_effect_volley,+25% gold vs swarm,+25% Gold gegen Schwärme,对群集 +25% 金币
+class_synergy_effect_frenzy,+25% gold vs bruisers,+25% Gold gegen Schläger,对斗士 +25% 金币
+class_synergy_effect_vigil,+20% XP from all kills,+20% XP für alle Siege,所有击杀 +20% 经验
+prestige_button_label,Prestige Hero,Held verabschieden,英雄荣休
+prestige_confirmation_modal_body,"%s has earned their retirement. They'll join the Hall of Retired Heroes — your guild will remember them, and every future run will earn +5% more gold and XP, forever.","%s hat sich den Ruhestand verdient. Sie ziehen in die Halle der Veteranen ein — deine Gilde wird sich an sie erinnern, und jeder künftige Zug bringt für immer +5% mehr Gold und XP.",%s 已赢得荣休。他们将进入荣退英雄殿 — 你的公会会永远铭记他们，且此后每一次远征都将永久获得 +5% 的额外金币与经验。
+prestige_confirmation_button_confirm,Prestige Hero,Held verabschieden,英雄荣休
+prestige_confirmation_button_cancel,Cancel,Abbrechen,取消
+prestige_complete_toast,%s joined the Hall of Retired Heroes.,%s ist in die Halle der Veteranen eingezogen.,%s 已进入荣退英雄殿。
+hall_of_retired_heroes_title,Hall of Retired Heroes,Halle der Veteranen,荣退英雄殿
+hall_card_metadata_format,%s · %s · Lv %d · Retired Day %d,%s · %s · St. %d · Ruhestand Tag %d,%s · %s · %d 级 · 荣退于第 %d 天
+prestige_disabled_active_run_tooltip,Prestige a hero between runs.,Verabschiede einen Helden zwischen den Zügen.,请在两次远征之间让英雄荣休。
+hall_empty_state_placeholder,No retired heroes yet.,Noch keine Veteranen.,还没有荣退的英雄。
+recruit_pool_empty_placeholder,The pool is rebuilding. Refresh to scout new heroes.,"Der Pool füllt sich wieder. Aktualisiere, um neue Helden zu finden.",候选池正在重建。刷新以发掘新英雄。
+matchup_floor_locked_tooltip_format,Clear floor %d first,Räume zuerst Ebene %d,请先通关第 %d 层
+matchup_floor_recommended_format,Recommended: %s,Empfohlen: %s,推荐：%s
+guild_hall_roster_tab_active,Active,Aktiv,现役
+guild_hall_roster_tab_retired,Retired,Veteranen,荣退
+guild_hall_all_injured_format,Your guild is recovering — ready in %s.,Deine Gilde erholt sich — bereit in %s.,你的公会正在恢复 — %s 后就绪。
+guild_hall_all_injured_no_timer,Your guild is recovering.,Deine Gilde erholt sich.,你的公会正在恢复。
+guild_hall_all_injured_under_minute,less than a minute,weniger als eine Minute,不到一分钟
+pause_menu_title,Paused,Pausiert,已暂停
+pause_menu_resume_button,Resume,Fortsetzen,继续
+pause_menu_settings_button,Settings,Einstellungen,设置
+pause_menu_quit_to_guild_hall_button,Quit to Guild Hall,Zur Gildenhalle,返回公会大厅
+settings_version_label_format,Version %s,Version %s,版本 %s
+settings_quit_to_desktop_button,Quit to Desktop,Zum Desktop beenden,退出到桌面
+synergy_preview_none_format,Synergy: %s,Synergie: %s,羁绊：%s
+synergy_preview_none_label,None,Keine,无
+synergy_tier_none,None,Keine,无
+synergy_tier_bronze,Bronze,Bronze,青铜
+synergy_tier_silver,Silver,Silber,白银
+synergy_tier_gold,Gold,Gold,黄金
+synergy_tier_platinum,Platinum,Platin,铂金
+synergy_preview_tiered_format,Synergy: %s (%s),Synergie: %s (%s),羁绊：%s（%s）
+synergy_preview_tiered_format_with_effect,Synergy: %s (%s) — %s,Synergie: %s (%s) — %s,羁绊：%s（%s）— %s
+formation_presets_none_option,(none),(keine),（无）
+formation_presets_saved_toast,Formation saved.,Formation gespeichert.,阵容已保存。
+formation_presets_truncated_toast,Name shortened to fit.,"Name gekürzt, um zu passen.",名称已缩短以适应。
+formation_presets_at_cap_toast,You've saved the most formations you can. Delete one to make room.,"Du hast die maximale Anzahl an Formationen gespeichert. Lösche eine, um Platz zu schaffen.",你保存的阵容已达上限。删除一个以腾出空间。
+formation_presets_name_empty_toast,Enter a name for this formation.,Gib dieser Formation einen Namen.,请为该阵容输入一个名称。
+formation_presets_missing_toast,%d saved hero(es) are no longer in your guild — those slots are empty.,%d gespeicherte Held(en) sind nicht mehr in deiner Gilde — diese Plätze sind leer.,%d 名已保存的英雄已不在你的公会中 — 这些位置为空。
+formation_presets_recall_unknown_toast,That formation is no longer available.,Diese Formation ist nicht mehr verfügbar.,该阵容已不可用。
+formation_presets_deleted_toast,Formation deleted.,Formation gelöscht.,阵容已删除。
+app_wordmark,Lantern Guild,Lantern Guild,Lantern Guild
+app_tagline,The dungeon is dark. Send a light.,Das Verlies ist dunkel. Schick ein Licht.,地下城一片漆黑。送去一束光。
+back_to_guild_hall_button,← Guild Hall,← Gildenhalle,← 公会大厅
+title_screen_continue_button,Continue the Watch,Die Wacht fortsetzen,继续守望
+title_screen_settings_button,Settings,Einstellungen,设置
+start_menu_start_button,Start Expedition,Expedition starten,开始远征
+start_menu_quit_button,Quit,Beenden,退出
+codex_eyebrow,· The guild keeps a record ·,· Die Gilde führt Buch ·,· 公会留有记录 ·
+codex_title,The Codex,Der Kodex,图鉴
+codex_close_button,Close,Schließen,关闭
+codex_tab_heroes,Heroes,Helden,英雄
+codex_tab_monsters,Monsters,Monster,怪物
+codex_tab_dungeons,Dungeons,Verliese,地下城
+codex_empty_state,Nothing recorded yet.,Noch nichts aufgezeichnet.,还没有任何记录。
+pause_menu_eyebrow,· The guild waits ·,· Die Gilde wartet ·,· 公会静候 ·
+pause_menu_tagline,The hour-glass turns regardless.,Die Sanduhr läuft trotzdem weiter.,沙漏依旧流转。
+pause_menu_return_to_title_button,Return to Title,Zum Titel zurück,返回标题
+dungeon_run_hp_format,HP %d/%d,TP %d/%d,生命 %d/%d
+dungeon_run_enemies_format,Enemies %d/%d,Gegner %d/%d,敌人 %d/%d
+dungeon_run_return_to_hall_button,Return to Hall,Zurück zur Halle,返回大厅
+victory_zero_gold_label,0 gold,0 Gold,0 金币
+formation_assignment_gold_counter_format,Gold: %s,Gold: %s,金币：%s
+formation_assignment_no_biomes,No biomes available,Keine Regionen verfügbar,暂无可用区域
+formation_assignment_common_archetypes_format,Common: %s,Häufig: %s,常见：%s
+formation_assignment_floor_button_format,F%d,E%d,%d层
+formation_assignment_floor_button_locked_format,🔒 F%d,🔒 E%d,🔒 %d层
+formation_assignment_select_locked,Select (locked),Wählen (gesperrt),选择（已锁定）
+formation_assignment_synergy_badge_format,%s: %s,%s: %s,%s：%s
+formation_assignment_hero_slot_counter_format,%s (%s Lv%d · vs %s),%s (%s St.%d · vs %s),%s（%s %d级 · 克制 %s）
+formation_assignment_hero_slot_format,%s (%s Lv%d),%s (%s St.%d),%s（%s %d级）
+formation_presets_panel_title,Saved Formations,Gespeicherte Formationen,已保存的阵容
+formation_presets_recall_button,Recall,Abrufen,取出
+formation_presets_save_button,Save,Speichern,保存
+formation_presets_delete_button,Delete,Löschen,删除
+formation_assignment_mid_run_confirm_body,Changing your formation will end the current run. Continue?,"Wenn du die Formation änderst, endet der aktuelle Zug. Fortfahren?",更改阵容将结束当前远征。是否继续？
+formation_assignment_cancel_button,Cancel,Abbrechen,取消
+formation_assignment_end_run_confirm_button,End Run & Change,Zug beenden & ändern,结束远征并更改
+formation_assignment_picker_cancel_button,← Cancel,← Abbrechen,← 取消
+formation_assignment_picker_title,Choose Your Run,Wähle deinen Zug,选择你的远征
+formation_assignment_picker_select_button,Select,Wählen,选择
+formation_presets_save_modal_title,Name this formation,Benenne diese Formation,为该阵容命名
+formation_presets_name_placeholder,My formation,Meine Formation,我的阵容
+formation_presets_delete_confirm_body,Delete this formation? This can't be undone.,Diese Formation löschen? Das kann nicht rückgängig gemacht werden.,删除该阵容？此操作无法撤销。
+hero_detail_counter_archetype_format,Strong vs: %s,Stark gegen: %s,克制：%s
+hero_detail_name_scaffold,Hero Name,Heldenname,英雄名称
+hero_detail_class_scaffold,Class,Klasse,职业
+hero_detail_level_label,Level,Stufe,等级
+hero_detail_level_up_button,Level Up,Stufenaufstieg,升级
+hero_detail_close_button,Close,Schließen,关闭
+recruitment_gold_counter_format,%s gold,%s Gold,%s 金币
+recruitment_recruit_button,Recruit,Rekrutieren,招募
+recruitment_refresh_pool_button_format,Refresh Pool — %s gold,Pool auffrischen — %s Gold,刷新候选池 — %s 金币
+recruitment_class_matchup_format,%s · vs %s,%s · vs %s,%s · 克制 %s
+recruitment_screen_title,Recruit,Rekrutieren,招募
+guild_hall_prestige_multiplier_format,×%.2f,×%.2f,×%.2f
+guild_hall_gold_counter_format,Gold: %d,Gold: %d,金币：%d
+guild_hall_synergy_badge_format,%s: %s,%s: %s,%s：%s
+guild_hall_hero_card_counter_format,%s · %s · Lv %d · vs %s,%s · %s · St. %d · vs %s,%s · %s · %d级 · 克制 %s
+guild_hall_hero_card_format,%s · %s · Lv %d,%s · %s · St. %d,%s · %s · %d级
+guild_hall_title,Guild Hall,Gildenhalle,公会大厅
+guild_hall_dispatch_button,Go to Dispatch,Zur Entsendung,前往派遣
+guild_hall_recruit_button,Recruit,Rekrutieren,招募
+victory_kills_label,Kills,Besiegt,击杀
+victory_gold_gained_label,Gold gained,Gold erhalten,获得金币
+settings_volume_silent_label,-INF,-INF,-INF
+settings_volume_db_format,%d dB,%d dB,%d dB
+settings_eyebrow_header,· The inner workings ·,· Das Innenleben ·,· 内部运作 ·
+settings_section_audio,Audio,Audio,音频
+settings_section_accessibility,Accessibility,Barrierefreiheit,无障碍
+settings_section_data_locale,Data & locale,Daten & Sprache,数据与语言
+settings_title,Settings,Einstellungen,设置
+settings_volume_master_label,Master,Gesamt,主音量
+settings_volume_music_label,Music,Musik,音乐
+settings_volume_sfx_label,SFX,Effekte,音效
+settings_mute_label,Mute (master),Stumm (gesamt),静音（主）
+settings_reduce_motion_label,Reduce motion,Bewegung reduzieren,减弱动态效果
+settings_language_label,Language,Sprache,语言
+settings_telemetry_label,Share anonymous diagnostic data,Anonyme Diagnosedaten teilen,分享匿名诊断数据
+settings_reset_button,Reset to Defaults,Auf Standard zurücksetzen,恢复默认设置
+settings_close_button,Close,Schließen,关闭
