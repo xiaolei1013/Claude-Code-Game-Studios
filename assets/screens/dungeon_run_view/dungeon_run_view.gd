@@ -1398,8 +1398,13 @@ func _enemy_display_name(enemy_id: String) -> String:
 # ===========================================================================
 
 ## On-screen display size (px) of each hero sprite — the square bounding box the
-## idle frame is fit into (KEEP_ASPECT_CENTERED). UX spec default 72 (range 48–96).
-const _HERO_SPRITE_DISPLAY_PX: int = 72
+## idle frame is fit into (KEEP_ASPECT_CENTERED). UX spec range 48–96 (spec default
+## 72); the party diorama is the focal subject, so we run at the TOP of the range —
+## the playtest flagged the heroes (and their reaction-beat action poses) as too
+## small to read (#5). Source frames are 192 px wide, so 96 px still DOWNSCALES
+## (nearest-neighbour keeps the pixel register crisp). Fits even a max formation:
+## 10 × 96 + 9 × 24 sep = 1176 px < 1280 viewport, so no per-count shrink is needed.
+const _HERO_SPRITE_DISPLAY_PX: int = 96
 
 ## Horizontal gap (px) between adjacent hero sprites in the front-line row.
 const _HERO_SLOT_SEPARATION_PX: int = 24
