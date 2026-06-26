@@ -1400,8 +1400,9 @@ func _enemy_display_name(enemy_id: String) -> String:
 ## On-screen display size (px) of each hero sprite — the square box the idle frame
 ## fits into (KEEP_ASPECT_CENTERED). UX spec range 48–96 (default 72); playtest #5
 ## read the heroes + their reaction-beat poses as too small, so we run at the top of
-## the range. Source frames are 192 px, so 96 px downscales cleanly (nearest-neighbour
-## keeps the pixel register crisp). Flat box at every count: the default 3-hero party
+## the range. The idle frames are tall — 192×432 (768×432 strips ÷ 4 cols) — so the square
+## box is height-bound: 96 px renders each frame ~43×96 centered, a downscale of the
+## source art (never a blurry upscale). Flat box at every count: the default 3-hero party
 ## fits the row's centered ~560 px band (±280 offsets); 5+ heroes outgrow it, which the
 ## spec's deferred large-formation shrink/tighten (GDD #35 §E.2, UX-DRV-HERO-09) — not
 ## this constant — is meant to handle.
