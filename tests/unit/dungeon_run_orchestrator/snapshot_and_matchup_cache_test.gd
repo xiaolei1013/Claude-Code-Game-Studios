@@ -221,19 +221,19 @@ func test_run_snapshot_matchup_cache_has_one_entry_per_distinct_archetype() -> v
 	if not _data_registry_can_resolve_classes():
 		push_warning("Skipped")
 		return
-	# Arrange — synthetic 3-enemy floor (default fallback in _build_combat_snapshot)
-	# has all 3 enemies as archetype "bruiser" → matchup_cache should have
-	# exactly 1 distinct archetype entry.
+	# Arrange — dispatch to the real Forest Reach floor 1. Post no-defeat fix the
+	# live path resolves real floor data; matchup_cache holds one entry per
+	# distinct archetype. The assertions below are content-independent.
 	var orch: Node = _make_orch_with_real_resolvers()
 
 	# Act
 	orch.dispatch([_make_hero(WARRIOR_ID, 1)], 1, "forest_reach")
 
-	# Assert — cache built; bruiser is the only archetype.
+	# Assert — cache built with at least one distinct archetype entry.
 	assert_object(orch.run_snapshot.matchup_cache).is_not_null()
 	assert_int(orch.run_snapshot.matchup_cache.size()).is_greater_equal(1)
-	# Bruiser archetype must be present (the fallback floor has 3 bruisers).
-	# Cache keys are StringName per build_matchup_cache contract.
+	# Bruiser must be present — Forest Reach floor 1 includes bruiser-archetype
+	# enemies. Cache keys are StringName per build_matchup_cache contract.
 	assert_bool(orch.run_snapshot.matchup_cache.has(&"bruiser")).is_true()
 
 
@@ -287,7 +287,7 @@ func test_run_snapshot_kill_schedule_populates_from_floor_enemy_list() -> void:
 	var orch: Node = _make_orch_with_real_resolvers()
 	orch.dispatch([_make_hero(WARRIOR_ID, 1)], 1, "forest_reach")
 
-	# Assert — kill_schedule populated with the 3-enemy synthetic fallback.
+	# Assert — kill_schedule populated from the real Forest Reach floor enemy_list.
 	assert_int(orch.run_snapshot.kill_schedule.size()).is_greater(0)
 	# Every archetype in kill_schedule has a matchup_cache entry.
 	for entry: Variant in orch.run_snapshot.kill_schedule:
@@ -316,14 +316,22 @@ func test_matchup_cache_built_exactly_once_at_dispatch() -> void:
 	add_child(orch)
 	auto_free(orch)
 
-	# Act — dispatch (synthetic 3-enemy floor → 1 distinct archetype "bruiser"
-	# → 1 resolver call expected per build_matchup_cache's dedup).
+	# Act — dispatch to the real Forest Reach floor 1.
 	orch.dispatch([_make_hero(WARRIOR_ID, 1)], 1, "forest_reach")
 	var post_dispatch_calls: int = matchup_spy.resolve_formation_matchup_call_count
 
-	# Assert — cache built once. The 3-enemy synthetic floor has 1 distinct
-	# archetype, so call count is exactly 1 after dispatch.
-	assert_int(post_dispatch_calls).is_equal(1)
+	# Assert — dedup invariant: the resolver is called exactly once per DISTINCT
+	# enemy archetype (matchup_cache holds one entry per archetype), never once
+	# per enemy. Content-independent — no hardcoded archetype count, so it stays
+	# correct as floor content evolves. (Pre-fix the live path resolved the
+	# synthetic 1-archetype stub and this asserted == 1; the real floor carries
+	# more archetypes, which is exactly the no-defeat fix landing.)
+	var distinct_archetypes: int = orch.run_snapshot.matchup_cache.size()
+	assert_int(post_dispatch_calls).override_failure_message(
+		"resolver called %d times for %d distinct archetypes — dedup broken"
+		% [post_dispatch_calls, distinct_archetypes]
+	).is_equal(distinct_archetypes)
+	assert_int(post_dispatch_calls).is_greater(0)
 
 
 func test_per_tick_replay_does_not_invoke_matchup_resolver() -> void:

@@ -241,3 +241,98 @@ func test_run_snapshot_kill_count_persists_via_to_dict() -> void:
 	var saved: Dictionary = orch.run_snapshot.to_dict()
 	assert_bool(saved.has("kill_count")).is_true()
 	assert_int(int(saved["kill_count"])).is_equal(orch.run_snapshot.kill_count)
+
+
+# ===========================================================================
+# Group G: live-path defeat regression — the "every dispatch wins" bug
+#
+# _resolve_floor navigated a nonexistent biome.dungeon_ids field, so it returned
+# null on every real dispatch and _build_combat_snapshot fell back to the
+# synthetic always-win enemy stub — making EVERY run unloseable. The fix
+# navigates the real biome.dungeons Array[Dungeon]. floor_calibration_test.gd
+# proves the real floor data defeats an underpowered party at the RESOLVER
+# level; these tests prove the LIVE orchestrator dispatch path now delivers that
+# data and computes (and closes on) the loss. Each would have failed pre-fix.
+# (memory: feedback_scaffolded_but_unwired_pattern)
+# ===========================================================================
+
+# Permissive floor-unlock spy: lets the defeat test dispatch to a high floor
+# (F5) without depending on the live FloorUnlock state. The unlock gate is
+# orthogonal to the combat verdict under test here (gate coverage lives in
+# orchestrator_dispatch_gate_test.gd).
+class _AllFloorsUnlocked extends RefCounted:
+	func is_unlocked(_floor_index: int) -> bool:
+		return true
+
+
+func test_resolve_floor_navigates_biome_to_real_forest_reach_floor() -> void:
+	# Structural: the fixed _resolve_floor must reach real Floor data via the
+	# biome → dungeon → floor navigation. Pre-fix it returned null here.
+	if DataRegistry.resolve("biomes", "forest_reach") == null:
+		push_warning("Skipped: forest_reach biome not resolvable in this env")
+		return
+	var orch: Node = _make_orch_with_real_resolvers()
+	var floor_res: Resource = orch._resolve_floor("forest_reach", 1)
+	assert_object(floor_res).override_failure_message(
+		"_resolve_floor returned null for forest_reach floor 1 — the live dispatch "
+		+ "path would fall back to the synthetic always-win stub (the no-defeat bug)"
+	).is_not_null()
+	assert_bool("enemy_list" in floor_res).is_true()
+	assert_int((floor_res.get("enemy_list") as Array).size()).is_greater(0)
+
+
+func test_live_dispatch_snapshot_uses_real_enemy_data_not_synthetic_stub() -> void:
+	# Structural: real materialized floor enemies carry an "enemy_id" key
+	# (DataRegistry-resolved); the synthetic fallback stub never does. Assert the
+	# live combat snapshot is built from real data, not the always-win stub.
+	if DataRegistry.resolve("biomes", "forest_reach") == null:
+		push_warning("Skipped: forest_reach biome not resolvable in this env")
+		return
+	var orch: Node = _make_orch_with_real_resolvers()
+	orch.dispatch([_make_hero(WARRIOR_ID, 1, 5)], 1, "forest_reach")
+	assert_int(orch.state).is_equal(DungeonRunStateScript.State.ACTIVE_FOREGROUND)
+	var enemies: Array = orch._combat_snapshot.enemy_list
+	assert_int(enemies.size()).is_greater(0)
+	assert_bool((enemies[0] as Dictionary).has("enemy_id")).override_failure_message(
+		"live snapshot enemy has no 'enemy_id' — the synthetic always-win stub is "
+		+ "still being used instead of real Forest Reach floor data"
+	).is_true()
+
+
+func test_weak_party_run_ends_in_defeat_through_live_path() -> void:
+	# Behavioral — THE regression for the playtest report "every dispatch wins at
+	# the end." A lone L1 hero dispatched to the real boss floor (F5, intended
+	# L13) must be DEFEATED, and the run must close via run_defeated. The wide
+	# level gap makes the loss robust to live matchup-cache variation. Pre-fix the
+	# synthetic stub forced _run_won = true and the run always ended in a win.
+	if DataRegistry.resolve("biomes", "forest_reach") == null:
+		push_warning("Skipped: forest_reach biome not resolvable in this env")
+		return
+	var orch: Node = _make_orch_with_real_resolvers()
+	# Override any lazy-bound live FloorUnlock so F5 is dispatchable.
+	orch.set_floor_unlock(_AllFloorsUnlocked.new())
+	orch.dispatch([_make_hero(WARRIOR_ID, 1, 1)], 5, "forest_reach")
+	assert_int(orch.state).override_failure_message(
+		"dispatch to forest_reach floor 5 did not reach ACTIVE_FOREGROUND — "
+		+ "cannot evaluate the defeat verdict"
+	).is_equal(DungeonRunStateScript.State.ACTIVE_FOREGROUND)
+	# Verdict computed at dispatch from REAL boss-floor enemy data: a loss.
+	assert_bool(orch._run_won).override_failure_message(
+		"a lone L1 hero on the real boss floor was NOT defeated (_run_won=true) — "
+		+ "the live dispatch path is still resolving the synthetic always-win stub"
+	).is_false()
+	# Drive the run to closure: it must end in DEFEAT (run_defeated fires once),
+	# not a clear — directly answering "every dispatch wins at the end."
+	var defeats: Array = []
+	orch.run_defeated.connect(
+		func(_fi: int, _bi: String) -> void:
+			defeats.append(1)
+	)
+	for n: int in range(1, 2001):
+		orch._on_tick_fired(n)
+		if orch.state == DungeonRunStateScript.State.RUN_ENDED:
+			break
+	assert_int(orch.state).is_equal(DungeonRunStateScript.State.RUN_ENDED)
+	assert_int(defeats.size()).override_failure_message(
+		"run ended without firing run_defeated — defeat closure did not happen"
+	).is_equal(1)

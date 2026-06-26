@@ -2342,6 +2342,16 @@ func _build_combat_snapshot(formation: Array, floor_index: int, biome_id: String
 		# floor to drive ticks against. base_speed is low (Phase 1: enemy→party
 		# DPS = base_attack×base_speed/SPEED_BASE) so the synthetic floor's threat
 		# stays well under any real formation HP → resolves to WIN by default.
+		#
+		# REGRESSION GUARD (no-defeat bug): because this stub always WINS, it must
+		# only ever fire in minimal test envs that have not loaded content. If it
+		# fires for a real, content-loaded dispatch it silently makes the run
+		# unloseable ("every dispatch wins"). Warn loudly so a future _resolve_floor
+		# regression surfaces instead of failing silent.
+		push_warning(
+			"DungeonRunOrchestrator: no real floor resolved for biome='%s' floor=%d; using the synthetic always-win enemy stub. In a content-loaded build this is the no-defeat regression."
+			% [biome_id, floor_index]
+		)
 		snap.enemy_list = [
 			{"id": &"e1", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10, "base_attack": 1, "base_speed": 1},
 			{"id": &"e2", "archetype": &"bruiser", "tier": 1, "is_boss": false, "base_hp": 10, "base_attack": 1, "base_speed": 1},
@@ -2445,27 +2455,40 @@ func _materialize_enemy_list(floor_enemy_list: Array) -> Array:
 	return materialized
 
 
-## Looks up Floor resource by [param biome_id] + [param floor_index]. Returns
-## null if the lookup fails (biome-dungeon-database not populated in test env).
+## Looks up the Floor resource for [param biome_id] + [param floor_index] by
+## navigating biome → dungeon → floor. Returns null when the lookup fails (the
+## biome-dungeon database isn't populated in the test env, or the floor index is
+## out of range); [method _build_combat_snapshot] routes a null return to its
+## synthetic always-win stub, guarded there by a fail-loud push_warning.
 ##
-## Sprint 7 S7-M13 MVP — uses DataRegistry for "biomes" / "dungeons" lookup;
-## the actual Floor resolution is composite (biome → dungeon → floor). For
-## the harness MVP, attempts a direct lookup via "floors" category if
-## available; falls back to null.
+## Sprint 7 S7-M13 MVP — Floor resolution is composite: resolve the Biome via
+## DataRegistry, then navigate its `dungeons: Array[Dungeon]` (see biome.gd) and
+## that dungeon's `floors: Array[Floor]`. There is NO flat "floors" DataRegistry
+## category (see [constant DataRegistry.ORDERED_CATEGORIES]), so floors are
+## reachable ONLY by this navigation — never by an id lookup.
+##
+## Bug history (no-defeat playtest bug): an earlier version read a nonexistent
+## `biome.dungeon_ids` id list — the schema field is `dungeons` — so this
+## returned null on every real dispatch and every run fell to the always-win
+## stub. The fix navigates the real `dungeons`/`floors` Resource arrays directly.
+##
+## MVP scope: resolves `dungeons[0]` only — single-dungeon-per-biome is a
+## deliberate deferral (landmine I.13 / NTH-7, `design/gdd/floor-unlock-system.md`),
+## mirroring the inline note at `floor_unlock_system.gd` `_resolve_floors_for`.
+## Floors are indexed positionally (`floors[floor_index - 1]`); the Floor schema
+## validates `floors` is authored in ascending `floor_index` order (Story 004), so
+## position and `floor_index` coincide today. The standing follow-up to route this
+## (and the 4 sibling biome→dungeon→floor walks) through a single
+## `BiomeDungeonDatabase` façade method is where V1.0 multi-dungeon + an explicit
+## match-by-`floor_index` strategy land.
 func _resolve_floor(biome_id: String, floor_index: int) -> Resource:
-	# Try direct floors category first (some test envs / future content shape).
-	var direct_id: String = "%s_floor_%d" % [biome_id, floor_index]
-	var floor_data: Resource = DataRegistry.resolve("floors", direct_id)
-	if floor_data != null:
-		return floor_data
-	# Fall back: navigate biome → dungeon → floor.
 	var biome: Resource = DataRegistry.resolve("biomes", biome_id)
-	if biome == null or not ("dungeon_ids" in biome):
+	if biome == null or not ("dungeons" in biome):
 		return null
-	var dungeon_ids: Array = biome.get("dungeon_ids") as Array
-	if dungeon_ids.is_empty():
+	var dungeons: Array = biome.get("dungeons") as Array
+	if dungeons.is_empty():
 		return null
-	var dungeon: Resource = DataRegistry.resolve("dungeons", str(dungeon_ids[0]))
+	var dungeon: Resource = dungeons[0] as Resource
 	if dungeon == null or not ("floors" in dungeon):
 		return null
 	var floors: Array = dungeon.get("floors") as Array
